@@ -51,6 +51,13 @@ import {
   type StressContext,
 } from './stress';
 import { computeFxPosition, computeProfitability, type ProfitabilityContext } from './profitability';
+import {
+  computeFtp,
+  type AdjustmentRule,
+  type FtpAssignmentInput,
+  type TpMethod,
+  type YieldCurve,
+} from './ftp';
 
 export interface RunInputs {
   positions: Position[];
@@ -65,6 +72,11 @@ export interface RunInputs {
   /** Total stressed outflow for the survival-horizon scenario. */
   stressedOutflow?: number;
   shockBps?: number;
+  /** Transfer-pricing inputs. Absent curves means the FTP element reports everything unpriced. */
+  yieldCurves?: YieldCurve[];
+  adjustmentRules?: AdjustmentRule[];
+  ftpAssignments?: FtpAssignmentInput[];
+  ftpMethod?: TpMethod;
 }
 
 export interface RunOutcome {
@@ -241,6 +253,57 @@ export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): Run
     };
   });
 
+  record('TransferPricing', () => {
+    // The LCR-driven adjustment needs the LCR that this same run computed,
+    // not a figure from elsewhere: an add-on priced off last month's buffer
+    // is not the cost of funds this run is describing.
+    const lcrResult = results.find((r) => r.element === 'Lcr')?.payload as { lcrPercent: number | null } | undefined;
+    const currentLcrPercent = lcrResult?.lcrPercent ?? computeLcr(scoped, liquidityCtx).lcrPercent;
+
+    const r = computeFtp(scoped, inputs.yieldCurves ?? [], inputs.adjustmentRules ?? [], {
+      asOfDate: run.asOfDate,
+      currentLcrPercent,
+      method: inputs.ftpMethod,
+      assignments: inputs.ftpAssignments,
+    });
+    return { payload: r, methodology: r.methodology };
+  });
+
+  record('TpAdjustments', () => {
+    // The adjustment stack on its own, so the screen can show what each
+    // add-on contributes rather than only the all-in rate.
+    const ftp = results.find((r) => r.element === 'TransferPricing')?.payload as
+      | { lines: Array<{ adjustments: Array<{ type: string; bps: number }>; positionId: string }> }
+      | undefined;
+    if (!ftp) {
+      throw new Error('FTP adjustments need the Transfer Pricing element in the same run.');
+    }
+
+    const byType = new Map<string, { totalBps: number; positions: number }>();
+    for (const line of ftp.lines) {
+      for (const adjustment of line.adjustments) {
+        const entry = byType.get(adjustment.type) ?? { totalBps: 0, positions: 0 };
+        entry.totalBps += adjustment.bps;
+        entry.positions += 1;
+        byType.set(adjustment.type, entry);
+      }
+    }
+
+    return {
+      payload: {
+        byType: Array.from(byType.entries()).map(([type, v]) => ({
+          type,
+          averageBps: v.positions > 0 ? v.totalBps / v.positions : 0,
+          positions: v.positions,
+        })),
+      },
+      methodology:
+        'Average add-on in basis points per adjustment type, across the positions each rule touched. Averages ' +
+        'are over affected positions only, not the whole book, so a rule scoped to one product is not diluted ' +
+        'by the products it does not apply to.',
+    };
+  });
+
   record('ProfitabilityRatios', () => {
     const r = computeProfitability(scoped, profitabilityCtx);
     return { payload: r, methodology: r.notes.join(' ') };
@@ -275,6 +338,8 @@ export const ALL_ELEMENTS: CalculationElement[] = [
   'NiiSensitivity',
   'EveSensitivity',
   'SurvivalHorizon',
+  'TransferPricing',
+  'TpAdjustments',
   'ProfitabilityRatios',
   'FxPosition',
 ];
@@ -307,6 +372,8 @@ export function draftRun(params: {
     forecastScenarioIds: [],
     newBusinessRuleId: null,
     transactionStrategyId: null,
+    ftpRuleId: null,
+    adjustmentRuleId: null,
     elements: params.elements ?? ALL_ELEMENTS,
     positionBatchIds: params.batchIds,
     status: 'Draft',

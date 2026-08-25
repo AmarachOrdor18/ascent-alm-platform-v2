@@ -137,6 +137,8 @@ function run(id: string, overrides: Partial<ProcessRun> = {}): ProcessRun {
     forecastScenarioIds: [],
     newBusinessRuleId: null,
     transactionStrategyId: null,
+    ftpRuleId: null,
+    adjustmentRuleId: null,
     elements: ['Lcr'],
     positionBatchIds: ['B-1'],
     status: 'Completed',

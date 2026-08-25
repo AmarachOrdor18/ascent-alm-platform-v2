@@ -28,6 +28,20 @@ const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) =>
 
 /** Screens built so far. Anything absent renders the placeholder. */
 const BUILT: Record<string, ComponentType> = {
+  // Phase 6 — results, every one reading from a run rather than recomputing
+  '/dashboard': lazy(() => import('@/pages/results/Dashboard').then((m) => ({ default: m.Dashboard }))),
+  '/balance-sheet': lazy(() => import('@/pages/results/BalanceSheet').then((m) => ({ default: m.BalanceSheet }))),
+  '/liquidity-risk': lazy(() => import('@/pages/results/LiquidityRisk').then((m) => ({ default: m.LiquidityRisk }))),
+  '/gap-analysis': lazy(() => import('@/pages/results/GapAnalysis').then((m) => ({ default: m.GapAnalysis }))),
+  '/interest-rate-risk': lazy(() => import('@/pages/results/Irrbb').then((m) => ({ default: m.Irrbb }))),
+  '/ftp': lazy(() => import('@/pages/results/TransferPricing').then((m) => ({ default: m.TransferPricing }))),
+  '/behavioural-analysis': lazy(() =>
+    import('@/pages/results/BehaviouralAnalysis').then((m) => ({ default: m.BehaviouralAnalysis })),
+  ),
+  '/profitability': lazy(() => import('@/pages/results/Profitability').then((m) => ({ default: m.Profitability }))),
+  '/concentration': lazy(() => import('@/pages/results/Concentration').then((m) => ({ default: m.Concentration }))),
+  '/fx-position': lazy(() => import('@/pages/results/FxPosition').then((m) => ({ default: m.FxPosition }))),
+
   // Phase 5 — execution
   '/runs/new': lazy(() => import('@/pages/ProcessRun').then((m) => ({ default: m.ProcessRun }))),
   '/runs': lazy(() => import('@/pages/RunHistory').then((m) => ({ default: m.RunHistory }))),

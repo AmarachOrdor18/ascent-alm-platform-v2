@@ -422,6 +422,9 @@ export interface ProcessRun {
   forecastScenarioIds: string[];
   newBusinessRuleId: string | null;
   transactionStrategyId: string | null;
+  /** Transfer-pricing method assignments and the adjustment stack layered on top. */
+  ftpRuleId: string | null;
+  adjustmentRuleId: string | null;
 
   elements: CalculationElement[];
 

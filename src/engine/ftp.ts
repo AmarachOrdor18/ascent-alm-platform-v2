@@ -118,6 +118,10 @@ export function adjustmentsFor(
 export interface TransferRateLine {
   positionId: string;
   productClass: string;
+  /** Where the margin is attributed. */
+  orgUnitCode: string;
+  /** Which assignment picked this line's method and curve. */
+  commonCoaCode: string;
   currency: CurrencyCode;
   baseTransferRatePercent: number | null;
   adjustments: AdjustmentBreakdown[];
@@ -134,6 +138,20 @@ export interface FtpResult {
   byOrgUnit: Array<{ orgUnitCode: string; marginContribution: number }>;
   unpriced: number;
   methodology: string;
+}
+
+/**
+ * Which method and curve apply to a slice of the book.
+ *
+ * Oracle assigns a transfer-pricing method per product (ALM UG Ch. 8): the
+ * mortgage book and the overnight desk are not priced the same way. The
+ * assignment keys on the Common Chart of Accounts code, so it survives the
+ * three affiliates' incompatible local GL schemes.
+ */
+export interface FtpAssignmentInput {
+  commonCoaCode: string;
+  method: TpMethod;
+  curveCode: string | null;
 }
 
 function tenorDaysFor(position: Position, asOfDate: string): number {
@@ -158,19 +176,35 @@ export function computeFtp(
   positions: Position[],
   curves: YieldCurve[],
   adjustmentRules: AdjustmentRule[],
-  options: { asOfDate: string; currentLcrPercent: number | null; method?: TpMethod },
+  options: {
+    asOfDate: string;
+    currentLcrPercent: number | null;
+    method?: TpMethod;
+    /** Per-COA method and curve. Positions with no matching assignment use `method`. */
+    assignments?: FtpAssignmentInput[];
+  },
 ): FtpResult {
-  const method = options.method ?? 'SpreadFromInterestRateCode';
+  const fallbackMethod = options.method ?? 'SpreadFromInterestRateCode';
+  const assignments = options.assignments ?? [];
   const lines: TransferRateLine[] = [];
   let unpriced = 0;
 
   for (const p of positions) {
     if (p.category === 'Capital' || p.isOffBalanceSheet) continue;
 
-    const curve =
-      curves.find((c) => c.currency === p.currency && (p.rateIndexCode === null || c.indexCode === p.rateIndexCode)) ??
-      curves.find((c) => c.currency === p.currency) ??
-      null;
+    const assignment = assignments.find((a) => a.commonCoaCode === p.commonCoaCode) ?? null;
+    const method = assignment?.method ?? fallbackMethod;
+
+    // An assignment naming a curve is authoritative: if that curve is absent
+    // the position is left unpriced rather than quietly falling back to some
+    // other curve, which would price the book off a rate nobody chose.
+    const curve = assignment?.curveCode
+      ? (curves.find((c) => c.indexCode === assignment.curveCode && c.currency === p.currency) ?? null)
+      : (curves.find(
+          (c) => c.currency === p.currency && (p.rateIndexCode === null || c.indexCode === p.rateIndexCode),
+        ) ??
+        curves.find((c) => c.currency === p.currency) ??
+        null);
 
     const baseTransferRatePercent = curve ? interpolateCurve(curve, tenorDaysFor(p, options.asOfDate)) : null;
     const adjustments = adjustmentsFor(p, adjustmentRules, options.currentLcrPercent);
@@ -193,6 +227,8 @@ export function computeFtp(
     lines.push({
       positionId: p.id,
       productClass: p.productClass,
+      orgUnitCode: p.orgUnitCode,
+      commonCoaCode: p.commonCoaCode,
       currency: p.currency,
       baseTransferRatePercent,
       adjustments,
@@ -203,12 +239,13 @@ export function computeFtp(
     });
   }
 
+  // Attribution reads the org unit off the line itself. It previously
+  // re-filtered `positions` and matched by array index, which was correct
+  // only for as long as the two orders stayed in step.
   const byUnit = new Map<string, number>();
-  for (const [index, line] of lines.entries()) {
+  for (const line of lines) {
     if (line.marginContribution === null) continue;
-    const orgUnit =
-      positions.filter((p) => p.category !== 'Capital' && !p.isOffBalanceSheet)[index]?.orgUnitCode ?? 'UNKNOWN';
-    byUnit.set(orgUnit, (byUnit.get(orgUnit) ?? 0) + line.marginContribution);
+    byUnit.set(line.orgUnitCode, (byUnit.get(line.orgUnitCode) ?? 0) + line.marginContribution);
   }
 
   return {

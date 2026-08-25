@@ -18,7 +18,8 @@ import { buildFxTable } from '@/engine/fx';
 import { defaultLadder } from '@/engine/buckets';
 import { DEFAULT_PATTERNS } from '@/engine/behavioural';
 import type { ProcessRun, RunResult } from '@/engine/types';
-import type { BehaviourPatternRule, TimeBucketRule } from '@/engine/ruleTypes';
+import type { YieldCurve } from '@/engine/ftp';
+import type { AdjustmentRuleDef, BehaviourPatternRule, FtpRule, TimeBucketRule } from '@/engine/ruleTypes';
 
 export const runKeys = {
   all: ['runs'] as const,
@@ -48,16 +49,21 @@ export function useRunResults(runId: string | null) {
  * later opens the result.
  */
 async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
-  const [positions, fxRates, orgUnitMembers, productMembers] = await Promise.all([
+  const [positions, fxRates, orgUnitMembers, productMembers, storedCurves] = await Promise.all([
     repository.queryPositions({}),
     repository.listFxRates(),
     repository.listDimensionMembers('OrgUnit'),
     repository.listDimensionMembers('Product'),
+    repository.listYieldCurves(),
   ]);
 
   const bucketRule = run.timeBucketRuleId ? await repository.getRule<TimeBucketRule>(run.timeBucketRuleId) : null;
   const behaviourRule = run.behaviourPatternRuleId
     ? await repository.getRule<BehaviourPatternRule>(run.behaviourPatternRuleId)
+    : null;
+  const ftpRule = run.ftpRuleId ? await repository.getRule<FtpRule>(run.ftpRuleId) : null;
+  const adjustmentRule = run.adjustmentRuleId
+    ? await repository.getRule<AdjustmentRuleDef>(run.adjustmentRuleId)
     : null;
 
   // Fall back to engine defaults where no rule is attached, and the result's
@@ -66,6 +72,18 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
     bucketRule?.ladders.find((l) => l.kind === 'LiquidityGap') ?? defaultLadder('LiquidityGap');
   const repricingLadder =
     bucketRule?.ladders.find((l) => l.kind === 'RepricingGap') ?? defaultLadder('RepricingGap');
+
+  // Only curves as at or before the run date. A curve published after the
+  // as-of date did not exist when these balances were struck, and pricing
+  // the book off it would be hindsight.
+  const yieldCurves: YieldCurve[] = storedCurves
+    .filter((c) => c.isActive && c.asOfDate <= run.asOfDate)
+    .map((c) => ({
+      currency: c.currency,
+      indexCode: c.code,
+      points: c.terms.map((t) => ({ tenorDays: t.tenorDays, ratePercent: t.ratePercent })),
+      asOfDate: c.asOfDate,
+    }));
 
   return {
     positions,
@@ -76,6 +94,9 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
     orgUnitMembers,
     productMembers,
     tier1Capital: null,
+    yieldCurves,
+    adjustmentRules: adjustmentRule?.adjustments ?? [],
+    ftpAssignments: ftpRule?.assignments ?? [],
   };
 }
 
