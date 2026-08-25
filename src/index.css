@@ -1,0 +1,633 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Enterprise Typography */
+  --font-sans: "Google Sans", "Outfit", sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* ───── Ecobank Brand Palette ───── */
+  /* Primary: Ecobank Teal — --teal-700 is the EXACT logo color (sampled
+     #01607E, confirmed via pixel-histogram over the source PNG). The rest
+     of the ramp is built around it at the same hue (194°) so every shade,
+     including the dark sidebar surface, reads as recognizably Ecobank-teal
+     rather than fading to near-black. */
+  --teal-950: 194 65% 7%;
+  /* #06181D */
+  --teal-900: 194 70% 12%;
+  /* #092A34 */
+  --teal-800: 194 80% 18%;
+  /* #094253 */
+  --teal-700: 194 98% 25%;
+  /* #01607E — exact Ecobank logo color */
+  --teal-600: 194 90% 32%;
+  /* #08799B */
+  --teal-500: 194 80% 40%;
+  /* #1492B8 */
+  --teal-400: 220 6% 55%;
+  /* #83858C */
+  --teal-300: 220 8% 70%;
+  /* #AFB1B8 */
+  --teal-200: 220 10% 85%;
+  /* #D3D5DC */
+  --teal-100: 220 14% 95%;
+  /* #F0F1F4 */
+  --teal-50: 220 20% 97%;
+  /* #F5F6F8 */
+
+  /* Accent: Lime Green — exact color of the underline beneath the Ecobank
+     wordmark (sampled #BCD023) — checkboxes, focus rings, active-nav
+     accents, small badges, secondary chart series */
+  --amber-600: 67 71% 34%;
+  /* #859717 */
+  --amber-500: 67 71% 48%;
+  /* #BCD023 — exact underline color */
+  --amber-400: 70 72% 58%;
+  /* #C6DF4E */
+  --amber-300: 73 62% 70%;
+  /* #CFE087 */
+  --amber-200: 75 55% 82%;
+  /* #DEEAB8 */
+  --amber-100: 76 60% 92%;
+  /* #F0F7DE */
+
+  /* Semantic Colors */
+  --success: 161 94% 30%;
+  /* #059669 */
+  --success-bg: 152 69% 95%;
+  /* #ECFDF5 */
+
+  --warning: 38 92% 44%;
+  /* #D97706 */
+  --warning-bg: 48 100% 96%;
+  /* #FFFBEB */
+
+  --danger: 0 72% 51%;
+  /* #DC2626 */
+  --danger-bg: 0 86% 97%;
+  /* #FEF2F2 */
+
+  /* Neutrals */
+  --gray-50: 210 20% 98%;
+  /* #F8F9FB */
+  --gray-100: 210 18% 96%;
+  /* #F1F3F5 */
+  --gray-200: 214 14% 90%;
+  /* #E1E5EA */
+  --gray-300: 216 12% 84%;
+  /* #CDD2DA */
+  --gray-400: 218 11% 65%;
+  /* #9AA1AE */
+  --gray-500: 220 9% 46%;
+  /* #6B7280 */
+  --gray-600: 215 14% 34%;
+  /* #4B5563 */
+  --gray-700: 217 19% 27%;
+  /* #374151 */
+  --gray-800: 219 25% 18%;
+  /* #1F2937 */
+  --gray-900: 221 39% 11%;
+  /* #111827 */
+
+  /* ───── Semantic Mapping ───── */
+  --background: var(--gray-50);
+  --foreground: var(--gray-900);
+
+  --card: 0 0% 100%;
+  --card-foreground: var(--gray-900);
+
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--gray-900);
+
+  --primary: var(--teal-700);
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: var(--gray-200);
+  --secondary-foreground: var(--gray-900);
+
+  --muted: var(--gray-200);
+  --muted-foreground: var(--gray-500);
+
+  --accent: var(--amber-500);
+  --accent-foreground: var(--gray-900);
+
+  --border: var(--gray-200);
+  --input: var(--gray-300);
+  --ring: var(--amber-500);
+
+  --radius: 0.6rem;
+
+  /* Glassmorphism Tokens */
+  --glass-bg: 255 255 255 / 0.7;
+  --glass-border: 255 255 255 / 0.2;
+  --glass-blur: 12px;
+
+  /* Modern Elevations (Soft UI) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+
+  /* Legacy aliases for backward-compat */
+  --navy-950: var(--teal-950);
+  --navy-900: var(--teal-900);
+  --navy-800: var(--teal-800);
+  --navy-700: var(--teal-700);
+  --navy-600: var(--teal-600);
+  --navy-500: var(--teal-500);
+  --navy-100: var(--teal-100);
+  --gold-600: var(--amber-600);
+  --gold-500: var(--amber-500);
+  --gold-400: var(--amber-400);
+  --gold-300: var(--amber-300);
+  --gold-100: var(--amber-100);
+}
+
+/* ---------- Dark Mode ---------- */
+.dark {
+  --background: 194 30% 7%;
+  /* #0B1518 */
+  --foreground: 0 0% 96%;
+
+  --card: 194 28% 13%;
+  /* #14262B */
+  --card-foreground: 0 0% 96%;
+
+  --popover: 194 28% 13%;
+  --popover-foreground: 0 0% 96%;
+
+  --primary: 0 0% 96%;
+  --primary-foreground: 194 42% 9%;
+
+  --secondary: 194 25% 19%;
+  --secondary-foreground: 0 0% 96%;
+
+  --muted: 194 25% 19%;
+  --muted-foreground: 194 10% 65%;
+
+  --accent: var(--amber-400);
+  --accent-foreground: 194 42% 9%;
+
+  --border: 194 20% 22%;
+  --input: 194 20% 22%;
+  --ring: var(--amber-400);
+
+  --success: 152 55% 45%;
+  --success-bg: 152 40% 15%;
+
+  --warning: 38 85% 58%;
+  --warning-bg: 38 45% 17%;
+
+  --danger: 0 75% 62%;
+  --danger-bg: 0 45% 18%;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+}
+
+/* Retrofit dark-mode for pages still using literal (non-semantic) Tailwind
+   gray/white utility classes instead of the background/card/foreground tokens. */
+.dark .bg-white,
+.dark .bg-\[\#FDFDFD\] {
+  background-color: hsl(194 30% 7%);
+}
+
+.dark .bg-\[\#F9FAFB\]\/50 {
+  background-color: hsl(194 30% 7% / 0.5);
+}
+
+.dark .bg-gray-50 {
+  background-color: hsl(194 30% 7%);
+}
+
+.dark .bg-gray-100 {
+  background-color: hsl(194 25% 15%);
+}
+
+.dark .bg-gray-200 {
+  background-color: hsl(194 20% 22%);
+}
+
+.dark .bg-gray-300 {
+  background-color: hsl(194 16% 28%);
+}
+
+.dark .text-gray-900 {
+  color: hsl(0 0% 96%);
+}
+
+.dark .text-gray-700 {
+  color: hsl(0 0% 88%);
+}
+
+.dark .text-gray-600 {
+  color: hsl(194 10% 76%);
+}
+
+.dark .text-gray-500 {
+  color: hsl(194 10% 65%);
+}
+
+.dark .text-gray-400 {
+  color: hsl(194 8% 52%);
+}
+
+.dark .text-gray-300 {
+  color: hsl(194 8% 42%);
+}
+
+.dark .text-gray-200 {
+  color: hsl(194 8% 32%);
+}
+
+.dark .border-gray-50,
+.dark .border-gray-100 {
+  border-color: hsl(194 20% 19%);
+}
+
+.dark .border-gray-200 {
+  border-color: hsl(194 20% 23%);
+}
+
+.dark .border-gray-300 {
+  border-color: hsl(194 16% 29%);
+}
+
+.dark .bg-white\/80 {
+  background-color: hsl(194 30% 7% / 0.8);
+}
+
+.dark .bg-white\/50 {
+  background-color: hsl(194 30% 7% / 0.5);
+}
+
+.dark .bg-white\/40 {
+  background-color: hsl(194 30% 7% / 0.4);
+}
+
+.dark .bg-white\/10 {
+  background-color: hsl(194 20% 22% / 0.4);
+}
+
+.dark .bg-white\/5 {
+  background-color: hsl(194 20% 22% / 0.2);
+}
+
+.dark .bg-gray-100\/50 {
+  background-color: hsl(194 25% 15% / 0.5);
+}
+
+.dark .bg-gray-50\/30 {
+  background-color: hsl(194 30% 7% / 0.3);
+}
+
+.dark .bg-gray-50\/50 {
+  background-color: hsl(194 30% 7% / 0.5);
+}
+
+.dark .border-white\/40,
+.dark .border-white\/10,
+.dark .border-white\/5 {
+  border-color: hsl(194 20% 23% / 0.6);
+}
+
+.dark .glass-card {
+  background: hsl(194 28% 13% / 0.6);
+  border-color: hsl(194 20% 23% / 0.4);
+}
+
+/* text-navy-900/700 and bg-navy-50/100 double as the (always-dark) sidebar
+   surface color and as content-area text/badge tints — the content-area
+   uses need to invert in dark mode, independently of the sidebar. */
+.dark .text-navy-900 {
+  color: hsl(0 0% 96%);
+}
+
+.dark .text-navy-700 {
+  color: hsl(194 10% 76%);
+}
+
+.dark .bg-navy-100 {
+  background-color: hsl(194 22% 18%);
+}
+
+.dark .bg-navy-50 {
+  background-color: hsl(194 28% 11%);
+}
+
+.dark .bg-gold-100 {
+  background-color: hsl(70 30% 20%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Number columns in tables can use monospace for alignment */
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer utilities {
+
+  /* ── Teal backgrounds ── */
+  .bg-navy-950 {
+    background-color: hsl(var(--teal-950));
+  }
+
+  .bg-navy-900 {
+    background-color: hsl(var(--teal-900));
+  }
+
+  .bg-navy-800 {
+    background-color: hsl(var(--teal-800));
+  }
+
+  .bg-navy-700 {
+    background-color: hsl(var(--teal-700));
+  }
+
+  .bg-navy-600 {
+    background-color: hsl(var(--teal-600));
+  }
+
+  .bg-navy-100 {
+    background-color: hsl(var(--teal-100));
+  }
+
+  .bg-navy-50 {
+    background-color: hsl(var(--teal-50));
+  }
+
+  .bg-gold-500 {
+    background-color: hsl(var(--amber-500));
+  }
+
+  .bg-gold-100 {
+    background-color: hsl(var(--amber-100));
+  }
+
+  .bg-gray-50 {
+    background-color: hsl(var(--gray-50));
+  }
+
+  /* Semantic */
+  .bg-success-bg {
+    background-color: hsl(var(--success-bg));
+  }
+
+  .bg-danger-bg {
+    background-color: hsl(var(--danger-bg));
+  }
+
+  .bg-warning-bg {
+    background-color: hsl(var(--warning-bg));
+  }
+
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
+
+  .bg-danger {
+    background-color: hsl(var(--danger));
+  }
+
+  /* ── Teal text ── */
+  .text-navy-900 {
+    color: hsl(var(--teal-900));
+  }
+
+  .text-navy-700 {
+    color: hsl(var(--teal-700));
+  }
+
+  .text-gold-500 {
+    color: hsl(var(--amber-500));
+  }
+
+  .text-gold-400 {
+    color: hsl(var(--amber-400));
+  }
+
+  .text-gold-600 {
+    color: hsl(var(--amber-600));
+  }
+
+  .text-success {
+    color: hsl(var(--success));
+  }
+
+  .text-danger {
+    color: hsl(var(--danger));
+  }
+
+  .text-warning {
+    color: hsl(var(--warning));
+  }
+
+  /* ── Borders ── */
+  .border-gold-500 {
+    border-color: hsl(var(--amber-500));
+  }
+
+  .border-navy-700 {
+    border-color: hsl(var(--teal-700));
+  }
+
+  .border-warning {
+    border-color: hsl(var(--warning));
+  }
+
+  .border-danger {
+    border-color: hsl(var(--danger));
+  }
+
+  /* ── Interactive States ── */
+  .hover-bg-navy-800:hover {
+    background-color: hsl(var(--teal-800));
+  }
+
+  .hover-bg-gray-50:hover {
+    background-color: hsl(var(--gray-50));
+  }
+
+  /* ── Glassmorphism Utilities ── */
+  .glass-panel {
+    background: rgba(var(--glass-bg));
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid rgba(var(--glass-border));
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* ── Modern Shadow Overrides ── */
+  .shadow-sm {
+    box-shadow: var(--shadow-sm);
+  }
+
+  .shadow-md {
+    box-shadow: var(--shadow-md);
+  }
+
+  .shadow-lg {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .shadow-xl {
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* ── Typography Enhancements ── */
+  .text-secondary {
+    @apply text-gray-500 text-[13px] font-normal;
+  }
+
+  .text-label {
+    @apply text-gray-400 text-[11px] font-bold uppercase tracking-wider;
+  }
+
+  /* ── Table Modernization (DataGrid Inspired) ── */
+  .table-datagrid-container {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col;
+  }
+
+  .table-datagrid {
+    @apply w-full border-separate border-spacing-0 table-fixed;
+  }
+
+  .table-datagrid th {
+    @apply bg-gray-50/50 backdrop-blur-sm sticky top-0 z-10 border-b border-gray-100 py-2.5 px-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider transition-colors;
+  }
+
+  .table-datagrid td {
+    @apply border-b border-gray-50 py-2 px-3 text-[13px] text-gray-700 font-medium whitespace-nowrap overflow-hidden text-ellipsis transition-colors;
+  }
+
+  /* Density Support */
+  .table-datagrid.density-compact td {
+    @apply py-1 px-2 text-[12px];
+  }
+
+  .table-datagrid.density-compact th {
+    @apply py-1.5 px-2 text-[10px];
+  }
+
+  .table-datagrid.density-tall td {
+    @apply py-4 px-4;
+  }
+
+  .table-datagrid.density-tall th {
+    @apply py-3.5 px-4;
+  }
+
+  .table-datagrid tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .table-datagrid tr:hover td {
+    @apply bg-gray-50/80;
+  }
+
+  /* Cell Highlight/Selection */
+  .table-datagrid tr.is-selected td {
+    background-color: hsla(var(--teal-50), 0.5);
+  }
+
+  .table-datagrid tr.is-selected td:first-child {
+    box-shadow: inset 3px 0 0 hsl(var(--teal-700));
+  }
+
+  /* ── Legacy Table ── */
+  .table-frameless {
+    @apply w-full border-separate border-spacing-0;
+  }
+
+  .table-frameless th {
+    @apply bg-transparent border-b border-gray-100 text-label py-3 px-4;
+  }
+
+  .table-frameless td {
+    @apply py-3.5 px-4 text-[13px] border-b border-gray-50 transition-colors;
+  }
+
+  .table-frameless tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .table-frameless tr:hover td {
+    @apply bg-gray-50/50;
+  }
+
+  /* ── Micro-Animations ── */
+  @keyframes slideInRight {
+    from {
+      transform: translateX(20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in {
+    animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(var(--teal-500) / 0.15);
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
+}
+
+/* Custom Scrollbar for Enterprise Feel */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--gray-200));
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--gray-400));
+}
+
+/* Utility for text-overflow with ellipsis */
+.text-overflow-ellipsis {
+  text-overflow: ellipsis;
+}

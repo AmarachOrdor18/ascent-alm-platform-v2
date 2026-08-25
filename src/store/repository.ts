@@ -1,0 +1,94 @@
+/**
+ * The data-access contract.
+ *
+ * Pages and hooks depend on this interface, never on Dexie directly. That is
+ * what makes the later swap to a microservice backend a single new file
+ * (`HttpRepository`) rather than a rewrite — see build plan §5, rule 2.
+ */
+
+import type {
+  Affiliate,
+  AuditEvent,
+  DataDomain,
+  DimensionMember,
+  DimensionType,
+  IsoDate,
+  LoadBatch,
+  Position,
+  ProcessRun,
+  RuleKind,
+  RuleMeta,
+  RunResult,
+  User,
+} from '@/engine/types';
+
+export interface PositionQuery {
+  affiliateCode?: string;
+  asOfDate?: IsoDate;
+  batchIds?: string[];
+  orgUnitCodes?: string[];
+  productCodes?: string[];
+  currency?: string;
+}
+
+export interface RuleQuery {
+  kind?: RuleKind;
+  affiliateCode?: string | null;
+  folder?: string;
+  activeOnly?: boolean;
+}
+
+/** What a rule's dependants look like when a delete is blocked. */
+export interface Dependency {
+  ruleId: string;
+  ruleKind: RuleKind;
+  ruleName: string;
+  relation: string;
+}
+
+export interface Repository {
+  // Affiliates
+  listAffiliates(): Promise<Affiliate[]>;
+  getAffiliate(code: string): Promise<Affiliate | null>;
+  upsertAffiliate(affiliate: Affiliate): Promise<void>;
+
+  // Dimensions
+  listDimensionMembers(dimension: DimensionType): Promise<DimensionMember[]>;
+  upsertDimensionMembers(members: DimensionMember[]): Promise<void>;
+
+  // Positions
+  queryPositions(query: PositionQuery): Promise<Position[]>;
+  insertPositions(positions: Position[]): Promise<void>;
+
+  // Load batches
+  listBatches(affiliateCode?: string, domain?: DataDomain): Promise<LoadBatch[]>;
+  getBatch(id: string): Promise<LoadBatch | null>;
+  upsertBatch(batch: LoadBatch): Promise<void>;
+
+  // Rules
+  listRules(query: RuleQuery): Promise<RuleMeta[]>;
+  getRule<T extends RuleMeta>(id: string): Promise<T | null>;
+  upsertRule(rule: RuleMeta): Promise<void>;
+  deleteRule(id: string): Promise<void>;
+  /** Empty array means the rule is safe to delete. */
+  checkDependencies(id: string): Promise<Dependency[]>;
+
+  // Runs
+  listRuns(affiliateCode?: string): Promise<ProcessRun[]>;
+  getRun(id: string): Promise<ProcessRun | null>;
+  upsertRun(run: ProcessRun): Promise<void>;
+  listRunResults(runId: string): Promise<RunResult[]>;
+  insertRunResults(results: RunResult[]): Promise<void>;
+
+  // Users
+  listUsers(): Promise<User[]>;
+  getUserByEmail(email: string): Promise<User | null>;
+  upsertUser(user: User): Promise<void>;
+
+  // Audit
+  listAuditEvents(limit?: number): Promise<AuditEvent[]>;
+  recordAuditEvent(event: AuditEvent): Promise<void>;
+
+  /** Wipe and re-seed. Used by the demo reset control. */
+  reset(): Promise<void>;
+}
