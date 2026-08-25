@@ -499,11 +499,12 @@ def main():
         assert abs(a - l - c) < max(2.0, abs(a) * 1e-9), f"{code} does not balance: {a - l - c}"
         assert len(rows) >= 30, f"{code} has only {len(rows)} records"
 
-        # One folder per affiliate. The filenames keep their country prefix
-        # even inside the folder: onboarding is done through a file picker,
-        # and thirty-three files all called position_book_2026-07.csv are
-        # indistinguishable once they land in a downloads folder.
-        adir = os.path.join(OUT, code)
+        # One folder per affiliate, named for the affiliate. The filenames
+        # keep their country prefix even inside it: onboarding is done through
+        # a file picker, and thirty-three files all called
+        # position_book_2026-07.csv are indistinguishable once they land in a
+        # downloads folder.
+        adir = os.path.join(OUT, name)
         os.makedirs(adir, exist_ok=True)
 
         pb = os.path.join(adir, f"{code}_position_book_2026-07.csv")
@@ -624,16 +625,18 @@ def write_manifest(summary):
     A("```")
     A("demo_data/affiliates/")
     A("  MANIFEST.md")
-    A("  NG/  NG_position_book_2026-07.csv")
-    A("       NG_gl_trial_balance_2026-07.csv")
-    A("  KE/  KE_position_book_2026-07.csv")
-    A("       KE_gl_trial_balance_2026-07.csv")
-    A("       KE_validation_failures.csv               <- fails ten ways on purpose")
-    A("       KE_gl_trial_balance_OUT_OF_BALANCE.csv   <- blocks reconciliation")
+    A("  Ecobank Nigeria/")
+    A("      NG_position_book_2026-07.csv")
+    A("      NG_gl_trial_balance_2026-07.csv")
+    A("  Ecobank Kenya/")
+    A("      KE_position_book_2026-07.csv")
+    A("      KE_gl_trial_balance_2026-07.csv")
+    A("      KE_validation_failures.csv               <- fails ten ways on purpose")
+    A("      KE_gl_trial_balance_OUT_OF_BALANCE.csv   <- blocks reconciliation")
     A("  ... 31 more")
     A("```")
     A("")
-    A("Filenames keep their country prefix even inside the folder. Onboarding runs through a "
+    A("Filenames keep their country code even inside a named folder. Onboarding runs through a "
       "file picker, and thirty-three files all called `position_book_2026-07.csv` are "
       "indistinguishable once they land in a downloads folder.")
     A("")
@@ -661,10 +664,10 @@ def write_manifest(summary):
     A("")
     A("## The 33")
     A("")
-    A("| Code | Affiliate | Currency | Regulator | Rows | Total assets | NPL | Top depositor |")
+    A("| Folder | Code | Currency | Regulator | Rows | Total assets | NPL | Top depositor |")
     A("|---|---|---|---|---|---|---|---|")
     for s in summary:
-        A(f"| `{s['code']}` | {s['name']} | {s['ccy']} | {s['regulator']} | {s['records']} | "
+        A(f"| `{s['name']}/` | {s['code']} | {s['ccy']} | {s['regulator']} | {s['records']} | "
           f"{s['assets']:,.0f} | {s['npl']:.2f}% | {s['conc']:.2f}% |")
     A("")
     A("Ethiopia is absent deliberately: it is a representative office, not a banking "
@@ -690,12 +693,14 @@ def write_manifest(summary):
         A("")
     A("## Practising the failure path")
     A("")
+    A("Both live in `Ecobank Kenya/`.")
+    A("")
     A("| File | What it does |")
     A("|---|---|")
-    A("| `KE/KE_validation_failures.csv` | Breaks ten different ways: duplicate key, HQLA with no "
+    A("| `KE_validation_failures.csv` | Breaks ten different ways: duplicate key, HQLA with no "
       "haircut, maturity before the as-of date, unmapped org unit, missing balance, unknown "
       "currency, invalid category, invalid credit classification, lien exceeding the balance |")
-    A("| `KE/KE_gl_trial_balance_OUT_OF_BALANCE.csv` | Out by 35% on one GL line, so "
+    A("| `KE_gl_trial_balance_OUT_OF_BALANCE.csv` | Out by 35% on one GL line, so "
       "reconciliation blocks sign-off instead of offering a plug to approve |")
     A("")
     A("## Suggested order for a demo")
