@@ -29,8 +29,6 @@ import random
 
 OUT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "demo_data", "affiliates"
-) if False else os.path.join(
-    r"c:\Users\AmarachiOrdor\Documents\Consulting Demo\ascent-alm-v2\demo_data\affiliates"
 )
 AS_OF = "2026-07-31"
 
@@ -501,14 +499,21 @@ def main():
         assert abs(a - l - c) < max(2.0, abs(a) * 1e-9), f"{code} does not balance: {a - l - c}"
         assert len(rows) >= 30, f"{code} has only {len(rows)} records"
 
-        pb = os.path.join(OUT, f"{code}_position_book_2026-07.csv")
+        # One folder per affiliate. The filenames keep their country prefix
+        # even inside the folder: onboarding is done through a file picker,
+        # and thirty-three files all called position_book_2026-07.csv are
+        # indistinguishable once they land in a downloads folder.
+        adir = os.path.join(OUT, code)
+        os.makedirs(adir, exist_ok=True)
+
+        pb = os.path.join(adir, f"{code}_position_book_2026-07.csv")
         with open(pb, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=HEADER)
             w.writeheader()
             w.writerows(rows)
 
         tb = trial_balance(rows, ccy)
-        with open(os.path.join(OUT, f"{code}_gl_trial_balance_2026-07.csv"),
+        with open(os.path.join(adir, f"{code}_gl_trial_balance_2026-07.csv"),
                   "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=["glAccountCode", "orgUnitCode", "currency",
                                               "endingBalance", "asOfDate"])
@@ -569,7 +574,8 @@ def write_broken_files():
     Each breaks in a different way, so the failure list is a real list rather
     than one repeated message.
     """
-    src = os.path.join(OUT, "KE_position_book_2026-07.csv")
+    ke = os.path.join(OUT, "KE")
+    src = os.path.join(ke, "KE_position_book_2026-07.csv")
     with open(src, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
 
@@ -586,7 +592,7 @@ def write_broken_files():
     broken[8]["performingStatus"] = "Probably Fine"        # not a classification
     broken[9]["lienAmount"] = str(float(broken[9]["amount"] or 0) * 3)  # lien exceeds balance
 
-    with open(os.path.join(OUT, "KE_validation_failures.csv"), "w", newline="",
+    with open(os.path.join(ke, "KE_validation_failures.csv"), "w", newline="",
               encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=HEADER)
         w.writeheader()
@@ -594,11 +600,11 @@ def write_broken_files():
 
     # A book that is out by more than tolerance, so GL reconciliation blocks
     # sign-off rather than producing a plug to approve.
-    tb_src = os.path.join(OUT, "KE_gl_trial_balance_2026-07.csv")
+    tb_src = os.path.join(ke, "KE_gl_trial_balance_2026-07.csv")
     with open(tb_src, newline="", encoding="utf-8") as f:
         tb = list(csv.DictReader(f))
     tb[0]["endingBalance"] = str(round(float(tb[0]["endingBalance"]) * 1.35, 2))
-    with open(os.path.join(OUT, "KE_gl_trial_balance_OUT_OF_BALANCE.csv"), "w", newline="",
+    with open(os.path.join(ke, "KE_gl_trial_balance_OUT_OF_BALANCE.csv"), "w", newline="",
               encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["glAccountCode", "orgUnitCode", "currency",
                                           "endingBalance", "asOfDate"])
@@ -612,8 +618,24 @@ def write_manifest(summary):
     A("# Affiliate onboarding datasets")
     A("")
     A(f"Thirty-three African affiliates, {sum(s['records'] for s in summary)} position records, "
-      f"as at {AS_OF}. Two files each — a position book and a GL trial balance — so every "
-      "affiliate can be taken through the full onboarding path and reconciled.")
+      f"as at {AS_OF}. One folder per affiliate, holding a position book and a GL trial balance, "
+      "so every affiliate can be taken through the full onboarding path and reconciled.")
+    A("")
+    A("```")
+    A("demo_data/affiliates/")
+    A("  MANIFEST.md")
+    A("  NG/  NG_position_book_2026-07.csv")
+    A("       NG_gl_trial_balance_2026-07.csv")
+    A("  KE/  KE_position_book_2026-07.csv")
+    A("       KE_gl_trial_balance_2026-07.csv")
+    A("       KE_validation_failures.csv               <- fails ten ways on purpose")
+    A("       KE_gl_trial_balance_OUT_OF_BALANCE.csv   <- blocks reconciliation")
+    A("  ... 31 more")
+    A("```")
+    A("")
+    A("Filenames keep their country prefix even inside the folder. Onboarding runs through a "
+      "file picker, and thirty-three files all called `position_book_2026-07.csv` are "
+      "indistinguishable once they land in a downloads folder.")
     A("")
     A("## Where the structure comes from")
     A("")
@@ -670,11 +692,11 @@ def write_manifest(summary):
     A("")
     A("| File | What it does |")
     A("|---|---|")
-    A("| `KE_validation_failures.csv` | Breaks ten different ways: duplicate key, HQLA with no "
+    A("| `KE/KE_validation_failures.csv` | Breaks ten different ways: duplicate key, HQLA with no "
       "haircut, maturity before the as-of date, unmapped org unit, missing balance, unknown "
       "currency, invalid category, invalid credit classification, lien exceeding the balance |")
-    A("| `KE_gl_trial_balance_OUT_OF_BALANCE.csv` | Out by 35% on one GL line, so reconciliation "
-      "blocks sign-off instead of offering a plug to approve |")
+    A("| `KE/KE_gl_trial_balance_OUT_OF_BALANCE.csv` | Out by 35% on one GL line, so "
+      "reconciliation blocks sign-off instead of offering a plug to approve |")
     A("")
     A("## Suggested order for a demo")
     A("")

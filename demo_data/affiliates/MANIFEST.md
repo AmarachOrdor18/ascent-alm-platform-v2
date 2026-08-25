@@ -1,6 +1,20 @@
 # Affiliate onboarding datasets
 
-Thirty-three African affiliates, 1583 position records, as at 2026-07-31. Two files each — a position book and a GL trial balance — so every affiliate can be taken through the full onboarding path and reconciled.
+Thirty-three African affiliates, 1583 position records, as at 2026-07-31. One folder per affiliate, holding a position book and a GL trial balance, so every affiliate can be taken through the full onboarding path and reconciled.
+
+```
+demo_data/affiliates/
+  MANIFEST.md
+  NG/  NG_position_book_2026-07.csv
+       NG_gl_trial_balance_2026-07.csv
+  KE/  KE_position_book_2026-07.csv
+       KE_gl_trial_balance_2026-07.csv
+       KE_validation_failures.csv               <- fails ten ways on purpose
+       KE_gl_trial_balance_OUT_OF_BALANCE.csv   <- blocks reconciliation
+  ... 31 more
+```
+
+Filenames keep their country prefix even inside the folder. Onboarding runs through a file picker, and thirty-three files all called `position_book_2026-07.csv` are indistinguishable once they land in a downloads folder.
 
 ## Where the structure comes from
 
@@ -92,8 +106,8 @@ Zimbabwe reports in USD, so it is the affiliate where the reporting currency and
 
 | File | What it does |
 |---|---|
-| `KE_validation_failures.csv` | Breaks ten different ways: duplicate key, HQLA with no haircut, maturity before the as-of date, unmapped org unit, missing balance, unknown currency, invalid category, invalid credit classification, lien exceeding the balance |
-| `KE_gl_trial_balance_OUT_OF_BALANCE.csv` | Out by 35% on one GL line, so reconciliation blocks sign-off instead of offering a plug to approve |
+| `KE/KE_validation_failures.csv` | Breaks ten different ways: duplicate key, HQLA with no haircut, maturity before the as-of date, unmapped org unit, missing balance, unknown currency, invalid category, invalid credit classification, lien exceeding the balance |
+| `KE/KE_gl_trial_balance_OUT_OF_BALANCE.csv` | Out by 35% on one GL line, so reconciliation blocks sign-off instead of offering a plug to approve |
 
 ## Suggested order for a demo
 
