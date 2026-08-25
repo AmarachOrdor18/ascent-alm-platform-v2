@@ -12,6 +12,8 @@ import type {
   DataDomain,
   DimensionMember,
   DimensionType,
+  EconomicIndicator,
+  HolidayCalendar,
   IsoDate,
   LoadBatch,
   Position,
@@ -19,6 +21,9 @@ import type {
   RuleKind,
   RuleMeta,
   RunResult,
+  StoredCurrency,
+  StoredFxRate,
+  StoredYieldCurve,
   User,
 } from '@/engine/types';
 
@@ -84,6 +89,29 @@ export interface Repository {
   listUsers(): Promise<User[]>;
   getUserByEmail(email: string): Promise<User | null>;
   upsertUser(user: User): Promise<void>;
+
+  // Reference data
+  listYieldCurves(currency?: string): Promise<StoredYieldCurve[]>;
+  getYieldCurve(id: string): Promise<StoredYieldCurve | null>;
+  upsertYieldCurve(curve: StoredYieldCurve): Promise<void>;
+  deleteYieldCurve(id: string): Promise<void>;
+
+  listCurrencies(): Promise<StoredCurrency[]>;
+  upsertCurrency(currency: StoredCurrency): Promise<void>;
+
+  listFxRates(asOfDate?: IsoDate): Promise<StoredFxRate[]>;
+  upsertFxRate(rate: StoredFxRate): Promise<void>;
+  deleteFxRate(id: string): Promise<void>;
+
+  listEconomicIndicators(countryCode?: string): Promise<EconomicIndicator[]>;
+  getEconomicIndicator(id: string): Promise<EconomicIndicator | null>;
+  upsertEconomicIndicator(indicator: EconomicIndicator): Promise<void>;
+  deleteEconomicIndicator(id: string): Promise<void>;
+
+  listHolidayCalendars(): Promise<HolidayCalendar[]>;
+  getHolidayCalendar(id: string): Promise<HolidayCalendar | null>;
+  upsertHolidayCalendar(calendar: HolidayCalendar): Promise<void>;
+  deleteHolidayCalendar(id: string): Promise<void>;
 
   // Audit
   listAuditEvents(limit?: number): Promise<AuditEvent[]>;

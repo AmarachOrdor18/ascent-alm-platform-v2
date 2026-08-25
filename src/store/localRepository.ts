@@ -14,11 +14,17 @@ import type {
   DataDomain,
   DimensionMember,
   DimensionType,
+  EconomicIndicator,
+  HolidayCalendar,
+  IsoDate,
   LoadBatch,
   Position,
   ProcessRun,
   RuleMeta,
   RunResult,
+  StoredCurrency,
+  StoredFxRate,
+  StoredYieldCurve,
   User,
 } from '@/engine/types';
 
@@ -221,6 +227,93 @@ export class LocalRepository implements Repository {
     await this.database.users.put({ ...user, email: user.email.toLowerCase() });
   }
 
+  // ── Reference data ────────────────────────────────────────────────────
+  listYieldCurves(currency?: string): Promise<StoredYieldCurve[]> {
+    return currency
+      ? this.database.yieldCurves.where('currency').equals(currency).toArray()
+      : this.database.yieldCurves.toArray();
+  }
+
+  async getYieldCurve(id: string): Promise<StoredYieldCurve | null> {
+    return (await this.database.yieldCurves.get(id)) ?? null;
+  }
+
+  async upsertYieldCurve(curve: StoredYieldCurve): Promise<void> {
+    // Terms are kept sorted on write so every reader — interpolation
+    // included — can rely on the ordering.
+    await this.database.yieldCurves.put({
+      ...curve,
+      terms: [...curve.terms].sort((a, b) => a.tenorDays - b.tenorDays),
+    });
+  }
+
+  async deleteYieldCurve(id: string): Promise<void> {
+    await this.database.yieldCurves.delete(id);
+  }
+
+  listCurrencies(): Promise<StoredCurrency[]> {
+    return this.database.currencies.orderBy('code').toArray();
+  }
+
+  async upsertCurrency(currency: StoredCurrency): Promise<void> {
+    await this.database.currencies.put(currency);
+  }
+
+  async listFxRates(asOfDate?: IsoDate): Promise<StoredFxRate[]> {
+    const rows = asOfDate
+      ? await this.database.fxRates.where('asOfDate').equals(asOfDate).toArray()
+      : await this.database.fxRates.toArray();
+    return rows.sort((a, b) => b.asOfDate.localeCompare(a.asOfDate) || a.base.localeCompare(b.base));
+  }
+
+  async upsertFxRate(rate: StoredFxRate): Promise<void> {
+    await this.database.fxRates.put(rate);
+  }
+
+  async deleteFxRate(id: string): Promise<void> {
+    await this.database.fxRates.delete(id);
+  }
+
+  listEconomicIndicators(countryCode?: string): Promise<EconomicIndicator[]> {
+    return countryCode
+      ? this.database.economicIndicators.where('countryCode').equals(countryCode).toArray()
+      : this.database.economicIndicators.toArray();
+  }
+
+  async getEconomicIndicator(id: string): Promise<EconomicIndicator | null> {
+    return (await this.database.economicIndicators.get(id)) ?? null;
+  }
+
+  async upsertEconomicIndicator(indicator: EconomicIndicator): Promise<void> {
+    await this.database.economicIndicators.put({
+      ...indicator,
+      observations: [...indicator.observations].sort((a, b) => a.asOfDate.localeCompare(b.asOfDate)),
+    });
+  }
+
+  async deleteEconomicIndicator(id: string): Promise<void> {
+    await this.database.economicIndicators.delete(id);
+  }
+
+  listHolidayCalendars(): Promise<HolidayCalendar[]> {
+    return this.database.holidayCalendars.toArray();
+  }
+
+  async getHolidayCalendar(id: string): Promise<HolidayCalendar | null> {
+    return (await this.database.holidayCalendars.get(id)) ?? null;
+  }
+
+  async upsertHolidayCalendar(calendar: HolidayCalendar): Promise<void> {
+    await this.database.holidayCalendars.put({
+      ...calendar,
+      holidays: [...calendar.holidays].sort((a, b) => a.date.localeCompare(b.date)),
+    });
+  }
+
+  async deleteHolidayCalendar(id: string): Promise<void> {
+    await this.database.holidayCalendars.delete(id);
+  }
+
   // ── Audit ─────────────────────────────────────────────────────────────
   async listAuditEvents(limit = 200): Promise<AuditEvent[]> {
     return this.database.auditEvents.orderBy('recordedAt').reverse().limit(limit).toArray();
@@ -244,6 +337,11 @@ export class LocalRepository implements Repository {
         this.database.runResults,
         this.database.users,
         this.database.auditEvents,
+        this.database.yieldCurves,
+        this.database.currencies,
+        this.database.fxRates,
+        this.database.economicIndicators,
+        this.database.holidayCalendars,
       ],
       async () => {
         await Promise.all([
@@ -256,6 +354,11 @@ export class LocalRepository implements Repository {
           this.database.runResults.clear(),
           this.database.users.clear(),
           this.database.auditEvents.clear(),
+          this.database.yieldCurves.clear(),
+          this.database.currencies.clear(),
+          this.database.fxRates.clear(),
+          this.database.economicIndicators.clear(),
+          this.database.holidayCalendars.clear(),
         ]);
       },
     );

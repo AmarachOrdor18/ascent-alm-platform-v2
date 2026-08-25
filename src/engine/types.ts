@@ -402,3 +402,112 @@ export interface AuditEvent {
   detail: string | null;
   recordedAt: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Reference data (build plan §11, screens 12–15)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Zero-coupon or yield-to-maturity, per OFSAA's Rate Format attribute. */
+export type RateFormat = 'Zero Coupon' | 'Yield to Maturity';
+
+export type CompoundingBasis = 'Annual' | 'Semiannual' | 'Monthly' | 'Simple';
+
+export interface CurveTerm {
+  /** Term in days from the curve date. */
+  tenorDays: number;
+  label: string;
+  ratePercent: number;
+}
+
+/**
+ * A yield curve. OFSAA calls this an Interest Rate Code and hangs
+ * rate format, compounding and accrual basis off it (ALM UG §5.2.2) —
+ * attributes that change what the same quoted rate actually means.
+ */
+export interface StoredYieldCurve {
+  id: string;
+  code: string;
+  name: string;
+  currency: CurrencyCode;
+  rateFormat: RateFormat;
+  compoundingBasis: CompoundingBasis;
+  accrualBasis: AccrualBasis;
+  terms: CurveTerm[];
+  asOfDate: IsoDate;
+  isActive: boolean;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+/**
+ * OFSAA distinguishes three currency roles (ALM UG §7.6): one functional
+ * currency per institution, reporting currencies that intermediate
+ * consolidation, and other active currencies it transacts in.
+ */
+export type CurrencyRole = 'Functional' | 'Reporting' | 'Active';
+
+export interface StoredCurrency {
+  code: CurrencyCode;
+  name: string;
+  symbol: string;
+  role: CurrencyRole;
+  isActive: boolean;
+}
+
+export interface StoredFxRate {
+  id: string;
+  base: CurrencyCode;
+  quote: CurrencyCode;
+  rate: number;
+  asOfDate: IsoDate;
+  source: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export type IndicatorFrequency = 'Weekly' | 'Monthly' | 'Quarterly' | 'Semi-Annually' | 'Annually';
+export type IndicatorValueType = 'Numeric' | 'Percentage' | 'Amount';
+
+export interface IndicatorObservation {
+  asOfDate: IsoDate;
+  value: number;
+}
+
+/**
+ * Macroeconomic series feeding behavioural modelling and stress scenarios.
+ * For African affiliates the ones that matter are inflation, policy rate,
+ * FX reserves and — for Nigeria especially — the oil price.
+ */
+export interface EconomicIndicator {
+  id: string;
+  code: string;
+  name: string;
+  countryCode: string;
+  frequency: IndicatorFrequency;
+  valueType: IndicatorValueType;
+  unit: string;
+  observations: IndicatorObservation[];
+  isActive: boolean;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface HolidayEntry {
+  date: IsoDate;
+  name: string;
+  /** A one-off exception overrides the recurring pattern for that year. */
+  isException: boolean;
+}
+
+export interface HolidayCalendar {
+  id: string;
+  code: string;
+  name: string;
+  countryCode: string;
+  /** Days of the week that are not business days. 0 = Sunday. */
+  weekendDays: number[];
+  holidays: HolidayEntry[];
+  isActive: boolean;
+  updatedBy: string;
+  updatedAt: string;
+}

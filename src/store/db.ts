@@ -12,11 +12,16 @@ import type {
   Affiliate,
   AuditEvent,
   DimensionMember,
+  EconomicIndicator,
+  HolidayCalendar,
   LoadBatch,
   Position,
   ProcessRun,
   RuleMeta,
   RunResult,
+  StoredCurrency,
+  StoredFxRate,
+  StoredYieldCurve,
   User,
 } from '@/engine/types';
 
@@ -30,6 +35,11 @@ export class AscentDb extends Dexie {
   runResults!: EntityTable<RunResult, 'id'>;
   users!: EntityTable<User, 'id'>;
   auditEvents!: EntityTable<AuditEvent, 'id'>;
+  yieldCurves!: EntityTable<StoredYieldCurve, 'id'>;
+  currencies!: EntityTable<StoredCurrency, 'code'>;
+  fxRates!: EntityTable<StoredFxRate, 'id'>;
+  economicIndicators!: EntityTable<EconomicIndicator, 'id'>;
+  holidayCalendars!: EntityTable<HolidayCalendar, 'id'>;
 
   constructor(name = 'ascent-alm') {
     super(name);
@@ -45,6 +55,11 @@ export class AscentDb extends Dexie {
       runResults: 'id, runId, element, [runId+element]',
       users: 'id, email, role, affiliateCode',
       auditEvents: 'id, module, userId, recordedAt',
+      yieldCurves: 'id, code, currency, isActive, [currency+isActive]',
+      currencies: 'code, role, isActive',
+      fxRates: 'id, base, quote, asOfDate, [base+quote], [base+quote+asOfDate]',
+      economicIndicators: 'id, code, countryCode, isActive',
+      holidayCalendars: 'id, code, countryCode, isActive',
     });
   }
 }
