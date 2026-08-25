@@ -601,3 +601,44 @@ export interface HolidayCalendar {
   updatedBy: string;
   updatedAt: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Scheduling (screen 32)
+// ─────────────────────────────────────────────────────────────────────────
+
+export type ScheduleFrequency = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly';
+
+/**
+ * A recurring run definition.
+ *
+ * The platform runs in the browser, so nothing fires while the tab is
+ * closed. A schedule therefore records *when a run became due* and the app
+ * surfaces the backlog when someone next opens it. That is stated on the
+ * screen rather than implied, because a scheduler that silently never fires
+ * is worse than no scheduler at all.
+ */
+export interface RunSchedule {
+  id: string;
+  name: string;
+  /** The run this schedule clones on each occurrence. */
+  templateRunId: string;
+  affiliateCode: string;
+  frequency: ScheduleFrequency;
+  /** Day of month for Monthly/Quarterly; `'last'` means the month end. */
+  dayOfMonth: number | 'last';
+  /** Day of week for Weekly. 0 = Sunday. */
+  dayOfWeek: number;
+  /** Roll a due date that lands on a non-business day forward to the next one. */
+  holidayCalendarId: string | null;
+  /** First date the schedule is eligible to fire. */
+  startDate: IsoDate;
+  endDate: IsoDate | null;
+  isActive: boolean;
+  /** Last occurrence actually executed, so the backlog can be computed. */
+  lastRunDate: IsoDate | null;
+  lastRunId: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}

@@ -22,6 +22,7 @@ import type {
   ProcessRun,
   RuleMeta,
   RunResult,
+  RunSchedule,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -214,6 +215,26 @@ export class LocalRepository implements Repository {
     await this.database.runResults.bulkPut(results);
   }
 
+  // ── Schedules ─────────────────────────────────────────────────────────
+  async listSchedules(affiliateCode?: string): Promise<RunSchedule[]> {
+    const rows = affiliateCode
+      ? await this.database.runSchedules.where('affiliateCode').equals(affiliateCode).toArray()
+      : await this.database.runSchedules.toArray();
+    return rows.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getSchedule(id: string): Promise<RunSchedule | null> {
+    return (await this.database.runSchedules.get(id)) ?? null;
+  }
+
+  async upsertSchedule(schedule: RunSchedule): Promise<void> {
+    await this.database.runSchedules.put(schedule);
+  }
+
+  async deleteSchedule(id: string): Promise<void> {
+    await this.database.runSchedules.delete(id);
+  }
+
   // ── Users ─────────────────────────────────────────────────────────────
   listUsers(): Promise<User[]> {
     return this.database.users.orderBy('name').toArray();
@@ -335,6 +356,7 @@ export class LocalRepository implements Repository {
         this.database.rules,
         this.database.runs,
         this.database.runResults,
+        this.database.runSchedules,
         this.database.users,
         this.database.auditEvents,
         this.database.yieldCurves,
@@ -352,6 +374,7 @@ export class LocalRepository implements Repository {
           this.database.rules.clear(),
           this.database.runs.clear(),
           this.database.runResults.clear(),
+          this.database.runSchedules.clear(),
           this.database.users.clear(),
           this.database.auditEvents.clear(),
           this.database.yieldCurves.clear(),

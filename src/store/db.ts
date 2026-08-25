@@ -19,6 +19,7 @@ import type {
   ProcessRun,
   RuleMeta,
   RunResult,
+  RunSchedule,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -33,6 +34,7 @@ export class AscentDb extends Dexie {
   rules!: EntityTable<RuleMeta, 'id'>;
   runs!: EntityTable<ProcessRun, 'id'>;
   runResults!: EntityTable<RunResult, 'id'>;
+  runSchedules!: EntityTable<RunSchedule, 'id'>;
   users!: EntityTable<User, 'id'>;
   auditEvents!: EntityTable<AuditEvent, 'id'>;
   yieldCurves!: EntityTable<StoredYieldCurve, 'id'>;
@@ -60,6 +62,12 @@ export class AscentDb extends Dexie {
       fxRates: 'id, base, quote, asOfDate, [base+quote], [base+quote+asOfDate]',
       economicIndicators: 'id, code, countryCode, isActive',
       holidayCalendars: 'id, code, countryCode, isActive',
+    });
+
+    // v2 adds recurring run definitions. Declaring a new version rather than
+    // editing v1 keeps an existing browser's data intact across the upgrade.
+    this.version(2).stores({
+      runSchedules: 'id, affiliateCode, templateRunId, isActive, [affiliateCode+isActive]',
     });
   }
 }

@@ -28,6 +28,13 @@ const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) =>
 
 /** Screens built so far. Anything absent renders the placeholder. */
 const BUILT: Record<string, ComponentType> = {
+  // Phase 5 — execution
+  '/runs/new': lazy(() => import('@/pages/ProcessRun').then((m) => ({ default: m.ProcessRun }))),
+  '/runs': lazy(() => import('@/pages/RunHistory').then((m) => ({ default: m.RunHistory }))),
+  '/scheduler': lazy(() => import('@/pages/BatchScheduler').then((m) => ({ default: m.BatchScheduler }))),
+  '/what-if': lazy(() => import('@/pages/WhatIf').then((m) => ({ default: m.WhatIf }))),
+  '/stress-testing': lazy(() => import('@/pages/StressTesting').then((m) => ({ default: m.StressTesting }))),
+
   // Phase 4 — business rules, all on the shared RuleEditor shell
   '/rules': lazy(() => import('@/pages/rules/ModelsAssumptions').then((m) => ({ default: m.ModelsAssumptions }))),
   '/rules/time-buckets': lazy(() =>

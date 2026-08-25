@@ -21,6 +21,7 @@ import type {
   RuleKind,
   RuleMeta,
   RunResult,
+  RunSchedule,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -84,6 +85,12 @@ export interface Repository {
   upsertRun(run: ProcessRun): Promise<void>;
   listRunResults(runId: string): Promise<RunResult[]>;
   insertRunResults(results: RunResult[]): Promise<void>;
+
+  // Schedules
+  listSchedules(affiliateCode?: string): Promise<RunSchedule[]>;
+  getSchedule(id: string): Promise<RunSchedule | null>;
+  upsertSchedule(schedule: RunSchedule): Promise<void>;
+  deleteSchedule(id: string): Promise<void>;
 
   // Users
   listUsers(): Promise<User[]>;
