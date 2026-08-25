@@ -9,6 +9,14 @@
  * the workbook's bucket labels, so that deriving buckets from dates
  * reproduces the same allocation.
  *
+ * KNOWN INHERITED ASSUMPTION: the workbook states "Repricing bucket is
+ * assumed equal to contractual maturity bucket", so every floating-rate
+ * position here reprices at maturity. That is not how a quarterly-reset
+ * loan behaves, and it is why this dataset cannot demonstrate defect D-06
+ * being closed. `src/engine/repricing.test.ts` proves the mechanism with
+ * purpose-built fixtures; the Ghana and Cote d'Ivoire seeds should carry
+ * realistic repricing dates so the demo shows the distinction.
+ *
  * Synthetic data. Not sourced from any real institution.
  */
 
@@ -289,7 +297,7 @@ export const NIGERIA_POSITIONS: Position[] = [
     lastRepricingDate: null,
     amortizationType: 'Non-Amortising',
     paymentFrequencyMonths: 3,
-    repricingFrequencyMonths: 3,
+    repricingFrequencyMonths: null,
     accrualBasis: 'Actual/365',
     rateType: 'Floating',
     interestRatePct: 19.0,
@@ -339,7 +347,7 @@ export const NIGERIA_POSITIONS: Position[] = [
     lastRepricingDate: null,
     amortizationType: 'Non-Amortising',
     paymentFrequencyMonths: 3,
-    repricingFrequencyMonths: 3,
+    repricingFrequencyMonths: null,
     accrualBasis: 'Actual/365',
     rateType: 'Floating',
     interestRatePct: 24.0,
@@ -389,7 +397,7 @@ export const NIGERIA_POSITIONS: Position[] = [
     lastRepricingDate: null,
     amortizationType: 'Non-Amortising',
     paymentFrequencyMonths: 3,
-    repricingFrequencyMonths: 3,
+    repricingFrequencyMonths: null,
     accrualBasis: 'Actual/365',
     rateType: 'Floating',
     interestRatePct: 24.0,
@@ -439,7 +447,7 @@ export const NIGERIA_POSITIONS: Position[] = [
     lastRepricingDate: null,
     amortizationType: 'Non-Amortising',
     paymentFrequencyMonths: 3,
-    repricingFrequencyMonths: 3,
+    repricingFrequencyMonths: null,
     accrualBasis: 'Actual/365',
     rateType: 'Floating',
     interestRatePct: 24.5,
@@ -489,7 +497,7 @@ export const NIGERIA_POSITIONS: Position[] = [
     lastRepricingDate: null,
     amortizationType: 'Non-Amortising',
     paymentFrequencyMonths: 3,
-    repricingFrequencyMonths: 3,
+    repricingFrequencyMonths: null,
     accrualBasis: 'Actual/365',
     rateType: 'Floating',
     interestRatePct: 24.5,
@@ -539,7 +547,7 @@ export const NIGERIA_POSITIONS: Position[] = [
     lastRepricingDate: null,
     amortizationType: 'Non-Amortising',
     paymentFrequencyMonths: 3,
-    repricingFrequencyMonths: 3,
+    repricingFrequencyMonths: null,
     accrualBasis: 'Actual/365',
     rateType: 'Floating',
     interestRatePct: 25.0,
