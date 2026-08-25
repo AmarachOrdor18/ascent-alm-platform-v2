@@ -24,9 +24,20 @@ import { useAffiliates } from '@/lib/hooks';
 
 const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login })));
 const Placeholder = lazy(() => import('@/pages/Placeholder').then((m) => ({ default: m.Placeholder })));
+const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) => ({ default: m.AffiliateDetail })));
 
 /** Screens built so far. Anything absent renders the placeholder. */
 const BUILT: Record<string, ComponentType> = {
+  // Phase 3 — setup and onboarding
+  '/affiliates': lazy(() => import('@/pages/Affiliates').then((m) => ({ default: m.Affiliates }))),
+  '/affiliates/onboard': lazy(() => import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate }))),
+  '/connectors': lazy(() => import('@/pages/Connectors').then((m) => ({ default: m.Connectors }))),
+  '/data-upload': lazy(() => import('@/pages/DataUpload').then((m) => ({ default: m.DataUpload }))),
+  '/data-vintages': lazy(() => import('@/pages/DataVintages').then((m) => ({ default: m.DataVintages }))),
+  '/validation-rules': lazy(() => import('@/pages/ValidationRules').then((m) => ({ default: m.ValidationRules }))),
+  '/gl-reconciliation': lazy(() => import('@/pages/GlReconciliation').then((m) => ({ default: m.GlReconciliation }))),
+
+  // Phase 2 — dimensions and reference data
   '/dimensions': lazy(() => import('@/pages/Dimensions').then((m) => ({ default: m.Dimensions }))),
   '/counterparties': lazy(() => import('@/pages/Counterparties').then((m) => ({ default: m.Counterparties }))),
   '/yield-curves': lazy(() => import('@/pages/YieldCurves').then((m) => ({ default: m.YieldCurves }))),
@@ -90,7 +101,21 @@ export function App() {
       <ScopeSync />
       <Switch>
         <Route path="/">
-          <Redirect to="/dimensions" />
+          <Redirect to="/affiliates" />
+        </Route>
+
+        {/* Parameterised, so it sits outside the nav-driven map. Declared
+            before /affiliates so the more specific pattern wins. */}
+        <Route path="/affiliates/:code">
+          {(params) =>
+            params.code === 'onboard' ? null : (
+              <ErrorBoundary screenName="Affiliate Detail">
+                <Suspense fallback={<ScreenFallback />}>
+                  <AffiliateDetail />
+                </Suspense>
+              </ErrorBoundary>
+            )
+          }
         </Route>
 
         {ALL_NAV_ITEMS.map((item) => {

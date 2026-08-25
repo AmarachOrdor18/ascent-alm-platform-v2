@@ -10,7 +10,10 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
 import type {
+  Affiliate,
   AuditEvent,
+  LoadBatch,
+  Position,
   DimensionType,
   EconomicIndicator,
   HolidayCalendar,
@@ -202,4 +205,95 @@ export function useBatches() {
 
 export function useAuditEvents(limit = 200) {
   return useQuery({ queryKey: keys.audit, queryFn: () => repository.listAuditEvents(limit) });
+}
+
+// ── Positions ────────────────────────────────────────────────────────────
+export function usePositions(affiliateCode?: string, asOfDate?: string) {
+  return useQuery({
+    queryKey: ['positions', affiliateCode ?? 'ALL', asOfDate ?? 'ANY'],
+    queryFn: () =>
+      repository.queryPositions({
+        ...(affiliateCode && affiliateCode !== 'GROUP' ? { affiliateCode } : {}),
+        ...(asOfDate ? { asOfDate } : {}),
+      }),
+  });
+}
+
+// ── Affiliates ───────────────────────────────────────────────────────────
+export function useSaveAffiliate() {
+  return useAuditedMutation(
+    'Affiliates',
+    'Save',
+    'Affiliate',
+    (affiliate: Affiliate) => repository.upsertAffiliate(affiliate),
+    (affiliate) => ({ id: affiliate.code, detail: `${affiliate.name} (${affiliate.status})` }),
+    [keys.affiliates],
+  );
+}
+
+// ── Load batches ─────────────────────────────────────────────────────────
+export function useSaveBatch() {
+  return useAuditedMutation(
+    'Data Ingestion',
+    'Save',
+    'Load Batch',
+    (batch: LoadBatch) => repository.upsertBatch(batch),
+    (batch) => ({
+      id: batch.id,
+      detail: `${batch.domain} for ${batch.affiliateCode} as at ${batch.asOfDate} — ${batch.status}, v${batch.version}`,
+    }),
+    [keys.batches, ['positions']],
+  );
+}
+
+/**
+ * Commit a staged batch: write the rows and mark the batch committed, with
+ * any previous version for the same as-of date superseded.
+ */
+export function useCommitBatch() {
+  const client = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      batch,
+      positions,
+      supersedes,
+      reason,
+    }: {
+      batch: LoadBatch;
+      positions: Position[];
+      supersedes: LoadBatch | null;
+      reason: string | null;
+    }) => {
+      if (supersedes) {
+        await repository.upsertBatch({ ...supersedes, status: 'Superseded', supersededReason: reason });
+      }
+      await repository.insertPositions(positions);
+      await repository.upsertBatch({
+        ...batch,
+        status: 'Committed',
+        committedBy: user?.name ?? 'unknown',
+        committedAt: new Date().toISOString(),
+        supersedesBatchId: supersedes?.id ?? null,
+        supersededReason: reason,
+      });
+      if (user) {
+        await repository.recordAuditEvent(
+          auditEvent(
+            user,
+            'Data Ingestion',
+            'Commit',
+            'Load Batch',
+            batch.id,
+            `${positions.length} position(s) committed for ${batch.affiliateCode} as at ${batch.asOfDate}` +
+              (supersedes ? `, superseding ${supersedes.id}: ${reason ?? 'no reason given'}` : ''),
+          ),
+        );
+      }
+    },
+    onSuccess: () => {
+      for (const key of [keys.batches, keys.audit, ['positions']]) client.invalidateQueries({ queryKey: key });
+    },
+  });
 }
