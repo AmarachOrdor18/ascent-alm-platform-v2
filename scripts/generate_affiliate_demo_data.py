@@ -113,7 +113,6 @@ GL = {
     "loan_trade":     ("200608", "TRADE FINANCE - IMPORT"),
     "loan_asset":     ("200609", "ASSET FINANCE - LEASES"),
     "fixed_asset":    ("100101", "FIXED AND OTHER ASSETS"),
-    "depreciation":   ("101301", "CUMM. DEPRECIATION LEVEL2"),
     "prepaid":        ("101201", "FIXED ASSETS ACCOUNTS"),
     "ca_retail":      ("400102", "CURRENT"),
     "ca_corp":        ("400105", "CURRENT - CORPORATE"),
@@ -327,14 +326,20 @@ def build(aff):
                 performingStatus=status, provisionAmount=n(impaired * prov, ccy),
                 notes=f"{dpd} days past due; non-accrual")
 
-    # Non-earning assets. Depreciation is a credit balance sitting in the
-    # asset category, which is how a ledger actually carries it.
+    # Non-earning assets. Depreciation reduces fixed assets to their net book
+    # value rather than being booked as its own negative-amount row.
+    # `amount` is always a non-negative magnitude in this schema — the real
+    # importer takes Math.abs() of every value on the way in, since core
+    # systems sometimes export liabilities negative and the `category` field
+    # alone is meant to carry the sign. A standalone contra-asset row with a
+    # negative amount silently flips sign on import instead of being
+    # rejected, which overstated every one of the 33 balance sheets by twice
+    # the depreciation line until a real upload caught it.
+    gross_fixed = A * 0.028 * j(0.3)
+    depreciation = A * 0.009 * j(0.3)
     add(key="fixed_asset", accountClass="Internal", category="Asset",
-        amount=n(A * 0.028 * j(0.3), ccy), rsfFactorPct=100, orgUnitCode=ou_tsy,
-        commonCoaCode="COA-15", notes="Non-earning")
-    add(key="depreciation", accountClass="Internal", category="Asset",
-        amount=n(-A * 0.009 * j(0.3), ccy), rsfFactorPct=100, orgUnitCode=ou_tsy,
-        commonCoaCode="COA-15", notes="Accumulated depreciation — credit balance")
+        amount=n(gross_fixed - depreciation, ccy), rsfFactorPct=100, orgUnitCode=ou_tsy,
+        commonCoaCode="COA-15", notes=f"Net of accumulated depreciation of {n(depreciation, ccy):,.0f} {ccy}")
     add(key="prepaid", accountClass="Internal", category="Asset",
         amount=n(A * 0.011 * j(0.35), ccy), rsfFactorPct=100, orgUnitCode=ou_tsy,
         commonCoaCode="COA-15", notes="Prepayments and sundry receivables")
@@ -376,17 +381,29 @@ def build(aff):
                "fd_corp": .13, "target": .04, "domiciliary": .06, "interbank": .05,
                "borrowing": .03}
 
+    # `behaviouralTag` is the platform's own enum (Core / Non-Core /
+    # Operational / Non-Operational / N/A — engine/types.ts), not a plain-
+    # English "how sticky is this" label. It also does real work: any
+    # liability tagged anything but N/A has its maturity date REPLACED by a
+    # behavioural pattern (applyBehaviouralMaturity in behavioural.ts), so
+    # the tag is only correct on products that have no genuine contractual
+    # maturity — a true non-maturity deposit. Fixed deposits, target
+    # savings, interbank and borrowings below all carry a real maturityDate
+    # (see `mats`), so overriding it with a behavioural tag would silently
+    # discard the contractual date the gap ladders are supposed to use.
+    # ca_retail/ca_corp/savings/domiciliary have none, which is exactly why
+    # they are the ones that need a behavioural model at all.
     spec = {
-        # key            tag            asf  lcr%  class      unit   turnover
-        "ca_retail":   ("Stable",       90,   5,  "Customer", "RTL", 1.30),
-        "ca_corp":     ("Less Stable",  50,  25,  "Customer", "CIB", 1.90),
-        "savings":     ("Stable",       95,   5,  "Customer", "RTL", 0.42),
-        "fd_retail":   ("Stable",       95,   5,  "Customer", "RTL", 0.04),
-        "fd_corp":     ("Volatile",     50,  40,  "Customer", "CIB", 0.06),
-        "target":      ("Stable",       95,   3,  "Customer", "RTL", 0.22),
-        "domiciliary": ("Less Stable",  50,  25,  "Customer", "CIB", 0.85),
-        "interbank":   ("Volatile",      0, 100,  "Customer", "TSY", 0.30),
-        "borrowing":   ("N/A",         100,   0,  "Customer", "TSY", 0.00),
+        # key            tag                  asf  lcr%  class      unit   turnover
+        "ca_retail":   ("Core",               90,   5,  "Customer", "RTL", 1.30),
+        "ca_corp":     ("Operational",        50,  25,  "Customer", "CIB", 1.90),
+        "savings":     ("Core",               95,   5,  "Customer", "RTL", 0.42),
+        "fd_retail":   ("N/A",                95,   5,  "Customer", "RTL", 0.04),
+        "fd_corp":     ("N/A",                50,  40,  "Customer", "CIB", 0.06),
+        "target":      ("N/A",                95,   3,  "Customer", "RTL", 0.22),
+        "domiciliary": ("Operational",        50,  25,  "Customer", "CIB", 0.85),
+        "interbank":   ("N/A",                 0, 100,  "Customer", "TSY", 0.30),
+        "borrowing":   ("N/A",                100,   0,  "Customer", "TSY", 0.00),
     }
     mats = {"fd_retail": "2027-01-31", "fd_corp": "2026-11-30", "target": "2027-06-30",
             "interbank": "2026-08-20", "borrowing": "2031-12-31"}
@@ -474,13 +491,29 @@ def build(aff):
 
 def trial_balance(rows, ccy):
     """Roll the position book up to level-2 GL codes, which is the grain a
-    core banking system reports a trial balance at."""
+    core banking system reports a trial balance at.
+
+    `endingBalance` is a magnitude, not a signed figure, because that is the
+    convention the position book and the whole engine use: a liability of 100
+    is stored as +100 under category Liability, not as -100. Reconciliation
+    compares per GL code, so the two tie exactly.
+
+    Reading the file on its own, though, that convention is invisible and the
+    balances sum to twice total assets rather than to zero. `drCr` states the
+    normal balance of each account so the file reads as a trial balance
+    without changing the figure anything reconciles against.
+    """
     totals = {}
+    side = {}
     for r in rows:
-        totals[r["glAccountCode"]] = totals.get(r["glAccountCode"], 0) + float(r["amount"])
+        gl = r["glAccountCode"]
+        totals[gl] = totals.get(gl, 0) + float(r["amount"])
+        # Assets are debit-normal; liabilities and capital are credit-normal.
+        side[gl] = "Dr" if r["category"] == "Asset" else "Cr"
+
     return [
         {"glAccountCode": gl, "orgUnitCode": "", "currency": ccy,
-         "endingBalance": n(v, ccy), "asOfDate": AS_OF}
+         "endingBalance": n(v, ccy), "drCr": side[gl], "asOfDate": AS_OF}
         for gl, v in sorted(totals.items())
     ]
 
@@ -517,7 +550,7 @@ def main():
         with open(os.path.join(adir, f"{code}_gl_trial_balance_2026-07.csv"),
                   "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=["glAccountCode", "orgUnitCode", "currency",
-                                              "endingBalance", "asOfDate"])
+                                              "endingBalance", "drCr", "asOfDate"])
             w.writeheader()
             w.writerows(tb)
 
@@ -575,7 +608,8 @@ def write_broken_files():
     Each breaks in a different way, so the failure list is a real list rather
     than one repeated message.
     """
-    ke = os.path.join(OUT, "KE")
+    # Folders are named for the affiliate, not the country code.
+    ke = os.path.join(OUT, "Ecobank Kenya")
     src = os.path.join(ke, "KE_position_book_2026-07.csv")
     with open(src, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
@@ -608,7 +642,7 @@ def write_broken_files():
     with open(os.path.join(ke, "KE_gl_trial_balance_OUT_OF_BALANCE.csv"), "w", newline="",
               encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["glAccountCode", "orgUnitCode", "currency",
-                                          "endingBalance", "asOfDate"])
+                                          "endingBalance", "drCr", "asOfDate"])
         w.writeheader()
         w.writerows(tb)
 

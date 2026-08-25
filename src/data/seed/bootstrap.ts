@@ -8,6 +8,11 @@
 
 import type { Repository } from '@/store/repository';
 import type { LoadBatch, User } from '@/engine/types';
+import {
+  AFFILIATE_CURRENCIES,
+  AFFILIATE_FX_RATES,
+  ALL_AFFILIATE_REFERENCE,
+} from './affiliateReference';
 import { SEED_CONNECTORS } from './connectors';
 import { SEED_LIMITS } from './limits';
 import { NIGERIA_AS_OF, NIGERIA_BATCH_ID, NIGERIA_POSITIONS } from './nigeria';
@@ -155,8 +160,13 @@ const COTEIVOIRE_BATCH: LoadBatch = {
 async function writeSeed(repo: Repository): Promise<void> {
   for (const affiliate of AFFILIATES) await repo.upsertAffiliate(affiliate);
   await repo.upsertDimensionMembers(ALL_DIMENSION_MEMBERS);
+  // All 33 affiliates' org units, legal entities and the counterparty register.
+  await repo.upsertDimensionMembers(ALL_AFFILIATE_REFERENCE);
   for (const currency of CURRENCIES) await repo.upsertCurrency(currency);
+  // Every affiliate's functional currency, so onboarding can select it.
+  for (const currency of AFFILIATE_CURRENCIES) await repo.upsertCurrency(currency);
   for (const rate of FX_RATES) await repo.upsertFxRate(rate);
+  for (const rate of AFFILIATE_FX_RATES) await repo.upsertFxRate(rate);
   for (const curve of YIELD_CURVES) await repo.upsertYieldCurve(curve);
   for (const indicator of ECONOMIC_INDICATORS) await repo.upsertEconomicIndicator(indicator);
   for (const calendar of HOLIDAY_CALENDARS) await repo.upsertHolidayCalendar(calendar);
@@ -173,12 +183,72 @@ async function writeSeed(repo: Repository): Promise<void> {
   await repo.insertPositions(COTEIVOIRE_POSITIONS);
 }
 
-/** Seed only if the database is empty. Safe to call on every app start. */
+const DIMENSION_TYPES = [
+  'LegalEntity', 'OrgUnit', 'Product', 'GlAccount', 'CommonCoa', 'FinancialElement', 'Counterparty', 'Country',
+] as const;
+
+/**
+ * Bring a database that was seeded by an earlier build up to date with
+ * anything a later build added — a new affiliate's org units, its currency,
+ * its FX rate, a limit the framework has grown since.
+ *
+ * `ensureSeeded` only runs the full first-time seed once: the very first
+ * `existing.length > 0` check short-circuits it forever after, on this
+ * browser, for this affiliate register. Thirty affiliates' worth of org
+ * units, currencies and FX rates were added in a later change, and without
+ * this, nobody who had already opened the app would ever receive them —
+ * onboarding a new affiliate would still hit "functional currency not
+ * found" or "unmapped org unit" against reference data that exists in the
+ * codebase but never reached their database.
+ *
+ * Every write here is add-only: a record already present — including one a
+ * user has since edited on the Limits, Connectors or Currency screens — is
+ * left alone. Only what is genuinely missing is inserted.
+ */
+async function refreshReferenceData(repo: Repository): Promise<void> {
+  const existingMemberIds = new Set(
+    (await Promise.all(DIMENSION_TYPES.map((d) => repo.listDimensionMembers(d))))
+      .flat()
+      .map((m) => m.id),
+  );
+  const missingMembers = [...ALL_DIMENSION_MEMBERS, ...ALL_AFFILIATE_REFERENCE].filter(
+    (m) => !existingMemberIds.has(m.id),
+  );
+  if (missingMembers.length > 0) await repo.upsertDimensionMembers(missingMembers);
+
+  const existingCurrencyCodes = new Set((await repo.listCurrencies()).map((c) => c.code));
+  for (const currency of [...CURRENCIES, ...AFFILIATE_CURRENCIES]) {
+    if (!existingCurrencyCodes.has(currency.code)) await repo.upsertCurrency(currency);
+  }
+
+  const existingRateIds = new Set((await repo.listFxRates()).map((r) => r.id));
+  for (const rate of [...FX_RATES, ...AFFILIATE_FX_RATES]) {
+    if (!existingRateIds.has(rate.id)) await repo.upsertFxRate(rate);
+  }
+
+  const existingLimitIds = new Set((await repo.listLimitConfigs()).map((l) => l.id));
+  for (const limit of SEED_LIMITS) {
+    if (!existingLimitIds.has(limit.id)) await repo.upsertLimitConfig(limit);
+  }
+
+  const existingConnectorIds = new Set((await repo.listConnectors()).map((c) => c.id));
+  for (const connector of SEED_CONNECTORS) {
+    if (!existingConnectorIds.has(connector.id)) await repo.upsertConnector(connector);
+  }
+}
+
+/**
+ * Seed only if the database is empty; otherwise top up reference data that a
+ * later build added. Safe to call on every app start either way.
+ */
 export async function ensureSeeded(repo: Repository): Promise<boolean> {
   const existing = await repo.listAffiliates();
-  if (existing.length > 0) return false;
-  await writeSeed(repo);
-  return true;
+  if (existing.length === 0) {
+    await writeSeed(repo);
+    return true;
+  }
+  await refreshReferenceData(repo);
+  return false;
 }
 
 /** Wipe and re-seed. The demo reset control. */

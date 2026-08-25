@@ -99,6 +99,42 @@ export function useAffiliates() {
   return useQuery({ queryKey: keys.affiliates, queryFn: () => repository.listAffiliates() });
 }
 
+/**
+ * Resolve the scope's affiliate for a screen that operates on exactly one
+ * entity — data upload, GL reconciliation, connector configuration,
+ * validation rules.
+ *
+ * `GROUP` is a genuine row in the affiliates table (Ecobank Group,
+ * functional currency USD, seeded in reference.ts) because Process Run and
+ * the results screens need a real record to represent a Group-consolidated
+ * view. But it represents a *consolidation*, not an entity with its own
+ * position book or general ledger, and `affiliates.find(a => a.code ===
+ * affiliateCode)` cannot tell those two cases apart — when the global scope
+ * switcher is left on "Ecobank Group (Consolidated)", that lookup matches
+ * the GROUP row directly, handing a single-entity screen a currency of USD
+ * while `usePositions('GROUP', asOfDate)` fetches every affiliate's
+ * positions, unfiltered. Reconciling that mixture against an identity FX
+ * table (USD-only) fails on the first non-USD row it meets — which is
+ * exactly the "No FX rate available to convert NGN to USD" crash: GL
+ * Reconciliation is a per-entity control, so it cannot run at Group scope,
+ * but nothing stopped the lookup from pretending it was one.
+ *
+ * This never returns the GROUP row. Screens that legitimately consolidate
+ * across the Group — Process Run, Stress Testing, What-If — are unaffected;
+ * they already special-case `affiliateCode === 'GROUP'` or build a real,
+ * multi-currency FX table rather than an identity one.
+ */
+export function resolveSingleAffiliate<T extends { code: string }>(
+  affiliates: T[],
+  affiliateCode: string,
+): T | undefined {
+  if (affiliateCode !== 'GROUP') {
+    const exact = affiliates.find((a) => a.code === affiliateCode);
+    if (exact) return exact;
+  }
+  return affiliates.find((a) => a.code !== 'GROUP');
+}
+
 // ── Dimensions ───────────────────────────────────────────────────────────
 export function useDimensionMembers(dimension: DimensionType) {
   return useQuery({

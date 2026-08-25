@@ -8,7 +8,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie';
-import type { Connector } from '@/engine/types';
+import type { Connector, ApprovalRequest, RemediationIssue, NotificationRule, RiskEntry, AlcoMeeting, RegulatoryReturn, ReportPack } from '@/engine/types';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 import type {
   Affiliate,
@@ -41,6 +41,13 @@ export class AscentDb extends Dexie {
   temporaryLimits!: EntityTable<TemporaryLimit, 'id'>;
   breachNotes!: EntityTable<BreachNote, 'id'>;
   connectors!: EntityTable<Connector, 'id'>;
+  approvals!: EntityTable<ApprovalRequest, 'id'>;
+  remediationIssues!: EntityTable<RemediationIssue, 'id'>;
+  notificationRules!: EntityTable<NotificationRule, 'id'>;
+  riskEntries!: EntityTable<RiskEntry, 'id'>;
+  alcoMeetings!: EntityTable<AlcoMeeting, 'id'>;
+  regulatoryReturns!: EntityTable<RegulatoryReturn, 'id'>;
+  reportPacks!: EntityTable<ReportPack, 'id'>;
   users!: EntityTable<User, 'id'>;
   auditEvents!: EntityTable<AuditEvent, 'id'>;
   yieldCurves!: EntityTable<StoredYieldCurve, 'id'>;
@@ -89,6 +96,19 @@ export class AscentDb extends Dexie {
     // this platform had asserted about theirs.
     this.version(4).stores({
       connectors: 'id, vendor, status, isActive',
+    });
+
+    // v5 gives the governance, monitoring and reporting screens somewhere to
+    // live. They previously rendered hardcoded arrays because there was no
+    // entity behind them at all.
+    this.version(5).stores({
+      approvals: 'id, status, module, affiliateCode, requestedAt',
+      remediationIssues: 'id, stage, severity, affiliateCode, raisedAt',
+      notificationRules: 'id, event, isActive, affiliateCode',
+      riskEntries: 'id, category, affiliateCode',
+      alcoMeetings: 'id, status, scheduledFor, affiliateCode',
+      regulatoryReturns: 'id, regulator, affiliateCode, status, dueDate',
+      reportPacks: 'id, kind, affiliateCode, status',
     });
   }
 }

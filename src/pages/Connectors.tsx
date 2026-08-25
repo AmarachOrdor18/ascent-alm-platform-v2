@@ -21,7 +21,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useSaveAffiliate } from '@/lib/hooks';
+import { resolveSingleAffiliate, useAffiliates, useSaveAffiliate } from '@/lib/hooks';
 import {
   availableFor,
   newConnector,
@@ -91,7 +91,7 @@ export function Connectors() {
   const [testing, setTesting] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, 'ok' | 'failed'>>({});
 
-  const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
+  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
 
   const feedFor = (domain: DataDomain): DomainFeed =>
     affiliate?.feeds.find((f) => f.domain === domain) ?? {

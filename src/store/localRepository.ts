@@ -25,6 +25,13 @@ import type {
   RunResult,
   RunSchedule,
   Connector,
+  ApprovalRequest,
+  RemediationIssue,
+  NotificationRule,
+  RiskEntry,
+  AlcoMeeting,
+  RegulatoryReturn,
+  ReportPack,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -217,6 +224,97 @@ export class LocalRepository implements Repository {
     await this.database.runResults.bulkPut(results);
   }
 
+  // ── Governance, monitoring and reporting ──────────────────────────────
+  // Each of these is scoped the same way: a null affiliateCode means the
+  // row is Group-wide and applies everywhere.
+  private scoped<T extends { affiliateCode?: string | null }>(rows: T[], affiliateCode?: string): T[] {
+    if (!affiliateCode || affiliateCode === 'GROUP') return rows;
+    return rows.filter((r) => r.affiliateCode == null || r.affiliateCode === affiliateCode);
+  }
+
+  async listApprovalRequests(affiliateCode?: string): Promise<ApprovalRequest[]> {
+    return this.scoped(await this.database.approvals.toArray(), affiliateCode);
+  }
+
+  async upsertApprovalRequest(row: ApprovalRequest): Promise<void> {
+    await this.database.approvals.put(row);
+  }
+
+  async deleteApprovalRequest(id: string): Promise<void> {
+    await this.database.approvals.delete(id);
+  }
+
+  async listRemediationIssues(affiliateCode?: string): Promise<RemediationIssue[]> {
+    return this.scoped(await this.database.remediationIssues.toArray(), affiliateCode);
+  }
+
+  async upsertRemediationIssue(row: RemediationIssue): Promise<void> {
+    await this.database.remediationIssues.put(row);
+  }
+
+  async deleteRemediationIssue(id: string): Promise<void> {
+    await this.database.remediationIssues.delete(id);
+  }
+
+  async listNotificationRules(affiliateCode?: string): Promise<NotificationRule[]> {
+    return this.scoped(await this.database.notificationRules.toArray(), affiliateCode);
+  }
+
+  async upsertNotificationRule(row: NotificationRule): Promise<void> {
+    await this.database.notificationRules.put(row);
+  }
+
+  async deleteNotificationRule(id: string): Promise<void> {
+    await this.database.notificationRules.delete(id);
+  }
+
+  async listRiskEntrys(affiliateCode?: string): Promise<RiskEntry[]> {
+    return this.scoped(await this.database.riskEntries.toArray(), affiliateCode);
+  }
+
+  async upsertRiskEntry(row: RiskEntry): Promise<void> {
+    await this.database.riskEntries.put(row);
+  }
+
+  async deleteRiskEntry(id: string): Promise<void> {
+    await this.database.riskEntries.delete(id);
+  }
+
+  async listAlcoMeetings(affiliateCode?: string): Promise<AlcoMeeting[]> {
+    return this.scoped(await this.database.alcoMeetings.toArray(), affiliateCode);
+  }
+
+  async upsertAlcoMeeting(row: AlcoMeeting): Promise<void> {
+    await this.database.alcoMeetings.put(row);
+  }
+
+  async deleteAlcoMeeting(id: string): Promise<void> {
+    await this.database.alcoMeetings.delete(id);
+  }
+
+  async listRegulatoryReturns(affiliateCode?: string): Promise<RegulatoryReturn[]> {
+    return this.scoped(await this.database.regulatoryReturns.toArray(), affiliateCode);
+  }
+
+  async upsertRegulatoryReturn(row: RegulatoryReturn): Promise<void> {
+    await this.database.regulatoryReturns.put(row);
+  }
+
+  async deleteRegulatoryReturn(id: string): Promise<void> {
+    await this.database.regulatoryReturns.delete(id);
+  }
+
+  async listReportPacks(affiliateCode?: string): Promise<ReportPack[]> {
+    return this.scoped(await this.database.reportPacks.toArray(), affiliateCode);
+  }
+
+  async upsertReportPack(row: ReportPack): Promise<void> {
+    await this.database.reportPacks.put(row);
+  }
+
+  async deleteReportPack(id: string): Promise<void> {
+    await this.database.reportPacks.delete(id);
+  }
   // ── Connectors ────────────────────────────────────────────────────────
   async listConnectors(): Promise<Connector[]> {
     const rows = await this.database.connectors.toArray();
@@ -418,6 +516,13 @@ export class LocalRepository implements Repository {
         this.database.temporaryLimits,
         this.database.breachNotes,
         this.database.connectors,
+        this.database.approvals,
+        this.database.remediationIssues,
+        this.database.notificationRules,
+        this.database.riskEntries,
+        this.database.alcoMeetings,
+        this.database.regulatoryReturns,
+        this.database.reportPacks,
         this.database.users,
         this.database.auditEvents,
         this.database.yieldCurves,
@@ -440,6 +545,13 @@ export class LocalRepository implements Repository {
           this.database.temporaryLimits.clear(),
           this.database.breachNotes.clear(),
           this.database.connectors.clear(),
+          this.database.approvals.clear(),
+          this.database.remediationIssues.clear(),
+          this.database.notificationRules.clear(),
+          this.database.riskEntries.clear(),
+          this.database.alcoMeetings.clear(),
+          this.database.regulatoryReturns.clear(),
+          this.database.reportPacks.clear(),
           this.database.users.clear(),
           this.database.auditEvents.clear(),
           this.database.yieldCurves.clear(),

@@ -16,7 +16,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, usePositions } from '@/lib/hooks';
+import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
 import { DEFAULT_VALIDATION_RULES, validatePositions, type ValidationRule } from '@/engine/validation';
 import type { Severity } from '@/engine/types';
 
@@ -44,7 +44,7 @@ export function ValidationRules() {
   const [asOfDate, setAsOfDate] = useState('2026-07-31');
   const [lastRun, setLastRun] = useState<{ at: string; by: string } | null>(null);
 
-  const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
+  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
 
   const result = useMemo(

@@ -23,6 +23,13 @@ import type {
   RunResult,
   RunSchedule,
   Connector,
+  ApprovalRequest,
+  RemediationIssue,
+  NotificationRule,
+  RiskEntry,
+  AlcoMeeting,
+  RegulatoryReturn,
+  ReportPack,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -88,6 +95,29 @@ export interface Repository {
   upsertRun(run: ProcessRun): Promise<void>;
   listRunResults(runId: string): Promise<RunResult[]>;
   insertRunResults(results: RunResult[]): Promise<void>;
+
+  // Governance, monitoring and reporting
+  listApprovalRequests(affiliateCode?: string): Promise<ApprovalRequest[]>;
+  upsertApprovalRequest(row: ApprovalRequest): Promise<void>;
+  deleteApprovalRequest(id: string): Promise<void>;
+  listRemediationIssues(affiliateCode?: string): Promise<RemediationIssue[]>;
+  upsertRemediationIssue(row: RemediationIssue): Promise<void>;
+  deleteRemediationIssue(id: string): Promise<void>;
+  listNotificationRules(affiliateCode?: string): Promise<NotificationRule[]>;
+  upsertNotificationRule(row: NotificationRule): Promise<void>;
+  deleteNotificationRule(id: string): Promise<void>;
+  listRiskEntrys(affiliateCode?: string): Promise<RiskEntry[]>;
+  upsertRiskEntry(row: RiskEntry): Promise<void>;
+  deleteRiskEntry(id: string): Promise<void>;
+  listAlcoMeetings(affiliateCode?: string): Promise<AlcoMeeting[]>;
+  upsertAlcoMeeting(row: AlcoMeeting): Promise<void>;
+  deleteAlcoMeeting(id: string): Promise<void>;
+  listRegulatoryReturns(affiliateCode?: string): Promise<RegulatoryReturn[]>;
+  upsertRegulatoryReturn(row: RegulatoryReturn): Promise<void>;
+  deleteRegulatoryReturn(id: string): Promise<void>;
+  listReportPacks(affiliateCode?: string): Promise<ReportPack[]>;
+  upsertReportPack(row: ReportPack): Promise<void>;
+  deleteReportPack(id: string): Promise<void>;
 
   // Connectors
   listConnectors(): Promise<Connector[]>;

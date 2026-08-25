@@ -13,12 +13,13 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { GroupScopeNotice } from '@/components/layout/GroupScopeNotice';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, usePositions } from '@/lib/hooks';
+import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
 import { importLedger } from '@/lib/csvImport';
 import { identityFxTable } from '@/engine/fx';
 import {
@@ -45,7 +46,7 @@ export function GlReconciliation() {
   const [approvedPlugs, setApprovedPlugs] = useState<Set<string>>(new Set());
   const [signedOff, setSignedOff] = useState(false);
 
-  const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
+  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const currency = affiliate?.functionalCurrency ?? 'USD';
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
 
@@ -165,6 +166,8 @@ export function GlReconciliation() {
           },
         ]}
       />
+
+      {affiliateCode === 'GROUP' && <GroupScopeNotice fallbackName={affiliate?.name} />}
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Reconciliation basis</h2>

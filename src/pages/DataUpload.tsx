@@ -9,17 +9,19 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { GroupScopeNotice } from '@/components/layout/GroupScopeNotice';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useBatches, useCommitBatch, useSaveBatch } from '@/lib/hooks';
+import { resolveSingleAffiliate, useAffiliates, useBatches, useCommitBatch, useSaveBatch } from '@/lib/hooks';
 import { importPositions, type RowError } from '@/lib/csvImport';
 import { validatePositions, DEFAULT_VALIDATION_RULES, type ValidationResult } from '@/engine/validation';
 import { planSupersede } from '@/engine/vintage';
 import { unmappedCodes } from '@/engine/dimensions';
 import { ALL_DIMENSION_MEMBERS } from '@/data/seed/reference';
+import { ALL_AFFILIATE_REFERENCE } from '@/data/seed/affiliateReference';
 import { formatDate } from '@/lib/format';
 import type { DataDomain, LoadBatch, Position } from '@/engine/types';
 
@@ -56,7 +58,7 @@ export function DataUpload() {
   const [supersedeReason, setSupersedeReason] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
+  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
 
   const validation: ValidationResult | null = useMemo(
     () =>
@@ -69,12 +71,18 @@ export function DataUpload() {
     [staged, asOfDate, affiliates],
   );
 
+  // Static seed constants, not the live store: this check runs against
+  // whatever a staged file references before anything is committed. Merged
+  // with the 33-affiliate reference set so a newly onboarded affiliate's org
+  // units and counterparties are recognised, not just the original three.
+  const knownMembers = useMemo(() => [...ALL_DIMENSION_MEMBERS, ...ALL_AFFILIATE_REFERENCE], []);
+
   const unmapped = useMemo(() => {
     if (!staged) return [] as Array<{ dimension: string; codes: string[] }>;
     return (['OrgUnit', 'GlAccount', 'CommonCoa', 'Counterparty'] as const)
-      .map((dimension) => ({ dimension, codes: unmappedCodes(staged.positions, dimension, ALL_DIMENSION_MEMBERS) }))
+      .map((dimension) => ({ dimension, codes: unmappedCodes(staged.positions, dimension, knownMembers) }))
       .filter((x) => x.codes.length > 0);
-  }, [staged]);
+  }, [staged, knownMembers]);
 
   const supersede = affiliate ? planSupersede(batches, affiliate.code, domain, asOfDate) : null;
 
@@ -242,6 +250,8 @@ export function DataUpload() {
           },
         ]}
       />
+
+      {affiliateCode === 'GROUP' && <GroupScopeNotice fallbackName={affiliate?.name} />}
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Upload</h2>

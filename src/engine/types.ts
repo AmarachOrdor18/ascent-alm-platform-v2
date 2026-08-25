@@ -698,3 +698,175 @@ export interface Connector {
   updatedBy: string;
   updatedAt: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Governance, monitoring and reporting entities (screens 47–54)
+// ─────────────────────────────────────────────────────────────────────────
+
+export type ApprovalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
+
+/**
+ * A maker-checker request.
+ *
+ * The rule the whole queue exists to enforce: `requestedBy` may never equal
+ * `decidedBy`. Segregation of duties is not a policy the screen reminds you
+ * of — it is a condition the approval action refuses to violate.
+ */
+export interface ApprovalRequest {
+  id: string;
+  module: string;
+  entityType: string;
+  entityId: string;
+  entityLabel: string;
+  action: 'Create' | 'Update' | 'Delete' | 'Activate' | 'Override';
+  summary: string;
+  affiliateCode: string | null;
+  status: ApprovalStatus;
+  requestedBy: string;
+  requestedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+/** Oracle-style six-stage control lifecycle; a closure needs a second pair of eyes. */
+export type RemediationStage =
+  'Identified' | 'Assessed' | 'Planned' | 'In Progress' | 'Verified' | 'Closed';
+
+export interface RemediationUpdate {
+  at: string;
+  by: string;
+  stage: RemediationStage;
+  note: string;
+}
+
+export interface RemediationIssue {
+  id: string;
+  title: string;
+  description: string;
+  /** Where it came from — a limit breach, a validation failure, an audit finding. */
+  source: string;
+  /** Set when the issue was raised by a limit breach, so the two stay linked. */
+  linkedLimitId: string | null;
+  severity: Severity;
+  stage: RemediationStage;
+  owner: string;
+  affiliateCode: string | null;
+  raisedBy: string;
+  raisedAt: string;
+  dueDate: IsoDate | null;
+  closedAt: string | null;
+  /** Closure is maker-checker: whoever verified may not be the owner. */
+  closureApprovedBy: string | null;
+  updates: RemediationUpdate[];
+}
+
+export type NotificationChannel = 'Email' | 'SMS' | 'In-App' | 'Webhook';
+
+export interface NotificationRule {
+  id: string;
+  name: string;
+  /** Which event fires it — a limit status, a run outcome, a data-freshness lapse. */
+  event: string;
+  channel: NotificationChannel;
+  recipients: string[];
+  /** Only fire at or above this severity. */
+  minimumSeverity: Severity;
+  affiliateCode: string | null;
+  /** Escalate to a second recipient list if nobody acts within this many hours. */
+  escalateAfterHours: number | null;
+  escalateTo: string[];
+  isActive: boolean;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+/** Likelihood and impact on the conventional 1–5 scale. */
+export interface RiskEntry {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  inherentLikelihood: number;
+  inherentImpact: number;
+  controls: string;
+  residualLikelihood: number;
+  residualImpact: number;
+  owner: string;
+  affiliateCode: string | null;
+  lastReviewedAt: string;
+  nextReviewDue: IsoDate | null;
+}
+
+export type MeetingStatus = 'Scheduled' | 'Held' | 'Cancelled';
+
+export interface AlcoAction {
+  id: string;
+  description: string;
+  owner: string;
+  dueDate: IsoDate | null;
+  status: 'Open' | 'Closed' | 'Carried forward';
+}
+
+export interface AlcoMeeting {
+  id: string;
+  title: string;
+  scheduledFor: string;
+  status: MeetingStatus;
+  chair: string;
+  attendees: string[];
+  agenda: string[];
+  /** The run whose figures the pack was built from — the meeting's evidence. */
+  runId: string | null;
+  minutes: string;
+  decisions: string[];
+  actions: AlcoAction[];
+  affiliateCode: string | null;
+}
+
+export type ReturnStatus = 'Not started' | 'In preparation' | 'Under review' | 'Submitted' | 'Accepted' | 'Rejected';
+
+export interface RegulatoryReturn {
+  id: string;
+  name: string;
+  regulator: string;
+  affiliateCode: string;
+  frequency: 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Annual';
+  periodEnd: IsoDate;
+  dueDate: IsoDate;
+  status: ReturnStatus;
+  /** Which run supplies the figures. Absent means nothing has been attached yet. */
+  runId: string | null;
+  preparedBy: string | null;
+  reviewedBy: string | null;
+  submittedAt: string | null;
+  notes: string;
+}
+
+export type PackKind = 'ALCO' | 'Management' | 'Board' | 'Ad hoc';
+
+export interface PackSection {
+  id: string;
+  title: string;
+  /** Which calculation element or screen supplies it. */
+  source: string;
+  included: boolean;
+  commentary: string;
+}
+
+export interface ReportPack {
+  id: string;
+  name: string;
+  kind: PackKind;
+  affiliateCode: string | null;
+  runId: string | null;
+  sections: PackSection[];
+  /** Null for an on-demand pack; set where the pack recurs. */
+  scheduleId: string | null;
+  status: 'Draft' | 'Generated' | 'Distributed';
+  recipients: string[];
+  generatedAt: string | null;
+  generatedBy: string | null;
+  updatedBy: string;
+  updatedAt: string;
+}
