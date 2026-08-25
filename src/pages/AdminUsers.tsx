@@ -1,194 +1,251 @@
 /**
- * Users, Roles & Permissions — screen 56 (Phase 8).
+ * Users & Roles — screen 56.
  *
- * User management with role-based access control and permission administration.
+ * Reads the real user register rather than a fabricated list. The six roles
+ * and their permissions are the ones the application actually gates on, so
+ * what this screen shows about a role is what that role can do — the sidebar
+ * and every action button read the same table.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ROLES } from '@/context/AuthContext';
+import { useAuth, ROLES } from '@/context/AuthContext';
+import { useUsers, useSaveUser } from '@/lib/hooks';
+import type { RoleCode, User } from '@/engine/types';
+
+/** ROLES is keyed by code; the screen wants them in a stable order. */
+const ROLE_LIST = Object.values(ROLES);
 
 export function AdminUsers() {
-  const [selectedTab, setSelectedTab] = useState<'users' | 'roles' | 'permissions'>('users');
+  const { hasPermission, user: signedIn } = useAuth();
+  const { data: users = [], isLoading } = useUsers();
+  const save = useSaveUser();
+  const canEdit = hasPermission('admin.users');
 
-  // Mock user data
-  const mockUsers = [
-    { id: 'U-001', name: 'Adaeze Okonkwo', email: 'adaeze.okonkwo@ecobank.com', role: 'ADMIN', status: 'Active', lastLogin: '2026-08-25' },
-    { id: 'U-002', name: 'Chinwe Okafor', email: 'chinwe.okafor@ecobank.com', role: 'RISK_ANALYST', status: 'Active', lastLogin: '2026-08-25' },
-    { id: 'U-003', name: 'Aminata Traoré', email: 'aminata.traore@ecobank.com', role: 'TREASURY_USER', status: 'Active', lastLogin: '2026-08-24' },
-    { id: 'U-004', name: 'Yaw Boateng', email: 'yaw.boateng@ecobank.com', role: 'EXECUTIVE_VIEWER', status: 'Active', lastLogin: '2026-08-25' },
-    { id: 'U-005', name: 'Fatima Bello', email: 'fatima.bello@ecobank.com', role: 'CONTROL_TESTER', status: 'Active', lastLogin: '2026-08-23' },
-    { id: 'U-006', name: 'Samuel Owusu', email: 'samuel.owusu@ecobank.com', role: 'REPORTING_USER', status: 'Active', lastLogin: '2026-08-25' },
+  const [editing, setEditing] = useState<User | null>(null);
+
+  const active = users.filter((u) => u.isActive);
+  const withoutMfa = active.filter((u) => !u.mfaEnrolled);
+  const byRole = useMemo(() => {
+    const m = new Map<RoleCode, number>();
+    for (const u of users) m.set(u.role, (m.get(u.role) ?? 0) + 1);
+    return m;
+  }, [users]);
+
+  const columns: ResultColumn<User>[] = [
+    {
+      key: 'name',
+      header: 'User',
+      render: (u) => (
+        <span>
+          <span className="font-medium text-navy-900">{u.name}</span>
+          {u.id === signedIn?.id && <span className="ml-2 text-[10px] text-gray-400">you</span>}
+        </span>
+      ),
+    },
+    { key: 'email', header: 'Email', render: (u) => <span className="font-mono text-[11px]">{u.email}</span> },
+    {
+      key: 'role',
+      header: 'Role',
+      render: (u) => <StatusBadge status={ROLE_LIST.find((r) => r.code === u.role)?.name ?? u.role} tone="neutral" />,
+    },
+    { key: 'scope', header: 'Scope', render: (u) => <span className="font-mono text-[11px]">{u.affiliateCode}</span> },
+    {
+      key: 'mfa',
+      header: 'MFA',
+      render: (u) =>
+        u.mfaEnrolled ? (
+          <StatusBadge status="Enrolled" tone="success" />
+        ) : (
+          <StatusBadge status="Not enrolled" tone="warning" />
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (u) => (
+        <StatusBadge status={u.isActive ? 'Active' : 'Disabled'} tone={u.isActive ? 'success' : 'neutral'} />
+      ),
+    },
+    {
+      key: 'last',
+      header: 'Last signed in',
+      render: (u) => (
+        <span className="text-[11px] text-gray-500">
+          {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'never'}
+        </span>
+      ),
+    },
   ];
-
-  const activeUsers = mockUsers.filter((u) => u.status === 'Active');
 
   return (
     <>
       <ModuleHeader
-        title="Users, Roles & Permissions"
-        description="User management with role-based access control and permission administration"
+        title="Users & Roles"
+        description="The register the application gates on — what a role can do here is what it can do everywhere."
         asOfDate={null}
-        scope="Ecobank Group"
         metrics={[
-          { label: 'Total Users', value: String(mockUsers.length) },
-          { label: 'Active Users', value: String(activeUsers.length), tone: 'success' },
-          { label: 'Roles Defined', value: String(Object.keys(ROLES).length) },
-          { label: 'Permission Categories', value: '12' },
+          { label: 'Users', value: String(users.length) },
+          { label: 'Active', value: String(active.length) },
+          {
+            label: 'Without MFA',
+            value: String(withoutMfa.length),
+            tone: withoutMfa.length > 0 ? 'warning' : 'success',
+          },
+          { label: 'Roles in use', value: `${byRole.size} of ${ROLE_LIST.length}` },
         ]}
       />
 
-      <div className="mb-6">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setSelectedTab('users')}
-            className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-              selectedTab === 'users' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-            }`}
-          >
-            Users ({mockUsers.length})
+      <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Users</h2>
+        <ResultTable
+          rows={users}
+          columns={columns}
+          rowKey={(u) => u.id}
+          emptyMessage={isLoading ? 'Loading…' : 'No users in the register.'}
+          renderDetail={(u) => {
+            const role = ROLE_LIST.find((r) => r.code === u.role);
+            return (
+              <div className="space-y-3 text-[11px]">
+                <p className="text-gray-600">{role?.description ?? 'No description for this role.'}</p>
+                <div>
+                  <p className="mb-1 font-bold uppercase tracking-wider text-gray-400">
+                    Permissions ({role?.permissions.length ?? 0})
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {(role?.permissions ?? []).map((p) => (
+                      <span key={p} className="rounded border border-gray-200 px-2 py-0.5 font-mono text-[10px] text-gray-600">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2 border-t border-gray-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(u)}
+                    disabled={!canEdit}
+                    className="rounded border border-gray-200 px-3 py-1.5 font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canEdit || u.id === signedIn?.id}
+                    title={u.id === signedIn?.id ? 'You cannot disable your own account' : undefined}
+                    onClick={() => void save.mutateAsync({ ...u, isActive: !u.isActive })}
+                    className="rounded border border-gray-200 px-3 py-1.5 font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
+                  >
+                    {u.isActive ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
+              </div>
+            );
+          }}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Roles</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {ROLE_LIST.map((r) => (
+            <div key={r.code} className="rounded-lg border border-gray-100 p-4">
+              <div className="flex items-baseline justify-between">
+                <p className="text-[12px] font-bold text-navy-900">{r.name}</p>
+                <span className="text-[11px] text-gray-400">{byRole.get(r.code) ?? 0} user(s)</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{r.description}</p>
+              <p className="mt-2 font-mono text-[10px] text-gray-400">{r.permissions.length} permissions</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
+          Roles are fixed in this build; users move between them. Sign in as any of them to see the effect — the
+          navigation, the action buttons and the run controls all read this same permission set, so a Reporting user
+          genuinely cannot execute a run.
+        </p>
+      </section>
+
+      {editing && (
+        <UserEditor
+          user={editing}
+          onCancel={() => setEditing(null)}
+          onSave={async (next) => {
+            await save.mutateAsync(next);
+            setEditing(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function UserEditor({
+  user,
+  onCancel,
+  onSave,
+}: {
+  user: User;
+  onCancel: () => void;
+  onSave: (u: User) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(user);
+  const set = (patch: Partial<User>) => setDraft((d) => ({ ...d, ...patch }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-4 text-[14px] font-bold text-navy-900">{draft.name}</h2>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="u-role" className="mb-1 block text-[11px] font-medium text-gray-600">Role</label>
+            <select
+              id="u-role"
+              value={draft.role}
+              onChange={(e) => set({ role: e.target.value as RoleCode })}
+              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+            >
+              {ROLE_LIST.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="u-scope" className="mb-1 block text-[11px] font-medium text-gray-600">Affiliate scope</label>
+            <input
+              id="u-scope"
+              value={draft.affiliateCode}
+              onChange={(e) => set({ affiliateCode: e.target.value })}
+              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <label htmlFor="u-mfa" className="mt-4 flex items-center gap-2 text-[11px] text-gray-600">
+          <input
+            id="u-mfa"
+            type="checkbox"
+            checked={draft.mfaEnrolled}
+            onChange={(e) => set({ mfaEnrolled: e.target.checked })}
+            className="accent-gold-500"
+          />
+          Multi-factor authentication enrolled
+        </label>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+            Cancel
           </button>
           <button
-            onClick={() => setSelectedTab('roles')}
-            className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-              selectedTab === 'roles' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-            }`}
+            type="button"
+            onClick={() => void onSave(draft)}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
           >
-            Roles ({Object.keys(ROLES).length})
-          </button>
-          <button
-            onClick={() => setSelectedTab('permissions')}
-            className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-              selectedTab === 'permissions' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-            }`}
-          >
-            Permissions
+            Save user
           </button>
         </div>
       </div>
-
-      {selectedTab === 'users' && (
-        <div className="table-datagrid-container">
-          <div className="p-5 border-b border-gray-100 bg-white/50 flex justify-between items-center">
-            <h3 className="font-bold text-navy-900 text-sm uppercase tracking-wider">User Directory</h3>
-            <button className="rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-700 transition-colors">
-              Add User
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="table-datagrid">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Last Login</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td className="font-bold text-navy-900">{user.name}</td>
-                    <td className="text-gray-600">{user.email}</td>
-                    <td>{ROLES[user.role as keyof typeof ROLES].name}</td>
-                    <td><StatusBadge status={user.status} /></td>
-                    <td>{new Date(user.lastLogin).toLocaleDateString()}</td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button className="rounded border border-gray-200 px-3 py-1 text-[11px] font-bold text-navy-900 hover:bg-gray-50 transition-colors">
-                          Edit
-                        </button>
-                        <button className="rounded border border-danger px-3 py-1 text-[11px] font-bold text-danger hover:bg-danger/5 transition-colors">
-                          Deactivate
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {selectedTab === 'roles' && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Role Definitions</h3>
-            <p className="text-[11px] text-gray-400 font-medium mt-1">System roles and their associated permissions</p>
-          </div>
-          <div className="space-y-4">
-            {Object.entries(ROLES).map(([code, role]) => (
-              <div key={code} className="border border-gray-100 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="text-[12px] font-bold text-navy-900">{role.name}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase">{code}</p>
-                  </div>
-                  <span className="px-2 py-0.5 bg-navy-100 text-navy900 rounded text-[10px] font-bold">
-                    {role.permissions.length} permissions
-                  </span>
-                </div>
-                <p className="text-[11px] text-gray-600">{role.description}</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {role.permissions.slice(0, 5).map((permission) => (
-                    <span key={permission} className="px-2 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">
-                      {permission}
-                    </span>
-                  ))}
-                  {role.permissions.length > 5 && (
-                    <span className="px-2 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">
-                      +{role.permissions.length - 5} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedTab === 'permissions' && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Permission Matrix</h3>
-            <p className="text-[11px]] text-gray-400 font-medium mt-1">Permission assignments by role</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-0">
-              <thead>
-                <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                  <th className="py-2.5 px-3 font-bold">Permission</th>
-                  {Object.values(ROLES).map((role) => (
-                    <th key={role.code} className="py-2.5 px-3 font-bold">{role.name}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  'dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'data.view', 'admin.manage', 'group.manage', 'data.configure', 'risk.configure', 'rules.edit', 'run.execute', 'reporting.generate', 'approvals.approve', 'audit.view',
-                ].slice(0, 8).map((permission) => (
-                  <tr key={permission} className="border-b border-gray-50 py-2 px-3 text-[13px] text-gray-700 font-medium">
-                    <td className="font-mono text-[11px]">{permission}</td>
-                    {Object.values(ROLES).map((role) => (
-                      <td key={role.code} className="text-center">
-                        {role.permissions.includes(permission) ? (
-                          <span className="text-gold-500">✓</span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

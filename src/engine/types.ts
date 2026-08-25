@@ -645,3 +645,56 @@ export interface RunSchedule {
   updatedBy: string | null;
   updatedAt: string | null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Connectors (screen 5)
+// ─────────────────────────────────────────────────────────────────────────
+
+export type ConnectorProtocol = 'REST' | 'SOAP' | 'SFTP' | 'JDBC' | 'Proprietary' | 'FileDrop';
+
+/**
+ * Whether a connector can actually be used.
+ *
+ * `Blocked` is not a judgement the platform makes on the bank's behalf — it
+ * is a field the bank sets, with a reason, because what blocks an
+ * integration is a fact about the engagement rather than about the software.
+ */
+export type ConnectorStatus = 'Available' | 'Blocked' | 'Planned' | 'Retired';
+
+export type AuthMode = 'None' | 'ApiKey' | 'OAuth2' | 'Basic' | 'Certificate' | 'SshKey';
+
+export interface Connector {
+  id: string;
+  name: string;
+  vendor: string;
+  protocol: ConnectorProtocol;
+  /** Which data domains this source can supply. */
+  domains: DataDomain[];
+  status: ConnectorStatus;
+  /** Required when status is Blocked or Planned — an unexplained block is not actionable. */
+  statusReason: string | null;
+
+  endpoint: string;
+  authMode: AuthMode;
+  /**
+   * A pointer into the secret store, never the secret itself.
+   *
+   * This platform runs in the browser. A credential typed here would sit in
+   * IndexedDB in clear text on every machine that opened the page, so the
+   * field holds a vault reference and the connector service resolves it
+   * server-side.
+   */
+  credentialRef: string;
+
+  /** Expected refresh cadence in days, and the wall-clock window it lands in. */
+  cadenceDays: number;
+  scheduleWindow: string;
+  timeoutSeconds: number;
+  maxRetries: number;
+
+  owner: string;
+  notes: string;
+  isActive: boolean;
+  updatedBy: string;
+  updatedAt: string;
+}

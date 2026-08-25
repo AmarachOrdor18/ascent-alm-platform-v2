@@ -24,6 +24,7 @@ import type {
   RuleMeta,
   RunResult,
   RunSchedule,
+  Connector,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -216,6 +217,20 @@ export class LocalRepository implements Repository {
     await this.database.runResults.bulkPut(results);
   }
 
+  // ── Connectors ────────────────────────────────────────────────────────
+  async listConnectors(): Promise<Connector[]> {
+    const rows = await this.database.connectors.toArray();
+    return rows.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async upsertConnector(connector: Connector): Promise<void> {
+    await this.database.connectors.put(connector);
+  }
+
+  async deleteConnector(id: string): Promise<void> {
+    await this.database.connectors.delete(id);
+  }
+
   // ── Limits ────────────────────────────────────────────────────────────
   async listLimitConfigs(affiliateCode?: string): Promise<LimitConfig[]> {
     const rows = await this.database.limitConfigs.toArray();
@@ -402,6 +417,7 @@ export class LocalRepository implements Repository {
         this.database.limitConfigs,
         this.database.temporaryLimits,
         this.database.breachNotes,
+        this.database.connectors,
         this.database.users,
         this.database.auditEvents,
         this.database.yieldCurves,
@@ -423,6 +439,7 @@ export class LocalRepository implements Repository {
           this.database.limitConfigs.clear(),
           this.database.temporaryLimits.clear(),
           this.database.breachNotes.clear(),
+          this.database.connectors.clear(),
           this.database.users.clear(),
           this.database.auditEvents.clear(),
           this.database.yieldCurves.clear(),

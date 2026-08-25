@@ -21,6 +21,7 @@ import type {
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
+  User,
 } from '@/engine/types';
 
 export const keys = {
@@ -202,6 +203,18 @@ export function useSaveHolidayCalendar() {
 // ── Batches and audit ────────────────────────────────────────────────────
 export function useBatches() {
   return useQuery({ queryKey: keys.batches, queryFn: () => repository.listBatches() });
+}
+
+export function useUsers() {
+  return useQuery({ queryKey: ['users'], queryFn: () => repository.listUsers() });
+}
+
+export function useSaveUser() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (user: User) => repository.upsertUser(user),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['users'] }),
+  });
 }
 
 export function useAuditEvents(limit = 200) {

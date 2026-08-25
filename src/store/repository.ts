@@ -22,6 +22,7 @@ import type {
   RuleMeta,
   RunResult,
   RunSchedule,
+  Connector,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -87,6 +88,11 @@ export interface Repository {
   upsertRun(run: ProcessRun): Promise<void>;
   listRunResults(runId: string): Promise<RunResult[]>;
   insertRunResults(results: RunResult[]): Promise<void>;
+
+  // Connectors
+  listConnectors(): Promise<Connector[]>;
+  upsertConnector(connector: Connector): Promise<void>;
+  deleteConnector(id: string): Promise<void>;
 
   // Limits
   listLimitConfigs(affiliateCode?: string): Promise<LimitConfig[]>;

@@ -8,6 +8,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie';
+import type { Connector } from '@/engine/types';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 import type {
   Affiliate,
@@ -39,6 +40,7 @@ export class AscentDb extends Dexie {
   limitConfigs!: EntityTable<LimitConfig, 'id'>;
   temporaryLimits!: EntityTable<TemporaryLimit, 'id'>;
   breachNotes!: EntityTable<BreachNote, 'id'>;
+  connectors!: EntityTable<Connector, 'id'>;
   users!: EntityTable<User, 'id'>;
   auditEvents!: EntityTable<AuditEvent, 'id'>;
   yieldCurves!: EntityTable<StoredYieldCurve, 'id'>;
@@ -80,6 +82,13 @@ export class AscentDb extends Dexie {
       limitConfigs: 'id, metricKey, affiliateCode, isActive, [affiliateCode+isActive]',
       temporaryLimits: 'id, limitId, expiresOn',
       breachNotes: 'id, breachId, recordedAt',
+    });
+
+    // v4 makes connectors configurable. They were a hardcoded array in the
+    // screen, so a bank could not add its own source or correct the status
+    // this platform had asserted about theirs.
+    this.version(4).stores({
+      connectors: 'id, vendor, status, isActive',
     });
   }
 }
