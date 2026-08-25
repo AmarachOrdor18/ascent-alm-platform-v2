@@ -28,6 +28,10 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/engine/**/*.ts'],
+      // types.ts declares interfaces and unions only — it emits no runtime
+      // code, so v8 reports every line as uncovered and drags the real
+      // figure down. Test files are excluded for the same reason.
+      exclude: ['src/engine/types.ts', 'src/engine/**/*.test.ts'],
       thresholds: { lines: 90, functions: 90, branches: 80, statements: 90 },
     },
   },
