@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
@@ -145,6 +146,14 @@ export function TransferPricing() {
             tone: (ftp?.unpriced ?? 0) > 0 ? 'warning' : 'success',
           },
         ]}
+        actions={
+          <Link
+            to="/rules"
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:bg-gray-50 transition-colors"
+          >
+            Configure FTP Rules
+          </Link>
+        }
       />
 
       <ResultsFrame

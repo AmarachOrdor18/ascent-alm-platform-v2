@@ -11,11 +11,11 @@
  */
 
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { Amount } from '@/components/ui/Amount';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Link } from 'wouter';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
@@ -60,12 +60,20 @@ export function Irrbb() {
           },
         ]}
         actions={
-          <Link
-            href="/stress-testing"
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
-          >
-            Run all six shocks
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              to="/stress-testing"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+            >
+              Run all six shocks
+            </Link>
+            <Link
+              to="/rules"
+              className="rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-bold text-navy-900 hover:bg-gray-50 transition-colors"
+            >
+              Configure Rules
+            </Link>
+          </div>
         }
       />
 

@@ -17,6 +17,7 @@ import { NAV_GROUPS } from './navigation';
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['OVERVIEW', 'RISK MANAGEMENT']));
   const { user, role, hasPermission, logout } = useAuth();
   const { affiliateCode, setAffiliateCode, affiliates, asOfDate, run, currency } = useScope();
 
@@ -31,67 +32,133 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const selectable = affiliates.filter((a) => a.code === GROUP_CODE || a.status === 'Live');
 
+  const toggleGroup = (groupLabel: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupLabel)) {
+        next.delete(groupLabel);
+      } else {
+        next.add(groupLabel);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <nav
         aria-label="Main navigation"
-        className={cn('flex flex-col bg-navy-900 transition-all duration-200', collapsed ? 'w-16' : 'w-64')}
+        className={cn('flex flex-col bg-navy-900 transition-all duration-200', collapsed ? 'w-16' : 'w-72')}
       >
-        <div className="flex h-14 items-center gap-2 border-b border-white/10 px-4">
-          {!collapsed && <span className="text-[13px] font-bold tracking-wide text-white">Ascent ALM</span>}
+        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded bg-white/10">
+            <span className="text-[14px] font-bold text-gold-500">E</span>
+          </div>
+          {!collapsed && (
+            <div className="flex flex-col">
+              <span className="text-[13px] font-bold tracking-wide text-white">Ecobank</span>
+              <span className="text-[10px] font-medium text-white/60">ALM Platform</span>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
             aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-            className="ml-auto rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
+            className="ml-auto rounded p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
           >
-            <span aria-hidden="true">{collapsed ? '»' : '«'}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {collapsed ? (
+                <path d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+              ) : (
+                <path d="M11 19l-7-7 7-7M19 19l-7-7 7-7"/>
+              )}
+            </svg>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-3">
-          {visibleGroups.map((group) => (
-            <div key={group.label} className="mb-4">
-              {!collapsed && (
-                <h2 className="px-4 pb-1.5 text-[9px] font-bold uppercase tracking-widest text-white/40">
-                  {group.label}
-                </h2>
-              )}
-              <ul>
-                {group.items.map((item) => {
-                  const active = location === item.path || location.startsWith(`${item.path}/`);
-                  return (
-                    <li key={item.path}>
-                      <Link
-                        href={item.path}
-                        aria-current={active ? 'page' : undefined}
-                        title={collapsed ? item.name : undefined}
-                        className={cn(
-                          'flex items-center gap-2.5 px-4 py-2 text-[12px] transition-colors',
-                          active
-                            ? 'border-l-2 border-gold-500 bg-white/10 font-bold text-white'
-                            : 'border-l-2 border-transparent text-white/70 hover:bg-white/5 hover:text-white',
-                        )}
-                      >
-                        {collapsed ? <span aria-hidden="true">•</span> : item.name}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+        <div className="flex-1 overflow-y-auto py-4 px-2">
+          {visibleGroups.map((group) => {
+            const isExpanded = expandedGroups.has(group.label);
+            const hasActiveItem = group.items.some((item) => location === item.path || location.startsWith(`${item.path}/`));
+            
+            return (
+              <div key={group.label} className="mb-2">
+                {!collapsed && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.label)}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
+                      hasActiveItem ? 'text-gold-500' : 'text-white/50 hover:text-white/80'
+                    )}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn('transition-transform', isExpanded ? 'rotate-90' : 'rotate-0')}>
+                      <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                    <span>{group.label}</span>
+                  </button>
+                )}
+                
+                {collapsed && <div className="px-3 mb-2 border-b border-white/10 opacity-30"></div>}
+                
+                {(isExpanded || collapsed) && (
+                  <ul className={cn('mt-1 space-y-0.5', collapsed && 'px-1')}>
+                    {group.items.map((item) => {
+                      const active = location === item.path || location.startsWith(`${item.path}/`);
+                      return (
+                        <li key={item.path}>
+                          <Link
+                            href={item.path}
+                            aria-current={active ? 'page' : undefined}
+                            title={collapsed ? item.name : undefined}
+                            className={cn(
+                              'flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] transition-all duration-150',
+                              active
+                                ? 'bg-gold-500/10 text-gold-500 font-medium border-l-2 border-gold-500'
+                                : 'text-white/70 hover:bg-white/5 hover:text-white border-l-2 border-transparent',
+                              collapsed && 'justify-center px-2'
+                            )}
+                          >
+                            {collapsed ? (
+                              <span className="text-[10px] font-bold">{item.name.charAt(0)}</span>
+                            ) : (
+                              <>
+                                <span className={cn('w-1 h-1 rounded-full transition-colors', active ? 'bg-gold-500' : 'bg-white/30')}/>
+                                {item.name}
+                              </>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {!collapsed && user && (
           <div className="border-t border-white/10 p-4">
-            <p className="truncate text-[12px] font-bold text-white">{user.name}</p>
-            <p className="truncate text-[10px] text-white/50">{role?.name}</p>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white font-bold text-[12px]">
+                {user.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-[12px] font-bold text-white">{user.name}</p>
+                <p className="truncate text-[10px] text-white/50">{role?.name}</p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={logout}
-              className="mt-2 text-[11px] font-bold text-white/60 hover:text-white"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
               Sign out
             </button>
           </div>
@@ -99,43 +166,55 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-14 items-center gap-4 border-b border-gray-200 bg-white px-6">
-          <label htmlFor="scope-affiliate" className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-            Scope
-          </label>
-          <select
-            id="scope-affiliate"
-            value={affiliateCode}
-            onChange={(e) => setAffiliateCode(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-          >
-            {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
-            {selectable.map((a) => (
-              <option key={a.code} value={a.code}>
-                {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : `${a.name} — ${a.country}`}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-2 text-[11px] text-gray-500">
-            <span className="font-bold uppercase tracking-wider text-gray-400">As at</span>
-            <span className="font-mono text-navy-900">{asOfDate ? formatDate(asOfDate) : 'no data loaded'}</span>
+        <div className="flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-6">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-1 bg-gold-500 rounded-full"/>
+            <div>
+              <h1 className="text-[14px] font-bold text-navy-900">Asset & Liability Management</h1>
+              <p className="text-[10px] text-gray-500">Ecobank Group Platform</p>
+            </div>
           </div>
+          
+          <div className="ml-auto flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <label htmlFor="scope-affiliate" className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                Scope
+              </label>
+              <select
+                id="scope-affiliate"
+                value={affiliateCode}
+                onChange={(e) => setAffiliateCode(e.target.value)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50"
+              >
+                {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
+                {selectable.map((a) => (
+                  <option key={a.code} value={a.code}>
+                    {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : `${a.name} — ${a.country}`}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-gray-500">
-            <span className="font-bold uppercase tracking-wider text-gray-400">Currency</span>
-            <span className="font-mono text-navy-900">{currency}</span>
-          </div>
+            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+              <span className="font-bold uppercase tracking-wider text-gray-400">As at</span>
+              <span className="font-mono text-navy-900">{asOfDate ? formatDate(asOfDate) : 'no data loaded'}</span>
+            </div>
 
-          <div className="ml-auto text-[11px] text-gray-500">
-            {run ? (
-              <>
-                <span className="font-bold uppercase tracking-wider text-gray-400">Run</span>{' '}
-                <span className="text-navy-900">{run.name}</span>
-              </>
-            ) : (
-              <span className="text-gray-400">No run selected — results screens will prompt you to execute one</span>
-            )}
+            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+              <span className="font-bold uppercase tracking-wider text-gray-400">Currency</span>
+              <span className="font-mono text-navy-900">{currency}</span>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px]">
+              {run ? (
+                <>
+                  <span className="font-bold uppercase tracking-wider text-gray-400">Run</span>{' '}
+                  <span className="font-mono text-navy-900">{run.name}</span>
+                </>
+              ) : (
+                <span className="text-gray-400">No run selected</span>
+              )}
+            </div>
           </div>
         </div>
 

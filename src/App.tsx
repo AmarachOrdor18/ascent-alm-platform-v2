@@ -42,6 +42,24 @@ const BUILT: Record<string, ComponentType> = {
   '/concentration': lazy(() => import('@/pages/results/Concentration').then((m) => ({ default: m.Concentration }))),
   '/fx-position': lazy(() => import('@/pages/results/FxPosition').then((m) => ({ default: m.FxPosition }))),
 
+  // Phase 7 — monitoring & control
+  '/limits': lazy(() => import('@/pages/Limits').then((m) => ({ default: m.Limits }))),
+  '/kri': lazy(() => import('@/pages/Kri').then((m) => ({ default: m.Kri }))),
+  '/remediation': lazy(() => import('@/pages/Remediation').then((m) => ({ default: m.Remediation }))),
+  '/approvals': lazy(() => import('@/pages/Approvals').then((m) => ({ default: m.Approvals }))),
+  '/risk-map': lazy(() => import('@/pages/RiskMap').then((m) => ({ default: m.RiskMap }))),
+  '/notifications': lazy(() => import('@/pages/Notifications').then((m) => ({ default: m.Notifications }))),
+
+  // Phase 8 — reporting & admin
+  '/alco-meetings': lazy(() => import('@/pages/AlcoMeetings').then((m) => ({ default: m.AlcoMeetings }))),
+  '/regulatory-reporting': lazy(() => import('@/pages/RegulatoryReporting').then((m) => ({ default: m.RegulatoryReporting }))),
+  '/alco-reporting': lazy(() => import('@/pages/AlcoReporting').then((m) => ({ default: m.AlcoReporting }))),
+  '/management-reporting': lazy(() => import('@/pages/ManagementReporting').then((m) => ({ default: m.ManagementReporting }))),
+  '/ad-hoc': lazy(() => import('@/pages/AdHoc').then((m) => ({ default: m.AdHoc }))),
+  '/admin/users': lazy(() => import('@/pages/AdminUsers').then((m) => ({ default: m.AdminUsers }))),
+  '/admin/preferences': lazy(() => import('@/pages/AdminPreferences').then((m) => ({ default: m.AdminPreferences }))),
+  '/admin/audit': lazy(() => import('@/pages/AdminAudit').then((m) => ({ default: m.AdminAudit }))),
+
   // Phase 5 — execution
   '/runs/new': lazy(() => import('@/pages/ProcessRun').then((m) => ({ default: m.ProcessRun }))),
   '/runs': lazy(() => import('@/pages/RunHistory').then((m) => ({ default: m.RunHistory }))),
@@ -101,6 +119,45 @@ const BUILT: Record<string, ComponentType> = {
   '/holiday-calendar': lazy(() => import('@/pages/HolidayCalendar').then((m) => ({ default: m.HolidayCalendar }))),
 };
 
+export interface RouteEntry {
+  path: string;
+  screenName: string;
+  Component: ComponentType;
+}
+
+/**
+ * Every route, in the order `Switch` evaluates them — first match wins.
+ *
+ * This is an ordered array rather than inline JSX because the order carries a
+ * correctness requirement that is otherwise invisible. `/affiliates/:code`
+ * matches every literal path beneath `/affiliates`, including
+ * `/affiliates/onboard`. Declared before the nav routes it swallowed the
+ * onboarding wizard and rendered a blank page — the click did nothing, with
+ * no error to follow.
+ *
+ * Literal paths must therefore precede parameterised ones. `routing.test.ts`
+ * holds that invariant against this array, which only works while the router
+ * renders from it rather than from a hand-maintained copy.
+ */
+export function buildRouteOrder(): RouteEntry[] {
+  const literal: RouteEntry[] = ALL_NAV_ITEMS.map((item) => {
+    const Built = BUILT[item.path];
+    return {
+      path: item.path,
+      screenName: item.name,
+      Component: Built ?? (() => <Placeholder item={item} />),
+    };
+  });
+
+  const parameterised: RouteEntry[] = [
+    { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail },
+  ];
+
+  return [...literal, ...parameterised];
+}
+
+const ROUTE_ORDER = buildRouteOrder();
+
 function ScreenFallback() {
   return (
     <div className="flex items-center justify-center p-12" role="status" aria-live="polite">
@@ -157,30 +214,15 @@ export function App() {
           <Redirect to="/affiliates" />
         </Route>
 
-        {/* Parameterised, so it sits outside the nav-driven map. Declared
-            before /affiliates so the more specific pattern wins. */}
-        <Route path="/affiliates/:code">
-          {(params) =>
-            params.code === 'onboard' ? null : (
-              <ErrorBoundary screenName="Affiliate Detail">
-                <Suspense fallback={<ScreenFallback />}>
-                  <AffiliateDetail />
-                </Suspense>
-              </ErrorBoundary>
-            )
-          }
-        </Route>
-
-        {ALL_NAV_ITEMS.map((item) => {
-          const Built = BUILT[item.path];
-          return (
-            <Route key={item.path} path={item.path}>
-              <ErrorBoundary screenName={item.name}>
-                <Suspense fallback={<ScreenFallback />}>{Built ? <Built /> : <Placeholder item={item} />}</Suspense>
-              </ErrorBoundary>
-            </Route>
-          );
-        })}
+        {ROUTE_ORDER.map(({ path, screenName, Component }) => (
+          <Route key={path} path={path}>
+            <ErrorBoundary screenName={screenName}>
+              <Suspense fallback={<ScreenFallback />}>
+                <Component />
+              </Suspense>
+            </ErrorBoundary>
+          </Route>
+        ))}
 
         <Route>
           <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">

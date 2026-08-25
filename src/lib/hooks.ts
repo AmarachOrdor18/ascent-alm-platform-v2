@@ -33,6 +33,7 @@ export const keys = {
   calendars: ['holidayCalendars'] as QueryKey,
   batches: ['batches'] as QueryKey,
   audit: ['auditEvents'] as QueryKey,
+  limits: ['limits'] as QueryKey,
 };
 
 let auditCounter = 0;
@@ -296,4 +297,9 @@ export function useCommitBatch() {
       for (const key of [keys.batches, keys.audit, ['positions']]) client.invalidateQueries({ queryKey: key });
     },
   });
+}
+
+// ── Limits ─────────────────────────────────────────────────────────────
+export function useLimits() {
+  return useQuery({ queryKey: keys.limits, queryFn: () => Promise.resolve([]) });
 }
