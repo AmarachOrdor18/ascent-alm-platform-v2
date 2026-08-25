@@ -5,11 +5,8 @@
  */
 
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useAffiliates } from '@/lib/hooks';
 
 export function RiskMap() {
-  const { data: affiliates = [] } = useAffiliates();
 
   // Mock risk map data - in real implementation this would come from the risk engine
   const mockRiskData = [

@@ -68,16 +68,16 @@ export function AlcoReporting() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-[11px] font-medium text-gray-700 mb-2">Reporting Period</label>
-            <select className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
+            <label htmlFor="reporting-period" className="block text-[11px] font-medium text-gray-700 mb-2">Reporting Period</label>
+            <select id="reporting-period" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
               <option>August 2026</option>
               <option>September 2026</option>
               <option>October 2026</option>
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-gray-700 mb-2">Affiliate Scope</label>
-            <select className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
+            <label htmlFor="affiliate-scope" className="block text-[11px] font-medium text-gray-700 mb-2">Affiliate Scope</label>
+            <select id="affiliate-scope" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
               <option>Group Consolidated</option>
               <option>Nigeria Only</option>
               <option>Ghana Only</option>

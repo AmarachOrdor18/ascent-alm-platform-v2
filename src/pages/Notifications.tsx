@@ -6,7 +6,6 @@
 
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 
 interface Notification {
   id: string;

@@ -211,7 +211,7 @@ export const GHANA_POSITIONS: Position[] = [
       monthlyCredit: 2800.0,
       monthlyDebit: 2576.0,
       totalCredit: 30800.0,
-      totalDebt: 29120.0,
+      totalDebit: 29120.0,
     },
     overdraft: null,
     control: {
@@ -281,7 +281,7 @@ export const GHANA_POSITIONS: Position[] = [
       monthlyCredit: 2500.0,
       monthlyDebit: 2300.0,
       totalCredit: 27500.0,
-      totalDebt: 25800.0,
+      totalDebit: 25800.0,
     },
     overdraft: null,
     control: {
@@ -326,7 +326,7 @@ export const GHANA_POSITIONS: Position[] = [
     spreadOverIndexBps: null,
     rateCapLifePct: null,
     rateFloorLifePct: null,
-    behaviouralTag: 'Stable',
+    behaviouralTag: 'Core',
     hqlaLevel: 'None',
     hqlaHaircutPct: 0.0,
     lcrCashflowRole: 'Outflow',
@@ -351,7 +351,7 @@ export const GHANA_POSITIONS: Position[] = [
       monthlyCredit: 6800.0,
       monthlyDebit: 6256.0,
       totalCredit: 74800.0,
-      totalDebt: 70400.0,
+      totalDebit: 70400.0,
     },
     overdraft: null,
     control: {

@@ -139,7 +139,8 @@ export interface RouteEntry {
  * holds that invariant against this array, which only works while the router
  * renders from it rather than from a hand-maintained copy.
  */
-export function buildRouteOrder(): RouteEntry[] {
+/* eslint-disable react-refresh/only-export-components */
+export const buildRouteOrder = (): RouteEntry[] => {
   const literal: RouteEntry[] = ALL_NAV_ITEMS.map((item) => {
     const Built = BUILT[item.path];
     return {
@@ -155,6 +156,7 @@ export function buildRouteOrder(): RouteEntry[] {
 
   return [...literal, ...parameterised];
 }
+/* eslint-enable react-refresh/only-export-components */
 
 const ROUTE_ORDER = buildRouteOrder();
 

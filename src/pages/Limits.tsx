@@ -7,12 +7,10 @@
 
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useLimits } from '@/lib/hooks';
 import { REGULATORY_MINIMA } from '@/engine/limits';
 import { Link } from 'react-router-dom';
 
 export function Limits() {
-  const { data: limits = [] } = useLimits();
 
   // Mock data for demo purposes - in real implementation this would come from the engine
   const mockLimits = [

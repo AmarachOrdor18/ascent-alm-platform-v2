@@ -5,7 +5,6 @@
  */
 
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 
 export function Kri() {
   // Mock KRI data - in real implementation this would come from the KRI Engine
@@ -132,7 +131,7 @@ export function Kri() {
               </div>
               <div className="flex items-end justify-between mb-3">
                 <span className="text-[20px] font-bold text-navy-900 tracking-tight">{k.value.toFixed(1)}%</span>
-                <Sparkline values={mockTrendData[i]} status={status} />
+                <Sparkline values={mockTrendData[i] ?? []} status={status} />
               </div>
               <p className="text-[11px] text-gray-500 leading-relaxed border-t border-gray-50 pt-3">
                 {k.earlyWarningReason ?? 'No early-warning signal currently.'}

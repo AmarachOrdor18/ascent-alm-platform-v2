@@ -105,8 +105,8 @@ export function Login() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Sign in as</label>
-            <div className="grid grid-cols-2 gap-2">
+            <span className="block text-sm font-medium text-gray-700 mb-2">Sign in as</span>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Role selection">
               {Object.entries(ROLES).map(([roleCode, role]) => (
                 <button
                   key={roleCode}
@@ -127,8 +127,9 @@ export function Login() {
 
           <form onSubmit={handleSignIn} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <label htmlFor="email-input" className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
               <input
+                id="email-input"
                 type="email"
                 value={account.email}
                 readOnly
@@ -138,10 +139,11 @@ export function Login() {
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
-                <a href="#" className="text-xs text-gold-600 hover:underline">Forgot password?</a>
+                <label htmlFor="password-input" className="block text-sm font-medium text-gray-700">Password</label>
+                <button type="button" className="text-xs text-gold-600 hover:underline">Forgot password?</button>
               </div>
               <input
+                id="password-input"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}

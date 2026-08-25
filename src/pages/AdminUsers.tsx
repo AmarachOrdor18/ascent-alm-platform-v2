@@ -7,11 +7,9 @@
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useAuth } from '@/context/AuthContext';
 import { ROLES } from '@/context/AuthContext';
 
 export function AdminUsers() {
-  const { hasPermission } = useAuth();
   const [selectedTab, setSelectedTab] = useState<'users' | 'roles' | 'permissions'>('users');
 
   // Mock user data

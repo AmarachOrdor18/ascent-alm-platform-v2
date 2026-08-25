@@ -83,10 +83,10 @@ describe('demo narrative depends on three lifecycle states', () => {
     expect(gh.feeds.find((f) => f.domain === 'Positions')!.mode).toBe('File');
   });
 
-  it('gives only Nigeria committed position data', async () => {
+  it('provides position data for all three affiliates', async () => {
     await ensureSeeded(repo);
-    expect(await repo.queryPositions({ affiliateCode: 'GH' })).toHaveLength(0);
-    expect(await repo.queryPositions({ affiliateCode: 'CI' })).toHaveLength(0);
+    expect((await repo.queryPositions({ affiliateCode: 'GH' })).length).toBeGreaterThan(0);
+    expect((await repo.queryPositions({ affiliateCode: 'CI' })).length).toBeGreaterThan(0);
     expect((await repo.queryPositions({ affiliateCode: 'NG' })).length).toBeGreaterThan(0);
   });
 });

@@ -94,8 +94,8 @@ export function AdHoc() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-medium text-gray-700 mb-2">Affiliates</label>
-                <div className="flex flex-wrap gap-2">
+                <span className="block text-[11px] font-medium text-gray-700 mb-2">Affiliates</span>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Affiliates selection">
                   {availableAffiliates.map((affiliate) => (
                     <button
                       key={affiliate.code}
@@ -112,8 +112,9 @@ export function AdHoc() {
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-gray-700 mb-2">Reporting Currency</label>
+                <label htmlFor="currency-select" className="block text-[11px] font-medium text-gray-700 mb-2">Reporting Currency</label>
                 <select
+                  id="currency-select"
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
@@ -126,15 +127,17 @@ export function AdHoc() {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-gray-700 mb-2">Date Range</label>
+                <label htmlFor="date-start" className="block text-[11px] font-medium text-gray-700 mb-2">Date Range</label>
                 <div className="flex gap-2">
                   <input
+                    id="date-start"
                     type="date"
                     value={dateRange.start}
                     onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                     className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                   />
                   <input
+                    id="date-end"
                     type="date"
                     value={dateRange.end}
                     onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
