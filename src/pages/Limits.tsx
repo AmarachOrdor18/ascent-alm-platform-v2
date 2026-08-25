@@ -8,7 +8,7 @@
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { REGULATORY_MINIMA } from '@/engine/limits';
-import { Link } from 'react-router-dom';
+import { Link } from 'wouter';
 
 export function Limits() {
 
@@ -90,7 +90,7 @@ export function Limits() {
         ]}
         actions={
           <Link
-            to="/rules"
+            href="/rules"
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:bg-gray-50 transition-colors"
           >
             Configure Rules

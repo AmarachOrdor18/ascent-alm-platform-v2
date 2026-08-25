@@ -25,6 +25,16 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'error',
     'no-console': ['error', { allow: ['warn', 'error'] }],
     eqeqeq: ['error', 'always', { null: 'ignore' }],
+    // This app routes with wouter. A `<Link>` from react-router-dom needs a
+    // Router context that does not exist here, so it throws and the screen
+    // renders as an error card instead. Four screens shipped that way before
+    // this rule existed, including Liquidity Risk and IRRBB.
+    'no-restricted-imports': ['error', {
+      paths: [{
+        name: 'react-router-dom',
+        message: 'This app routes with wouter. Import Link, useLocation and Redirect from "wouter".',
+      }],
+    }],
   },
   overrides: [
     {
