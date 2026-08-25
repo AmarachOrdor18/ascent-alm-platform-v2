@@ -1,0 +1,22 @@
+id,category,productClass,currency,amount,maturityDate,nextRepricingDate,behaviouralTag,rateType,interestRatePct,hqlaLevel,hqlaHaircutPct,lcrCashflowRole,lcrRatePct,asfFactorPct,rsfFactorPct,irrbbRateSensitive,approxDurationYears,orgUnitCode,glAccountCode,commonCoaCode,counterpartyId,performingStatus,isEncumbered,notes
+GH-A01,Asset,Cash & Central Bank Reserves,GHS,2400,2026-08-15,,N/A,N/A,0,Level 1,0,HQLA,,,0,No,0,OU-GH-TSY,GL-GH-1000,COA-ASSET,,Performing,No,
+GH-A02,Asset,BoG Treasury Bills (91D),GHS,3100,2026-10-29,,N/A,Fixed,26.5,Level 1,0,HQLA,,,5,Yes,0.25,OU-GH-TSY,GL-GH-1000,COA-ASSET,CP-SOVEREIGN-GH,Performing,No,
+GH-A03,Asset,GoG Bonds (2-5Y),GHS,2900,2029-07-31,,N/A,Fixed,22.0,Level 1,0,HQLA,,,5,Yes,2.6,OU-GH-TSY,GL-GH-1000,COA-ASSET,CP-SOVEREIGN-GH,Performing,No,
+GH-A04,Asset,GoG Bonds pledged to BoG,GHS,900,2030-07-31,,N/A,Fixed,21.0,Level 1,0,HQLA,,,5,Yes,3.4,OU-GH-TSY,GL-GH-1000,COA-ASSET,CP-SOVEREIGN-GH,Performing,Yes,Pledged as collateral for BoG standing facility - excluded from HQLA
+GH-A05,Asset,Interbank Placements (0-30D),GHS,1200,2026-08-20,2026-08-20,N/A,Floating,25.0,None,0,Inflow,100,,15,Yes,0.06,OU-GH-TSY,GL-GH-1000,COA-ASSET,CP-GH-INTERBANK,Performing,No,
+GH-A06,Asset,"Loans - Corporate, Floating",GHS,4200,2029-07-31,2026-10-31,N/A,Floating,29.5,None,0,None,,,85,Yes,0.25,OU-GH-COR,GL-GH-1000,COA-ASSET,CP-GH-OBLIGOR-01,Performing,No,3-year loan on a quarterly reset - reprices long before it matures
+GH-A07,Asset,"Loans - Corporate, Floating",GHS,2600,2028-01-31,2026-10-31,N/A,Floating,29.0,None,0,None,,,85,Yes,0.25,OU-GH-COR,GL-GH-1000,COA-ASSET,CP-GH-OBLIGOR-02,Performing,No,
+GH-A08,Asset,Loans - Corporate (1-3Y),GHS,3300,2028-07-31,,N/A,Fixed,27.5,None,0,None,,,85,Yes,1.8,OU-GH-COR,GL-GH-1000,COA-ASSET,CP-GH-OBLIGOR-03,Performing,No,
+GH-A09,Asset,"Loans - Corporate, impaired",GHS,640,2027-07-31,,N/A,Fixed,26.0,None,0,None,,,100,Yes,1.0,OU-GH-COR,GL-GH-1000,COA-ASSET,CP-GH-OBLIGOR-04,Doubtful,No,Classified Doubtful - 180+ days past due
+GH-A10,Asset,Loans - Retail Consumer,GHS,1850,2028-07-31,,N/A,Fixed,32.0,None,0,None,,,85,Yes,1.5,OU-GH-RET,GL-GH-1000,COA-ASSET,CP-GH-RETAIL-POOL,Performing,No,
+GH-A11,Asset,Loans - Retail Mortgage,GHS,1400,2036-07-31,,N/A,Fixed,24.5,None,0,None,,,65,Yes,6.8,OU-GH-RET,GL-GH-1000,COA-ASSET,CP-GH-RETAIL-POOL,Performing,No,
+GH-A12,Asset,Fixed & Other Assets,GHS,2010,2036-07-31,,N/A,N/A,0,None,0,None,,,100,No,0,OU-GH-COR,GL-GH-1000,COA-ASSET,,Performing,No,
+GH-L01,Liability,Corporate Deposits - Non-Operational,GHS,5600,2026-08-15,2026-08-01,Non-Operational,Floating,18.0,None,0,Outflow,55,0,,Yes,0,OU-GH-COR,GL-GH-2000,COA-LIAB,CP-GH-STATE-ENTITY,Performing,No,Single public-sector depositor - concentration watch
+GH-L02,Liability,Retail Deposits - Core,GHS,6200,2026-08-15,2026-08-01,Core,Floating,7.5,None,0,Outflow,10,95,,Yes,0,OU-GH-RET,GL-GH-2000,COA-LIAB,CP-GH-RETAIL-POOL,Performing,No,
+GH-L03,Liability,Retail Deposits - Non-Core,GHS,2100,2026-08-15,2026-08-01,Non-Core,Floating,12.0,None,0,Outflow,20,90,,Yes,0,OU-GH-RET,GL-GH-2000,COA-LIAB,CP-GH-RETAIL-POOL,Performing,No,
+GH-L04,Liability,Corporate Deposits - Operational,GHS,2450,2026-08-15,2026-08-01,Operational,Floating,9.0,None,0,Outflow,10,50,,Yes,0,OU-GH-COR,GL-GH-2000,COA-LIAB,CP-GH-CORP-01,Performing,No,
+GH-L05,Liability,Term Deposits - Corporate,GHS,1900,2026-11-30,,N/A,N/A,24.0,None,0,None,,50,,Yes,0.33,OU-GH-COR,GL-GH-2000,COA-LIAB,CP-GH-CORP-02,Performing,No,
+GH-L06,Liability,Interbank Borrowing (0-30D),GHS,1350,2026-08-14,2026-08-14,N/A,Floating,27.0,None,0,Outflow,100,0,,Yes,0.04,OU-GH-TSY,GL-GH-2000,COA-LIAB,CP-GH-INTERBANK,Performing,No,
+GH-L07,Liability,Long-Term Debt (5Y+),GHS,2200,2033-07-31,,N/A,Fixed,13.5,None,0,None,,100,,Yes,5.2,OU-GH-TSY,GL-GH-2000,COA-LIAB,,Performing,No,
+GH-L08,Liability,Other Liabilities & Provisions,GHS,1300,2026-08-15,,N/A,N/A,0,None,0,Outflow,30,0,,No,0,OU-GH-COR,GL-GH-2000,COA-LIAB,,Performing,No,
+GH-C01,Capital,Shareholders' Equity,GHS,3400,2036-07-31,,N/A,N/A,,None,0,None,,100,,No,,OU-GH-TSY,GL-GH-3000,COA-CAPITAL,,Performing,No,
