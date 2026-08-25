@@ -8,6 +8,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie';
+import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 import type {
   Affiliate,
   AuditEvent,
@@ -35,6 +36,9 @@ export class AscentDb extends Dexie {
   runs!: EntityTable<ProcessRun, 'id'>;
   runResults!: EntityTable<RunResult, 'id'>;
   runSchedules!: EntityTable<RunSchedule, 'id'>;
+  limitConfigs!: EntityTable<LimitConfig, 'id'>;
+  temporaryLimits!: EntityTable<TemporaryLimit, 'id'>;
+  breachNotes!: EntityTable<BreachNote, 'id'>;
   users!: EntityTable<User, 'id'>;
   auditEvents!: EntityTable<AuditEvent, 'id'>;
   yieldCurves!: EntityTable<StoredYieldCurve, 'id'>;
@@ -68,6 +72,14 @@ export class AscentDb extends Dexie {
     // editing v1 keeps an existing browser's data intact across the upgrade.
     this.version(2).stores({
       runSchedules: 'id, affiliateCode, templateRunId, isActive, [affiliateCode+isActive]',
+    });
+
+    // v3 adds limit monitoring. The engine modules for this existed from
+    // phase 1; nothing had ever persisted their configuration.
+    this.version(3).stores({
+      limitConfigs: 'id, metricKey, affiliateCode, isActive, [affiliateCode+isActive]',
+      temporaryLimits: 'id, limitId, expiresOn',
+      breachNotes: 'id, breachId, recordedAt',
     });
   }
 }

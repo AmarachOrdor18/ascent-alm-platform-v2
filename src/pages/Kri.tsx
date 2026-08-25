@@ -1,145 +1,246 @@
 /**
- * Key Risk Indicators — screen 46 (Phase 7).
+ * KRI Dashboard — screen 46.
  *
- * Trend-based early-warning indicators, distinct from Limits & Breaches' hard threshold status.
+ * A limit is a point-in-time test. A key risk indicator is a *direction of
+ * travel*, so this screen reads the same metric from every completed run at
+ * successive as-of dates and fits a trend across them.
+ *
+ * The distinction matters at ALCO: a bank sitting at 118% LCR is within
+ * appetite, but if it was at 168% six months ago the interesting fact is the
+ * slope, not the level. `engine/kri.ts` fits a least-squares line rather than
+ * differencing the endpoints, so a single odd month does not read as a trend.
+ *
+ * This screen previously rendered a hardcoded array and had no access to run
+ * history at all.
  */
 
+import { useMemo } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useScope } from '@/context/ScopeContext';
+import { useRuns } from '@/lib/runHooks';
+import { evaluateKris, useKriSeries } from '@/lib/limitHooks';
+import { DEFAULT_KRIS, type KriEvaluation } from '@/engine/kri';
+import { formatMetric } from '@/lib/metrics';
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
+const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  Green: 'success', Amber: 'warning', Red: 'danger', 'No data': 'neutral',
+};
+const TREND_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  Improving: 'success', Stable: 'neutral', Deteriorating: 'danger',
+};
 
 export function Kri() {
-  // Mock KRI data - in real implementation this would come from the KRI Engine
-  const mockKris = [
+  const { affiliateCode } = useScope();
+  const { data: runs = [], isLoading } = useRuns(affiliateCode);
+
+  const metricKeys = useMemo(() => DEFAULT_KRIS.filter((k) => k.isActive).map((k) => k.metricKey), []);
+  const { data: series } = useKriSeries(runs, metricKeys);
+
+  const evaluations = useMemo(() => evaluateKris(series), [series]);
+  const deteriorating = evaluations.filter((e) => e.trend === 'Deteriorating');
+  const observationCount = series ? Math.max(0, ...Array.from(series.values()).map((s) => s.length)) : 0;
+  const completed = runs.filter((r) => r.status === 'Completed').length;
+
+  const columns: ResultColumn<KriEvaluation>[] = [
+    { key: 'label', header: 'Indicator', render: (k) => <span className="font-medium text-navy-900">{k.label}</span> },
     {
-      metricKey: 'lcrTrend',
-      label: 'LCR Trend (30-day)',
-      value: 88.4,
-      trend: 'Worsening' as const,
-      earlyWarning: true,
-      earlyWarningReason: 'LCR has declined 3.2 points over the last 30 days, approaching regulatory floor.',
+      key: 'current',
+      header: 'Current',
+      align: 'right',
+      render: (k) => <span className="font-mono font-bold">{formatMetric(k.currentValue, k.metricKey)}</span>,
+      compareValue: (k) => k.currentValue,
     },
     {
-      metricKey: 'nsfrTrend',
-      label: 'NSFR Trend (90-day)',
-      value: 103.6,
-      trend: 'Stable' as const,
-      earlyWarning: false,
-      earlyWarningReason: null,
+      key: 'prior',
+      header: 'Window start',
+      align: 'right',
+      render: (k) => <span className="font-mono text-gray-500">{formatMetric(k.priorValue, k.metricKey)}</span>,
     },
     {
-      metricKey: 'concentrationTrend',
-      label: 'Deposit Concentration Trend',
-      value: 40.7,
-      trend: 'Improving' as const,
-      earlyWarning: false,
-      earlyWarningReason: null,
+      key: 'change',
+      header: 'Change',
+      align: 'right',
+      render: (k) =>
+        k.changeOverWindow === null ? (
+          <span className="text-gray-300">—</span>
+        ) : (
+          <span className={`font-mono ${k.trend === 'Deteriorating' ? 'text-danger' : k.trend === 'Improving' ? 'text-success' : ''}`}>
+            {k.changeOverWindow > 0 ? '+' : ''}
+            {k.changeOverWindow.toFixed(2)}
+          </span>
+        ),
     },
     {
-      metricKey: 'niiSensitivityTrend',
-      label: 'NII Sensitivity Trend',
-      value: -8.1,
-      trend: 'Worsening' as const,
-      earlyWarning: true,
-      earlyWarningReason: 'NII sensitivity has become more negative by 1.4 points due to rate environment shift.',
+      key: 'slope',
+      header: 'Per period',
+      align: 'right',
+      render: (k) =>
+        k.slopePerPeriod === null ? (
+          <span className="text-gray-300">—</span>
+        ) : (
+          <span className="font-mono text-[11px]">
+            {k.slopePerPeriod > 0 ? '+' : ''}
+            {k.slopePerPeriod.toFixed(2)}
+          </span>
+        ),
     },
     {
-      metricKey: 'gapTrend',
-      label: 'Liquidity Gap Trend (0-30d)',
-      value: -2.3,
-      trend: 'Stable' as const,
-      earlyWarning: false,
-      earlyWarningReason: null,
+      key: 'projected',
+      header: 'If it persists',
+      align: 'right',
+      render: (k) =>
+        k.projectedValue === null ? (
+          <span className="text-gray-300">—</span>
+        ) : (
+          <span className="font-mono text-[11px] text-gray-600">{formatMetric(k.projectedValue, k.metricKey)}</span>
+        ),
     },
-    {
-      metricKey: 'hqlaTrend',
-      label: 'HQLA Coverage Trend',
-      value: 15.2,
-      trend: 'Improving' as const,
-      earlyWarning: false,
-      earlyWarningReason: null,
-    },
+    { key: 'trend', header: 'Trend', render: (k) => <StatusBadge status={k.trend} tone={TREND_TONE[k.trend]} /> },
+    { key: 'status', header: 'Status', render: (k) => <StatusBadge status={k.status} tone={TONE[k.status]} /> },
+    { key: 'n', header: 'Obs', align: 'right', render: (k) => <span className="font-mono text-[11px]">{k.observationsUsed}</span> },
   ];
-
-  const redCount = mockKris.filter((k) => k.earlyWarning).length;
-  const amberCount = mockKris.filter((k) => k.trend === 'Worsening' && !k.earlyWarning).length;
-  const greenCount = mockKris.filter((k) => k.trend === 'Improving' || (k.trend === 'Stable' && !k.earlyWarning)).length;
-
-  function visualStatus(k: typeof mockKris[0]): 'Red' | 'Amber' | 'Green' {
-    if (k.earlyWarning) return 'Red';
-    if (k.trend === 'Worsening') return 'Amber';
-    return 'Green';
-  }
-
-  const kriStatusClass = {
-    Red: 'bg-danger-bg text-danger',
-    Amber: 'bg-warning-bg text-warning',
-    Green: 'bg-success-bg text-success',
-  } as const;
-
-  function KriStatusBadge({ status }: { status: string }) {
-    return (
-      <span className={`px-2 py-0.5 rounded text-xs font-medium inline-flex items-center whitespace-nowrap ${kriStatusClass[status as keyof typeof kriStatusClass] || 'bg-gray-100 text-gray-600'}`}>
-        {status}
-      </span>
-    );
-  }
-
-  function Sparkline({ values, status }: { values: number[]; status: string }) {
-    if (values.length === 0) return <p className="text-[10px] text-gray-400">Insufficient history</p>;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-    const color = status === 'Red' ? 'bg-danger' : status === 'Amber' ? 'bg-warning' : 'bg-success';
-    return (
-      <div className="flex items-end gap-1 h-9">
-        {values.map((v, i) => {
-          const heightPct = 15 + ((v - min) / range) * 85;
-          return <div key={i} className={`w-2.5 rounded-sm ${color} opacity-70`} style={{ height: `${heightPct}%` }} />;
-        })}
-      </div>
-    );
-  }
-
-  // Mock trend data for sparklines
-  const mockTrendData = mockKris.map(() => Array.from({ length: 10 }, () => Math.random() * 20 + 80));
 
   return (
     <>
       <ModuleHeader
-        title="Key Risk Indicators (KRI)"
-        description="Trend-based early-warning indicators, live from KRI Engine — distinct from Limits & Breaches' hard threshold status"
+        title="KRI Dashboard"
+        description="Direction of travel across your run history — the slope, not just today's level."
         asOfDate={null}
-        scope="Ecobank Group"
+        scope={affiliateCode}
         metrics={[
-          { label: 'Red Indicators', value: String(redCount), tone: redCount > 0 ? 'danger' : 'success' },
-          { label: 'Amber Indicators', value: String(amberCount), tone: amberCount > 0 ? 'warning' : 'neutral' },
-          { label: 'Green Indicators', value: String(greenCount), tone: 'success' },
-          { label: 'Total KRIs Tracked', value: String(mockKris.length) },
+          { label: 'Indicators', value: String(evaluations.length) },
+          {
+            label: 'Deteriorating',
+            value: String(deteriorating.length),
+            tone: deteriorating.length > 0 ? 'danger' : 'success',
+          },
+          { label: 'Runs in history', value: String(completed) },
+          { label: 'Longest series', value: `${observationCount} obs` },
         ]}
+        actions={
+          <Link
+            href="/limits"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+          >
+            See today's levels
+          </Link>
+        }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {mockKris.map((k, i) => {
-          const status = visualStatus(k);
-          return (
-            <div key={k.metricKey} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-[12px] font-bold text-navy-900 leading-snug pr-2">{k.label}</p>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{k.trend}</p>
-                </div>
-                <KriStatusBadge status={status} />
+      {isLoading ? (
+        <p className="text-[12px] text-gray-500">Loading run history…</p>
+      ) : completed === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <p className="text-[13px] font-bold text-navy-900">No completed runs yet</p>
+          <p className="mx-auto mt-2 max-w-lg text-[11px] leading-relaxed text-gray-500">
+            A KRI is a trend, so it needs the same metric at several dates. Execute runs at successive as-of dates and
+            the series builds itself — there is no separate KRI data to maintain.
+          </p>
+          <Link
+            href="/runs/new"
+            className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+          >
+            Go to Process Run
+          </Link>
+        </div>
+      ) : (
+        <>
+          {observationCount < 3 && (
+            <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
+              <span className="font-bold text-navy-900">
+                Only {observationCount} observation{observationCount === 1 ? '' : 's'} available.
+              </span>{' '}
+              Below three points there is no trend worth fitting, so the indicators report their level and say the
+              trend is unknown rather than extrapolating from two points. Run more as-of dates — the Batch Scheduler
+              backlog will produce them in one pass.
+            </p>
+          )}
+
+          {deteriorating.length > 0 && (
+            <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <StatusBadge status={`${deteriorating.length} deteriorating`} tone="danger" />
+                <span className="text-[12px] font-bold text-navy-900">Moving the wrong way</span>
               </div>
-              <div className="flex items-end justify-between mb-3">
-                <span className="text-[20px] font-bold text-navy-900 tracking-tight">{k.value.toFixed(1)}%</span>
-                <Sparkline values={mockTrendData[i] ?? []} status={status} />
-              </div>
-              <p className="text-[11px] text-gray-500 leading-relaxed border-t border-gray-50 pt-3">
-                {k.earlyWarningReason ?? 'No early-warning signal currently.'}
-              </p>
+              <ul className="space-y-1 text-[11px] text-gray-700">
+                {deteriorating.map((k) => (
+                  <li key={k.definitionId}>
+                    <span className="font-bold text-navy-900">{k.label}</span> — {k.narrative}
+                  </li>
+                ))}
+              </ul>
             </div>
-          );
-        })}
-      </div>
+          )}
+
+          <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Indicators</h2>
+            <ResultTable
+              rows={evaluations}
+              columns={columns}
+              rowKey={(k) => k.definitionId}
+              emptyMessage="No indicators configured."
+              renderDetail={(k) => <KriDetail evaluation={k} observations={series?.get(k.metricKey) ?? []} />}
+            />
+            <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
+              The slope is a least-squares fit over the window, not the difference between the first and last
+              observation, so one anomalous month does not read as a trend. &ldquo;If it persists&rdquo; projects the
+              current slope forward by another window — an extrapolation, not a forecast.
+            </p>
+          </section>
+        </>
+      )}
     </>
+  );
+}
+
+function KriDetail({
+  evaluation,
+  observations,
+}: {
+  evaluation: KriEvaluation;
+  observations: Array<{ asOfDate: string; value: number }>;
+}) {
+  if (observations.length === 0) {
+    return (
+      <p className="text-[11px] text-gray-500">
+        No run has produced this metric. Its element was not among the calculation elements selected.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] leading-relaxed text-gray-600">{evaluation.narrative}</p>
+      <div style={{ width: '100%', height: 180 }}>
+        <ResponsiveContainer>
+          <LineChart data={observations} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+            <CartesianGrid stroke="hsl(var(--gray-200))" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="asOfDate" tick={{ fontSize: 10, fill: 'hsl(var(--gray-500))' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--gray-500))' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--gray-200))' }}
+              formatter={(v: number) => formatMetric(v, evaluation.metricKey)}
+            />
+            <Line
+              type="monotone"
+              dataKey="value"
+              name={evaluation.label}
+              stroke={evaluation.trend === 'Deteriorating' ? 'hsl(var(--danger))' : 'hsl(var(--teal-700))'}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-[10px] text-gray-400">
+        {observations.length} observation{observations.length === 1 ? '' : 's'} from{' '}
+        {observations[0]!.asOfDate} to {observations[observations.length - 1]!.asOfDate}. One run per as-of date; where
+        a date was run more than once, the most recent stands.
+      </p>
+    </div>
   );
 }

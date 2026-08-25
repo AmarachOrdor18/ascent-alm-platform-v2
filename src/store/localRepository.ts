@@ -8,6 +8,7 @@
 
 import { db, AscentDb } from './db';
 import type { Dependency, PositionQuery, Repository, RuleQuery } from './repository';
+import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 import type {
   Affiliate,
   AuditEvent,
@@ -215,6 +216,47 @@ export class LocalRepository implements Repository {
     await this.database.runResults.bulkPut(results);
   }
 
+  // ── Limits ────────────────────────────────────────────────────────────
+  async listLimitConfigs(affiliateCode?: string): Promise<LimitConfig[]> {
+    const rows = await this.database.limitConfigs.toArray();
+    // A limit with a null affiliate is a Group-wide default and applies
+    // everywhere, so it is returned alongside the affiliate's own.
+    return rows
+      .filter((r) => !affiliateCode || r.affiliateCode === null || r.affiliateCode === affiliateCode)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  async upsertLimitConfig(config: LimitConfig): Promise<void> {
+    await this.database.limitConfigs.put(config);
+  }
+
+  async deleteLimitConfig(id: string): Promise<void> {
+    await this.database.limitConfigs.delete(id);
+  }
+
+  listTemporaryLimits(): Promise<TemporaryLimit[]> {
+    return this.database.temporaryLimits.toArray();
+  }
+
+  async upsertTemporaryLimit(temp: TemporaryLimit): Promise<void> {
+    await this.database.temporaryLimits.put(temp);
+  }
+
+  async deleteTemporaryLimit(id: string): Promise<void> {
+    await this.database.temporaryLimits.delete(id);
+  }
+
+  async listBreachNotes(breachId?: string): Promise<BreachNote[]> {
+    const rows = breachId
+      ? await this.database.breachNotes.where('breachId').equals(breachId).toArray()
+      : await this.database.breachNotes.toArray();
+    return rows.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+  }
+
+  async upsertBreachNote(note: BreachNote): Promise<void> {
+    await this.database.breachNotes.put(note);
+  }
+
   // ── Schedules ─────────────────────────────────────────────────────────
   async listSchedules(affiliateCode?: string): Promise<RunSchedule[]> {
     const rows = affiliateCode
@@ -357,6 +399,9 @@ export class LocalRepository implements Repository {
         this.database.runs,
         this.database.runResults,
         this.database.runSchedules,
+        this.database.limitConfigs,
+        this.database.temporaryLimits,
+        this.database.breachNotes,
         this.database.users,
         this.database.auditEvents,
         this.database.yieldCurves,
@@ -375,6 +420,9 @@ export class LocalRepository implements Repository {
           this.database.runs.clear(),
           this.database.runResults.clear(),
           this.database.runSchedules.clear(),
+          this.database.limitConfigs.clear(),
+          this.database.temporaryLimits.clear(),
+          this.database.breachNotes.clear(),
           this.database.users.clear(),
           this.database.auditEvents.clear(),
           this.database.yieldCurves.clear(),

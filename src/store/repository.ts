@@ -28,6 +28,8 @@ import type {
   User,
 } from '@/engine/types';
 
+import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
+
 export interface PositionQuery {
   affiliateCode?: string;
   asOfDate?: IsoDate;
@@ -85,6 +87,18 @@ export interface Repository {
   upsertRun(run: ProcessRun): Promise<void>;
   listRunResults(runId: string): Promise<RunResult[]>;
   insertRunResults(results: RunResult[]): Promise<void>;
+
+  // Limits
+  listLimitConfigs(affiliateCode?: string): Promise<LimitConfig[]>;
+  upsertLimitConfig(config: LimitConfig): Promise<void>;
+  deleteLimitConfig(id: string): Promise<void>;
+
+  listTemporaryLimits(): Promise<TemporaryLimit[]>;
+  upsertTemporaryLimit(temp: TemporaryLimit): Promise<void>;
+  deleteTemporaryLimit(id: string): Promise<void>;
+
+  listBreachNotes(breachId?: string): Promise<BreachNote[]>;
+  upsertBreachNote(note: BreachNote): Promise<void>;
 
   // Schedules
   listSchedules(affiliateCode?: string): Promise<RunSchedule[]>;

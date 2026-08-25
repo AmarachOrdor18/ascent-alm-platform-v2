@@ -8,6 +8,7 @@
 
 import type { Repository } from '@/store/repository';
 import type { LoadBatch, User } from '@/engine/types';
+import { SEED_LIMITS } from './limits';
 import { NIGERIA_AS_OF, NIGERIA_BATCH_ID, NIGERIA_POSITIONS } from './nigeria';
 import { GHANA_AS_OF, GHANA_BATCH_ID, GHANA_POSITIONS } from './ghana';
 import { COTEIVOIRE_AS_OF, COTEIVOIRE_BATCH_ID, COTEIVOIRE_POSITIONS } from './cotedivoire';
@@ -159,6 +160,7 @@ async function writeSeed(repo: Repository): Promise<void> {
   for (const indicator of ECONOMIC_INDICATORS) await repo.upsertEconomicIndicator(indicator);
   for (const calendar of HOLIDAY_CALENDARS) await repo.upsertHolidayCalendar(calendar);
   for (const user of SEED_USERS) await repo.upsertUser(user);
+  for (const limit of SEED_LIMITS) await repo.upsertLimitConfig(limit);
 
   // Phase 9: Seed all three affiliates (Nigeria, Ghana, Côte d'Ivoire) with committed data
   await repo.upsertBatch(NIGERIA_BATCH);
