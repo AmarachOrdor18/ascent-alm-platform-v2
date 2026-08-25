@@ -28,6 +28,38 @@ const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) =>
 
 /** Screens built so far. Anything absent renders the placeholder. */
 const BUILT: Record<string, ComponentType> = {
+  // Phase 4 — business rules, all on the shared RuleEditor shell
+  '/rules': lazy(() => import('@/pages/rules/ModelsAssumptions').then((m) => ({ default: m.ModelsAssumptions }))),
+  '/rules/time-buckets': lazy(() =>
+    import('@/pages/rules/TimeBucketRules').then((m) => ({ default: m.TimeBucketRules })),
+  ),
+  '/rules/product-characteristics': lazy(() =>
+    import('@/pages/rules/ProductCharacteristics').then((m) => ({ default: m.ProductCharacteristics })),
+  ),
+  '/rules/behaviour-patterns': lazy(() =>
+    import('@/pages/rules/BehaviourPatterns').then((m) => ({ default: m.BehaviourPatterns })),
+  ),
+  '/rules/patterns': lazy(() => import('@/pages/rules/SimpleRules').then((m) => ({ default: m.Patterns }))),
+  '/rules/prepayment': lazy(() => import('@/pages/rules/SimpleRules').then((m) => ({ default: m.PrepaymentRules }))),
+  '/rules/discount-methods': lazy(() =>
+    import('@/pages/rules/SimpleRules').then((m) => ({ default: m.DiscountMethods })),
+  ),
+  '/rules/scenarios': lazy(() =>
+    import('@/pages/rules/ForecastScenarios').then((m) => ({ default: m.ForecastScenarios })),
+  ),
+  '/rules/new-business': lazy(() => import('@/pages/rules/NewBusiness').then((m) => ({ default: m.NewBusiness }))),
+  '/rules/transaction-strategies': lazy(() =>
+    import('@/pages/rules/TransactionStrategies').then((m) => ({ default: m.TransactionStrategies })),
+  ),
+  '/rules/ftp': lazy(() => import('@/pages/rules/FtpAndAdjustments').then((m) => ({ default: m.FtpRules }))),
+  '/rules/adjustments': lazy(() =>
+    import('@/pages/rules/FtpAndAdjustments').then((m) => ({ default: m.AdjustmentRules })),
+  ),
+  '/rules/filters': lazy(() => import('@/pages/rules/SimpleRules').then((m) => ({ default: m.Filters }))),
+  '/rules/custom-metrics': lazy(() =>
+    import('@/pages/rules/CustomMetrics').then((m) => ({ default: m.CustomMetrics })),
+  ),
+
   // Phase 3 — setup and onboarding
   '/affiliates': lazy(() => import('@/pages/Affiliates').then((m) => ({ default: m.Affiliates }))),
   '/affiliates/onboard': lazy(() => import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate }))),
