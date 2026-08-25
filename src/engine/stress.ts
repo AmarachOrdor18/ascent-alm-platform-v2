@@ -47,19 +47,25 @@ export function computeCounterbalancingCapacity(
   haircutPercent = 0,
 ): CounterbalancingCapacity {
   const haircut = haircutPercent / 100;
-  const value = (p: Position, weight: number) => convert(p.amount * weight, p.currency, ctx.reportingCurrency, ctx.fx);
 
-  const unencumberedHqla = positions
-    .filter((p) => p.lcrCashflowRole === 'HQLA' && !p.isEncumbered)
-    .reduce((s, p) => s + value(p, Math.max(0, 1 - p.hqlaHaircutPct / 100 - haircut)), 0);
+  /** Lien-free portion only, after haircut. */
+  const eligible = (p: Position) =>
+    convert(
+      Math.max(0, p.amount - p.lienAmount) * Math.max(0, 1 - p.hqlaHaircutPct / 100 - haircut),
+      p.currency,
+      ctx.reportingCurrency,
+      ctx.fx,
+    );
+
+  const unencumberedHqla = positions.filter((p) => p.lcrCashflowRole === 'HQLA').reduce((s, p) => s + eligible(p), 0);
 
   const committedLinesAvailable = positions
     .filter((p) => p.category === 'Asset' && p.isOffBalanceSheet && p.obsType === 'Undrawn Commitment')
     .reduce((s, p) => s + convert(p.undrawnAmount ?? 0, p.currency, ctx.reportingCurrency, ctx.fx), 0);
 
   const otherMarketableAssets = positions
-    .filter((p) => p.category === 'Asset' && p.hqlaLevel !== 'None' && p.lcrCashflowRole !== 'HQLA' && !p.isEncumbered)
-    .reduce((s, p) => s + value(p, Math.max(0, 1 - p.hqlaHaircutPct / 100 - haircut)), 0);
+    .filter((p) => p.category === 'Asset' && p.hqlaLevel !== 'None' && p.lcrCashflowRole !== 'HQLA')
+    .reduce((s, p) => s + eligible(p), 0);
 
   return {
     unencumberedHqla,
@@ -68,9 +74,10 @@ export function computeCounterbalancingCapacity(
     total: unencumberedHqla + committedLinesAvailable + otherMarketableAssets,
     currency: ctx.reportingCurrency,
     methodology:
-      'Counterbalancing capacity = unencumbered HQLA net of haircuts, plus committed undrawn lines available to ' +
-      'the bank, plus other unencumbered marketable assets. Encumbered assets are excluded: pledged collateral ' +
-      'cannot be realised twice. Commitments the bank has granted are outflows, not capacity, and are excluded.',
+      'Counterbalancing capacity = the lien-free portion of HQLA net of haircuts, plus committed undrawn lines ' +
+      'available to the bank, plus other unencumbered marketable assets. Liens are netted as amounts rather than ' +
+      'excluding the whole position, since pledges are usually partial. Commitments the bank has granted are ' +
+      'outflows, not capacity, and are excluded.',
   };
 }
 

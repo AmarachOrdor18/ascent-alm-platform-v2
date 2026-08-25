@@ -13,6 +13,11 @@
  *    was literally `Number(p.amount)` with no currency check anywhere, so
  *    NGN, GHS, XOF and USD were added together (defect D-02). Every
  *    aggregate here goes through `convert`.
+ *
+ * 3. **Internal accounts are excluded from customer metrics.** Core banking
+ *    systems classify every account, and suspense or internal accounts are
+ *    not customer money. Counting them inflates loan-to-deposit and
+ *    depositor concentration.
  */
 
 import type { CurrencyCode, IsoDate, Position, TimeBucketLadder } from './types';
@@ -67,11 +72,12 @@ export interface LcrStress {
  * `HQLA / max(net cash outflows, 0)`, where net cash outflows are gross
  * 30-day outflows less inflows capped at 75% of outflows.
  *
- * Encumbered assets are excluded from HQLA. Basel requires HQLA to be
- * unencumbered; v1's `isHqla` tested only whether the product name matched
- * `/government securities/i`, so a bill pledged against a repo counted and
- * overstated the ratio (defect D-03). The amount excluded is reported so the
- * effect is visible rather than silent.
+ * Only the *unencumbered* portion counts. Liens are amounts rather than
+ * flags, because real liens are partial: a bond of 500 carrying a lien of
+ * 200 contributes 300 of HQLA — not nothing, and not all of it. v1 tested
+ * only whether the product name matched `/government securities/i`, so a
+ * pledged bill counted in full (defect D-03). The encumbered amount is
+ * reported so the effect is visible rather than silent.
  */
 export function computeLcr(positions: Position[], ctx: LiquidityContext, stress: LcrStress = {}): LcrResult {
   const extraHaircut = (stress.hqlaHaircutPercent ?? 0) / 100;
@@ -79,21 +85,27 @@ export function computeLcr(positions: Position[], ctx: LiquidityContext, stress:
   const inflowSuppression = (stress.inflowSuppressionPercent ?? 0) / 100;
 
   const hqlaCandidates = positions.filter((p) => p.lcrCashflowRole === 'HQLA');
-  const unencumbered = hqlaCandidates.filter((p) => !p.isEncumbered);
 
-  const hqlaWeight = (p: Position) => Math.max(0, 1 - p.hqlaHaircutPct / 100 - extraHaircut);
-  const hqla = sumConverted(unencumbered, ctx, hqlaWeight);
+  const haircutWeight = (p: Position) => Math.max(0, 1 - p.hqlaHaircutPct / 100 - extraHaircut);
+  /** Only the portion free of lien is eligible, after its own haircut. */
+  const eligibleAmount = (p: Position) => Math.max(0, p.amount - p.lienAmount) * haircutWeight(p);
+
+  const hqla = hqlaCandidates.reduce(
+    (total, p) => total + convert(eligibleAmount(p), p.currency, ctx.reportingCurrency, ctx.fx),
+    0,
+  );
 
   const hqlaByLevel: Record<string, number> = {};
-  for (const p of unencumbered) {
-    const value = convert(p.amount * hqlaWeight(p), p.currency, ctx.reportingCurrency, ctx.fx);
+  for (const p of hqlaCandidates) {
+    const value = convert(eligibleAmount(p), p.currency, ctx.reportingCurrency, ctx.fx);
+    if (value === 0) continue;
     hqlaByLevel[p.hqlaLevel] = (hqlaByLevel[p.hqlaLevel] ?? 0) + value;
   }
 
-  const excludedEncumbered = sumConverted(
-    hqlaCandidates.filter((p) => p.isEncumbered),
-    ctx,
-    hqlaWeight,
+  const excludedEncumbered = hqlaCandidates.reduce(
+    (total, p) =>
+      total + convert(Math.min(p.amount, p.lienAmount) * haircutWeight(p), p.currency, ctx.reportingCurrency, ctx.fx),
+    0,
   );
 
   const grossOutflows = sumConverted(
@@ -208,17 +220,36 @@ export function computeLoanToDeposit(positions: Position[], ctx: LiquidityContex
     ratioPercent: deposits > 0 ? (loans / deposits) * 100 : null,
     currency: ctx.reportingCurrency,
     methodology:
-      'Total customer loans over total customer deposits, both classified by Common Chart of Accounts mapping. ' +
-      'Interbank placements and borrowings are excluded from both, being wholesale rather than customer flows.',
+      'Total customer loans over total customer deposits. Interbank placements and borrowings are excluded from ' +
+      'both, being wholesale rather than customer flows, and so are internal, suspense, nostro and vostro ' +
+      'accounts — they are not customer money and counting them would inflate the ratio.',
   };
 }
 
+/**
+ * Customer loans.
+ *
+ * `accountClass` does the work an internal-account exclusion needs: a
+ * suspense account holding loan-recovery entries is not a customer loan,
+ * however its product is described.
+ */
 export function isLoan(p: Position): boolean {
-  return p.category === 'Asset' && /^loans|trade finance/i.test(p.productClass) && !/interbank/i.test(p.productClass);
+  return (
+    p.category === 'Asset' &&
+    p.accountClass === 'Customer' &&
+    /^loans|trade finance/i.test(p.productClass) &&
+    !/interbank/i.test(p.productClass)
+  );
 }
 
+/** Customer deposits. Internal, suspense, nostro and vostro balances are not. */
 export function isDeposit(p: Position): boolean {
-  return p.category === 'Liability' && /deposits/i.test(p.productClass) && !/interbank/i.test(p.productClass);
+  return (
+    p.category === 'Liability' &&
+    p.accountClass === 'Customer' &&
+    /deposits/i.test(p.productClass) &&
+    !/interbank/i.test(p.productClass)
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────

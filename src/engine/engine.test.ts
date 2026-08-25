@@ -24,6 +24,7 @@ import { validatePositions } from './validation';
 import { checkFreshness, currentBatch, planSupersede, priorAsOfDate } from './vintage';
 import { reconcile, type LedgerBalance } from './reconciliation';
 import { buildHierarchy, descendantCodes, filterByDimension, rollup, unmappedCodes } from './dimensions';
+import { ORG_UNITS } from '@/data/seed/dimensions';
 import { computeProfitability, computeFxPosition } from './profitability';
 import { interpolateCurve, resolveAdjustmentBps, computeFtp, type YieldCurve, type AdjustmentRule } from './ftp';
 import { draftRun, executeRun, ALL_ELEMENTS } from './run';
@@ -459,76 +460,53 @@ describe('reconciliation', () => {
     tolerancePercent: 0.5,
   };
 
+  /** A ledger agreeing with the book, derived from the positions themselves. */
+  function ledgerFromPositions(adjust: Record<string, number> = {}): LedgerBalance[] {
+    const byGl = new Map<string, number>();
+    for (const p of NIGERIA_POSITIONS) {
+      byGl.set(p.glAccountCode, (byGl.get(p.glAccountCode) ?? 0) + p.amount);
+    }
+    return Array.from(byGl.entries()).map(([glAccountCode, balance]) => ({
+      glAccountCode,
+      orgUnitCode: null,
+      currency: 'NGN',
+      endingBalance: balance + (adjust[glAccountCode] ?? 0),
+      asOfDate: NIGERIA_AS_OF,
+    }));
+  }
+
   it('signs off when instrument data matches the ledger', () => {
-    const ledger: LedgerBalance[] = [
-      {
-        glAccountCode: 'GL-NG-1000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 2_280_000,
-        asOfDate: NIGERIA_AS_OF,
-      },
-      {
-        glAccountCode: 'GL-NG-2000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 1_980_000,
-        asOfDate: NIGERIA_AS_OF,
-      },
-      {
-        glAccountCode: 'GL-NG-3000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 300_000,
-        asOfDate: NIGERIA_AS_OF,
-      },
-    ];
-    const result = reconcile(NIGERIA_POSITIONS, ledger, rctx);
+    const result = reconcile(NIGERIA_POSITIONS, ledgerFromPositions(), rctx);
     expect(result.canSignOff).toBe(true);
     expect(result.totalVariance).toBeCloseTo(0, 6);
   });
 
+  it('reconciles at the local GL account level, not by category', () => {
+    const result = reconcile(NIGERIA_POSITIONS, ledgerFromPositions(), rctx);
+    // Six-digit local account codes on the real three-level chart, so far
+    // more than one line per category.
+    expect(result.lines.length).toBeGreaterThan(3);
+    expect(result.lines.every((l) => /^[0-9]{6}$/.test(l.glAccountCode))).toBe(true);
+  });
+
   it('proposes a plug for an immaterial variance but never posts it automatically', () => {
-    const ledger: LedgerBalance[] = [
-      {
-        glAccountCode: 'GL-NG-1000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 2_279_500,
-        asOfDate: NIGERIA_AS_OF,
-      },
-      {
-        glAccountCode: 'GL-NG-2000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 1_980_000,
-        asOfDate: NIGERIA_AS_OF,
-      },
-      {
-        glAccountCode: 'GL-NG-3000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 300_000,
-        asOfDate: NIGERIA_AS_OF,
-      },
-    ];
-    const result = reconcile(NIGERIA_POSITIONS, ledger, rctx);
+    // Both tolerances must be satisfied: 100 is inside the 1,000 absolute
+    // limit and inside 0.5% of the account, so it plugs rather than blocks.
+    const result = reconcile(NIGERIA_POSITIONS, ledgerFromPositions({ '200101': -100 }), rctx);
     expect(result.suggestedPlugs).toHaveLength(1);
-    expect(result.suggestedPlugs[0]!.amount).toBeCloseTo(-500, 6);
+    expect(result.suggestedPlugs[0]!.amount).toBeCloseTo(-100, 6);
     expect(result.canSignOff).toBe(true);
   });
 
+  it('blocks a variance that is small in absolute terms but large for the account', () => {
+    // 500 on a 100,000 account is 0.5% — inside the absolute tolerance but
+    // on the percentage limit. Both have to pass.
+    const result = reconcile(NIGERIA_POSITIONS, ledgerFromPositions({ '200101': -600 }), rctx);
+    expect(result.canSignOff).toBe(false);
+  });
+
   it('blocks sign-off on a material variance', () => {
-    const ledger: LedgerBalance[] = [
-      {
-        glAccountCode: 'GL-NG-1000',
-        orgUnitCode: null,
-        currency: 'NGN',
-        endingBalance: 2_000_000,
-        asOfDate: NIGERIA_AS_OF,
-      },
-    ];
-    const result = reconcile(NIGERIA_POSITIONS, ledger, rctx);
+    const result = reconcile(NIGERIA_POSITIONS, ledgerFromPositions({ '200101': -250_000 }), rctx);
     expect(result.canSignOff).toBe(false);
     expect(result.linesOutOfTolerance).toBeGreaterThan(0);
   });
@@ -536,7 +514,7 @@ describe('reconciliation', () => {
   it('surfaces an account present on only one side', () => {
     const ledger: LedgerBalance[] = [
       {
-        glAccountCode: 'GL-NG-9999',
+        glAccountCode: '999999',
         orgUnitCode: null,
         currency: 'NGN',
         endingBalance: 50_000,
@@ -544,27 +522,41 @@ describe('reconciliation', () => {
       },
     ];
     const result = reconcile([], ledger, rctx);
-    expect(result.lines.find((l) => l.glAccountCode === 'GL-NG-9999')!.variance).toBeCloseTo(-50_000, 6);
+    expect(result.lines.find((l) => l.glAccountCode === '999999')!.variance).toBeCloseTo(-50_000, 6);
   });
 });
 
 describe('dimensions', () => {
-  const members: DimensionMember[] = [
-    { id: '1', dimension: 'OrgUnit', code: 'OU-NG', name: 'Nigeria', parentCode: null, isLeaf: false },
-    { id: '2', dimension: 'OrgUnit', code: 'OU-NG-RET', name: 'Retail', parentCode: 'OU-NG', isLeaf: true },
-    { id: '3', dimension: 'OrgUnit', code: 'OU-NG-COR', name: 'Corporate', parentCode: 'OU-NG', isLeaf: true },
-    { id: '4', dimension: 'OrgUnit', code: 'OU-NG-TSY', name: 'Treasury', parentCode: 'OU-NG', isLeaf: true },
-  ];
+  // The real hierarchy, including the branch and desk level beneath each
+  // segment. Selecting a rollup has to bring those along.
+  const members = ORG_UNITS.filter((m) => m.code === 'OU-GROUP' || m.code.startsWith('OU-NG'));
 
-  it('expands a rollup node to all descendants', () => {
-    expect(descendantCodes(members, 'OU-NG').sort()).toEqual(['OU-NG', 'OU-NG-COR', 'OU-NG-RET', 'OU-NG-TSY']);
+  it('expands a rollup node to its whole subtree, three levels deep', () => {
+    const all = descendantCodes(members, 'OU-NG');
+    expect(all).toContain('OU-NG');
+    expect(all).toContain('OU-NG-RET');
+    // The branch and desk level beneath must come along too.
+    expect(all).toContain('OU-NG-RET-LAGOS');
+    expect(all).toContain('OU-NG-COR-LARGE-CORPORATES');
+    expect(all.length).toBeGreaterThan(10);
   });
 
   it('builds a tree with depths', () => {
     const tree = buildHierarchy(members);
+    // One root: the Group node the affiliate hangs off.
     expect(tree).toHaveLength(1);
-    expect(tree[0]!.children).toHaveLength(3);
-    expect(tree[0]!.children[0]!.depth).toBe(1);
+    expect(tree[0]!.code).toBe('OU-GROUP');
+
+    const nigeria = tree[0]!.children.find((c) => c.code === 'OU-NG')!;
+    expect(nigeria.depth).toBe(1);
+    // Four segments: Retail, Corporate, Treasury, Wealth.
+    expect(nigeria.children).toHaveLength(4);
+
+    const retail = nigeria.children.find((c) => c.code === 'OU-NG-RET')!;
+    expect(retail.depth).toBe(2);
+    // …and the regional network beneath Retail.
+    expect(retail.children.length).toBeGreaterThan(0);
+    expect(retail.children[0]!.depth).toBe(3);
   });
 
   it('filters positions by a rollup selection', () => {
@@ -575,6 +567,12 @@ describe('dimensions', () => {
     expect(retail.length).toBeLessThan(all.length);
   });
 
+  it('selecting a branch is narrower than selecting its segment', () => {
+    const segment = filterByDimension(NIGERIA_POSITIONS, 'OrgUnit', ['OU-NG-RET'], members);
+    const branch = filterByDimension(NIGERIA_POSITIONS, 'OrgUnit', ['OU-NG-RET-LAGOS'], members);
+    expect(branch.length).toBeLessThanOrEqual(segment.length);
+  });
+
   it('treats an empty selection as no constraint, not an empty result', () => {
     expect(filterByDimension(NIGERIA_POSITIONS, 'OrgUnit', [], members)).toHaveLength(NIGERIA_POSITIONS.length);
   });
@@ -582,6 +580,7 @@ describe('dimensions', () => {
   it('rolls balances up the hierarchy', () => {
     const totals = rollup(NIGERIA_POSITIONS, 'OrgUnit', members);
     const root = totals.find((t) => t.code === 'OU-NG')!;
+    // Nothing is booked at the rollup itself; everything sits at a leaf.
     expect(root.amount).toBe(0);
     expect(root.rollupAmount).toBeCloseTo(
       NIGERIA_POSITIONS.reduce((s, p) => s + p.amount, 0),
@@ -590,7 +589,9 @@ describe('dimensions', () => {
   });
 
   it('reports codes referenced by positions but missing from the dimension', () => {
-    expect(unmappedCodes(NIGERIA_POSITIONS, 'OrgUnit', members.slice(0, 1))).toContain('OU-NG-RET');
+    expect(unmappedCodes(NIGERIA_POSITIONS, 'OrgUnit', members.slice(0, 1)).length).toBeGreaterThan(0);
+    // Against the full hierarchy nothing is unmapped.
+    expect(unmappedCodes(NIGERIA_POSITIONS, 'OrgUnit', members)).toEqual([]);
   });
 });
 

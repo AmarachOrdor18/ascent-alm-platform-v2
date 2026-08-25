@@ -43,6 +43,13 @@ export type LimitStatus = 'Green' | 'Amber' | 'Red';
 export type DimensionType =
   'LegalEntity' | 'OrgUnit' | 'Product' | 'GlAccount' | 'CommonCoa' | 'FinancialElement' | 'Counterparty' | 'Country';
 
+/**
+ * GL depth. Real charts of accounts are hierarchical numeric codes where the
+ * child embeds its parent — category 20, group 2001, account 200101 — and
+ * reconciliation is performed *at a level*, not against a flat list.
+ */
+export type GlLevel = 'Category' | 'Level1' | 'Level2';
+
 /** A node in a dimension hierarchy. `parentCode: null` marks a root. */
 export interface DimensionMember {
   id: string;
@@ -119,6 +126,65 @@ export type AccrualBasis = '30/360' | 'Actual/360' | 'Actual/Actual' | '30/365' 
 export type ObsType =
   'Undrawn Commitment' | 'Guarantee' | 'Letter of Credit' | 'IR Swap' | 'FX Forward' | 'Cap' | 'Floor';
 
+/**
+ * What kind of account a position sits on.
+ *
+ * Core banking systems carry this on every account, and it matters here:
+ * internal and suspense accounts are not customer money. Without the
+ * distinction they are counted as customer deposits, which inflates
+ * loan-to-deposit and depositor concentration — the same class of quiet
+ * error as counting pledged collateral as HQLA.
+ */
+export type AccountClass = 'Customer' | 'Internal' | 'Suspense' | 'Nostro' | 'Vostro';
+
+/** Maker-checker state, carried on reference and account data as well as rules. */
+export type RecordStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'CLOSED' | 'DORMANT';
+
+/**
+ * Four-eyes and lifecycle metadata.
+ *
+ * Every row in a real core-banking extract carries these — the chart of
+ * accounts and the accounts alike, not just business rules.
+ */
+export interface RecordControl {
+  maker: string;
+  checker: string | null;
+  status: RecordStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Account turnover.
+ *
+ * This is the behavioural signal the platform previously had no access to.
+ * A current account with no movement in three months runs off nothing like
+ * an actively-used one, however they are classified by product.
+ */
+export interface AccountTurnover {
+  dailyCredit: number;
+  dailyDebit: number;
+  monthlyCredit: number;
+  monthlyDebit: number;
+  totalCredit: number;
+  totalDebit: number;
+}
+
+/**
+ * An overdraft facility attached to an account.
+ *
+ * The undrawn portion is an LCR outflow, and the expiry decides whether it
+ * falls inside the 30-day window. Core systems give the facility its own GL
+ * account, which is why the code is carried here.
+ */
+export interface OverdraftFacility {
+  productCode: string;
+  limit: number;
+  drawnAmount: number;
+  expiryDate: IsoDate | null;
+  glAccountCode: string | null;
+}
+
 export interface Position {
   id: string;
   affiliateCode: string;
@@ -126,6 +192,15 @@ export interface Position {
   asOfDate: IsoDate;
   /** Which load batch committed this row — the lineage pointer (defect P-19). */
   batchId: string;
+
+  /** The account this position sits on. Core systems embed the GL code in it. */
+  accountNumber: string;
+  /** Pre-migration account number, where one exists — migration lineage. */
+  legacyAccountNumber: string | null;
+  /** Internal and suspense accounts are excluded from customer metrics. */
+  accountClass: AccountClass;
+  /** Branch that owns the account, beneath the organisational unit. */
+  branchCode: string | null;
 
   category: PositionCategory;
   productCode: string;
@@ -177,9 +252,15 @@ export interface Position {
   daysPastDue: number | null;
   provisionAmount: number | null;
 
-  /** Basel requires HQLA to be unencumbered. v1 ignored this and overstated LCR (defect D-03). */
-  isEncumbered: boolean;
-  encumbranceReason: string | null;
+  /**
+   * Amount under lien, in the position's own currency.
+   *
+   * Basel requires HQLA to be unencumbered. This is an amount rather than a
+   * flag because real liens are partial: a bond of 500 with a lien of 200
+   * contributes 300 of HQLA, not nothing and not all of it.
+   */
+  lienAmount: number;
+  lienReason: string | null;
 
   // Off-balance-sheet
   isOffBalanceSheet: boolean;
@@ -187,6 +268,15 @@ export interface Position {
   notionalAmount: number | null;
   undrawnAmount: number | null;
   ccfPct: number | null;
+
+  /** Movement on the account. Absent for positions loaded without turnover. */
+  turnover: AccountTurnover | null;
+
+  /** Attached overdraft facility, where the account has one. */
+  overdraft: OverdraftFacility | null;
+
+  /** Four-eyes and lifecycle metadata from the source system. */
+  control: RecordControl;
 
   /** Free text recording the assumption basis, surfaced on drill-down. */
   notes: string | null;

@@ -187,16 +187,44 @@ describe('phase-1 gate — survival horizon', () => {
 });
 
 describe('beyond the workbook — capabilities v1 lacked', () => {
-  it('excludes encumbered assets from HQLA and reports the amount', () => {
+  it('excludes a fully pledged asset from HQLA and reports the amount', () => {
+    // POS004 is 150,000 of FGN bonds. Pledge the lot.
     const pledged = NIGERIA_POSITIONS.map((p) =>
-      p.id === 'POS004' ? { ...p, isEncumbered: true, encumbranceReason: 'Repo collateral' } : p,
+      p.id === 'POS004' ? { ...p, lienAmount: p.amount, lienReason: 'Repo collateral' } : p,
     );
     const result = computeLcr(pledged, ctx);
 
     expect(result.excludedEncumbered).toBeCloseTo(150_000, 6);
     expect(result.hqla).toBeCloseTo(WORKBOOK.hqla - 150_000, 6);
-    // v1 counted pledged bills as HQLA, overstating the ratio by ~47pp here.
+    // v1 counted pledged bills in full, overstating the ratio here.
     expect(result.lcrPercent!).toBeLessThan(WORKBOOK.lcrPercent);
+  });
+
+  it('nets a PARTIAL lien rather than excluding the whole position', () => {
+    // Real liens are partial: 60,000 pledged out of 150,000 leaves 90,000
+    // eligible. A boolean flag has to choose between 0 and 150,000, and both
+    // answers are wrong.
+    const partial = NIGERIA_POSITIONS.map((p) =>
+      p.id === 'POS004' ? { ...p, lienAmount: 60_000, lienReason: 'Partial repo pledge' } : p,
+    );
+    const result = computeLcr(partial, ctx);
+
+    expect(result.excludedEncumbered).toBeCloseTo(60_000, 6);
+    expect(result.hqla).toBeCloseTo(WORKBOOK.hqla - 60_000, 6);
+  });
+
+  it('excludes internal and suspense accounts from customer ratios', () => {
+    // An internal suspense account holding loan-recovery entries is not a
+    // customer loan, however its product is described. Counting it would
+    // inflate loan-to-deposit.
+    const suspense = {
+      ...NIGERIA_POSITIONS.find((p) => p.id === 'POS011')!,
+      id: 'INTERNAL-1',
+      accountClass: 'Internal' as const,
+      amount: 500_000,
+    };
+    const result = computeLoanToDeposit([...NIGERIA_POSITIONS, suspense], ctx);
+    expect(result.ratioPercent).toBeCloseTo(WORKBOOK.ldrPercent, 6);
   });
 
   it('groups concentration by counterparty, not by affiliate', () => {

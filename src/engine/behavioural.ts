@@ -113,6 +113,8 @@ export interface RunoffLine {
   volatileAmount: number;
   corePercent: number;
   patternName: string | null;
+  /** Movement-based classification, which adjusts the split above. */
+  activity: ActivityLevel;
 }
 
 export interface DepositRunoffResult {
@@ -161,16 +163,22 @@ export function computeDepositRunoff(
         volatileAmount: 0,
         corePercent: 0,
         patternName: null,
+        activity: classifyActivity(p),
       });
       continue;
     }
 
     // Stress shifts balance from core to volatile: a run makes stickier
     // money leave sooner. Capped so the volatile share cannot exceed 100%.
-    const volatileShare = Math.min(
-      100,
-      pattern.tiers.filter((t) => t.type === 'Volatile').reduce((s, t) => s + t.percent, 0) * stressMultiplier,
-    );
+    const patternVolatile = pattern.tiers.filter((t) => t.type === 'Volatile').reduce((s, t) => s + t.percent, 0);
+
+    // A quiet account is stickier than its product implies, so part of the
+    // volatile share is reclassified as core before stress is applied.
+    const activity = classifyActivity(p);
+    const uplift = ACTIVITY_CORE_UPLIFT[activity];
+    const adjustedVolatile = patternVolatile * (1 - uplift);
+
+    const volatileShare = Math.min(100, adjustedVolatile * stressMultiplier);
     const coreShare = 100 - volatileShare;
 
     lines.push({
@@ -182,6 +190,7 @@ export function computeDepositRunoff(
       volatileAmount: (p.amount * volatileShare) / 100,
       corePercent: coreShare,
       patternName: pattern.name,
+      activity,
     });
   }
 
@@ -242,6 +251,51 @@ export function applyBehaviouralMaturity(
 
   return out;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dormancy
+// ─────────────────────────────────────────────────────────────────────────
+
+export type ActivityLevel = 'Active' | 'Low' | 'Dormant' | 'Unknown';
+
+/**
+ * Classify an account by its movement.
+ *
+ * Turnover is the behavioural signal the platform previously had no access
+ * to. Product type says a current account is volatile; turnover says whether
+ * *this* current account has moved at all this quarter. A dormant balance is
+ * materially stickier than an active one of the same product, and treating
+ * them identically is why assumption-based run-off models drift.
+ *
+ * Returns `Unknown` rather than guessing when no turnover was loaded.
+ */
+export function classifyActivity(position: Position): ActivityLevel {
+  const t = position.turnover;
+  if (!t) return 'Unknown';
+
+  const monthlyMovement = Math.abs(t.monthlyCredit) + Math.abs(t.monthlyDebit);
+  if (monthlyMovement === 0) return 'Dormant';
+
+  // Movement as a share of the balance: a large account moving a token
+  // amount is behaviourally quiet even though the absolute figure is big.
+  const turnoverRatio = position.amount > 0 ? monthlyMovement / position.amount : 0;
+  if (turnoverRatio < 0.02) return 'Low';
+  return 'Active';
+}
+
+/**
+ * How much of a deposit's volatile share to reclassify as core, by activity.
+ *
+ * A dormant balance behaves like core money regardless of its product
+ * classification; an active one behaves like its product suggests. These are
+ * assumptions, stated rather than fitted.
+ */
+export const ACTIVITY_CORE_UPLIFT: Record<ActivityLevel, number> = {
+  Dormant: 0.5,
+  Low: 0.25,
+  Active: 0,
+  Unknown: 0,
+};
 
 // ─────────────────────────────────────────────────────────────────────────
 // Deposit betas

@@ -11,6 +11,16 @@
  */
 
 import { PRODUCTS } from './products';
+import {
+  CORE_DIMENSIONS,
+  COMMON_COA,
+  COUNTERPARTIES,
+  FINANCIAL_ELEMENTS,
+  GL_ACCOUNTS,
+  LEGAL_ENTITIES,
+  LOCAL_GL,
+  ORG_UNITS,
+} from './dimensions';
 import type {
   Affiliate,
   DimensionMember,
@@ -116,136 +126,15 @@ export const AFFILIATES: Affiliate[] = [
 // Dimensions
 // ─────────────────────────────────────────────────────────────────────────
 
-function member(
-  dimension: DimensionMember['dimension'],
-  code: string,
-  name: string,
-  parentCode: string | null,
-  isLeaf: boolean,
-  attributes?: DimensionMember['attributes'],
-): DimensionMember {
-  return {
-    id: `${dimension}:${code}`,
-    dimension,
-    code,
-    name,
-    parentCode,
-    isLeaf,
-    ...(attributes ? { attributes } : {}),
-  };
-}
-
-export const LEGAL_ENTITIES: DimensionMember[] = [
-  member('LegalEntity', 'LE-GROUP', 'Ecobank Transnational Incorporated', null, false),
-  member('LegalEntity', 'LE-NG', 'Ecobank Nigeria Limited', 'LE-GROUP', true, { regulator: 'CBN' }),
-  member('LegalEntity', 'LE-GH', 'Ecobank Ghana PLC', 'LE-GROUP', true, { regulator: 'Bank of Ghana' }),
-  member('LegalEntity', 'LE-CI', "Ecobank Côte d'Ivoire SA", 'LE-GROUP', true, { regulator: 'BCEAO' }),
-];
-
-/** Org units follow a common Group template so affiliates stay comparable. */
-export const ORG_UNITS: DimensionMember[] = [
-  member('OrgUnit', 'OU-GROUP', 'Ecobank Group', null, false),
-  ...['NG', 'GH', 'CI'].flatMap((code) => {
-    const label = { NG: 'Nigeria', GH: 'Ghana', CI: "Côte d'Ivoire" }[code]!;
-    return [
-      member('OrgUnit', `OU-${code}`, label, 'OU-GROUP', false),
-      member('OrgUnit', `OU-${code}-RET`, `${label} — Retail Banking`, `OU-${code}`, true),
-      member('OrgUnit', `OU-${code}-COR`, `${label} — Corporate Banking`, `OU-${code}`, true),
-      member('OrgUnit', `OU-${code}-TSY`, `${label} — Treasury`, `OU-${code}`, true),
-    ];
-  }),
-];
-
 // Product dimension is generated from the workbook alongside the positions,
 // so a position can never reference a code the dimension lacks.
 export { PRODUCTS } from './products';
 
-/**
- * The Group-standard chart of accounts every local GL maps onto.
- *
- * This mapping is what makes a Nigerian GL and an Ivorian GL comparable at
- * Group level — for a bank whose proposition is "One Bank, One Africa"
- * across 33 balance sheets, it is the platform.
- */
-export const COMMON_COA: DimensionMember[] = [
-  member('CommonCoa', 'COA-ROOT', 'Group Chart of Accounts', null, false),
-  member('CommonCoa', 'COA-ASSET', 'Assets', 'COA-ROOT', true),
-  member('CommonCoa', 'COA-LIAB', 'Liabilities', 'COA-ROOT', true),
-  member('CommonCoa', 'COA-CAPITAL', 'Capital & Reserves', 'COA-ROOT', true),
-];
+// The six core dimensions come from `dimensions.ts`; Product is generated
+// from the workbook so a position can never cite a code the dimension lacks.
+export { COMMON_COA, COUNTERPARTIES, FINANCIAL_ELEMENTS, GL_ACCOUNTS, LEGAL_ENTITIES, LOCAL_GL, ORG_UNITS };
 
-export const GL_ACCOUNTS: DimensionMember[] = [
-  member('GlAccount', 'GL-ROOT', 'General Ledger', null, false),
-  ...['NG', 'GH', 'CI'].flatMap((code) => [
-    member('GlAccount', `GL-${code}-1000`, `${code} — Assets`, 'GL-ROOT', true, { commonCoa: 'COA-ASSET' }),
-    member('GlAccount', `GL-${code}-2000`, `${code} — Liabilities`, 'GL-ROOT', true, { commonCoa: 'COA-LIAB' }),
-    member('GlAccount', `GL-${code}-3000`, `${code} — Capital`, 'GL-ROOT', true, { commonCoa: 'COA-CAPITAL' }),
-  ]),
-];
-
-/** What is being measured, so one results table serves every metric. */
-export const FINANCIAL_ELEMENTS: DimensionMember[] = [
-  member('FinancialElement', 'FE-ROOT', 'Financial Elements', null, false),
-  member('FinancialElement', 'FE-100', 'Ending Balance', 'FE-ROOT', true),
-  member('FinancialElement', 'FE-140', 'Average Balance', 'FE-ROOT', true),
-  member('FinancialElement', 'FE-430', 'Interest Accrued', 'FE-ROOT', true),
-  member('FinancialElement', 'FE-660', 'Repricing Gap', 'FE-ROOT', true),
-  member('FinancialElement', 'FE-1660', 'Liquidity Runoff', 'FE-ROOT', true),
-];
-
-/**
- * Counterparties, without which depositor concentration is not computable
- * (defect D-04). Ghana deliberately carries one dominant depositor so the
- * demo has a real concentration breach to resolve.
- */
-export const COUNTERPARTIES: DimensionMember[] = [
-  member('Counterparty', 'CP-ROOT', 'All Counterparties', null, false),
-  member('Counterparty', 'CP-SOVEREIGN-NG', 'Federal Government of Nigeria', 'CP-ROOT', true, {
-    sector: 'Sovereign',
-    rating: 'B-',
-  }),
-  member('Counterparty', 'CP-NG-INTERBANK', 'Nigerian Interbank Market', 'CP-ROOT', true, {
-    sector: 'Financial Institution',
-  }),
-  member('Counterparty', 'CP-NG-RETAIL-POOL', 'Retail Depositor Pool — Nigeria', 'CP-ROOT', true, {
-    sector: 'Retail',
-    note: 'Aggregated: no single depositor exceeds reporting threshold',
-  }),
-  ...[1, 2, 3].map((n) =>
-    member(
-      'Counterparty',
-      `CP-NG-CORP-${String(n).padStart(2, '0')}`,
-      `Nigerian Corporate Depositor ${n}`,
-      'CP-ROOT',
-      true,
-      { sector: 'Corporate' },
-    ),
-  ),
-  ...[1, 2, 3, 4, 5].map((n) =>
-    member(
-      'Counterparty',
-      `CP-NG-OBLIGOR-${String(n).padStart(2, '0')}`,
-      `Nigerian Corporate Obligor ${n}`,
-      'CP-ROOT',
-      true,
-      { sector: 'Corporate', rating: 'BB' },
-    ),
-  ),
-  member('Counterparty', 'CP-GH-STATE-ENTITY', 'Ghana State Entity — single large depositor', 'CP-ROOT', true, {
-    sector: 'Public Sector',
-    note: 'Concentration watch: dominant share of Ghana deposits',
-  }),
-];
-
-export const ALL_DIMENSION_MEMBERS: DimensionMember[] = [
-  ...LEGAL_ENTITIES,
-  ...ORG_UNITS,
-  ...PRODUCTS,
-  ...COMMON_COA,
-  ...GL_ACCOUNTS,
-  ...FINANCIAL_ELEMENTS,
-  ...COUNTERPARTIES,
-];
+export const ALL_DIMENSION_MEMBERS: DimensionMember[] = [...CORE_DIMENSIONS, ...PRODUCTS];
 
 // ─────────────────────────────────────────────────────────────────────────
 // Currencies and FX
