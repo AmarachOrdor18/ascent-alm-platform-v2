@@ -10,6 +10,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Connector, ApprovalRequest, RemediationIssue, NotificationRule, RiskEntry, AlcoMeeting, RegulatoryReturn, ReportPack } from '@/engine/types';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
+import type { StagedBatch } from './repository';
 import type {
   Affiliate,
   AuditEvent,
@@ -33,6 +34,7 @@ export class AscentDb extends Dexie {
   dimensionMembers!: EntityTable<DimensionMember, 'id'>;
   positions!: EntityTable<Position, 'id'>;
   batches!: EntityTable<LoadBatch, 'id'>;
+  stagedBatches!: EntityTable<StagedBatch, 'id'>;
   rules!: EntityTable<RuleMeta, 'id'>;
   runs!: EntityTable<ProcessRun, 'id'>;
   runResults!: EntityTable<RunResult, 'id'>;
@@ -109,6 +111,15 @@ export class AscentDb extends Dexie {
       alcoMeetings: 'id, status, scheduledFor, affiliateCode',
       regulatoryReturns: 'id, regulator, affiliateCode, status, dueDate',
       reportPacks: 'id, kind, affiliateCode, status',
+    });
+
+    // v6 persists staged (uncommitted) uploads. "Save as staged" previously
+    // wrote only the LoadBatch metadata row — the actual parsed positions
+    // lived in React state alone, so navigating away or refreshing silently
+    // discarded them while the batch record it left behind pointed at data
+    // that was never there.
+    this.version(6).stores({
+      stagedBatches: 'id, affiliateCode, domain, asOfDate, [affiliateCode+domain+asOfDate]',
     });
   }
 }

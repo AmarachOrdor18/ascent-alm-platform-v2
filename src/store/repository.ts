@@ -38,6 +38,26 @@ import type {
 
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 
+/**
+ * An uploaded batch that has been staged but not committed.
+ *
+ * "Save as staged" previously wrote only the `LoadBatch` metadata row —
+ * status, row counts, the filename — while the parsed positions themselves
+ * lived in the upload screen's React state alone. Leaving the screen or
+ * refreshing discarded them, so the batch record left behind pointed at
+ * data that no longer existed anywhere. This is the whole staged unit,
+ * batch and rows together, so it survives a navigation and can be resumed.
+ */
+export interface StagedBatch {
+  id: string;
+  affiliateCode: string;
+  domain: DataDomain;
+  asOfDate: IsoDate;
+  batch: LoadBatch;
+  positions: Position[];
+  savedAt: string;
+}
+
 export interface PositionQuery {
   affiliateCode?: string;
   asOfDate?: IsoDate;
@@ -80,6 +100,12 @@ export interface Repository {
   listBatches(affiliateCode?: string, domain?: DataDomain): Promise<LoadBatch[]>;
   getBatch(id: string): Promise<LoadBatch | null>;
   upsertBatch(batch: LoadBatch): Promise<void>;
+
+  // Staged (uncommitted) uploads
+  listStagedBatches(affiliateCode?: string): Promise<StagedBatch[]>;
+  getStagedBatchFor(affiliateCode: string, domain: DataDomain, asOfDate: IsoDate): Promise<StagedBatch | null>;
+  upsertStagedBatch(staged: StagedBatch): Promise<void>;
+  deleteStagedBatch(id: string): Promise<void>;
 
   // Rules
   listRules(query: RuleQuery): Promise<RuleMeta[]>;

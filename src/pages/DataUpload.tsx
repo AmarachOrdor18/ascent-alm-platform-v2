@@ -7,7 +7,7 @@
  * stated reason, or a reasoned adjustment. Nothing is ever silently edited.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -15,15 +15,25 @@ import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { resolveSingleAffiliate, useAffiliates, useBatches, useCommitBatch, useSaveBatch } from '@/lib/hooks';
+import {
+  resolveSingleAffiliate,
+  useAffiliates,
+  useBatches,
+  useCommitBatch,
+  useDeleteStagedBatch,
+  useSaveBatch,
+  useSaveDimensionMembers,
+  useStagedBatchFor,
+  useSaveStagedBatch,
+} from '@/lib/hooks';
 import { importPositions, type RowError } from '@/lib/csvImport';
 import { validatePositions, DEFAULT_VALIDATION_RULES, type ValidationResult } from '@/engine/validation';
 import { planSupersede } from '@/engine/vintage';
-import { unmappedCodes } from '@/engine/dimensions';
+import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
 import { ALL_DIMENSION_MEMBERS } from '@/data/seed/reference';
 import { ALL_AFFILIATE_REFERENCE } from '@/data/seed/affiliateReference';
 import { formatDate } from '@/lib/format';
-import type { DataDomain, LoadBatch, Position } from '@/engine/types';
+import type { DataDomain, DimensionMember, DimensionType, LoadBatch, Position } from '@/engine/types';
 
 /** Hash of the file content, so a re-upload of the same bytes is detectable. */
 async function hashFile(text: string): Promise<string> {
@@ -49,6 +59,11 @@ export function DataUpload() {
   const { data: batches = [] } = useBatches();
   const saveBatch = useSaveBatch();
   const commit = useCommitBatch();
+  const saveStagedBatch = useSaveStagedBatch();
+  const deleteStagedBatch = useDeleteStagedBatch();
+  const saveGlAccounts = useSaveDimensionMembers('GlAccount');
+  const saveOrgUnits = useSaveDimensionMembers('OrgUnit');
+  const saveCounterparties = useSaveDimensionMembers('Counterparty');
   const canUpload = hasPermission('data.configure');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -57,9 +72,23 @@ export function DataUpload() {
   const [domain, setDomain] = useState<DataDomain>('Positions');
   const [supersedeReason, setSupersedeReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [autoMapping, setAutoMapping] = useState(false);
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
   const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
+
+  // Resume a previously saved staging session for this exact affiliate,
+  // domain and as-of date. Without this, "Save as staged" persisted a batch
+  // record pointing at rows that lived only in this component's state — the
+  // moment you left the screen, they were gone and the save had done
+  // nothing you could see.
+  const { data: resumable } = useStagedBatchFor(affiliate?.code, domain, asOfDate);
+  useEffect(() => {
+    if (staged || !resumable) return;
+    setStaged({ batch: resumable.batch, positions: resumable.positions, parseErrors: [], ignoredColumns: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resuming is a one-shot hydration, not a sync effect
+  }, [resumable]);
 
   const validation: ValidationResult | null = useMemo(
     () =>
@@ -158,6 +187,63 @@ export function DataUpload() {
       },
       { onSuccess: () => setStaged(null) },
     );
+  };
+
+  const handleSaveStaged = async () => {
+    if (!staged || !affiliate) return;
+    await saveBatch.mutateAsync(staged.batch);
+    await saveStagedBatch.mutateAsync({
+      id: staged.batch.id,
+      affiliateCode: affiliate.code,
+      domain,
+      asOfDate,
+      batch: staged.batch,
+      positions: staged.positions,
+      savedAt: new Date().toISOString(),
+    });
+    setJustSaved(true);
+    window.setTimeout(() => setJustSaved(false), 2500);
+  };
+
+  const handleDiscard = () => {
+    if (staged) void deleteStagedBatch.mutateAsync(staged.batch.id);
+    setStaged(null);
+  };
+
+  /**
+   * Create the dimension members a newly onboarded affiliate's own file
+   * already implies, rather than asking someone to re-type twenty-odd GL
+   * codes that only exist because this file just said so.
+   *
+   * Deliberately excludes CommonCoa: that taxonomy is Group-governed and
+   * small, so a code it doesn't recognise is more likely a typo in the
+   * source data than a genuinely new one — auto-creating it would hide the
+   * mistake instead of surfacing it.
+   */
+  const autoMappable = unmapped.filter((u) => u.dimension !== 'CommonCoa');
+  const dimensionSavers: Partial<Record<string, { mutateAsync: (m: DimensionMember[]) => Promise<void> }>> = {
+    GlAccount: saveGlAccounts,
+    OrgUnit: saveOrgUnits,
+    Counterparty: saveCounterparties,
+  };
+
+  const handleAutoMap = async () => {
+    if (!staged || !affiliate || autoMappable.length === 0) return;
+    setAutoMapping(true);
+    try {
+      for (const { dimension, codes } of autoMappable) {
+        const members = deriveMembersFromFile(
+          dimension as DimensionType,
+          codes,
+          staged.positions,
+          affiliate.code,
+          affiliate.name,
+        );
+        await dimensionSavers[dimension]?.mutateAsync(members);
+      }
+    } finally {
+      setAutoMapping(false);
+    }
   };
 
   const totals = useMemo(() => {
@@ -392,17 +478,40 @@ export function DataUpload() {
           )}
 
           {unmapped.length > 0 && (
-            <div role="alert" className="mb-6 rounded-lg bg-danger-bg px-4 py-3 text-[12px] text-danger">
-              <span className="font-bold">Unmapped dimension codes.</span> These must exist before the batch can be
-              committed, otherwise the positions cannot be sliced or reconciled:
-              <ul className="mt-2 space-y-1">
+            <div className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] text-navy-900">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <span className="font-bold">One more step before this can commit.</span> The file parsed cleanly —
+                  these codes just don&apos;t exist yet as dimension members, which is normal for an affiliate this is
+                  the first load for. Nothing is wrong with the upload.
+                </div>
+                {autoMappable.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleAutoMap()}
+                    disabled={!canUpload || autoMapping}
+                    className="shrink-0 rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                  >
+                    {autoMapping ? 'Mapping…' : 'Create these from the file'}
+                  </button>
+                )}
+              </div>
+              <ul className="mt-3 space-y-1">
                 {unmapped.map((u) => (
                   <li key={u.dimension}>
-                    <span className="font-bold">{u.dimension}:</span>{' '}
-                    <span className="font-mono">{u.codes.join(', ')}</span>
+                    <span className="font-bold">{u.dimension}</span>
+                    {u.dimension === 'CommonCoa' && (
+                      <span className="text-[11px] text-gray-500"> — governed centrally; fix the source data rather than auto-creating</span>
+                    )}
+                    <span className="ml-1 font-mono text-[11px]">{u.codes.join(', ')}</span>
                   </li>
                 ))}
               </ul>
+              <p className="mt-3 text-[11px] leading-relaxed text-gray-600">
+                {autoMappable.length > 0
+                  ? 'The button above reads the name each code already has in this file — a product class for a GL account, for instance — and creates it as a real dimension member. Nothing is invented that the upload didn’t already say.'
+                  : 'These are governed dimensions and are not auto-created — add them on the Dimensions screen, or correct the code in the source file.'}
+              </p>
             </div>
           )}
 
@@ -415,22 +524,24 @@ export function DataUpload() {
                 <p className="mt-1 text-[11px] text-gray-500">
                   Version {staged.batch.version} · hash <span className="font-mono">{staged.batch.fileHash}</span> ·
                   editable until committed
+                  {resumable && ' · resumed from a previous "Save as staged"'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setStaged(null)}
+                  onClick={handleDiscard}
                   className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
                 >
                   Discard batch
                 </button>
                 <button
                   type="button"
-                  onClick={() => saveBatch.mutate(staged.batch)}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+                  onClick={() => void handleSaveStaged()}
+                  disabled={saveStagedBatch.isPending}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
                 >
-                  Save as staged
+                  {justSaved ? 'Saved ✓' : saveStagedBatch.isPending ? 'Saving…' : 'Save as staged'}
                 </button>
                 <button
                   type="button"

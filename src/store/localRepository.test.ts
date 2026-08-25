@@ -270,16 +270,110 @@ describe('affiliates and users', () => {
   });
 });
 
+describe('staged batches', () => {
+  function stagedBatch(id: string, overrides: Partial<Parameters<typeof repo.upsertStagedBatch>[0]> = {}) {
+    const loadBatch = {
+      id,
+      affiliateCode: 'RW',
+      domain: 'Positions' as const,
+      asOfDate: '2026-07-31',
+      version: 1,
+      fileName: 'rw_position_book_2026-07.csv',
+      fileHash: 'hash-1',
+      rowCount: 1,
+      rowsAccepted: 1,
+      rowsRejected: 0,
+      status: 'Staged' as const,
+      supersedesBatchId: null,
+      supersededReason: null,
+      uploadedBy: 'tester',
+      uploadedAt: '2026-08-01T00:00:00Z',
+      committedBy: null,
+      committedAt: null,
+    };
+    return {
+      id,
+      affiliateCode: 'RW',
+      domain: 'Positions' as const,
+      asOfDate: '2026-07-31',
+      batch: loadBatch,
+      positions: [position('P-1', { affiliateCode: 'RW', batchId: id })],
+      savedAt: '2026-08-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+
+  // The bug this whole entity exists to fix: "Save as staged" wrote only a
+  // LoadBatch metadata row, so the actual parsed positions lived in the
+  // upload screen's React state alone and vanished on refresh, leaving a
+  // batch record that pointed at data nobody could get back.
+  it('round-trips the positions alongside the batch, not just the batch metadata', async () => {
+    const staged = stagedBatch('B-RW-1');
+    await repo.upsertStagedBatch(staged);
+
+    const found = await repo.getStagedBatchFor('RW', 'Positions', '2026-07-31');
+    expect(found?.positions).toHaveLength(1);
+    expect(found?.positions[0]?.id).toBe('P-1');
+    expect(found?.batch.fileName).toBe('rw_position_book_2026-07.csv');
+  });
+
+  it('finds nothing for a domain or date that was never staged', async () => {
+    await repo.upsertStagedBatch(stagedBatch('B-RW-1'));
+    expect(await repo.getStagedBatchFor('RW', 'GeneralLedger', '2026-07-31')).toBeNull();
+    expect(await repo.getStagedBatchFor('RW', 'Positions', '2026-06-30')).toBeNull();
+    expect(await repo.getStagedBatchFor('GH', 'Positions', '2026-07-31')).toBeNull();
+  });
+
+  it('lists staged batches scoped to one affiliate', async () => {
+    await repo.upsertStagedBatch(stagedBatch('B-RW-1'));
+    await repo.upsertStagedBatch(stagedBatch('B-GH-1', { id: 'B-GH-1', affiliateCode: 'GH' }));
+
+    expect(await repo.listStagedBatches('RW')).toHaveLength(1);
+    expect(await repo.listStagedBatches()).toHaveLength(2);
+  });
+
+  it('deletes cleanly, which is what a successful commit does to its own staged copy', async () => {
+    await repo.upsertStagedBatch(stagedBatch('B-RW-1'));
+    await repo.deleteStagedBatch('B-RW-1');
+    expect(await repo.getStagedBatchFor('RW', 'Positions', '2026-07-31')).toBeNull();
+  });
+
+  it('a later save for the same affiliate, domain and date overwrites the earlier one rather than duplicating it', async () => {
+    await repo.upsertStagedBatch(stagedBatch('B-RW-1'));
+    await repo.upsertStagedBatch(
+      stagedBatch('B-RW-1', { positions: [position('P-1'), position('P-2', { affiliateCode: 'RW' })] }),
+    );
+    const found = await repo.getStagedBatchFor('RW', 'Positions', '2026-07-31');
+    expect(found?.positions).toHaveLength(2);
+    expect(await repo.listStagedBatches('RW')).toHaveLength(1);
+  });
+});
+
 describe('reset', () => {
   it('clears every table atomically', async () => {
     await repo.upsertAffiliate(affiliate('NG'));
     await repo.insertPositions([position('P-1')]);
     await repo.upsertRule(rule('TB-1'));
+    await repo.upsertStagedBatch({
+      id: 'B-1',
+      affiliateCode: 'NG',
+      domain: 'Positions',
+      asOfDate: '2026-07-31',
+      batch: {
+        id: 'B-1', affiliateCode: 'NG', domain: 'Positions', asOfDate: '2026-07-31', version: 1,
+        fileName: 'f.csv', fileHash: 'h', rowCount: 1, rowsAccepted: 1, rowsRejected: 0, status: 'Staged',
+        supersedesBatchId: null, supersededReason: null, uploadedBy: 't', uploadedAt: '2026-08-01T00:00:00Z',
+        committedBy: null, committedAt: null,
+      },
+      positions: [position('P-2')],
+      savedAt: '2026-08-01T00:00:00Z',
+    });
 
     await repo.reset();
 
     expect(await repo.listAffiliates()).toEqual([]);
     expect(await repo.queryPositions({})).toEqual([]);
     expect(await repo.listRules({})).toEqual([]);
+    expect(await repo.listStagedBatches()).toEqual([]);
   });
 });

@@ -7,7 +7,7 @@
  */
 
 import { db, AscentDb } from './db';
-import type { Dependency, PositionQuery, Repository, RuleQuery } from './repository';
+import type { Dependency, PositionQuery, Repository, RuleQuery, StagedBatch } from './repository';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 import type {
   Affiliate,
@@ -122,6 +122,31 @@ export class LocalRepository implements Repository {
 
   async upsertBatch(batch: LoadBatch): Promise<void> {
     await this.database.batches.put(batch);
+  }
+
+  // ── Staged (uncommitted) uploads ─────────────────────────────────────
+  async listStagedBatches(affiliateCode?: string): Promise<StagedBatch[]> {
+    const rows = affiliateCode
+      ? await this.database.stagedBatches.where('affiliateCode').equals(affiliateCode).toArray()
+      : await this.database.stagedBatches.toArray();
+    return rows.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  }
+
+  async getStagedBatchFor(affiliateCode: string, domain: DataDomain, asOfDate: IsoDate): Promise<StagedBatch | null> {
+    return (
+      (await this.database.stagedBatches
+        .where('[affiliateCode+domain+asOfDate]')
+        .equals([affiliateCode, domain, asOfDate])
+        .first()) ?? null
+    );
+  }
+
+  async upsertStagedBatch(staged: StagedBatch): Promise<void> {
+    await this.database.stagedBatches.put(staged);
+  }
+
+  async deleteStagedBatch(id: string): Promise<void> {
+    await this.database.stagedBatches.delete(id);
   }
 
   // ── Rules ─────────────────────────────────────────────────────────────
@@ -508,6 +533,7 @@ export class LocalRepository implements Repository {
         this.database.dimensionMembers,
         this.database.positions,
         this.database.batches,
+        this.database.stagedBatches,
         this.database.rules,
         this.database.runs,
         this.database.runResults,
@@ -537,6 +563,7 @@ export class LocalRepository implements Repository {
           this.database.dimensionMembers.clear(),
           this.database.positions.clear(),
           this.database.batches.clear(),
+          this.database.stagedBatches.clear(),
           this.database.rules.clear(),
           this.database.runs.clear(),
           this.database.runResults.clear(),

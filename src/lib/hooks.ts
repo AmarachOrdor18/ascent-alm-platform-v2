@@ -9,9 +9,11 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
+import type { StagedBatch } from '@/store/repository';
 import type {
   Affiliate,
   AuditEvent,
+  DataDomain,
   LoadBatch,
   Position,
   DimensionType,
@@ -333,6 +335,9 @@ export function useCommitBatch() {
         supersedesBatchId: supersedes?.id ?? null,
         supersededReason: reason,
       });
+      // The rows now live in the real positions table; the staged copy would
+      // otherwise sit there forever pointing at data that has moved on.
+      await repository.deleteStagedBatch(batch.id);
       if (user) {
         await repository.recordAuditEvent(
           auditEvent(
@@ -348,8 +353,40 @@ export function useCommitBatch() {
       }
     },
     onSuccess: () => {
-      for (const key of [keys.batches, keys.audit, ['positions']]) client.invalidateQueries({ queryKey: key });
+      for (const key of [keys.batches, keys.audit, ['positions'], ['stagedBatches']]) {
+        client.invalidateQueries({ queryKey: key });
+      }
     },
+  });
+}
+
+/**
+ * A previously staged (uncommitted) upload for this exact affiliate, domain
+ * and as-of date, if one was saved. Lets Data Upload resume where it left
+ * off instead of the parsed rows evaporating the moment the tab is closed.
+ */
+export function useStagedBatchFor(affiliateCode: string | undefined, domain: DataDomain, asOfDate: string) {
+  return useQuery({
+    queryKey: ['stagedBatches', affiliateCode ?? 'NONE', domain, asOfDate],
+    queryFn: () =>
+      affiliateCode ? repository.getStagedBatchFor(affiliateCode, domain, asOfDate) : Promise.resolve(null),
+    enabled: affiliateCode !== undefined,
+  });
+}
+
+export function useSaveStagedBatch() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (staged: StagedBatch) => repository.upsertStagedBatch(staged),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['stagedBatches'] }),
+  });
+}
+
+export function useDeleteStagedBatch() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repository.deleteStagedBatch(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['stagedBatches'] }),
   });
 }
 

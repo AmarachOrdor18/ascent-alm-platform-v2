@@ -187,3 +187,56 @@ export function unmappedCodes(positions: Position[], dimension: DimensionType, m
   }
   return Array.from(missing).sort();
 }
+
+/**
+ * Dimension members a "map from this file" action would create for a set of
+ * unmapped codes — without touching the store, so what gets created is
+ * testable independent of how it gets persisted.
+ *
+ * A newly onboarded affiliate's local GL codes do not exist as dimension
+ * members until someone creates them, but the file that references them
+ * already carries what is needed to do so: a GL code's product class is a
+ * real name, taken from the upload rather than invented.
+ *
+ * `CommonCoa` is deliberately unsupported. That taxonomy is Group-governed
+ * and small, so a code it doesn't recognise is more likely a typo in the
+ * source data than a genuinely new classification — auto-creating it would
+ * hide the mistake rather than surface it.
+ */
+export function deriveMembersFromFile(
+  dimension: DimensionType,
+  codes: string[],
+  positions: Position[],
+  affiliateCode: string,
+  affiliateName: string,
+): DimensionMember[] {
+  const key = positionKeyFor(dimension);
+  if (!key || dimension === 'CommonCoa' || codes.length === 0) return [];
+
+  const members: DimensionMember[] = [];
+  const rootCode = `GL-${affiliateCode}`;
+
+  if (dimension === 'GlAccount') {
+    members.push({
+      id: `GlAccount:${rootCode}`,
+      dimension: 'GlAccount',
+      code: rootCode,
+      name: `${affiliateName} — Local Chart`,
+      parentCode: null,
+      isLeaf: false,
+    });
+  }
+
+  for (const code of codes) {
+    const sample = positions.find((p) => p[key] === code);
+    members.push({
+      id: `${dimension}:${code}`,
+      dimension,
+      code,
+      name: dimension === 'GlAccount' ? (sample?.productClass ?? code) : code,
+      parentCode: dimension === 'GlAccount' ? rootCode : null,
+      isLeaf: true,
+    });
+  }
+  return members;
+}
