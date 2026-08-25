@@ -62,8 +62,8 @@ export function Login() {
         <div>
           <div className="mb-8">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10">
-                <span className="text-[24px] font-bold text-gold-500">E</span>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1">
+                <img src="/logo-icon.png" alt="Ecobank" className="h-full w-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[20px] font-bold tracking-wide">Ecobank</h1>

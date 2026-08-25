@@ -51,8 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={cn('flex flex-col bg-navy-900 transition-all duration-200', collapsed ? 'w-16' : 'w-72')}
       >
         <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded bg-white/10">
-            <span className="text-[14px] font-bold text-gold-500">E</span>
+          {/* White plate behind the mark: the Ecobank logo is dark teal and
+              would disappear against the navy rail. */}
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white p-0.5">
+            <img src="/logo-icon.png" alt="Ecobank" className="h-full w-full object-contain" />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
