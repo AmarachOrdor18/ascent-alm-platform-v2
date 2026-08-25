@@ -9,7 +9,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { GroupScopeNotice } from '@/components/layout/GroupScopeNotice';
+import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
@@ -58,7 +58,8 @@ export function DataUpload() {
   const [supersedeReason, setSupersedeReason] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
 
   const validation: ValidationResult | null = useMemo(
     () =>
@@ -251,7 +252,7 @@ export function DataUpload() {
         ]}
       />
 
-      {affiliateCode === 'GROUP' && <GroupScopeNotice fallbackName={affiliate?.name} />}
+      <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Upload</h2>

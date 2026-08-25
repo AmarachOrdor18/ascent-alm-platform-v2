@@ -18,6 +18,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
@@ -91,7 +92,8 @@ export function Connectors() {
   const [testing, setTesting] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, 'ok' | 'failed'>>({});
 
-  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
 
   const feedFor = (domain: DataDomain): DomainFeed =>
     affiliate?.feeds.find((f) => f.domain === domain) ?? {
@@ -156,6 +158,8 @@ export function Connectors() {
           </div>
         }
       />
+
+      <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
 
       {tab === 'feeds' ? (
         <>

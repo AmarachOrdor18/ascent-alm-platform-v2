@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
@@ -44,7 +45,8 @@ export function ValidationRules() {
   const [asOfDate, setAsOfDate] = useState('2026-07-31');
   const [lastRun, setLastRun] = useState<{ at: string; by: string } | null>(null);
 
-  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
 
   const result = useMemo(
@@ -180,6 +182,8 @@ export function ValidationRules() {
           </>
         }
       />
+
+      <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
 
       {result && (
         <div

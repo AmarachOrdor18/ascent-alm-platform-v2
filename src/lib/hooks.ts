@@ -124,7 +124,7 @@ export function useAffiliates() {
  * they already special-case `affiliateCode === 'GROUP'` or build a real,
  * multi-currency FX table rather than an identity one.
  */
-export function resolveSingleAffiliate<T extends { code: string }>(
+export function resolveSingleAffiliate<T extends { code: string; createdAt: string }>(
   affiliates: T[],
   affiliateCode: string,
 ): T | undefined {
@@ -132,7 +132,12 @@ export function resolveSingleAffiliate<T extends { code: string }>(
     const exact = affiliates.find((a) => a.code === affiliateCode);
     if (exact) return exact;
   }
-  return affiliates.find((a) => a.code !== 'GROUP');
+  // Deterministic rather than whatever order the store happens to return.
+  // `listAffiliates()` orders by primary key, so a plain `.find(code !==
+  // 'GROUP')` silently picked Côte d'Ivoire over Nigeria — "CI" sorts before
+  // "NG" alphabetically, which has nothing to do with which affiliate the
+  // fallback should sensibly mean. Earliest-onboarded is at least a reason.
+  return [...affiliates].filter((a) => a.code !== 'GROUP').sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
 }
 
 // ── Dimensions ───────────────────────────────────────────────────────────
