@@ -371,3 +371,40 @@ export function computeConcentration(positions: Position[], ctx: LiquidityContex
       'dropped or treated as one depositor, either of which would distort the measure.',
   };
 }
+
+export interface AffiliateFundingShare {
+  affiliateCode: string;
+  amount: number;
+  sharePercent: number;
+}
+
+/**
+ * Each affiliate's share of Group deposit funding.
+ *
+ * A deliberately different question from `computeConcentration`, and kept
+ * as a separate function rather than an extra field on that result: v1's
+ * defect D-04 was grouping *customer* concentration by affiliate, which
+ * answers "how diversified is our own funding base across entities" while
+ * the regulator asks "could a handful of customers walk away with our
+ * funding". Conflating the two here would reintroduce exactly that mistake
+ * under a different name. This one is only meaningful at Group scope,
+ * comparing affiliates against each other rather than against a limit.
+ */
+export function computeDepositsByAffiliate(positions: Position[], ctx: LiquidityContext): AffiliateFundingShare[] {
+  const deposits = positions.filter(isDeposit);
+  const total = sumConverted(deposits, ctx);
+
+  const byAffiliate = new Map<string, number>();
+  for (const p of deposits) {
+    const value = convert(p.amount, p.currency, ctx.reportingCurrency, ctx.fx);
+    byAffiliate.set(p.affiliateCode, (byAffiliate.get(p.affiliateCode) ?? 0) + value);
+  }
+
+  return Array.from(byAffiliate.entries())
+    .map(([affiliateCode, amount]) => ({
+      affiliateCode,
+      amount,
+      sharePercent: total > 0 ? (amount / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}

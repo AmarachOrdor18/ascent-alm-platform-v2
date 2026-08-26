@@ -1,58 +1,70 @@
 /**
  * Liquidity Risk Map — screen 49.
  *
- * Colour-coded risk positioning per affiliate. This used to plot a fixed
- * five-affiliate array with invented LCR/NSFR/concentration figures baked
- * into the component. It now reads each Live affiliate's latest completed
- * run for the same three metrics the Liquidity Risk and Concentration
- * screens already show, and classifies risk from those real figures
- * against the thresholds stated in the legend below, rather than a number
- * typed in alongside the mock array.
+ * A colour-coded card per Live affiliate rather than a table, so risk
+ * concentration across the Group reads at a glance. Each card's numbers
+ * come from that affiliate's own latest completed run — deposit share is
+ * that affiliate's deposits as a fraction of every Live affiliate's
+ * deposits combined, not a regulatory concentration measure (that question
+ * belongs to Concentration & Large Exposures; this one is Group funding
+ * diversification, a different question kept deliberately separate).
  */
 
 import { useQueries } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { useAffiliates } from '@/lib/hooks';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useAffiliates, useFxRates } from '@/lib/hooks';
 import { useRuns, runKeys } from '@/lib/runHooks';
 import { repository } from '@/store/localRepository';
 import { metricValue } from '@/lib/metrics';
-import type { RunResult } from '@/engine/types';
+import { buildFxTable } from '@/engine/fx';
+import { isDeposit } from '@/engine/liquidity';
+import { convert } from '@/engine/fx';
+import type { Position, RunResult } from '@/engine/types';
 
-type RiskLevel = 'High' | 'Medium' | 'Low' | 'No run';
+type Severity = 'Low' | 'Medium' | 'High' | 'No run';
 
-const RISK_DOT: Record<RiskLevel, string> = {
-  High: 'bg-danger',
-  Medium: 'bg-warning',
-  Low: 'bg-success',
-  'No run': 'bg-gray-300',
+const SEVERITY_STYLE: Record<Severity, { bar: string; ring: string; dot: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  Low: { bar: 'bg-success', ring: 'ring-success/20', dot: 'bg-success', tone: 'success' },
+  Medium: { bar: 'bg-warning', ring: 'ring-warning/20', dot: 'bg-warning', tone: 'warning' },
+  High: { bar: 'bg-danger', ring: 'ring-danger/20', dot: 'bg-danger', tone: 'danger' },
+  'No run': { bar: 'bg-gray-300', ring: 'ring-gray-200', dot: 'bg-gray-300', tone: 'neutral' },
 };
 
-const RISK_TEXT: Record<RiskLevel, string> = {
-  High: 'text-danger',
-  Medium: 'text-warning',
-  Low: 'text-success',
-  'No run': 'text-gray-400',
-};
-
-function classify(lcr: number | null, concentration: number | null): RiskLevel {
-  if (lcr === null || concentration === null) return 'No run';
-  if (lcr < 100 || concentration > 35) return 'High';
-  if (lcr <= 110 || concentration >= 25) return 'Medium';
+function classify(lcr: number | null, depositSharePercent: number | null): Severity {
+  if (lcr === null || depositSharePercent === null) return 'No run';
+  if (lcr < 100 || depositSharePercent > 35) return 'High';
+  if (lcr < 130 || depositSharePercent > 20) return 'Medium';
   return 'Low';
+}
+
+function primaryDriver(lcr: number | null, depositSharePercent: number | null, severity: Severity): string {
+  if (severity === 'No run') return 'No completed run yet for this affiliate.';
+  if (lcr !== null && lcr < 100) return `LCR of ${lcr.toFixed(1)}% is below the 100% regulatory minimum.`;
+  if (depositSharePercent !== null && depositSharePercent > 35) {
+    return `Holds ${depositSharePercent.toFixed(1)}% of Group deposit funding — a concentrated funding base.`;
+  }
+  if (lcr !== null && lcr < 130) return `LCR of ${lcr.toFixed(1)}% is inside the minimum but under the internal buffer.`;
+  return 'Within LCR and funding-diversification thresholds.';
 }
 
 interface AffiliatePoint {
   code: string;
   name: string;
+  region: string;
   lcr: number | null;
   nsfr: number | null;
-  concentration: number | null;
-  risk: RiskLevel;
+  totalAssets: number;
+  totalLiabilities: number;
+  depositTotal: number;
+  hasRun: boolean;
+  severity: Severity;
 }
 
 export function RiskMap() {
   const { data: affiliates = [] } = useAffiliates();
   const { data: runs = [] } = useRuns();
+  const { data: fxRates = [] } = useFxRates();
 
   const liveAffiliates = affiliates.filter((a) => a.code !== 'GROUP' && a.status === 'Live');
 
@@ -74,143 +86,147 @@ export function RiskMap() {
     }),
   });
 
-  const points: AffiliatePoint[] = liveAffiliates.map((a, i) => {
-    const results = resultQueries[i]?.data ?? [];
-    const lcr = metricValue(results, 'lcrPercent');
-    const nsfr = metricValue(results, 'nsfrPercent');
-    const concentration = metricValue(results, 'largestDepositorSharePercent');
-    return { code: a.code, name: a.name, lcr, nsfr, concentration, risk: classify(lcr, concentration) };
+  const positionQueries = useQueries({
+    queries: liveAffiliates.map((a) => {
+      const asOfDate = latestRunByAffiliate.get(a.code)?.asOfDate ?? null;
+      return {
+        queryKey: ['positions', a.code, asOfDate ?? 'none'],
+        queryFn: (): Promise<Position[]> =>
+          asOfDate ? repository.queryPositions({ affiliateCode: a.code, asOfDate }) : Promise.resolve([]),
+        enabled: asOfDate !== null,
+      };
+    }),
   });
 
-  const highCount = points.filter((p) => p.risk === 'High').length;
-  const mediumCount = points.filter((p) => p.risk === 'Medium').length;
-  const lowCount = points.filter((p) => p.risk === 'Low').length;
-  const noRunCount = points.filter((p) => p.risk === 'No run').length;
+  const raw = liveAffiliates.map((a, i) => {
+    const results = resultQueries[i]?.data ?? [];
+    const positions = positionQueries[i]?.data ?? [];
+    const run = latestRunByAffiliate.get(a.code) ?? null;
+    const fx = run ? buildFxTable('USD', fxRates, run.asOfDate) : buildFxTable('USD', fxRates, '');
+    const reportingCurrency = run?.reportingCurrency ?? 'USD';
+
+    const totalAssets = positions
+      .filter((p) => p.category === 'Asset')
+      .reduce((s, p) => s + convert(p.amount, p.currency, reportingCurrency, fx), 0);
+    const totalLiabilities = positions
+      .filter((p) => p.category === 'Liability')
+      .reduce((s, p) => s + convert(p.amount, p.currency, reportingCurrency, fx), 0);
+    const depositTotal = positions
+      .filter(isDeposit)
+      .reduce((s, p) => s + convert(p.amount, p.currency, reportingCurrency, fx), 0);
+
+    return {
+      code: a.code,
+      name: a.name,
+      region: a.region,
+      lcr: metricValue(results, 'lcrPercent'),
+      nsfr: metricValue(results, 'nsfrPercent'),
+      totalAssets,
+      totalLiabilities,
+      depositTotal,
+      hasRun: run !== null,
+    };
+  });
+
+  const groupDepositTotal = raw.reduce((s, a) => s + a.depositTotal, 0);
+
+  const points: AffiliatePoint[] = raw.map((a) => {
+    const depositSharePercent = a.hasRun && groupDepositTotal > 0 ? (a.depositTotal / groupDepositTotal) * 100 : null;
+    const severity = a.hasRun ? classify(a.lcr, depositSharePercent) : 'No run';
+    return { ...a, severity };
+  });
+
+  const highCount = points.filter((p) => p.severity === 'High').length;
+  const mediumCount = points.filter((p) => p.severity === 'Medium').length;
+  const lowCount = points.filter((p) => p.severity === 'Low').length;
+
+  const fmt = (n: number) =>
+    `$${(Math.abs(n) >= 1_000_000_000 ? `${(n / 1_000_000_000).toFixed(2)}B` : `${(n / 1_000_000).toFixed(1)}M`)}`;
 
   return (
     <>
       <ModuleHeader
         title="Liquidity Risk Map"
-        description="Every Live affiliate's latest completed run, plotted by LCR against depositor concentration."
+        description="Colour-coded funding concentration and LCR standing across every Live affiliate, from each one's latest completed run."
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
           { label: 'High risk', value: String(highCount), tone: highCount > 0 ? 'danger' : 'neutral' },
           { label: 'Medium risk', value: String(mediumCount), tone: mediumCount > 0 ? 'warning' : 'neutral' },
           { label: 'Low risk', value: String(lowCount), tone: 'success' },
-          { label: 'Live affiliates', value: String(liveAffiliates.length) },
+          { label: 'Affiliates monitored', value: String(liveAffiliates.length) },
         ]}
       />
 
-      {liveAffiliates.length === 0 && (
+      {liveAffiliates.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-sm text-gray-400 shadow-sm">
-          No affiliates are Live yet. This map plots the Group's Live affiliates once at least one is promoted.
+          No affiliates are Live yet.
         </div>
-      )}
-
-      {liveAffiliates.length > 0 && (
-        <>
-          {noRunCount > 0 && (
-            <p className="mb-4 rounded-lg bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
-              {noRunCount} of {liveAffiliates.length} Live affiliate(s) have no completed run yet and plot as gray, not a fabricated risk level.
-            </p>
-          )}
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="mb-4">
-                <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliate risk matrix</h3>
-                <p className="mt-1 text-[11px] font-medium text-gray-400">LCR against depositor concentration</p>
-              </div>
-              <div className="relative h-80 rounded-lg bg-gray-50 p-4">
-                <div className="absolute inset-4 rounded-lg border-2 border-dashed border-gray-300">
-                  <div className="absolute left-2 top-2 text-[10px] font-bold text-gray-400">High concentration</div>
-                  <div className="absolute right-2 top-2 text-[10px] font-bold text-gray-400">Low concentration</div>
-                  <div className="absolute bottom-2 left-2 text-[10px] font-bold text-gray-400">Low LCR</div>
-                  <div className="absolute bottom-2 right-2 text-[10px] font-bold text-gray-400">High LCR</div>
-
-                  {points
-                    .filter((p) => p.lcr !== null && p.concentration !== null)
-                    .map((p) => {
-                      const x = 20 + (100 - p.concentration!) * 0.6;
-                      const y = 80 - (p.lcr! - 70) * 0.5;
-                      return (
-                        <div
-                          key={p.code}
-                          className={`absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 transform rounded-full transition-transform hover:scale-125 ${RISK_DOT[p.risk]}`}
-                          style={{ left: `${Math.min(96, Math.max(4, x))}%`, top: `${Math.min(96, Math.max(4, y))}%` }}
-                          title={`${p.name}: LCR ${p.lcr!.toFixed(1)}%, concentration ${p.concentration!.toFixed(1)}%`}
-                        />
-                      );
-                    })}
+      ) : (
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Group liquidity risk concentration
+              </h2>
+              <p className="mt-1 text-[11px] font-medium text-gray-400">
+                Severity from LCR standing and each affiliate's share of Group deposit funding
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              {(['Low', 'Medium', 'High'] as const).map((label) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${SEVERITY_STYLE[label].dot}`} />
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="mb-4">
-                <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk summary by affiliate</h3>
-                <p className="mt-1 text-[11px] font-medium text-gray-400">From each affiliate's latest completed run</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="table-datagrid">
-                  <thead>
-                    <tr>
-                      <th>Affiliate</th>
-                      <th>LCR</th>
-                      <th>NSFR</th>
-                      <th>Concentration</th>
-                      <th>Overall risk</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {points.map((p) => (
-                      <tr key={p.code}>
-                        <td className="font-bold text-navy-900">{p.name}</td>
-                        <td className="font-mono">{p.lcr !== null ? `${p.lcr.toFixed(1)}%` : 'No run'}</td>
-                        <td className="font-mono">{p.nsfr !== null ? `${p.nsfr.toFixed(1)}%` : 'No run'}</td>
-                        <td className="font-mono">{p.concentration !== null ? `${p.concentration.toFixed(1)}%` : 'No run'}</td>
-                        <td>
-                          <span className={`rounded px-2 py-0.5 text-xs font-bold ${RISK_TEXT[p.risk]}`}>{p.risk}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              ))}
             </div>
           </div>
-        </>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {points.map((p) => {
+              const style = SEVERITY_STYLE[p.severity];
+              const depositShare = groupDepositTotal > 0 ? (p.depositTotal / groupDepositTotal) * 100 : null;
+              const netPosition = p.totalAssets - p.totalLiabilities;
+              return (
+                <div
+                  key={p.code}
+                  className={`overflow-hidden rounded-xl border border-gray-100 shadow-sm ring-4 transition-all hover:shadow-md ${style.ring}`}
+                >
+                  <div className={`h-1.5 ${style.bar}`} />
+                  <div className="p-5">
+                    <div className="mb-3 flex items-start justify-between">
+                      <div>
+                        <p className="text-[13px] font-bold text-navy-900">{p.name}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{p.region}</p>
+                      </div>
+                      <StatusBadge status={p.severity} tone={style.tone} />
+                    </div>
+                    <div className="mb-3 grid grid-cols-2 gap-3">
+                      <Stat label="Deposit share" value={depositShare !== null ? `${depositShare.toFixed(1)}%` : '—'} />
+                      <Stat label="Net position" value={p.hasRun ? `${netPosition >= 0 ? '' : '-'}${fmt(netPosition)}` : '—'} />
+                      <Stat label="Total assets" value={p.hasRun ? fmt(p.totalAssets) : '—'} />
+                      <Stat label="Total liabilities" value={p.hasRun ? fmt(p.totalLiabilities) : '—'} />
+                    </div>
+                    <p className="border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
+                      {primaryDriver(p.lcr, depositShare, p.severity)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
-
-      <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <div className="mb-4">
-          <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk assessment criteria</h3>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 h-4 w-4 shrink-0 rounded bg-danger" />
-            <div>
-              <p className="text-[12px] font-bold text-navy-900">High risk</p>
-              <p className="text-[11px] text-gray-500">LCR below 100% or concentration above 35%</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 h-4 w-4 shrink-0 rounded bg-warning" />
-            <div>
-              <p className="text-[12px] font-bold text-navy-900">Medium risk</p>
-              <p className="text-[11px] text-gray-500">LCR 100 to 110% or concentration 25 to 35%</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 h-4 w-4 shrink-0 rounded bg-success" />
-            <div>
-              <p className="text-[12px] font-bold text-navy-900">Low risk</p>
-              <p className="text-[11px] text-gray-500">LCR above 110% and concentration below 25%</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
+      <p className="text-[15px] font-bold text-navy-900">{value}</p>
+    </div>
   );
 }
