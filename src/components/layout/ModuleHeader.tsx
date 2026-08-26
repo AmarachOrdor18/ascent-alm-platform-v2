@@ -63,23 +63,25 @@ export function ModuleHeader({
           <h1 className="text-[20px] font-bold text-navy-900">{title}</h1>
           <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-gray-500">{description}</p>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
-            <span className="font-bold text-navy-700">{formatAsAt(asOfDate)}</span>
-            {scope && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{scope}</span>
-              </>
-            )}
-            {currency && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>
-                  Stated in <span className="font-mono">{currency}</span>
-                </span>
-              </>
-            )}
-          </div>
+          {(asOfDate || scope || currency) && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
+              {asOfDate && <span className="font-bold text-navy-700">{formatAsAt(asOfDate)}</span>}
+              {scope && (
+                <>
+                  {asOfDate && <span aria-hidden="true">·</span>}
+                  <span>{scope}</span>
+                </>
+              )}
+              {currency && (
+                <>
+                  {(asOfDate || scope) && <span aria-hidden="true">·</span>}
+                  <span>
+                    Stated in <span className="font-mono">{currency}</span>
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>

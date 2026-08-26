@@ -27,6 +27,7 @@ import {
   HOLIDAY_CALENDARS,
   YIELD_CURVES,
 } from './reference';
+import { SEED_DEFAULT_RULES } from './defaultRules';
 
 const SEED_USERS: User[] = [
   {
@@ -173,6 +174,7 @@ async function writeSeed(repo: Repository): Promise<void> {
   for (const user of SEED_USERS) await repo.upsertUser(user);
   for (const limit of SEED_LIMITS) await repo.upsertLimitConfig(limit);
   for (const connector of SEED_CONNECTORS) await repo.upsertConnector(connector);
+  for (const rule of SEED_DEFAULT_RULES) await repo.upsertRule(rule);
 
   // Phase 9: Seed all three affiliates (Nigeria, Ghana, Côte d'Ivoire) with committed data
   await repo.upsertBatch(NIGERIA_BATCH);
@@ -244,6 +246,15 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingUserIds = new Set((await repo.listUsers()).map((u) => u.id));
   for (const seedUser of SEED_USERS) {
     if (!existingUserIds.has(seedUser.id)) await repo.upsertUser(seedUser);
+  }
+
+  // Same reasoning: Time Buckets, Behaviour Patterns and Forecast Scenarios
+  // always had a real engine default in use, but nowhere to see or edit it
+  // until these were seeded as ordinary rules - an existing database never
+  // received them without this.
+  const existingRuleIds = new Set((await repo.listRules({})).map((r) => r.id));
+  for (const seedRule of SEED_DEFAULT_RULES) {
+    if (!existingRuleIds.has(seedRule.id)) await repo.upsertRule(seedRule);
   }
 }
 

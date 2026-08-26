@@ -99,8 +99,8 @@ export function Dashboard() {
         scope={affiliate?.name ?? affiliateCode}
         currency={run?.reportingCurrency}
         metrics={[
-          { label: 'Elements computed', value: run ? String(results.length) : '0' },
           { label: 'In breach', value: String(breaches.length), tone: breaches.length > 0 ? 'danger' : 'success' },
+          { label: 'Elements computed', value: run ? String(results.length) : '0' },
         ]}
       />
 

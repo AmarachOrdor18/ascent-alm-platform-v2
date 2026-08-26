@@ -176,7 +176,6 @@ export function RuleEditor<T extends RuleMeta>({
         metrics={[
           { label: `${noun}s`, value: String(rules.length) },
           { label: 'Active', value: String(activeCount) },
-          { label: 'Group default', value: String(rules.filter((r) => r.affiliateCode === null).length) },
           ...(extraMetrics ?? []),
         ]}
         actions={

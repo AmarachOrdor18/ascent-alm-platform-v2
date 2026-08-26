@@ -19,7 +19,7 @@ import { defaultLadder } from '@/engine/buckets';
 import { DEFAULT_PATTERNS } from '@/engine/behavioural';
 import type { ProcessRun, RunResult } from '@/engine/types';
 import type { YieldCurve } from '@/engine/ftp';
-import type { AdjustmentRuleDef, BehaviourPatternRule, FtpRule, TimeBucketRule } from '@/engine/ruleTypes';
+import type { AdjustmentRuleDef, BehaviourPatternRule, FtpRule, ForecastScenarioRule, TimeBucketRule } from '@/engine/ruleTypes';
 
 export const runKeys = {
   all: ['runs'] as const,
@@ -65,6 +65,19 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   const adjustmentRule = run.adjustmentRuleId
     ? await repository.getRule<AdjustmentRuleDef>(run.adjustmentRuleId)
     : null;
+  const scenarioRule = run.forecastScenarioIds[0]
+    ? await repository.getRule<ForecastScenarioRule>(run.forecastScenarioIds[0])
+    : null;
+
+  // The engine's NII/EVE sensitivity take one shock magnitude, not a full
+  // per-bucket curve (computeAllShocks reduces the same way for the six
+  // standard shocks). Selecting a scenario used to be recorded on the run
+  // and then never read here at all, so choosing one changed nothing about
+  // the actual figures - the 200bp fallback in engine/run.ts always won.
+  const scenarioShockBps = scenarioRule
+    ? Object.values(scenarioRule.shockByBucket).reduce((s, v) => s + v, 0) /
+      (Object.values(scenarioRule.shockByBucket).length || 1)
+    : undefined;
 
   // Fall back to engine defaults where no rule is attached, and the result's
   // methodology string says which basis was used.
@@ -97,6 +110,7 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
     yieldCurves,
     adjustmentRules: adjustmentRule?.adjustments ?? [],
     ftpAssignments: ftpRule?.assignments ?? [],
+    shockBps: scenarioShockBps,
   };
 }
 

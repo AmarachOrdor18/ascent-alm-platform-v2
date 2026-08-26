@@ -182,14 +182,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-1 bg-gold-500 rounded-full"/>
-            <div>
-              <h1 className="text-[14px] font-bold text-navy-900">Asset & Liability Management</h1>
-              <p className="text-[10px] text-gray-500">Ecobank Group Platform</p>
-            </div>
-          </div>
-          
           <div className="ml-auto flex items-center gap-6">
             <div className="flex items-center gap-2">
               <label htmlFor="scope-affiliate" className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
