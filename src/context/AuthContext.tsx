@@ -116,20 +116,23 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  // initialData is the static default so permission checks are correct from
-  // the very first render — the live query then supersedes it once the
-  // database (seeded before login is ever reachable) has answered. See
-  // db.ts v7 and bootstrap.ts's refreshReferenceData for how an edited
-  // permission set survives a reseed of everything else.
+  // Deliberately no `initialData` here: combined with the app's global
+  // staleTime, initialData marks the seeded data "fresh" for 30 seconds,
+  // which was skipping the real fetch and made the DB-backed roles table
+  // effectively invisible for the first half-minute of every session -
+  // exactly the window someone testing "log in as different users" would
+  // be in. Fetch for real every time; fall back to the static default only
+  // while genuinely loading or if the table is genuinely empty, the same
+  // fallback shape already used on Users & Roles and System Preferences.
   const { data: liveRoles } = useQuery({
     queryKey: ['roles'],
     queryFn: () => repository.listRoles(),
-    initialData: () => Object.values(ROLES),
   });
 
   const roleByCode = useMemo(() => {
+    const source = liveRoles && liveRoles.length > 0 ? liveRoles : Object.values(ROLES);
     const map = new Map<RoleCode, Role>();
-    for (const role of liveRoles) map.set(role.code, role);
+    for (const role of source) map.set(role.code, role);
     return map;
   }, [liveRoles]);
 

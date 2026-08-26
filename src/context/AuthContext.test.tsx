@@ -6,9 +6,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './AuthContext';
+import { repository } from '@/store/localRepository';
 import type { User } from '@/engine/types';
 
 const ADMIN_USER: User = {
@@ -45,7 +46,15 @@ function Probe() {
 }
 
 function renderProbe() {
-  const client = new QueryClient();
+  // Matches main.tsx's real defaults, including the 30s staleTime that was
+  // the actual bug: combined with `initialData` (since removed from
+  // AuthContext), that staleTime marked the seeded fallback "fresh" and
+  // skipped the real database fetch for the first 30 seconds of every
+  // session — precisely the window someone testing "log in as a different
+  // user" would be in.
+  const client = new QueryClient({
+    defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
+  });
   return render(
     <QueryClientProvider client={client}>
       <AuthProvider>
@@ -77,5 +86,27 @@ describe('AuthContext permission enforcement', () => {
     expect(screen.getByTestId('who').textContent).toBe('Test Viewer');
     expect(screen.getByTestId('admin-manage').textContent).toBe('false');
     expect(screen.getByTestId('run-execute').textContent).toBe('false');
+  });
+
+  it('picks up a real edit to a role stored in the database, not just the static default', async () => {
+    // Simulates what Users & Roles actually does when an admin edits
+    // permissions: write the changed role to the same table hasPermission
+    // reads from. If this test fails while the two above pass, the bug is
+    // specifically in the live-database path, not the static fallback.
+    await repository.upsertRole({
+      code: 'EXECUTIVE_VIEWER',
+      name: 'Executive Viewer',
+      description: 'Group-wide read-only view for senior leadership and ALCO.',
+      permissions: ['dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'commentary.review', 'admin.manage'],
+    });
+
+    renderProbe();
+    await act(async () => {
+      screen.getByText('as-viewer').click();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-manage').textContent).toBe('true');
+    });
   });
 });
