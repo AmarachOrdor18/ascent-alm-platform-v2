@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { HierarchyBrowser } from '@/components/ui/HierarchyBrowser';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
@@ -269,11 +270,13 @@ export function ProcessRun() {
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Scope</h2>
-            <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-              Leave a selection empty for no constraint. Selecting a rollup brings its whole subtree — picking Retail
-              Banking captures every region beneath it.
-            </p>
+            <div className="mb-4 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Scope</h2>
+              <InfoButton label="How scope selection works">
+                Leave a selection empty for no constraint. Selecting a rollup brings its whole subtree — picking
+                Retail Banking captures every region beneath it.
+              </InfoButton>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <HierarchyBrowser
                 members={orgUnits}
@@ -291,13 +294,15 @@ export function ProcessRun() {
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-              Calculation elements
-            </h2>
-            <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-              Choose what this run computes, per Oracle's element selection (ALM UG §35.2). Computing only what is
-              needed keeps a scheduled daily liquidity run light.
-            </p>
+            <div className="mb-4 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Calculation elements
+              </h2>
+              <InfoButton label="Why choose elements">
+                Choose what this run computes, per Oracle's element selection (ALM UG §35.2). Computing only what is
+                needed keeps a scheduled daily liquidity run light.
+              </InfoButton>
+            </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {ALL_ELEMENTS.map((element) => (
                 <div key={element} className="flex items-center gap-2">
@@ -338,10 +343,12 @@ export function ProcessRun() {
 
         <section className="space-y-6">
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rules</h2>
-            <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-              A rule left unselected falls back to the engine default, and the result says which basis it used.
-            </p>
+            <div className="mb-4 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Rules</h2>
+              <InfoButton label="What happens when a rule is left unselected">
+                A rule left unselected falls back to the engine default, and the result says which basis it used.
+              </InfoButton>
+            </div>
             <div className="space-y-3">
               <Field label="Time bucket rule">
                 <select value={bucketRuleId} onChange={(e) => setBucketRuleId(e.target.value)} className={input} aria-label="Time bucket rule">
@@ -420,7 +427,13 @@ export function ProcessRun() {
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Data version</h2>
+            <div className="mb-3 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Data version</h2>
+              <InfoButton label="Why the run pins a data version">
+                The run pins this version. Reloading the data later creates a new version — this run keeps reporting
+                what it computed, and says which version that was.
+              </InfoButton>
+            </div>
             {batch ? (
               <dl className="space-y-2 text-[11px]">
                 <Row label="Batch" value={batch.id} mono />
@@ -435,10 +448,6 @@ export function ProcessRun() {
                   : 'No committed batch for this date.'}
               </p>
             )}
-            <p className="mt-3 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-              The run pins this version. Reloading the data later creates a new version — this run keeps reporting what
-              it computed, and says which version that was.
-            </p>
           </div>
         </section>
       </div>

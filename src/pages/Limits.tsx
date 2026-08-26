@@ -20,6 +20,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps } from '@/lib/resultHooks';
@@ -210,7 +211,13 @@ export function Limits() {
 
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Limit framework</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Limit framework</h2>
+              <InfoButton label="About these thresholds">
+                Thresholds shipped with the platform are illustrative starting points, not Ecobank&apos;s risk
+                appetite. Expand any row to edit them; changes are stamped with who made them and when.
+              </InfoButton>
+            </div>
             <span className="text-[11px] text-gray-500">
               {configs.filter((c) => c.affiliateCode !== null).length} affiliate-specific,{' '}
               {configs.filter((c) => c.affiliateCode === null).length} Group-wide
@@ -232,11 +239,6 @@ export function Limits() {
               />
             )}
           />
-
-          <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-            Thresholds shipped with the platform are illustrative starting points, not Ecobank&apos;s risk appetite.
-            Expand any row to edit them; changes are stamped with who made them and when.
-          </p>
         </section>
       </ResultsFrame>
 

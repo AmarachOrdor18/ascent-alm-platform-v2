@@ -19,6 +19,7 @@ import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useRuns } from '@/lib/runHooks';
 import { evaluateKris, useKriSeries } from '@/lib/limitHooks';
@@ -135,11 +136,13 @@ export function Kri() {
         <p className="text-[12px] text-gray-500">Loading run history…</p>
       ) : completed === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <p className="text-[13px] font-bold text-navy-900">No completed runs yet</p>
-          <p className="mx-auto mt-2 max-w-lg text-[11px] leading-relaxed text-gray-500">
-            A KRI is a trend, so it needs the same metric at several dates. Execute runs at successive as-of dates and
-            the series builds itself — there is no separate KRI data to maintain.
-          </p>
+          <div className="flex items-center justify-center gap-1.5">
+            <p className="text-[13px] font-bold text-navy-900">No completed runs yet</p>
+            <InfoButton label="Why this matters">
+              A KRI is a trend, so it needs the same metric at several dates. Execute runs at successive as-of dates
+              and the series builds itself — there is no separate KRI data to maintain.
+            </InfoButton>
+          </div>
           <Link
             href="/runs/new"
             className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
@@ -177,7 +180,14 @@ export function Kri() {
           )}
 
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Indicators</h2>
+            <div className="mb-4 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Indicators</h2>
+              <InfoButton label="Methodology">
+                The slope is a least-squares fit over the window, not the difference between the first and last
+                observation, so one anomalous month does not read as a trend. &ldquo;If it persists&rdquo; projects
+                the current slope forward by another window — an extrapolation, not a forecast.
+              </InfoButton>
+            </div>
             <ResultTable
               rows={evaluations}
               columns={columns}
@@ -185,11 +195,6 @@ export function Kri() {
               emptyMessage="No indicators configured."
               renderDetail={(k) => <KriDetail evaluation={k} observations={series?.get(k.metricKey) ?? []} />}
             />
-            <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-              The slope is a least-squares fit over the window, not the difference between the first and last
-              observation, so one anomalous month does not read as a trend. &ldquo;If it persists&rdquo; projects the
-              current slope forward by another window — an extrapolation, not a forecast.
-            </p>
           </section>
         </>
       )}

@@ -192,9 +192,17 @@ export function Irrbb() {
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {nii && (
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                Earnings view — ΔNII
-              </h2>
+              <div className="mb-1 flex items-center gap-1.5">
+                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Earnings view — ΔNII
+                </h2>
+                <InfoButton label="Why this matters">
+                  {nii.repricingGap < 0
+                    ? 'The gap is negative — more liabilities reprice inside the horizon than assets, so a rate rise costs earnings before it earns them.'
+                    : 'The gap is positive — more assets reprice inside the horizon than liabilities, so a rate rise adds to earnings.'}{' '}
+                  Deposit betas are not applied here; the What-If Builder applies them and shows the difference.
+                </InfoButton>
+              </div>
               <p className="mb-4 text-[11px] text-gray-500">
                 What a {nii.shockBps > 0 ? '+' : ''}
                 {nii.shockBps}bp move does to net interest income over {nii.horizonDays} days.
@@ -226,13 +234,6 @@ export function Irrbb() {
                 />
               </dl>
 
-              <p className="mt-3 rounded bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-600">
-                {nii.repricingGap < 0
-                  ? 'The gap is negative — more liabilities reprice inside the horizon than assets, so a rate rise costs earnings before it earns them.'
-                  : 'The gap is positive — more assets reprice inside the horizon than liabilities, so a rate rise adds to earnings.'}{' '}
-                Deposit betas are not applied here; the What-If Builder applies them and shows the difference.
-              </p>
-
               <Methodology text={methodologyOf(results, 'NiiSensitivity')} />
             </section>
           )}
@@ -240,9 +241,17 @@ export function Irrbb() {
           {eve && (
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-1 flex items-baseline justify-between">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                  Economic value view — ΔEVE
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    Economic value view — ΔEVE
+                  </h2>
+                  <InfoButton label="Capital basis">
+                    <span className="font-bold text-navy-900">Capital basis: {eve.capitalBasis.toLowerCase()}.</span>{' '}
+                    {eve.capitalBasis === 'Balance-sheet equity'
+                      ? 'No regulatory Tier 1 figure has been supplied for this affiliate, so the outlier test runs against balance-sheet equity. Loading Tier 1 changes the denominator and can change the verdict.'
+                      : 'The supervisory outlier test is running against the regulatory figure, which is what BCBS 368 prescribes.'}
+                  </InfoButton>
+                </div>
                 {eve.isBaselOutlier !== null && (
                   <StatusBadge
                     status={eve.isBaselOutlier ? 'Supervisory outlier' : `Within ${eve.outlierThresholdPercent}%`}
@@ -284,13 +293,6 @@ export function Irrbb() {
                   value={<span className="font-mono font-bold">{formatPct(eve.eveSensitivityPercentOfEquity, 2)}</span>}
                 />
               </dl>
-
-              <p className="mt-3 rounded bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-600">
-                <span className="font-bold text-navy-900">Capital basis: {eve.capitalBasis.toLowerCase()}.</span>{' '}
-                {eve.capitalBasis === 'Balance-sheet equity'
-                  ? 'No regulatory Tier 1 figure has been supplied for this affiliate, so the outlier test runs against balance-sheet equity. Loading Tier 1 changes the denominator and can change the verdict.'
-                  : 'The supervisory outlier test is running against the regulatory figure, which is what BCBS 368 prescribes.'}
-              </p>
 
               <Methodology text={methodologyOf(results, 'EveSensitivity')} />
             </section>

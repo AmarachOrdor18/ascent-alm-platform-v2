@@ -20,6 +20,7 @@ import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, C
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, usePositions } from '@/lib/hooks';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
@@ -275,10 +276,10 @@ export function LiquidityRisk() {
 
         {activeGap && (
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               {gapView} ladder as numbers
+              <InfoButton label="Why this table exists">A chart is not an audit trail.</InfoButton>
             </h2>
-            <p className="mb-4 text-[11px] leading-relaxed text-gray-500">A chart is not an audit trail.</p>
             <GapLadderTable buckets={activeGap.buckets} currency={currency} priorBuckets={priorGap?.buckets} />
             <Methodology text={methodologyOf(results, 'LiquidityGap')} />
           </section>

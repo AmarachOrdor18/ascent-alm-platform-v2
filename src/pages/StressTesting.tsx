@@ -13,6 +13,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useBatches, useFxRates, usePositions, resolveSingleAffiliate } from '@/lib/hooks';
@@ -200,9 +201,15 @@ export function StressTesting() {
           <div className="space-y-6">
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                  Interest rate — six supervisory shocks
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    Interest rate — six supervisory shocks
+                  </h2>
+                  <InfoButton label="Why balance-sheet equity">
+                    The capital basis is balance-sheet equity because no Tier 1 figure has been supplied; loading one
+                    on the affiliate record changes the denominator and can change the verdict.
+                  </InfoButton>
+                </div>
                 <p className="text-[11px] text-gray-500">
                   Capital basis: balance-sheet equity of{' '}
                   <Amount value={analysis.equity} currency={currency} />
@@ -237,16 +244,17 @@ export function StressTesting() {
                     No shock moves economic value by more than 15% of capital. The book passes the outlier test on
                     every prescribed scenario.
                   </>
-                )}{' '}
-                The capital basis is balance-sheet equity because no Tier 1 figure has been supplied; loading one on
-                the affiliate record changes the denominator and can change the verdict.
+                )}
               </div>
             </section>
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                Liquidity — severe run
-              </h2>
+              <div className="mb-4 flex items-center gap-1.5">
+                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Liquidity — severe run
+                </h2>
+                <InfoButton label="Methodology">{analysis.survival.methodology}</InfoButton>
+              </div>
 
               <dl className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Stat
@@ -283,10 +291,6 @@ export function StressTesting() {
                   under a doubled run-off with a 10% additional haircut.
                 </span>
               </div>
-
-              <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-                {analysis.survival.methodology}
-              </p>
             </section>
           </div>
         )

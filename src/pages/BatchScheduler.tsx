@@ -119,10 +119,8 @@ export function BatchScheduler() {
       />
 
       <div className="mb-6 rounded-2xl border border-gold-500/40 bg-gold-500/5 p-4 text-[11px] leading-relaxed text-navy-900">
-        <span className="font-bold">How this fires.</span> The platform runs entirely in your browser, so no timer
-        executes while this tab is closed. Occurrences accumulate as a backlog and are listed below the moment you open
-        the screen. Against a scheduler service this same definition would fire unattended — the recurrence maths is
-        identical either way.
+        <span className="font-bold">How this fires.</span> No timer runs while this tab is closed — due occurrences
+        accumulate as the backlog below instead.
       </div>
 
       {error && (

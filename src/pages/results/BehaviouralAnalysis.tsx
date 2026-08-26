@@ -156,12 +156,12 @@ export function BehaviouralAnalysis() {
             )}
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Balance vs. volatile, by {groupBy === 'tag' ? 'behavioural tag' : groupBy}
+                <InfoButton label="What volatile means here">
+                  Volatile is the share the pattern models as likely to leave, not a fixed 12-month projection.
+                </InfoButton>
               </h2>
-              <p className="mb-4 text-[11px] font-medium text-gray-400">
-                Volatile is the share the pattern models as likely to leave, not a fixed 12-month projection
-              </p>
               <div style={{ width: '100%', height: 280 }}>
                 <ResponsiveContainer>
                   <BarChart data={grouped} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
@@ -190,14 +190,14 @@ export function BehaviouralAnalysis() {
             </section>
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Activity adjusts the split
+                <InfoButton label="How turnover changes the core share">
+                  Account movement is read from turnover and used to shift the core share. A dormant account is
+                  stickier than an active one — it is not being used, so it is not about to leave — and the uplift
+                  below is applied on top of the pattern&apos;s base split.
+                </InfoButton>
               </h2>
-              <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-                Account movement is read from turnover and used to shift the core share. A dormant account is stickier
-                than an active one — it is not being used, so it is not about to leave — and the uplift below is
-                applied on top of the pattern&apos;s base split.
-              </p>
               <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {Object.entries(ACTIVITY_CORE_UPLIFT).map(([level, uplift]) => (
                   <div key={level} className="rounded-lg bg-gray-50 p-4">
@@ -275,7 +275,10 @@ export function BehaviouralAnalysis() {
               </div>
             </section>
 
-            <p className="mt-4 text-[11px] leading-relaxed text-gray-500">{methodologyOf(results, 'LiquidityGap')}</p>
+            <div className="mt-4 flex items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Methodology</span>
+              <InfoButton label="Methodology note">{methodologyOf(results, 'LiquidityGap')}</InfoButton>
+            </div>
           </>
         )}
       </ResultsFrame>

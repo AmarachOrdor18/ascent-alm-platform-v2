@@ -17,6 +17,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { GapLadderChart, GapLadderTable } from '@/components/results/GapLadder';
 import { Amount } from '@/components/ui/Amount';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { useRules } from '@/lib/ruleHooks';
@@ -114,51 +115,61 @@ export function GapAnalysis() {
         elementLabels={{ LiquidityGap: 'the maturity gap', RepricingGap: 'the repricing gap' }}
       >
         {divergence !== null && (
-          <p className="mb-6 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-            {divergence > 0 ? (
-              <>
-                <span className="font-bold">The two ladders differ.</span> The front bucket alone diverges by{' '}
-                <Amount value={divergence} currency={currency} /> between the maturity and repricing bases — that gap
-                is the floating-rate book, which reprices long before it matures.
-              </>
-            ) : (
-              <>
-                <span className="font-bold">The two ladders agree in the front bucket.</span> That happens when the
-                book is entirely fixed-rate, since a fixed instrument reprices only at maturity. Worth confirming
-                against the loan book rather than assuming.
-              </>
-            )}
-          </p>
+          <div className="mb-6 flex items-center gap-1.5 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
+            <p>
+              {divergence > 0 ? (
+                <>
+                  <span className="font-bold">The two ladders differ.</span> The front bucket alone diverges by{' '}
+                  <Amount value={divergence} currency={currency} /> between the maturity and repricing bases.
+                </>
+              ) : (
+                <span className="font-bold">The two ladders agree in the front bucket.</span>
+              )}
+            </p>
+            <InfoButton label="Why this matters">
+              {divergence > 0
+                ? 'That gap is the floating-rate book, which reprices long before it matures.'
+                : 'That happens when the book is entirely fixed-rate, since a fixed instrument reprices only at maturity. Worth confirming against the loan book rather than assuming.'}
+            </InfoButton>
+          </div>
         )}
 
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-            {basis === 'maturity' ? 'Maturity gap' : 'Repricing gap'}
-          </h2>
-          <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-            {basis === 'maturity'
-              ? 'Bucketed on contractual maturity — when the cash actually moves.'
-              : 'Bucketed on next repricing date, falling back to maturity for fixed-rate instruments, which reprice only when they mature.'}
-          </p>
+          <div className="mb-4 flex items-center gap-1.5">
+            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              {basis === 'maturity' ? 'Maturity gap' : 'Repricing gap'}
+            </h2>
+            <InfoButton label="Methodology">
+              {basis === 'maturity'
+                ? 'Bucketed on contractual maturity — when the cash actually moves.'
+                : 'Bucketed on next repricing date, falling back to maturity for fixed-rate instruments, which reprice only when they mature.'}
+            </InfoButton>
+          </div>
           <GapLadderChart buckets={buckets} currency={currency} />
         </section>
 
         {basis === 'repricing' && nonSensitive && (
-          <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
-            <span className="font-bold text-navy-900">Non-rate-sensitive:</span>{' '}
-            <Amount value={nonSensitive.assets} currency={currency} /> of assets and{' '}
-            <Amount value={nonSensitive.liabilities} currency={currency} /> of liabilities sit in their own bucket
-            rather than being spread across the ladder. Equity and fixed assets do not reprice, and folding them into
-            a tenor bucket would understate the gap.
-          </p>
+          <div className="mb-6 flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
+            <p>
+              <span className="font-bold text-navy-900">Non-rate-sensitive:</span>{' '}
+              <Amount value={nonSensitive.assets} currency={currency} /> of assets and{' '}
+              <Amount value={nonSensitive.liabilities} currency={currency} /> of liabilities sit in their own bucket
+              rather than being spread across the ladder.
+            </p>
+            <InfoButton label="Why this matters">
+              Equity and fixed assets do not reprice, and folding them into a tenor bucket would understate the gap.
+            </InfoButton>
+          </div>
         )}
 
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">The ladder as numbers</h2>
+          <div className="mb-4 flex items-center gap-1.5">
+            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">The ladder as numbers</h2>
+            <InfoButton label="Methodology">
+              {basis === 'maturity' ? methodologyOf(results, 'LiquidityGap') : methodologyOf(results, 'RepricingGap')}
+            </InfoButton>
+          </div>
           <GapLadderTable buckets={buckets} currency={currency} />
-          <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-            {basis === 'maturity' ? methodologyOf(results, 'LiquidityGap') : methodologyOf(results, 'RepricingGap')}
-          </p>
         </section>
 
         {bucketRule && (
@@ -166,11 +177,11 @@ export function GapAnalysis() {
             <div className="mb-4 flex items-center gap-2">
               <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Bucket rule applied</h2>
               <StatusBadge status={`${bucketRule.name} v${bucketRule.version}`} tone="neutral" />
+              <InfoButton label="Why this matters">
+                This run consumed version {bucketRule.version} of the rule. Editing the rule now does not change what
+                this run reports — that is what makes the figure defensible months later.
+              </InfoButton>
             </div>
-            <p className="mb-3 text-[11px] leading-relaxed text-gray-500">
-              This run consumed version {bucketRule.version} of the rule. Editing the rule now does not change what
-              this run reports — that is what makes the figure defensible months later.
-            </p>
             <div className="flex flex-wrap gap-2">
               {bucketRule.ladders
                 .find((l) => (basis === 'maturity' ? l.kind === 'LiquidityGap' : l.kind === 'RepricingGap'))

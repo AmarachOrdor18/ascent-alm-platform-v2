@@ -16,6 +16,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { RatioChart } from '@/components/ui/RatioChart';
 import { Amount } from '@/components/ui/Amount';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
@@ -108,7 +109,14 @@ export function Profitability() {
 
               <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-baseline justify-between">
-                  <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Asset quality</h2>
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Asset quality</h2>
+                    <InfoButton label="Methodology">
+                      Anything classified Substandard or worse counts as non-performing, following the CBN
+                      classification. Coverage compares provisions held against that balance — below 100% means the
+                      provisioning does not yet cover the impaired book.
+                    </InfoButton>
+                  </div>
                   {p.nplRatioPercent !== null && (
                     <StatusBadge
                       status={p.nplRatioPercent > 5 ? 'Above 5% threshold' : 'Within threshold'}
@@ -135,19 +143,20 @@ export function Profitability() {
                     value={<span className="font-mono">{formatPct(p.loanToDepositPercent)}</span>}
                   />
                 </dl>
-
-                <p className="mt-4 rounded bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-600">
-                  Anything classified Substandard or worse counts as non-performing, following the CBN classification.
-                  Coverage compares provisions held against that balance — below 100% means the provisioning does not
-                  yet cover the impaired book.
-                </p>
               </section>
             </div>
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                Ratios against their thresholds
-              </h2>
+              <div className="mb-4 flex items-center gap-1.5">
+                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Ratios against their thresholds
+                </h2>
+                <InfoButton label="Why these thresholds">
+                  The thresholds drawn are the NPL ones — they do not apply to NIM or the non-earning ratio, which
+                  have no regulatory floor. Shown together because the three move against each other: a book that
+                  lends aggressively lifts NIM and NPL at once.
+                </InfoButton>
+              </div>
               <RatioChart
                 data={[
                   { label: 'NIM', value: p.netInterestMarginPercent ?? 0 },
@@ -161,11 +170,6 @@ export function Profitability() {
                 variant="bar"
                 seriesName="Ratio"
               />
-              <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
-                The thresholds drawn are the NPL ones — they do not apply to NIM or the non-earning ratio, which have
-                no regulatory floor. Shown together because the three move against each other: a book that lends
-                aggressively lifts NIM and NPL at once.
-              </p>
             </section>
 
             {p.notes.length > 0 && (

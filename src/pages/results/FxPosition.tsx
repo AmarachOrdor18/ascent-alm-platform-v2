@@ -16,6 +16,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
@@ -151,6 +152,11 @@ export function FxPosition() {
                   <span className="text-[12px] font-bold text-navy-900">
                     Single-currency exposure above {SINGLE_CURRENCY_LIMIT_PCT}% of capital
                   </span>
+                  <InfoButton label="Where these limits come from">
+                    The {SINGLE_CURRENCY_LIMIT_PCT}% and {AGGREGATE_LIMIT_PCT}% figures are the common supervisory
+                    shape across the footprint, not a limit configured for this affiliate. Set the real ones on
+                    Limits & Breaches once that screen is built, and this will compare against those instead.
+                  </InfoButton>
                 </div>
                 <ul className="space-y-1 text-[11px] text-gray-700">
                   {breaches.map((b) => (
@@ -162,39 +168,35 @@ export function FxPosition() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-3 text-[11px] leading-relaxed text-gray-600">
-                  The {SINGLE_CURRENCY_LIMIT_PCT}% and {AGGREGATE_LIMIT_PCT}% figures are the common supervisory
-                  shape across the footprint, not a limit configured for this affiliate. Set the real ones on Limits &
-                  Breaches once that screen is built, and this will compare against those instead.
-                </p>
               </div>
             )}
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                Net open position by currency
-              </h2>
+              <div className="mb-4 flex items-center gap-1.5">
+                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Net open position by currency
+                </h2>
+                <InfoButton label="Methodology">{methodologyOf(results, 'FxPosition')}</InfoButton>
+              </div>
               <ResultTable
                 rows={fx.lines}
                 columns={columns}
                 rowKey={(l) => l.currency}
                 emptyMessage="This run holds no positions, so there is no FX exposure to report."
               />
-
-              <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-                {methodologyOf(results, 'FxPosition')}
-              </p>
             </section>
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                Cross-currency funding
-              </h2>
-              <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-                How much of the balance sheet sits in a currency other than {currency}. An affiliate that funds in
-                dollars and lends locally carries the mismatch even when its net open position looks modest, because
-                the funding can be withdrawn in a currency it does not generate.
-              </p>
+              <div className="mb-4 flex items-center gap-1.5">
+                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Cross-currency funding
+                </h2>
+                <InfoButton label="Why this matters">
+                  How much of the balance sheet sits in a currency other than {currency}. An affiliate that funds in
+                  dollars and lends locally carries the mismatch even when its net open position looks modest,
+                  because the funding can be withdrawn in a currency it does not generate.
+                </InfoButton>
+              </div>
 
               <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
                 <Stat label="Foreign-currency assets" value={<Amount value={foreignAssets} currency={currency} />} />

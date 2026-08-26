@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAffiliates } from '@/lib/hooks';
 import { useRuns, useRunResults } from '@/lib/runHooks';
 import { METRIC_SPECS, extractMetrics, formatMetric } from '@/lib/metrics';
@@ -64,8 +65,12 @@ export function AdHoc() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Metrics</h2>
-            <p className="mb-4 text-[11px] text-gray-500">The same catalogue Limits and KRI read from — nothing metric-specific to this screen.</p>
+            <div className="mb-4 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Metrics</h2>
+              <InfoButton label="Why this list">
+                The same catalogue Limits and KRI read from — nothing metric-specific to this screen.
+              </InfoButton>
+            </div>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
               {METRIC_SPECS.map((m) => (
                 <button
@@ -82,8 +87,12 @@ export function AdHoc() {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
-            <p className="mb-4 text-[11px] text-gray-500">Analysis, not the Group-consolidated view — any status, not just Live.</p>
+            <div className="mb-4 flex items-center gap-1.5">
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
+              <InfoButton label="Why this list">
+                Analysis, not the Group-consolidated view — any status, not just Live.
+              </InfoButton>
+            </div>
             {liveAffiliates.length === 0 ? (
               <p className="text-[11px] text-gray-400">No affiliates onboarded yet.</p>
             ) : (
@@ -112,12 +121,14 @@ export function AdHoc() {
         </div>
 
         <aside className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">How this reads</h2>
-          <p className="text-[11px] leading-relaxed text-gray-500">
-            Each selected affiliate's <em>most recently completed</em> run supplies the figures — the same rule every
-            results screen follows. An affiliate with no completed run shows every metric as unmeasured rather than
-            zero, and one flagged &ldquo;no run&rdquo; above will read that way here too.
-          </p>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">How this reads</h2>
+            <InfoButton label="Why this matters">
+              Each selected affiliate's <em>most recently completed</em> run supplies the figures — the same rule every
+              results screen follows. An affiliate with no completed run shows every metric as unmeasured rather than
+              zero, and one flagged &ldquo;no run&rdquo; above will read that way here too.
+            </InfoButton>
+          </div>
         </aside>
       </div>
 

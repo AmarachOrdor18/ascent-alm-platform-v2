@@ -13,6 +13,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { RatioChart } from '@/components/ui/RatioChart';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
@@ -344,13 +345,15 @@ export function WhatIf() {
                     onChange={(e) => set({ applyDepositBetas: e.target.checked })}
                     className="mt-0.5 accent-gold-500"
                   />
-                  <label htmlFor="betas" className="cursor-pointer text-[11px]">
-                    <span className="block font-bold text-navy-900">Apply deposit betas</span>
-                    <span className="block leading-relaxed text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="betas" className="cursor-pointer text-[11px] font-bold text-navy-900">
+                      Apply deposit betas
+                    </label>
+                    <InfoButton label="Why this matters">
                       Damps the liability leg. A bank with a negative repricing gap looks less exposed to a rate rise
                       once betas apply — which is the real effect.
-                    </span>
-                  </label>
+                    </InfoButton>
+                  </div>
                 </div>
               </div>
             </div>
@@ -440,18 +443,18 @@ export function WhatIf() {
                 </div>
 
                 <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                  <h3 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                    Deposit behaviour under this scenario
-                  </h3>
+                  <div className="mb-3 flex items-center gap-1.5">
+                    <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                      Deposit behaviour under this scenario
+                    </h3>
+                    <InfoButton label="Methodology">{result.runoff.methodology}</InfoButton>
+                  </div>
                   <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
                     <Stat label="Total deposits" value={<Amount value={result.runoff.totalDeposits} currency={currency} />} />
                     <Stat label="Core" value={<Amount value={result.runoff.totalCore} currency={currency} />} />
                     <Stat label="Volatile" value={<Amount value={result.runoff.totalVolatile} currency={currency} />} />
                     <Stat label="Core share" value={<span className="font-mono">{formatPct(result.runoff.corePercent)}</span>} />
                   </dl>
-                  <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-                    {result.runoff.methodology}
-                  </p>
                 </div>
               </>
             )}
