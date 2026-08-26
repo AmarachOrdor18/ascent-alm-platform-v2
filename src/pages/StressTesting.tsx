@@ -15,7 +15,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useBatches, useFxRates, usePositions } from '@/lib/hooks';
+import { useAffiliates, useBatches, useFxRates, usePositions, resolveSingleAffiliate } from '@/lib/hooks';
 import { buildFxTable, missingRates } from '@/engine/fx';
 import { computeAllShocks, computeEquity } from '@/engine/irrbb';
 import { defaultLadder } from '@/engine/buckets';
@@ -45,7 +45,7 @@ export function StressTesting() {
   const { data: batches = [] } = useBatches();
   const { data: fxRates = [] } = useFxRates();
 
-  const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
+  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const dates = affiliate ? availableAsOfDates(batches, affiliate.code) : [];
   const [asOfDate, setAsOfDate] = useState<string | null>(null);
   const effectiveDate = asOfDate ?? dates[0] ?? '2026-07-31';

@@ -178,6 +178,16 @@ function ScopeSync() {
   return null;
 }
 
+/** ErrorBoundary re-keyed by scope, so a caught error resets when the affiliate or as-of date it was caught under changes, instead of requiring a full remount. */
+function ScopedErrorBoundary({ screenName, children }: { screenName?: string; children: React.ReactNode }) {
+  const { affiliateCode, asOfDate } = useScope();
+  return (
+    <ErrorBoundary key={`${affiliateCode}:${asOfDate ?? ''}`} screenName={screenName}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 export function App() {
   const { isAuthenticated } = useAuth();
   const [seeded, setSeeded] = useState(false);
@@ -218,11 +228,17 @@ export function App() {
 
         {ROUTE_ORDER.map(({ path, screenName, Component }) => (
           <Route key={path} path={path}>
-            <ErrorBoundary screenName={screenName}>
+            {/* Keyed by scope: a transient render error caught here otherwise
+                latches until the whole app remounts (only logout did that),
+                even after the affiliate/date that triggered it has changed.
+                Re-keying on scope gives the screen a fresh mount attempt
+                exactly when the user's next action already changes the
+                inputs it will render with. */}
+            <ScopedErrorBoundary screenName={screenName}>
               <Suspense fallback={<ScreenFallback />}>
                 <Component />
               </Suspense>
-            </ErrorBoundary>
+            </ScopedErrorBoundary>
           </Route>
         ))}
 

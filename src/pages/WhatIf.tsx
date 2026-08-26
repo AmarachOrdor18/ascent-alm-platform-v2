@@ -17,7 +17,7 @@ import { RatioChart } from '@/components/ui/RatioChart';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useBatches, useFxRates, usePositions } from '@/lib/hooks';
+import { useAffiliates, useBatches, useFxRates, usePositions, resolveSingleAffiliate } from '@/lib/hooks';
 import { useRuleMutations, newRuleMeta } from '@/lib/ruleHooks';
 import { buildFxTable, missingRates } from '@/engine/fx';
 import { computeLcr, computeNsfr } from '@/engine/liquidity';
@@ -83,7 +83,7 @@ export function WhatIf() {
   const { save } = useRuleMutations<ForecastScenarioRule>('ForecastScenario');
   const canRun = hasPermission('run.execute');
 
-  const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
+  const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const dates = affiliate ? availableAsOfDates(batches, affiliate.code) : [];
   const asOfDate = dates[0] ?? '2026-07-31';
   const currency = affiliate?.functionalCurrency ?? 'USD';
