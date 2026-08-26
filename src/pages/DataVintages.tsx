@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAffiliates, useBatches } from '@/lib/hooks';
 import { availableAsOfDates, checkAllDomains, expiredBatches } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
@@ -31,15 +32,21 @@ export function DataVintages() {
   const { data: batches = [], isLoading } = useBatches();
   const [filter, setFilter] = useState<string>('ALL');
 
-  const rows = filter === 'ALL' ? batches : batches.filter((b) => b.affiliateCode === filter);
-  const committed = rows.filter((b) => b.status === 'Committed');
-  const superseded = rows.filter((b) => b.status === 'Superseded');
-  const expired = expiredBatches(rows, TODAY, 24);
+  const filtered = filter === 'ALL' ? batches : batches.filter((b) => b.affiliateCode === filter);
+  const committed = filtered.filter((b) => b.status === 'Committed');
+  const superseded = filtered.filter((b) => b.status === 'Superseded');
+  const expired = expiredBatches(filtered, TODAY, 24);
 
   const freshness = affiliates
     .filter((a) => a.code !== 'GROUP')
     .flatMap((a) => checkAllDomains(a, batches, TODAY).map((c) => ({ affiliate: a.name, ...c })));
   const stale = freshness.filter((f) => f.status === 'Stale' || f.status === 'Never loaded');
+
+  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
+    filtered,
+    10,
+    ['affiliateCode', 'domain', 'asOfDate', 'status'],
+  );
 
   const columns: ResultColumn<LoadBatch>[] = [
     {
@@ -87,7 +94,7 @@ export function DataVintages() {
         asOfDate={null}
         scope={filter === 'ALL' ? 'All affiliates' : filter}
         metrics={[
-          { label: 'Load batches', value: String(rows.length) },
+          { label: 'Load batches', value: String(filtered.length) },
           { label: 'Committed', value: String(committed.length), tone: 'success' },
           { label: 'Superseded', value: String(superseded.length) },
           {
@@ -98,55 +105,38 @@ export function DataVintages() {
         ]}
       />
 
-      {stale.length > 0 && (
-        <div role="status" className="mb-6 rounded-lg bg-warning-bg px-4 py-3 text-[12px] leading-relaxed text-warning">
-          <span className="font-bold">Freshness.</span> {stale.length} affiliate-domain combination
-          {stale.length === 1 ? ' is' : 's are'} stale or never loaded. A stale feed does not announce itself — it
-          simply reports confident numbers off old data.
-          <ul className="mt-2 space-y-0.5">
-            {stale.slice(0, 6).map((f) => (
-              <li key={`${f.affiliateCode}-${f.domain}`}>
-                {f.affiliate} · {f.domain} —{' '}
-                {f.ageDays === null ? 'never loaded' : `${f.ageDays} days old against a ${f.slaDays}-day SLA`}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setFilter('ALL')}
-          className={
-            filter === 'ALL'
-              ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white'
-              : 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] text-gray-600 hover:border-navy-700'
-          }
-        >
-          All affiliates
-        </button>
-        {affiliates
-          .filter((a) => a.code !== 'GROUP')
-          .map((a) => (
-            <button
-              key={a.code}
-              type="button"
-              onClick={() => setFilter(a.code)}
-              className={
-                filter === a.code
-                  ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white'
-                  : 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] text-gray-600 hover:border-navy-700'
-              }
+      <section className="table-datagrid-container">
+        <div className="border-b border-gray-100 bg-white/50 p-5">
+          <TableToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            exportData={() => filtered}
+            exportFilename="data-vintages"
+            density={density}
+            onDensityChange={setDensity}
+          >
+            <select
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Filter by affiliate"
+              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
             >
-              {a.name}
-            </button>
-          ))}
-      </div>
-
-      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <option value="ALL">All affiliates</option>
+              {affiliates
+                .filter((a) => a.code !== 'GROUP')
+                .map((a) => (
+                  <option key={a.code} value={a.code}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </TableToolbar>
+        </div>
         <ResultTable
-          rows={rows}
+          rows={paged}
           columns={columns}
           rowKey={(b) => b.id}
           emptyMessage={isLoading ? 'Loading…' : 'No load batches yet. Upload a file to create one.'}
@@ -200,6 +190,7 @@ export function DataVintages() {
             </div>
           )}
         />
+        <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
