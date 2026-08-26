@@ -15,12 +15,12 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'wouter';
-import { Area, AreaChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
-import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
+import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, useYieldCurves, useEconomicIndicators } from '@/lib/hooks';
@@ -101,6 +101,7 @@ export function Dashboard() {
     'survivalHorizonDays',
     'niiSensitivityPercent',
     'eveSensitivityPercentOfEquity',
+    'netInterestMarginPercent',
   ]);
   const { data: fxRates = [] } = useFxRates();
   const { data: yieldCurves = [] } = useYieldCurves();
@@ -154,17 +155,14 @@ export function Dashboard() {
       : null,
   ].filter((r): r is { label: string; sublabel: string; value: string; delta: number | null } => r !== null);
 
-  // NII and EVE sensitivity — earnings and capital at risk from a 200bp
-  // shock, the pair a board actually asks about, rather than the
-  // regulatory liquidity ratios already sitting in the headline cards.
+  // Net interest margin — the profitability line a board actually asks
+  // about, rather than the regulatory liquidity ratios already sitting in
+  // the headline cards.
   const trendData = (() => {
     if (!trendSeries) return [];
-    const byDate = new Map<string, { asOfDate: string; nii?: number; eve?: number }>();
-    for (const obs of trendSeries.get('niiSensitivityPercent') ?? []) {
-      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), nii: obs.value });
-    }
-    for (const obs of trendSeries.get('eveSensitivityPercentOfEquity') ?? []) {
-      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), eve: obs.value });
+    const byDate = new Map<string, { asOfDate: string; nim?: number }>();
+    for (const obs of trendSeries.get('netInterestMarginPercent') ?? []) {
+      byDate.set(obs.asOfDate, { asOfDate: obs.asOfDate, nim: obs.value });
     }
     return Array.from(byDate.values()).sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
   })();
@@ -258,9 +256,6 @@ export function Dashboard() {
         asOfDate={run?.asOfDate ?? null}
         scope={affiliate?.name ?? affiliateCode}
         currency={run?.reportingCurrency}
-        metrics={[
-          { label: 'In breach', value: String(breaches.length), tone: breaches.length > 0 ? 'danger' : 'success' },
-        ]}
       />
 
       <ResultsFrame {...frameProps(selected)} requires={[]}>
@@ -295,8 +290,8 @@ export function Dashboard() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rate sensitivity trend</h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">NII and EVE sensitivity to a +200bp shock — earnings and capital at risk, across every completed run for this scope</p>
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Net interest margin trend</h2>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">NIM across every completed run for this scope</p>
             <div style={{ width: '100%', height: 260 }}>
               {trendData.length < 2 ? (
                 <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
@@ -305,26 +300,13 @@ export function Dashboard() {
                 </div>
               ) : (
                 <ResponsiveContainer>
-                  <AreaChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                    <defs>
-                      <linearGradient id="niiFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.25} />
-                        <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="eveFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={CHART_COLORS.accent} stopOpacity={0.25} />
-                        <stop offset="95%" stopColor={CHART_COLORS.accent} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                     <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="asOfDate" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(d: string) => formatDate(d)} />
                     <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
                     <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} labelFormatter={(d: string) => formatDate(d)} contentStyle={CHART_TOOLTIP_STYLE} />
-                    <Legend wrapperStyle={CHART_LEGEND_STYLE} />
-                    <ReferenceLine y={0} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" />
-                    <Area type="monotone" dataKey="nii" name="NII sensitivity" stroke={CHART_COLORS.primary} strokeWidth={2.5} fill="url(#niiFill)" dot={{ r: 3 }} connectNulls />
-                    <Area type="monotone" dataKey="eve" name="EVE sensitivity" stroke={CHART_COLORS.accent} strokeWidth={2.5} fill="url(#eveFill)" dot={{ r: 3 }} connectNulls />
-                  </AreaChart>
+                    <Bar dataKey="nim" name="Net interest margin" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
