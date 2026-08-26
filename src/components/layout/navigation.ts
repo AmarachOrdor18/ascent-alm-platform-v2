@@ -59,9 +59,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'REPORTING',
     items: [
       { name: 'ALCO Meetings', path: '/alco-meetings', permission: 'reporting.view', phase: 8 },
-      { name: 'ALCO Reporting', path: '/alco-reporting', permission: 'reporting.view', phase: 8 },
+      { name: 'Report Packs', path: '/alco-reporting', permission: 'reporting.view', phase: 8 },
       { name: 'Regulatory Reporting', path: '/regulatory-reporting', permission: 'reporting.view', phase: 8 },
-      { name: 'Management Reporting', path: '/management-reporting', permission: 'reporting.view', phase: 8 },
       { name: 'Ad-Hoc Analysis', path: '/ad-hoc', permission: 'reporting.view', phase: 8 },
     ],
   },
@@ -92,8 +91,6 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'CONFIGURATION',
     items: [
       { name: 'Business Rules', path: '/rules', permission: 'rules.edit', phase: 4 },
-      { name: 'FTP Rules', path: '/rules/ftp', permission: 'rules.edit', phase: 4 },
-      { name: 'Adjustment Rules', path: '/rules/adjustments', permission: 'rules.edit', phase: 4 },
       { name: 'Validation Rules', path: '/validation-rules', permission: 'data.configure', phase: 3 },
     ],
   },

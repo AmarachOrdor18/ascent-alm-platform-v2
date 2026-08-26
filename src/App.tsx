@@ -53,8 +53,8 @@ const BUILT: Record<string, ComponentType> = {
   // Phase 8 — reporting & admin
   '/alco-meetings': lazy(() => import('@/pages/AlcoMeetings').then((m) => ({ default: m.AlcoMeetings }))),
   '/regulatory-reporting': lazy(() => import('@/pages/RegulatoryReporting').then((m) => ({ default: m.RegulatoryReporting }))),
-  '/alco-reporting': lazy(() => import('@/pages/AlcoReporting').then((m) => ({ default: m.AlcoReporting }))),
-  '/management-reporting': lazy(() => import('@/pages/ManagementReporting').then((m) => ({ default: m.ManagementReporting }))),
+  '/alco-reporting': lazy(() => import('@/pages/ReportPacks').then((m) => ({ default: m.AlcoReporting }))),
+  '/management-reporting': lazy(() => import('@/pages/ReportPacks').then((m) => ({ default: m.ManagementReporting }))),
   '/ad-hoc': lazy(() => import('@/pages/AdHoc').then((m) => ({ default: m.AdHoc }))),
   '/admin/users': lazy(() => import('@/pages/AdminUsers').then((m) => ({ default: m.AdminUsers }))),
   '/admin/preferences': lazy(() => import('@/pages/AdminPreferences').then((m) => ({ default: m.AdminPreferences }))),
@@ -145,6 +145,9 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/transaction-strategies', screenName: 'Transaction Strategies' },
   { path: '/rules/filters', screenName: 'Filters' },
   { path: '/rules/custom-metrics', screenName: 'Custom Metrics' },
+  { path: '/rules/ftp', screenName: 'FTP Rules' },
+  { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
+  { path: '/management-reporting', screenName: 'Report Packs — Management' },
 ];
 
 /**
