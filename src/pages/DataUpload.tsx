@@ -21,6 +21,7 @@ import {
   useBatches,
   useCommitBatch,
   useDeleteStagedBatch,
+  useDimensionMembers,
   useSaveBatch,
   useSaveDimensionMembers,
   useStagedBatchFor,
@@ -30,8 +31,6 @@ import { importPositions, type RowError } from '@/lib/csvImport';
 import { validatePositions, DEFAULT_VALIDATION_RULES, type ValidationResult } from '@/engine/validation';
 import { planSupersede } from '@/engine/vintage';
 import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
-import { ALL_DIMENSION_MEMBERS } from '@/data/seed/reference';
-import { ALL_AFFILIATE_REFERENCE } from '@/data/seed/affiliateReference';
 import { formatDate } from '@/lib/format';
 import type { DataDomain, DimensionMember, DimensionType, LoadBatch, Position } from '@/engine/types';
 
@@ -101,11 +100,17 @@ export function DataUpload() {
     [staged, asOfDate, affiliates],
   );
 
-  // Static seed constants, not the live store: this check runs against
-  // whatever a staged file references before anything is committed. Merged
-  // with the 33-affiliate reference set so a newly onboarded affiliate's org
-  // units and counterparties are recognised, not just the original three.
-  const knownMembers = useMemo(() => [...ALL_DIMENSION_MEMBERS, ...ALL_AFFILIATE_REFERENCE], []);
+  // Live store, not a frozen snapshot: "Create these from the file" writes
+  // new dimension members, and this has to see them on the next render or
+  // Commit stays disabled forever even after the fix ran.
+  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit');
+  const { data: glAccounts = [] } = useDimensionMembers('GlAccount');
+  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa');
+  const { data: counterparties = [] } = useDimensionMembers('Counterparty');
+  const knownMembers = useMemo(
+    () => [...orgUnits, ...glAccounts, ...commonCoa, ...counterparties],
+    [orgUnits, glAccounts, commonCoa, counterparties],
+  );
 
   const unmapped = useMemo(() => {
     if (!staged) return [] as Array<{ dimension: string; codes: string[] }>;
@@ -480,11 +485,7 @@ export function DataUpload() {
           {unmapped.length > 0 && (
             <div className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] text-navy-900">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <span className="font-bold">One more step before this can commit.</span> The file parsed cleanly —
-                  these codes just don&apos;t exist yet as dimension members, which is normal for an affiliate this is
-                  the first load for. Nothing is wrong with the upload.
-                </div>
+                <span className="font-bold">Unmapped codes — must be created before commit:</span>
                 {autoMappable.length > 0 && (
                   <button
                     type="button"
@@ -501,17 +502,12 @@ export function DataUpload() {
                   <li key={u.dimension}>
                     <span className="font-bold">{u.dimension}</span>
                     {u.dimension === 'CommonCoa' && (
-                      <span className="text-[11px] text-gray-500"> — governed centrally; fix the source data rather than auto-creating</span>
+                      <span className="text-[11px] text-gray-500"> — fix in source file, not auto-created</span>
                     )}
                     <span className="ml-1 font-mono text-[11px]">{u.codes.join(', ')}</span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-[11px] leading-relaxed text-gray-600">
-                {autoMappable.length > 0
-                  ? 'The button above reads the name each code already has in this file — a product class for a GL account, for instance — and creates it as a real dimension member. Nothing is invented that the upload didn’t already say.'
-                  : 'These are governed dimensions and are not auto-created — add them on the Dimensions screen, or correct the code in the source file.'}
-              </p>
             </div>
           )}
 
