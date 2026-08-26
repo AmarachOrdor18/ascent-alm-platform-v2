@@ -1,57 +1,40 @@
 /**
- * Demo sign-in adapted from ecobank-alm-platform design.
+ * Sign-in, adapted from ecobank-alm-platform's design.
  *
- * Six seeded accounts, one per role, so the role model can be demonstrated
- * by switching between them. Real authentication (MFA via otplib, Azure AD
- * SSO via MSAL) is implemented in v1 and is out of scope here — see build
- * plan §15.
+ * Reads the same real user register Users & Roles manages, rather than a
+ * second, hardcoded copy of the same six identities — a user created there
+ * is signed-in-able here without touching this file, and disabling one
+ * there removes it from this list. Real authentication (MFA via otplib,
+ * Azure AD SSO via MSAL) is implemented in v1 and is out of scope here —
+ * see build plan §15.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ROLES, useAuth } from '@/context/AuthContext';
-import type { RoleCode, User } from '@/engine/types';
-
-const DEMO_ACCOUNTS: Array<Pick<User, 'id' | 'name' | 'email' | 'role' | 'affiliateCode'>> = [
-  { id: 'U-001', name: 'Adaeze Okonkwo', email: 'adaeze.okonkwo@ecobank.com', role: 'ADMIN', affiliateCode: 'GROUP' },
-  { id: 'U-002', name: 'Chinwe Okafor', email: 'chinwe.okafor@ecobank.com', role: 'RISK_ANALYST', affiliateCode: 'NG' },
-  {
-    id: 'U-003',
-    name: 'Aminata Traoré',
-    email: 'aminata.traore@ecobank.com',
-    role: 'TREASURY_USER',
-    affiliateCode: 'CI',
-  },
-  {
-    id: 'U-004',
-    name: 'Yaw Boateng',
-    email: 'yaw.boateng@ecobank.com',
-    role: 'EXECUTIVE_VIEWER',
-    affiliateCode: 'GROUP',
-  },
-  { id: 'U-005', name: 'Fatima Bello', email: 'fatima.bello@ecobank.com', role: 'CONTROL_TESTER', affiliateCode: 'NG' },
-  { id: 'U-006', name: 'Samuel Owusu', email: 'samuel.owusu@ecobank.com', role: 'REPORTING_USER', affiliateCode: 'GH' },
-];
+import { useUsers } from '@/lib/hooks';
 
 export function Login() {
   const { login } = useAuth();
-  const [selected, setSelected] = useState<RoleCode>('RISK_ANALYST');
-  const [password, setPassword] = useState('password123');
+  const { data: users = [], isLoading } = useUsers();
+  const active = users.filter((u) => u.isActive);
+
+  const [selectedId, setSelectedId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const account = DEMO_ACCOUNTS.find((a) => a.role === selected) ?? DEMO_ACCOUNTS[0]!;
+  useEffect(() => {
+    if (!selectedId && active.length > 0) setSelectedId(active[0]!.id);
+  }, [active, selectedId]);
+
+  const account = active.find((u) => u.id === selectedId) ?? active[0] ?? null;
+  const role = account ? ROLES[account.role] : null;
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!account) return;
     setIsSubmitting(true);
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800));
-    login({
-      ...account,
-      isActive: true,
-      mfaEnrolled: true,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    });
+    login({ ...account, lastLoginAt: new Date().toISOString() });
     setIsSubmitting(false);
   };
 
@@ -105,24 +88,23 @@ export function Login() {
           </div>
 
           <div className="mb-6">
-            <span className="block text-sm font-medium text-gray-700 mb-2">Sign in as</span>
-            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Role selection">
-              {Object.entries(ROLES).map(([roleCode, role]) => (
-                <button
-                  key={roleCode}
-                  type="button"
-                  onClick={() => setSelected(roleCode as RoleCode)}
-                  className={
-                    selected === roleCode
-                      ? "px-3 py-2 rounded-md text-xs font-bold bg-navy-900 text-white text-left transition-all"
-                      : "px-3 py-2 rounded-md text-xs font-bold bg-gray-50 text-gray-600 text-left border border-gray-200 hover:border-navy-900/30 transition-all"
-                  }
-                >
-                  {role.name}
-                </button>
+            <label htmlFor="user-select" className="block text-sm font-medium text-gray-700 mb-2">Sign in as</label>
+            <select
+              id="user-select"
+              value={account?.id ?? ''}
+              onChange={(e) => setSelectedId(e.target.value)}
+              disabled={isLoading || active.length === 0}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-gold-500"
+            >
+              {isLoading && <option>Loading users…</option>}
+              {!isLoading && active.length === 0 && <option>No active users</option>}
+              {active.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} — {ROLES[u.role].name}
+                </option>
               ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-2">{ROLES[selected].description}</p>
+            </select>
+            {role && <p className="text-xs text-gray-400 mt-2">{role.description}</p>}
           </div>
 
           <form onSubmit={handleSignIn} className="space-y-6">
@@ -131,7 +113,7 @@ export function Login() {
               <input
                 id="email-input"
                 type="email"
-                value={account.email}
+                value={account?.email ?? ''}
                 readOnly
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-all text-gray-700"
               />
@@ -145,8 +127,7 @@ export function Login() {
               <input
                 id="password-input"
                 type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                defaultValue="password123"
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-all tracking-wider"
                 required
               />
@@ -161,10 +142,10 @@ export function Login() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !account}
               className="w-full py-3 px-4 bg-navy-900 hover:bg-navy-800 text-white font-medium rounded-md shadow hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-900 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Signing In…' : `Sign In as ${ROLES[selected].name}`}
+              {isSubmitting ? 'Signing In…' : account ? `Sign In as ${account.name}` : 'Sign In'}
             </button>
           </form>
 

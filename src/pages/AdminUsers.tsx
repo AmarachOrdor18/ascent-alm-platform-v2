@@ -12,19 +12,37 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth, ROLES } from '@/context/AuthContext';
-import { useUsers, useSaveUser } from '@/lib/hooks';
+import { useAffiliates, useUsers, useSaveUser } from '@/lib/hooks';
 import type { RoleCode, User } from '@/engine/types';
 
 /** ROLES is keyed by code; the screen wants them in a stable order. */
 const ROLE_LIST = Object.values(ROLES);
 
+function newId(): string {
+  return `U-${Date.now().toString(36).toUpperCase()}`;
+}
+
+const BLANK_USER: User = {
+  id: '',
+  name: '',
+  email: '',
+  role: 'RISK_ANALYST',
+  affiliateCode: 'GROUP',
+  isActive: true,
+  mfaEnrolled: false,
+  createdAt: '',
+  lastLoginAt: null,
+};
+
 export function AdminUsers() {
   const { hasPermission, user: signedIn } = useAuth();
   const { data: users = [], isLoading } = useUsers();
+  const { data: affiliates = [] } = useAffiliates();
   const save = useSaveUser();
   const canEdit = hasPermission('admin.users');
 
   const [editing, setEditing] = useState<User | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const active = users.filter((u) => u.isActive);
   const withoutMfa = active.filter((u) => !u.mfaEnrolled);
@@ -96,6 +114,16 @@ export function AdminUsers() {
           },
           { label: 'Roles in use', value: `${byRole.size} of ${ROLE_LIST.length}` },
         ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            disabled={!canEdit}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            New user
+          </button>
+        }
       />
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -171,10 +199,26 @@ export function AdminUsers() {
       {editing && (
         <UserEditor
           user={editing}
+          affiliates={affiliates}
+          existingEmails={users.filter((u) => u.id !== editing.id).map((u) => u.email.toLowerCase())}
           onCancel={() => setEditing(null)}
           onSave={async (next) => {
             await save.mutateAsync(next);
             setEditing(null);
+          }}
+        />
+      )}
+
+      {creating && (
+        <UserEditor
+          user={{ ...BLANK_USER, id: newId(), createdAt: new Date().toISOString() }}
+          affiliates={affiliates}
+          existingEmails={users.map((u) => u.email.toLowerCase())}
+          isNew
+          onCancel={() => setCreating(false)}
+          onSave={async (next) => {
+            await save.mutateAsync(next);
+            setCreating(false);
           }}
         />
       )}
@@ -184,22 +228,51 @@ export function AdminUsers() {
 
 function UserEditor({
   user,
+  affiliates,
+  existingEmails,
+  isNew,
   onCancel,
   onSave,
 }: {
   user: User;
+  affiliates: Array<{ code: string; name: string }>;
+  existingEmails: string[];
+  isNew?: boolean;
   onCancel: () => void;
   onSave: (u: User) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(user);
   const set = (patch: Partial<User>) => setDraft((d) => ({ ...d, ...patch }));
 
+  const emailTaken = draft.email.trim() !== '' && existingEmails.includes(draft.email.trim().toLowerCase());
+  const canSave = draft.name.trim() !== '' && draft.email.trim() !== '' && !emailTaken;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-[14px] font-bold text-navy-900">{draft.name}</h2>
+        <h2 className="mb-4 text-[14px] font-bold text-navy-900">{isNew ? 'New user' : draft.name}</h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="u-name" className="mb-1 block text-[11px] font-medium text-gray-600">Name</label>
+            <input
+              id="u-name"
+              value={draft.name}
+              onChange={(e) => set({ name: e.target.value })}
+              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="u-email" className="mb-1 block text-[11px] font-medium text-gray-600">Email</label>
+            <input
+              id="u-email"
+              type="email"
+              value={draft.email}
+              onChange={(e) => set({ email: e.target.value })}
+              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+            />
+            {emailTaken && <p className="mt-1 text-[10px] text-danger">Already in use by another user.</p>}
+          </div>
           <div>
             <label htmlFor="u-role" className="mb-1 block text-[11px] font-medium text-gray-600">Role</label>
             <select
@@ -213,12 +286,17 @@ function UserEditor({
           </div>
           <div>
             <label htmlFor="u-scope" className="mb-1 block text-[11px] font-medium text-gray-600">Affiliate scope</label>
-            <input
+            <select
               id="u-scope"
               value={draft.affiliateCode}
               onChange={(e) => set({ affiliateCode: e.target.value })}
               className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
-            />
+            >
+              <option value="GROUP">Ecobank Group</option>
+              {affiliates.filter((a) => a.code !== 'GROUP').map((a) => (
+                <option key={a.code} value={a.code}>{a.name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -240,9 +318,10 @@ function UserEditor({
           <button
             type="button"
             onClick={() => void onSave(draft)}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+            disabled={!canSave}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Save user
+            {isNew ? 'Create user' : 'Save user'}
           </button>
         </div>
       </div>

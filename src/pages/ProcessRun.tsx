@@ -67,7 +67,20 @@ export function ProcessRun() {
   const canRun = hasPermission('run.execute');
 
   const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
-  const dates = affiliate ? availableAsOfDates(batches, affiliate.code) : [];
+
+  // A Group run isn't itself a data-loading entity - it has no positions of
+  // its own, ever - so its available dates are the union of whatever every
+  // real affiliate has actually committed, not a literal "GROUP" batch that
+  // was never going to exist. This was the reason a Group run always failed
+  // with "No as-of date with committed data" no matter what was loaded.
+  const dates =
+    affiliateCode === 'GROUP'
+      ? Array.from(
+          new Set(affiliates.filter((a) => a.code !== 'GROUP').flatMap((a) => availableAsOfDates(batches, a.code))),
+        ).sort((a, b) => b.localeCompare(a))
+      : affiliate
+        ? availableAsOfDates(batches, affiliate.code)
+        : [];
 
   const [name, setName] = useState('');
   const [asOfDate, setAsOfDate] = useState<string>('');

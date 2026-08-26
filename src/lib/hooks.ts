@@ -253,11 +253,14 @@ export function useUsers() {
 }
 
 export function useSaveUser() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (user: User) => repository.upsertUser(user),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['users'] }),
-  });
+  return useAuditedMutation<User>(
+    'Administration',
+    'Save',
+    'User',
+    (u) => repository.upsertUser(u),
+    (u) => ({ id: u.id, detail: `${u.name} (${u.email}), ${u.role}, ${u.isActive ? 'active' : 'disabled'}` }),
+    [['users']],
+  );
 }
 
 export function useAuditEvents(limit = 200) {
