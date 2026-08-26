@@ -75,16 +75,11 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'DATA MANAGEMENT',
+    label: 'DATA',
     items: [
       { name: 'Data Upload & Staging', path: '/data-upload', permission: 'data.view', phase: 3 },
       { name: 'GL Reconciliation', path: '/gl-reconciliation', permission: 'data.view', phase: 3 },
       { name: 'Data Vintages & Load History', path: '/data-vintages', permission: 'data.view', phase: 3 },
-    ],
-  },
-  {
-    label: 'REFERENCE DATA',
-    items: [
       { name: 'Dimensions & Hierarchies', path: '/dimensions', permission: 'data.view', phase: 2 },
       { name: 'Counterparty Register', path: '/counterparties', permission: 'data.view', phase: 2 },
       { name: 'Interest Rates & Curves', path: '/yield-curves', permission: 'data.view', phase: 2 },
@@ -103,24 +98,14 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'GROUP MANAGEMENT',
+    label: 'ADMINISTRATION',
     items: [
       { name: 'Affiliates', path: '/affiliates', permission: 'dashboard.view', phase: 3 },
       { name: 'Onboard Affiliate', path: '/affiliates/onboard', permission: 'group.manage', phase: 3 },
       { name: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', phase: 3 },
-    ],
-  },
-  {
-    label: 'WORKFLOW',
-    items: [
       { name: 'Approvals', path: '/approvals', permission: 'risk.view', phase: 7 },
       { name: 'Control Remediation', path: '/remediation', permission: 'risk.view', phase: 7 },
       { name: 'Notifications', path: '/notifications', permission: 'dashboard.view', phase: 7 },
-    ],
-  },
-  {
-    label: 'ADMINISTRATION',
-    items: [
       { name: 'Users, Roles & Permissions', path: '/admin/users', permission: 'admin.manage', phase: 8 },
       { name: 'System Preferences', path: '/admin/preferences', permission: 'admin.manage', phase: 8 },
       { name: 'Audit Log', path: '/admin/audit', permission: 'audit.view', phase: 8 },

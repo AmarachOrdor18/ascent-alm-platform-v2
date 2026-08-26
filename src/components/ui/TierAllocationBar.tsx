@@ -17,13 +17,21 @@ export interface AllocationSegment {
   key: string;
   label: string;
   percent: number;
-  tone: 'core' | 'volatile';
+  tone: 'core' | 'volatile' | 'a' | 'b' | 'c' | 'd';
 }
 
 const TONE_CLASS: Record<AllocationSegment['tone'], string> = {
   core: 'bg-navy-700',
   volatile: 'bg-gold-500',
+  a: 'bg-navy-700',
+  b: 'bg-[#01607E]',
+  c: 'bg-gold-500',
+  d: 'bg-[#83858C]',
 };
+
+/** Cycles a neutral palette by position — for segments with no natural Core/Volatile-style classification. */
+export const paletteTone = (index: number): AllocationSegment['tone'] =>
+  (['a', 'b', 'c', 'd'] as const)[index % 4]!;
 
 const MIN_PERCENT = 1;
 

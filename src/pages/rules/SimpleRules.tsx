@@ -8,6 +8,7 @@
 
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
+import { TierAllocationBar, paletteTone, type AllocationSegment } from '@/components/ui/TierAllocationBar';
 import { useAuth } from '@/context/AuthContext';
 import { useDimensionMembers, useYieldCurves } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
@@ -383,6 +384,27 @@ export function Patterns() {
               />
             </RuleField>
           </div>
+
+          {rule.phases.length > 1 && (
+            <TierAllocationBar
+              segments={rule.phases.map(
+                (p, i): AllocationSegment => ({
+                  key: `${p.term}-${i}`,
+                  label: p.term,
+                  percent: p.percent,
+                  tone: paletteTone(i),
+                }),
+              )}
+              readOnly={readOnly}
+              onResize={(left, right, leftPercent, rightPercent) =>
+                update({
+                  phases: rule.phases.map((p, i) =>
+                    i === left ? { ...p, percent: leftPercent } : i === right ? { ...p, percent: rightPercent } : p,
+                  ),
+                })
+              }
+            />
+          )}
 
           <RuleRows<PatternPhase>
             rows={rule.phases}

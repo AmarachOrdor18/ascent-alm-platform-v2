@@ -11,6 +11,7 @@
  */
 
 import { RuleEditor, RuleField, ruleInput, ruleNumber } from '@/components/ui/RuleEditor';
+import { BucketTimeline } from '@/components/ui/BucketTimeline';
 import { useAuth } from '@/context/AuthContext';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { defaultLadder } from '@/engine/buckets';
@@ -103,6 +104,20 @@ export function TimeBucketRules() {
                     </div>
                   )}
                 </div>
+
+                {ladder.buckets.length > 1 && (
+                  <div className="mb-3">
+                    <BucketTimeline
+                      buckets={ladder.buckets}
+                      readOnly={readOnly}
+                      onChangeBoundary={(i, days) =>
+                        setLadder({
+                          buckets: ladder.buckets.map((b, j) => (j === i ? { ...b, upperBoundDays: days } : b)),
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
                 <table className="w-full text-[12px]">
                   <thead>

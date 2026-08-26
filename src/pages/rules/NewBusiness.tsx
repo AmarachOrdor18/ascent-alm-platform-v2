@@ -12,6 +12,7 @@
 
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
+import { TierAllocationBar, paletteTone, type AllocationSegment } from '@/components/ui/TierAllocationBar';
 import { useAuth } from '@/context/AuthContext';
 import { useCurrencies, useDimensionMembers } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
@@ -219,6 +220,37 @@ export function NewBusiness() {
                   Maturity mix — {leaves.find((p) => p.code === line.productCode)?.name ?? line.productCode}
                 </h4>
                 <p className="mb-3 text-[11px] text-gray-500">{METHOD_HINT[line.method]}</p>
+
+                <div className="mb-3">
+                  <TierAllocationBar
+                    segments={BUCKETS.map(
+                      (bucket, bi): AllocationSegment => ({
+                        key: bucket,
+                        label: bucket,
+                        percent: line.maturityMix[bucket] ?? 0,
+                        tone: paletteTone(bi),
+                      }),
+                    )}
+                    readOnly={readOnly}
+                    onResize={(left, right, leftPercent, rightPercent) =>
+                      update({
+                        lines: rule.lines.map((l, j) =>
+                          j === i
+                            ? {
+                                ...l,
+                                maturityMix: {
+                                  ...l.maturityMix,
+                                  [BUCKETS[left]!]: leftPercent,
+                                  [BUCKETS[right]!]: rightPercent,
+                                },
+                              }
+                            : l,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+
                 <div className="grid grid-cols-3 gap-3 md:grid-cols-7">
                   {BUCKETS.map((bucket) => (
                     <RuleField key={bucket} label={bucket}>

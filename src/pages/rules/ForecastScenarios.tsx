@@ -8,6 +8,7 @@
  */
 
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
+import { ShockCurveEditor } from '@/components/ui/ShockCurveEditor';
 import { useAuth } from '@/context/AuthContext';
 import { useEconomicIndicators } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
@@ -91,6 +92,22 @@ export function ForecastScenarios() {
 
           <div>
             <h3 className="mb-2 text-[12px] font-bold text-navy-900">Shock by bucket (basis points)</h3>
+            <div className="mb-3">
+              <ShockCurveEditor
+                points={LADDER.buckets.map((bucket) => ({
+                  key: bucket.label,
+                  label: bucket.label,
+                  value: rule.shockByBucket[bucket.label] ?? 0,
+                }))}
+                readOnly={readOnly}
+                onChange={(label, value) =>
+                  update({
+                    shockByBucket: { ...rule.shockByBucket, [label]: value },
+                    basedOn: null,
+                  })
+                }
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
               {LADDER.buckets.map((bucket) => (
                 <RuleField key={bucket.label} label={bucket.label}>
