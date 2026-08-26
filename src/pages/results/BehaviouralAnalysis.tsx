@@ -17,6 +17,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { useRules } from '@/lib/ruleHooks';
@@ -220,12 +221,15 @@ export function BehaviouralAnalysis() {
             </section>
 
             <section className="rounded-2xl border border-navy-100 bg-navy-50 p-6">
-              <h2 className="mb-2 text-[12px] font-bold uppercase tracking-widest text-navy-900">Recalibrating</h2>
-              <p className="mb-4 text-[11px] leading-relaxed text-navy-900">
-                Changing the split changes the behavioural gap ladder, the survival horizon and NSFR together. So it is
-                done by editing the rule and re-running — not by a slider on this screen that would leave the figures
-                above describing assumptions nobody applied.
-              </p>
+              <h2 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Recalibrating
+                <InfoButton label="Why there's no slider here">
+                  Changing the split changes the behavioural gap ladder, the survival horizon and NSFR together. So
+                  it is done by editing the rule and re-running, not by a slider on this screen that would leave the
+                  figures above describing assumptions nobody applied.
+                </InfoButton>
+              </h2>
+              <p className="mb-4 text-[11px] leading-relaxed text-navy-900">Edit the rule, then re-run to apply it.</p>
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/rules/behaviour-patterns"

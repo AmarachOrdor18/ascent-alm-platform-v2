@@ -6,11 +6,12 @@
  * figures, so promoting one is a maker-checker action rather than a toggle.
  */
 
-import { useRoute } from 'wouter';
+import { Link, useRoute } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useBatches, usePositions, useSaveAffiliate } from '@/lib/hooks';
 import { checkAllDomains } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
@@ -31,6 +32,7 @@ const NEXT_STATUS: Record<AffiliateStatus, AffiliateStatus[]> = {
 export function AffiliateDetail() {
   const [, params] = useRoute('/affiliates/:code');
   const { hasPermission } = useAuth();
+  const { setAffiliateCode } = useScope();
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
   const save = useSaveAffiliate();
@@ -172,10 +174,19 @@ export function AffiliateDetail() {
       </div>
 
       <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Feeds & refresh SLAs</h2>
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Feeds & refresh SLAs</h2>
+          <Link
+            href="/connectors"
+            onClick={() => setAffiliateCode(affiliate.code)}
+            className="text-[11px] font-bold text-navy-700 hover:underline"
+          >
+            Configure data sources →
+          </Link>
+        </div>
         <p className="mb-4 text-[11px] leading-relaxed text-gray-500">
-          Each domain carries its own cadence. A stale feed does not announce itself — it simply reports confident
-          numbers off old data, which is why staleness is surfaced here and on any run that depends on it.
+          A stale feed reports confident numbers off old data without announcing itself, which is why it's surfaced
+          here and on any run that depends on it.
         </p>
         {affiliate.feeds.length === 0 ? (
           <p className="text-[12px] text-gray-500">No feeds configured — onboarding has not started.</p>

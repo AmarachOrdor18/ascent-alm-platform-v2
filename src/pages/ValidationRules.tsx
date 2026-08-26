@@ -15,6 +15,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
@@ -240,14 +241,14 @@ export function ValidationRules() {
         />
       </section>
 
-      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-2 text-[12px] font-bold uppercase tracking-widest text-navy-900">Why this gate exists</h2>
-        <p className="text-[11px] leading-relaxed text-gray-500">
-          Oracle runs Cash Flow Edits before any engine processing for the same reason: a calculation on data that does
-          not balance produces a confident, wrong answer, and a confident wrong answer is worse than a refusal. Marking
-          a rule blocking is what turns a data-quality report into a control.
-        </p>
-      </section>
+      <p className="flex items-center gap-1.5 text-[11px] text-gray-400">
+        Why blocking rules exist
+        <InfoButton label="Why blocking rules exist">
+          Oracle runs Cash Flow Edits before any engine processing for the same reason: a calculation on data that
+          does not balance produces a confident, wrong answer, and a confident wrong answer is worse than a refusal.
+          Marking a rule blocking is what turns a data-quality report into a control.
+        </InfoButton>
+      </p>
     </>
   );
 }

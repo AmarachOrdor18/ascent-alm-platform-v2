@@ -16,6 +16,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { Amount } from '@/components/ui/Amount';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
@@ -192,7 +193,14 @@ export function Irrbb() {
 
         {eve?.durationGap !== null && eve !== null && (
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Reading the gap</h2>
+            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Reading the gap
+              <InfoButton label="Why duration is approximated">
+                Duration is approximated per position rather than computed from full cash flows — ledger-grain data
+                does not carry the schedule a full revaluation needs, which is the same constraint Oracle names when
+                it prescribes non-cash-flow methods for this data shape.
+              </InfoButton>
+            </h2>
             <p className="text-[11px] leading-relaxed text-gray-600">
               A duration gap of <span className="font-mono font-bold text-navy-900">{eve.durationGap!.toFixed(2)}</span>{' '}
               years means assets reprice{' '}
@@ -202,10 +210,7 @@ export function Irrbb() {
                 ? 'A rate rise therefore reduces economic value: asset prices fall further than liability values do.'
                 : eve.durationGap! < 0
                   ? 'A rate rise therefore adds economic value: liability values fall further than asset prices do.'
-                  : 'The book is broadly immunised against a parallel move at this level of approximation.'}{' '}
-              Duration is approximated per position rather than computed from full cash flows — ledger-grain data does
-              not carry the schedule a full revaluation needs, which is the same constraint Oracle names when it
-              prescribes non-cash-flow methods for this data shape.
+                  : 'The book is broadly immunised against a parallel move at this level of approximation.'}
             </p>
           </section>
         )}

@@ -39,7 +39,7 @@ export function AdminUsers() {
   const { data: users = [], isLoading } = useUsers();
   const { data: affiliates = [] } = useAffiliates();
   const save = useSaveUser();
-  const canEdit = hasPermission('admin.users');
+  const canEdit = hasPermission('admin.manage');
 
   const [editing, setEditing] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);

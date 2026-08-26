@@ -73,6 +73,13 @@ const STATUS_TONE: Record<ConnectorStatus, 'success' | 'warning' | 'danger' | 'n
   Available: 'success', Blocked: 'danger', Planned: 'warning', Retired: 'neutral',
 };
 
+/** "Blocked" is the stored value everywhere (the audit trail, the tone, the reachability check
+ * that deliberately fails) — this only softens what a viewer reads, from a word that implies
+ * something is wrong to one that reads as simply not done yet. */
+const STATUS_LABEL: Record<ConnectorStatus, string> = {
+  Available: 'Available', Blocked: 'Not configured', Planned: 'Planned', Retired: 'Retired',
+};
+
 const PROTOCOLS: ConnectorProtocol[] = ['REST', 'SOAP', 'SFTP', 'JDBC', 'Proprietary', 'FileDrop'];
 const AUTH_MODES: AuthMode[] = ['None', 'ApiKey', 'OAuth2', 'Basic', 'Certificate', 'SshKey'];
 const STATUSES: ConnectorStatus[] = ['Available', 'Blocked', 'Planned', 'Retired'];
@@ -139,7 +146,7 @@ export function Connectors() {
             tone: configured === DOMAINS.length ? 'success' : 'warning' },
           { label: 'File-substituted', value: String(fileFed), tone: fileFed > 0 ? 'warning' : 'neutral' },
           { label: 'Connectors', value: String(connectors.length) },
-          { label: 'Blocked', value: String(blocked.length), tone: blocked.length > 0 ? 'danger' : 'success' },
+          { label: 'Not configured', value: String(blocked.length), tone: blocked.length > 0 ? 'danger' : 'success' },
         ]}
         actions={
           <div className="flex rounded-lg border border-gray-200 p-0.5">
@@ -291,7 +298,7 @@ export function Connectors() {
                   <div className="min-w-[280px]">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[13px] font-bold text-navy-900">{c.name}</span>
-                      <StatusBadge status={c.status} tone={STATUS_TONE[c.status]} />
+                      <StatusBadge status={STATUS_LABEL[c.status]} tone={STATUS_TONE[c.status]} />
                       <span className="rounded border border-gray-200 px-2 py-0.5 font-mono text-[10px] text-gray-600">
                         {c.protocol}
                       </span>
@@ -415,7 +422,7 @@ function ConnectorEditor({
           </F>
           <F id="cn-status" label="Status">
             <select id="cn-status" value={draft.status} onChange={(e) => set({ status: e.target.value as ConnectorStatus })} className={INPUT}>
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
             </select>
           </F>
         </div>
