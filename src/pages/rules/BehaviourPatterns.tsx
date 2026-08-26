@@ -13,6 +13,7 @@
 
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
+import { TierAllocationBar, type AllocationSegment } from '@/components/ui/TierAllocationBar';
 import { useAuth } from '@/context/AuthContext';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { DEFAULT_PATTERNS, DEFAULT_BETAS, type RunoffTier } from '@/engine/behavioural';
@@ -160,6 +161,32 @@ export function BehaviourPatterns() {
                   </RuleField>
                 </div>
 
+                {pattern.tiers.length > 1 && (
+                  <div className="mb-4">
+                    <TierAllocationBar
+                      segments={sortedTierOrder(pattern.tiers).map(
+                        (origIndex): AllocationSegment => ({
+                          key: String(origIndex),
+                          label: `${pattern.tiers[origIndex]!.tenorDays}d`,
+                          percent: pattern.tiers[origIndex]!.percent,
+                          tone: pattern.tiers[origIndex]!.type === 'Core' ? 'core' : 'volatile',
+                        }),
+                      )}
+                      readOnly={readOnly}
+                      onResize={(leftDisplay, rightDisplay, leftPercent, rightPercent) => {
+                        const order = sortedTierOrder(pattern.tiers);
+                        const leftOrig = order[leftDisplay]!;
+                        const rightOrig = order[rightDisplay]!;
+                        setPattern({
+                          tiers: pattern.tiers.map((t, i) =>
+                            i === leftOrig ? { ...t, percent: leftPercent } : i === rightOrig ? { ...t, percent: rightPercent } : t,
+                          ),
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+
                 <RuleRows<RunoffTier>
                   rows={pattern.tiers}
                   columns={tierColumns(patternIndex)}
@@ -210,4 +237,9 @@ export function BehaviourPatterns() {
       )}
     />
   );
+}
+
+/** Original tier indices, ordered near-term to far-term — the allocation bar reads left to right as time does. */
+function sortedTierOrder(tiers: RunoffTier[]): number[] {
+  return tiers.map((_, i) => i).sort((a, b) => tiers[a]!.tenorDays - tiers[b]!.tenorDays);
 }
