@@ -9,7 +9,8 @@
  * there is no unscoped query to write.
  */
 
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext';
 import type { Affiliate, CurrencyCode, IsoDate, ProcessRun } from '@/engine/types';
 
 export const GROUP_CODE = 'GROUP';
@@ -37,10 +38,23 @@ interface ScopeContextValue {
 const ScopeContext = createContext<ScopeContextValue | null>(null);
 
 export function ScopeProvider({ children }: { children: React.ReactNode }) {
-  const [affiliateCode, setAffiliateCode] = useState<string>(GROUP_CODE);
+  const { user } = useAuth();
+  const [affiliateCode, setAffiliateCode] = useState<string>(user?.affiliateCode ?? GROUP_CODE);
   const [asOfDate, setAsOfDate] = useState<IsoDate | null>(null);
   const [run, setRun] = useState<ProcessRun | null>(null);
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
+
+  // A user assigned to one affiliate (not Group) starts scoped to it on
+  // every login, rather than always defaulting to Group and leaving them
+  // to pick — which is what made two different logins show the same data:
+  // nothing was actually reading who was signed in. Re-syncs on every
+  // login/logout so switching accounts genuinely switches what's visible.
+  useEffect(() => {
+    setAffiliateCode(user?.affiliateCode ?? GROUP_CODE);
+    setAsOfDate(null);
+    setRun(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on identity, not the whole user object
+  }, [user?.id]);
 
   const affiliate = useMemo(
     () => affiliates.find((a) => a.code === affiliateCode) ?? null,

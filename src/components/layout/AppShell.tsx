@@ -44,7 +44,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     [hasPermission],
   );
 
-  const selectable = affiliates.filter((a) => a.code === GROUP_CODE || a.status === 'Live');
+  // A user assigned to one affiliate sees only that affiliate here, unless
+  // group.manage says otherwise — that's the segregation Group vs
+  // affiliate-level access is supposed to mean, not just a label on the
+  // user record nothing actually enforced.
+  const restrictedToOwn = user !== null && user.affiliateCode !== GROUP_CODE && !hasPermission('group.manage');
+  const selectable = restrictedToOwn
+    ? affiliates.filter((a) => a.code === user!.affiliateCode)
+    : affiliates.filter((a) => a.code === GROUP_CODE || a.status === 'Live');
 
   const toggleGroup = (groupLabel: string) => {
     setExpandedGroups((prev) => {
@@ -190,8 +197,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <select
                 id="scope-affiliate"
                 value={affiliateCode}
+                disabled={restrictedToOwn}
                 onChange={(e) => setAffiliateCode(e.target.value)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50"
+                title={restrictedToOwn ? 'This account is scoped to one affiliate' : undefined}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50 disabled:opacity-70"
               >
                 {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
                 {selectable.map((a) => (
