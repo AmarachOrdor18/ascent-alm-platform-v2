@@ -19,6 +19,7 @@ import { useScope } from '@/context/ScopeContext';
 import { reportPacks, newId } from '@/lib/governanceHooks';
 import { useRuns, useRunResults } from '@/lib/runHooks';
 import { METRIC_SPECS, formatMetric } from '@/lib/metrics';
+import { exportPackPdf } from '@/lib/pdfExport';
 import type { CalculationElement, PackKind, PackSection, ReportPack } from '@/engine/types';
 
 interface SectionCandidate {
@@ -181,6 +182,7 @@ function PackDetail({
   pack, canEdit, onDistribute,
 }: { pack: ReportPack; canEdit: boolean; onDistribute: (p: ReportPack, recipients: string) => Promise<void> }) {
   const { data: results = [] } = useRunResults(pack.runId);
+  const { data: runs = [] } = useRuns();
   const [recipients, setRecipients] = useState(pack.recipients.join(', '));
 
   const headline = (element: string): string => {
@@ -192,9 +194,53 @@ function PackDetail({
     return formatMetric(value, spec.key);
   };
 
+  const sectionRows = pack.sections.map((s) => ({
+    title: s.title,
+    status: s.included ? 'Computed' : 'Not computed by this run',
+    value: s.included ? headline(s.source) : '—',
+  }));
+
+  const downloadPdf = () => {
+    exportPackPdf({
+      packName: pack.name,
+      kindLabel: pack.kind,
+      status: pack.status,
+      generatedAt: pack.generatedAt,
+      generatedBy: pack.generatedBy,
+      runAsOfDate: runs.find((r) => r.id === pack.runId)?.asOfDate ?? null,
+      recipients: pack.recipients,
+      sections: sectionRows,
+    });
+  };
+
+  const emailPack = () => {
+    const to = recipients
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(',');
+    const subject = `${pack.name} — ALM report pack`;
+    const bodyLines = [
+      pack.runId ? 'Reading live from the attached run.' : 'No run attached.',
+      '',
+      ...sectionRows.map((r) => `${r.title}: ${r.value}${r.status === 'Computed' ? '' : ` (${r.status})`}`),
+    ];
+    const href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines.join('\n'))}`;
+    window.location.href = href;
+  };
+
   return (
     <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">{pack.name}</h2>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">{pack.name}</h2>
+        <button
+          type="button"
+          onClick={downloadPdf}
+          className="rounded-lg border border-navy-700 px-3 py-1.5 text-[11px] font-bold text-navy-700 hover:bg-navy-700 hover:text-white"
+        >
+          Download PDF
+        </button>
+      </div>
       <p className="mb-4 text-[11px] text-gray-500">
         {pack.runId ? `Reading live from the attached run.` : 'No run attached.'} Generated {pack.generatedAt?.slice(0, 10)} by {pack.generatedBy}.
       </p>
@@ -219,6 +265,14 @@ function PackDetail({
             </div>
             <button
               type="button"
+              onClick={emailPack}
+              disabled={!recipients.trim()}
+              className="rounded-lg border border-navy-700 px-4 py-2 text-[12px] font-bold text-navy-700 hover:bg-navy-700 hover:text-white disabled:opacity-40"
+            >
+              Email pack
+            </button>
+            <button
+              type="button"
               onClick={() => void onDistribute(pack, recipients)}
               disabled={!canEdit || !recipients.trim()}
               className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
@@ -227,7 +281,10 @@ function PackDetail({
             </button>
           </div>
         )}
-        <p className="mt-2 text-[10px] text-gray-400">This platform does not send email — marking distributed records who it went to.</p>
+        <p className="mt-2 text-[10px] text-gray-400">
+          "Email pack" opens your own mail client with the figures filled in — the platform doesn't run a mail server
+          itself. "Mark distributed" is the audit record of what actually went out.
+        </p>
       </div>
     </section>
   );
