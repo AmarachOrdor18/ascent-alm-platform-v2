@@ -123,6 +123,8 @@ export interface RouteEntry {
   path: string;
   screenName: string;
   Component: ComponentType;
+  /** Required to actually render the screen, not just to see it in the sidebar. */
+  permission: string;
 }
 
 /**
@@ -153,6 +155,23 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
 ];
 
 /**
+ * The permission required to actually render a screen not listed in the
+ * sidebar — everything under a hub's own gate inherits that hub's
+ * permission, since it's reached by clicking through it.
+ */
+const UNLISTED_PERMISSION: Record<string, string> = {
+  '/affiliates/onboard': 'group.manage',
+  '/connectors': 'data.view',
+  '/management-reporting': 'reporting.view',
+};
+
+function permissionForUnlisted(path: string): string {
+  if (path in UNLISTED_PERMISSION) return UNLISTED_PERMISSION[path]!;
+  if (path.startsWith('/rules/')) return 'rules.edit';
+  return 'dashboard.view';
+}
+
+/**
  * Every route, in the order `Switch` evaluates them — first match wins.
  *
  * This is an ordered array rather than inline JSX because the order carries a
@@ -174,6 +193,7 @@ export const buildRouteOrder = (): RouteEntry[] => {
       path: item.path,
       screenName: item.name,
       Component: Built ?? (() => <Placeholder item={item} />),
+      permission: item.permission,
     };
   });
 
@@ -190,10 +210,11 @@ export const buildRouteOrder = (): RouteEntry[] => {
       path,
       screenName: UNLISTED_SCREENS.find((s) => s.path === path)?.screenName ?? path,
       Component: BUILT[path]!,
+      permission: permissionForUnlisted(path),
     }));
 
   const parameterised: RouteEntry[] = [
-    { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail },
+    { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail, permission: 'dashboard.view' },
   ];
 
   return [...navLiteral, ...unlisted, ...parameterised];
@@ -218,6 +239,31 @@ function ScopeSync() {
     if (affiliates) setAffiliates(affiliates);
   }, [affiliates, setAffiliates]);
   return null;
+}
+
+/**
+ * Blocks the screen behind a route, not just its sidebar link. The sidebar
+ * already hides links a role can't reach, but every screen still rendered
+ * in full for anyone who typed the URL directly or had a tab open from a
+ * more privileged session — permission only ever gated the edit buttons
+ * inside a page, never whether the page rendered at all. Read-only content
+ * on a screen requiring a real permission (dashboard.view, granted to
+ * every role) still renders for everyone, which is the point: view access
+ * is broad by design, edit access is what's actually restricted.
+ */
+export function RouteGate({
+  permission, screenName, children,
+}: { permission: string; screenName?: string; children: React.ReactNode }) {
+  const { hasPermission } = useAuth();
+  if (hasPermission(permission)) return <>{children}</>;
+  return (
+    <div role="alert" className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
+      <p className="text-[13px] font-bold text-navy-900">Access restricted</p>
+      <p className="mt-1 text-[12px] text-gray-500">
+        Your role doesn&rsquo;t have access to {screenName ?? 'this screen'}.
+      </p>
+    </div>
+  );
 }
 
 /** ErrorBoundary re-keyed by scope, so a caught error resets when the affiliate or as-of date it was caught under changes, instead of requiring a full remount. */
@@ -268,7 +314,7 @@ export function App() {
           <Redirect to="/dashboard" />
         </Route>
 
-        {ROUTE_ORDER.map(({ path, screenName, Component }) => (
+        {ROUTE_ORDER.map(({ path, screenName, Component, permission }) => (
           <Route key={path} path={path}>
             {/* Keyed by scope: a transient render error caught here otherwise
                 latches until the whole app remounts (only logout did that),
@@ -278,7 +324,9 @@ export function App() {
                 inputs it will render with. */}
             <ScopedErrorBoundary screenName={screenName}>
               <Suspense fallback={<ScreenFallback />}>
-                <Component />
+                <RouteGate permission={permission} screenName={screenName}>
+                  <Component />
+                </RouteGate>
               </Suspense>
             </ScopedErrorBoundary>
           </Route>

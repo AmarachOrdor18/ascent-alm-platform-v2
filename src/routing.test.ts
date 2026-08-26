@@ -93,3 +93,28 @@ describe('route order', () => {
     expect(ALL_NAV_ITEMS.length).toBeGreaterThan(30);
   });
 });
+
+describe('route-level permission gating', () => {
+  // Regression for: the sidebar hid a link a role couldn't reach, but
+  // nothing stopped that role from rendering the full screen anyway via a
+  // typed URL or an already-open tab — permission only ever gated the edit
+  // buttons inside a page. Every route must now carry a real permission
+  // string the router actually enforces (see RouteGate in App.tsx).
+
+  it('gives every route a non-empty permission', () => {
+    expect(ROUTES.every((r) => typeof r.permission === 'string' && r.permission.length > 0)).toBe(true);
+  });
+
+  it('matches each nav-listed route\'s permission to its sidebar entry — the two must never drift apart', () => {
+    for (const item of ALL_NAV_ITEMS) {
+      const route = ROUTES.find((r) => r.path === item.path);
+      expect(route?.permission).toBe(item.permission);
+    }
+  });
+
+  it('gates every /rules/* sub-editor behind rules.edit, matching the Business Rules hub itself', () => {
+    const ruleSubRoutes = ROUTES.filter((r) => r.path.startsWith('/rules/'));
+    expect(ruleSubRoutes.length).toBeGreaterThan(0);
+    expect(ruleSubRoutes.every((r) => r.permission === 'rules.edit')).toBe(true);
+  });
+});
