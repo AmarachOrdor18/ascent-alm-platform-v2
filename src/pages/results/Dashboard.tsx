@@ -15,7 +15,8 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'wouter';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useMemo } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -23,11 +24,14 @@ import { Amount } from '@/components/ui/Amount';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
-import { useFxRates, useYieldCurves, useEconomicIndicators } from '@/lib/hooks';
+import { useFxRates, useYieldCurves, useEconomicIndicators, usePositions } from '@/lib/hooks';
 import { useRuns } from '@/lib/runHooks';
 import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
+import { buildFxTable } from '@/engine/fx';
+import { computeAllShocks } from '@/engine/irrbb';
+import { defaultLadder } from '@/engine/buckets';
 import type { KriObservation } from '@/engine/kri';
 import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } from '@/engine/liquidity';
 import type { EveResult, NiiResult } from '@/engine/irrbb';
@@ -167,15 +171,21 @@ export function Dashboard() {
   const conc = payloadOf<ConcentrationResult>(results, 'Concentration');
   const prof = payloadOf<ProfitabilityResult>(results, 'ProfitabilityRatios');
 
-  // This run's own numbers side by side, not a trend over time — a board
-  // reads "where do we stand" faster as one bar per metric than as a line
-  // that needs several runs of history before it says anything.
-  const snapshotBars = [
-    { metric: 'LCR', value: lcr?.lcrPercent ?? null },
-    { metric: 'NSFR', value: nsfr?.nsfrPercent ?? null },
-    { metric: 'NIM', value: prof?.netInterestMarginPercent ?? null },
-    { metric: 'NPL', value: prof?.nplRatioPercent ?? null },
-  ].filter((r) => r.value !== null) as Array<{ metric: string; value: number }>;
+  // The six BCBS supervisory rate shocks, same battery as Stress Testing,
+  // recomputed from this scope's own positions at the run's as-of date —
+  // capital at risk under every prescribed scenario side by side, not just
+  // the one shock this run happened to be configured with. This is what
+  // actually answers "where is our interest rate risk concentrated."
+  const shockPositionsScope = run?.affiliateCode ?? affiliateCode;
+  const { data: shockPositions = [] } = usePositions(shockPositionsScope, run?.asOfDate ?? undefined);
+  const shockRows = useMemo(() => {
+    if (!run || shockPositions.length === 0) return [];
+    const ctx = { asOfDate: run.asOfDate, reportingCurrency: currency, fx: buildFxTable(currency, fxRates, run.asOfDate), tier1Capital: null };
+    const { results: shockResults } = computeAllShocks(shockPositions, ctx, defaultLadder('RepricingGap'));
+    return Object.values(shockResults)
+      .filter((r) => r.eve.eveSensitivityPercentOfEquity !== null)
+      .map((r) => ({ shock: r.label, evePercent: r.eve.eveSensitivityPercentOfEquity! }));
+  }, [run, shockPositions, currency, fxRates]);
   const survival = payloadOf<{ survivalHorizonDays: number; survivesFullHorizon: boolean }>(
     results,
     'SurvivalHorizon',
@@ -288,21 +298,27 @@ export function Dashboard() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Key metrics this run</h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">LCR, NSFR, NIM and NPL for the run selected above</p>
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rate shock sensitivity — ΔEVE by scenario</h2>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">Capital impact under all six BCBS supervisory shocks, this scope's own book — dashed lines mark the ±15% outlier test</p>
             <div className="min-h-[260px] flex-1">
-              {snapshotBars.length === 0 ? (
+              {shockRows.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
                   No run selected yet.
                 </div>
               ) : (
                 <ResponsiveContainer>
-                  <BarChart data={snapshotBars} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                  <BarChart data={shockRows} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                     <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="metric" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="shock" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
                     <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
                     <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} contentStyle={CHART_TOOLTIP_STYLE} />
-                    <Bar dataKey="value" name="Value" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
+                    <ReferenceLine y={15} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" />
+                    <ReferenceLine y={-15} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" />
+                    <Bar dataKey="evePercent" name="ΔEVE % of equity" radius={[4, 4, 4, 4]}>
+                      {shockRows.map((r) => (
+                        <Cell key={r.shock} fill={Math.abs(r.evePercent) > 15 ? 'hsl(0, 72%, 51%)' : CHART_COLORS.primary} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
