@@ -27,7 +27,7 @@ const STATUS_TONE: Record<ReturnStatus, 'success' | 'warning' | 'danger' | 'neut
 
 export function RegulatoryReporting() {
   const { hasPermission, user } = useAuth();
-  const canEdit = hasPermission('reporting.manage') || hasPermission('run.execute');
+  const canEdit = hasPermission('reporting.generate') || hasPermission('reporting.manage') || hasPermission('run.execute');
   const { data: rows = [], isLoading } = regulatoryReturns.useList();
   const { data: affiliates = [] } = useAffiliates();
   const { data: runs = [] } = useRuns();

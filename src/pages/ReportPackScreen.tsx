@@ -36,7 +36,7 @@ export function ReportPackScreen({
 }: { kind: PackKind; title: string; description: string; candidates: SectionCandidate[] }) {
   const { hasPermission, user } = useAuth();
   const { affiliateCode } = useScope();
-  const canEdit = hasPermission('reporting.manage') || hasPermission('run.execute');
+  const canEdit = hasPermission('reporting.generate') || hasPermission('reporting.manage') || hasPermission('run.execute');
   const { data: packs = [], isLoading } = reportPacks.useList();
   const { data: runs = [] } = useRuns();
   const save = reportPacks.useSave();

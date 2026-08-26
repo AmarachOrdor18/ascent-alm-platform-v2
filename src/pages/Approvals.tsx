@@ -28,7 +28,8 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> 
 };
 
 export function Approvals() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canDecide = hasPermission('approvals.approve');
   const { data: affiliates = [] } = useAffiliates();
   const { data: requests = [], isLoading } = approvals.useList();
   const save = approvals.useSave();
@@ -56,7 +57,7 @@ export function Approvals() {
   );
 
   const decide = (request: ApprovalRequest, status: 'Approved' | 'Rejected') => {
-    if (!user) return;
+    if (!user || !canDecide) return;
     void save.mutateAsync({
       ...request,
       status,
@@ -182,7 +183,9 @@ export function Approvals() {
                 </tr>
               )}
               {paged.map((r) => {
-                const blocked = approvalBlockedReason(r, user?.name);
+                const blocked = !canDecide
+                  ? 'Your role does not have permission to approve or reject requests.'
+                  : approvalBlockedReason(r, user?.name);
                 return (
                   <tr key={r.id}>
                     <td>

@@ -35,7 +35,7 @@ const STATUS_TONE: Record<MeetingStatus, 'success' | 'warning' | 'neutral' | 'da
 export function AlcoMeetings() {
   const { hasPermission, user } = useAuth();
   const { affiliateCode } = useScope();
-  const canEdit = hasPermission('reporting.manage') || hasPermission('run.execute');
+  const canEdit = hasPermission('reporting.generate') || hasPermission('reporting.manage') || hasPermission('run.execute');
   const { data: rows = [], isLoading } = meetings.useList(affiliateCode === 'GROUP' ? undefined : affiliateCode);
   const { data: runs = [] } = useRuns();
   const save = meetings.useSave();
