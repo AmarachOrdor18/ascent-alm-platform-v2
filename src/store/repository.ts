@@ -18,6 +18,7 @@ import type {
   LoadBatch,
   Position,
   ProcessRun,
+  Role,
   RuleKind,
   RuleMeta,
   RunResult,
@@ -172,6 +173,10 @@ export interface Repository {
   listUsers(): Promise<User[]>;
   getUserByEmail(email: string): Promise<User | null>;
   upsertUser(user: User): Promise<void>;
+
+  // Roles
+  listRoles(): Promise<Role[]>;
+  upsertRole(role: Role): Promise<void>;
 
   // Reference data
   listYieldCurves(currency?: string): Promise<StoredYieldCurve[]>;

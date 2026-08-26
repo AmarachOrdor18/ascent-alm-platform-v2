@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { useAffiliates } from '@/lib/hooks';
 import { useRuns, useRunResults } from '@/lib/runHooks';
 import { METRIC_SPECS, extractMetrics, formatMetric } from '@/lib/metrics';
@@ -82,21 +83,22 @@ export function AdHoc() {
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
-            <p className="mb-4 text-[11px] text-gray-500">Every onboarded affiliate, whatever its status — this is analysis, not the Group-consolidated view.</p>
-            <div className="flex flex-wrap gap-2">
-              {liveAffiliates.map((a) => (
-                <button
-                  key={a.code}
-                  type="button"
-                  onClick={() => { toggle(affiliateCodes, setAffiliateCodes, a.code); setRan(false); }}
-                  className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${affiliateCodes.includes(a.code) ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                >
-                  {a.name}
-                  {!latestRunByAffiliate.has(a.code) && <span className="ml-1 text-warning">·no run</span>}
-                </button>
-              ))}
-              {liveAffiliates.length === 0 && <p className="text-[11px] text-gray-400">No affiliates onboarded yet.</p>}
-            </div>
+            <p className="mb-4 text-[11px] text-gray-500">Analysis, not the Group-consolidated view — any status, not just Live.</p>
+            {liveAffiliates.length === 0 ? (
+              <p className="text-[11px] text-gray-400">No affiliates onboarded yet.</p>
+            ) : (
+              <MultiSelectDropdown
+                className="max-w-sm"
+                placeholder="Select affiliates…"
+                selected={affiliateCodes}
+                onChange={(next) => { setAffiliateCodes(next); setRan(false); }}
+                options={liveAffiliates.map((a) => ({
+                  value: a.code,
+                  label: a.name,
+                  hint: latestRunByAffiliate.has(a.code) ? undefined : 'no completed run',
+                }))}
+              />
+            )}
           </section>
 
           <button

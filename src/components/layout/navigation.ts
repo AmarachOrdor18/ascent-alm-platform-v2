@@ -95,11 +95,12 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'AFFILIATE MANAGEMENT',
+    items: [{ name: 'Affiliates', path: '/affiliates', permission: 'dashboard.view', phase: 3 }],
+  },
+  {
     label: 'ADMINISTRATION',
     items: [
-      { name: 'Affiliates', path: '/affiliates', permission: 'dashboard.view', phase: 3 },
-      { name: 'Onboard Affiliate', path: '/affiliates/onboard', permission: 'group.manage', phase: 3 },
-      { name: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', phase: 3 },
       { name: 'Approvals', path: '/approvals', permission: 'risk.view', phase: 7 },
       { name: 'Control Remediation', path: '/remediation', permission: 'risk.view', phase: 7 },
       { name: 'Notifications', path: '/notifications', permission: 'dashboard.view', phase: 7 },

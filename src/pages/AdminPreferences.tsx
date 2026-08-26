@@ -16,10 +16,14 @@
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ROLES } from '@/context/AuthContext';
+import { useRoles } from '@/lib/hooks';
 
-const ROLE_LIST = Object.values(ROLES);
+const DEFAULT_ROLE_LIST = Object.values(ROLES);
 
 export function AdminPreferences() {
+  const { data: roles } = useRoles();
+  const roleList = roles && roles.length > 0 ? roles : DEFAULT_ROLE_LIST;
+
   return (
     <>
       <ModuleHeader
@@ -32,9 +36,9 @@ export function AdminPreferences() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h3 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Access &amp; roles</h3>
-          <p className="mb-4 text-[11px] text-gray-400">Six fixed roles; users move between them, roles themselves aren't editable here.</p>
+          <p className="mb-4 text-[11px] text-gray-400">Six roles; users move between them and permissions are editable, but not from this screen.</p>
           <dl className="space-y-3 text-[12px]">
-            {ROLE_LIST.map((r) => (
+            {roleList.map((r) => (
               <div key={r.code} className="flex items-center justify-between border-b border-gray-50 pb-2 last:border-0">
                 <dt className="text-gray-600">{r.name}</dt>
                 <dd className="font-mono text-gray-400">{r.permissions.length} permissions</dd>

@@ -250,9 +250,8 @@ export function GlReconciliation() {
       {!ledger ? (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-[13px] font-bold text-navy-900">No trial balance loaded</p>
-          <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-500">
-            Upload the affiliate&rsquo;s general ledger extract to reconcile it against the {positions.length} committed
-            position{positions.length === 1 ? '' : 's'} for this date.
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+            Upload the trial balance above to reconcile against {positions.length} position{positions.length === 1 ? '' : 's'}.
           </p>
           <p className="mt-3 font-mono text-[11px] text-gray-400">demo_data/ghana_gl_trial_balance_2026-07.csv</p>
         </section>

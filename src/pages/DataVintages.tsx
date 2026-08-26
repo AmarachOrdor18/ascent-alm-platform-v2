@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAffiliates, useBatches } from '@/lib/hooks';
@@ -212,15 +213,21 @@ export function DataVintages() {
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-2 text-[12px] font-bold uppercase tracking-widest text-navy-900">Retention</h2>
-          <p className="mb-3 text-[11px] leading-relaxed text-gray-500">
-            Default policy retains 24 monthly as-of dates and every version within them. Expiry is soft: data is marked
-            expired and hidden, never deleted, until an administrator purges it.
-          </p>
-          <p className="text-[12px]">
-            <span className="font-bold text-navy-900">{expired.length}</span>{' '}
-            <span className="text-gray-500">batch{expired.length === 1 ? '' : 'es'} past the retention window</span>
-          </p>
+          <div className="mb-2 flex items-center gap-1.5">
+            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Retention</h2>
+            <InfoButton label="Retention policy">
+              Default policy retains 24 monthly as-of dates and every version within them. Expiry is soft: data is
+              marked expired and hidden, never deleted, until an administrator purges it.
+            </InfoButton>
+          </div>
+          {expired.length > 0 ? (
+            <p className="text-[12px]">
+              <span className="font-bold text-navy-900">{expired.length}</span>{' '}
+              <span className="text-gray-500">batch{expired.length === 1 ? '' : 'es'} past the retention window</span>
+            </p>
+          ) : (
+            <p className="text-[12px] text-gray-400">Nothing past the retention window.</p>
+          )}
         </div>
       </section>
     </>

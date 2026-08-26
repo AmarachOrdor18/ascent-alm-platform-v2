@@ -28,7 +28,7 @@ import {
   useSaveStagedBatch,
 } from '@/lib/hooks';
 import { importPositions, type RowError } from '@/lib/csvImport';
-import { validatePositions, DEFAULT_VALIDATION_RULES, type ValidationResult } from '@/engine/validation';
+import { validatePositions, type ValidationResult } from '@/engine/validation';
 import { planSupersede } from '@/engine/vintage';
 import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
 import { formatDate } from '@/lib/format';
@@ -618,10 +618,8 @@ export function DataUpload() {
       {!staged && (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-[13px] font-bold text-navy-900">No batch staged</p>
-          <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-500">
-            Upload a position book to stage it. Nothing is written until you commit, and{' '}
-            {DEFAULT_VALIDATION_RULES.filter((r) => r.blocksCommit).length} of the {DEFAULT_VALIDATION_RULES.length}{' '}
-            validation rules will block the commit if they fail.
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+            Upload a position book above to get started.
           </p>
           <p className="mt-3 font-mono text-[11px] text-gray-400">demo_data/ghana_position_book_2026-07.csv</p>
         </section>

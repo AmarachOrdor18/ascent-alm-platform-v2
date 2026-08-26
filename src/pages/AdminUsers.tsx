@@ -13,11 +13,20 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth, ROLES } from '@/context/AuthContext';
-import { useAffiliates, useUsers, useSaveUser } from '@/lib/hooks';
-import type { RoleCode, User } from '@/engine/types';
+import { useAffiliates, useUsers, useSaveUser, useRoles, useSaveRole } from '@/lib/hooks';
+import type { Role, RoleCode, User } from '@/engine/types';
 
-/** ROLES is keyed by code; the screen wants them in a stable order. */
-const ROLE_LIST = Object.values(ROLES);
+/** ROLES is the seed default, keyed by code; the screen wants them in a stable order as a fallback before the live table loads. */
+const DEFAULT_ROLE_LIST = Object.values(ROLES);
+
+/** Every permission string checked anywhere in the app, grouped for a readable checklist. */
+const PERMISSION_GROUPS: Array<{ label: string; permissions: string[] }> = [
+  { label: 'View', permissions: ['dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'data.view', 'audit.view'] },
+  { label: 'Configure', permissions: ['data.configure', 'risk.configure', 'rules.edit'] },
+  { label: 'Execute & generate', permissions: ['run.execute', 'reporting.generate', 'reporting.manage', 'approvals.approve'] },
+  { label: 'Manage', permissions: ['admin.manage', 'group.manage', 'limits.manage'] },
+  { label: 'Commentary', permissions: ['commentary.write', 'commentary.review'] },
+];
 
 function newId(): string {
   return `U-${Date.now().toString(36).toUpperCase()}`;
@@ -39,11 +48,15 @@ export function AdminUsers() {
   const { hasPermission, user: signedIn } = useAuth();
   const { data: users = [], isLoading } = useUsers();
   const { data: affiliates = [] } = useAffiliates();
+  const { data: roles } = useRoles();
+  const saveRole = useSaveRole();
+  const roleList = roles && roles.length > 0 ? roles : DEFAULT_ROLE_LIST;
   const save = useSaveUser();
   const canEdit = hasPermission('admin.manage');
 
   const [editing, setEditing] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   const active = users.filter((u) => u.isActive);
   const withoutMfa = active.filter((u) => !u.mfaEnrolled);
@@ -74,7 +87,7 @@ export function AdminUsers() {
     {
       key: 'role',
       header: 'Role',
-      render: (u) => <StatusBadge status={ROLE_LIST.find((r) => r.code === u.role)?.name ?? u.role} tone="neutral" />,
+      render: (u) => <StatusBadge status={roleList.find((r) => r.code === u.role)?.name ?? u.role} tone="neutral" />,
     },
     { key: 'scope', header: 'Scope', render: (u) => <span className="font-mono text-[11px]">{u.affiliateCode}</span> },
     {
@@ -119,7 +132,7 @@ export function AdminUsers() {
             value: String(withoutMfa.length),
             tone: withoutMfa.length > 0 ? 'warning' : 'success',
           },
-          { label: 'Roles in use', value: `${byRole.size} of ${ROLE_LIST.length}` },
+          { label: 'Roles in use', value: `${byRole.size} of ${roleList.length}` },
         ]}
         actions={
           <button
@@ -151,7 +164,7 @@ export function AdminUsers() {
           rowKey={(u) => u.id}
           emptyMessage={isLoading ? 'Loading…' : 'No users in the register.'}
           renderDetail={(u) => {
-            const role = ROLE_LIST.find((r) => r.code === u.role);
+            const role = roleList.find((r) => r.code === u.role);
             return (
               <div className="space-y-3 text-[11px]">
                 <p className="text-gray-600">{role?.description ?? 'No description for this role.'}</p>
@@ -196,21 +209,30 @@ export function AdminUsers() {
       <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Roles</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {ROLE_LIST.map((r) => (
+          {roleList.map((r) => (
             <div key={r.code} className="rounded-lg border border-gray-100 p-4">
               <div className="flex items-baseline justify-between">
                 <p className="text-[12px] font-bold text-navy-900">{r.name}</p>
                 <span className="text-[11px] text-gray-400">{byRole.get(r.code) ?? 0} user(s)</span>
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{r.description}</p>
-              <p className="mt-2 font-mono text-[10px] text-gray-400">{r.permissions.length} permissions</p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="font-mono text-[10px] text-gray-400">{r.permissions.length} permissions</p>
+                <button
+                  type="button"
+                  onClick={() => setEditingRole(r)}
+                  disabled={!canEdit}
+                  className="text-[11px] font-bold text-navy-700 hover:underline disabled:opacity-40"
+                >
+                  Edit permissions
+                </button>
+              </div>
             </div>
           ))}
         </div>
         <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-          Roles are fixed in this build; users move between them. Sign in as any of them to see the effect — the
-          navigation, the action buttons and the run controls all read this same permission set, so a Reporting user
-          genuinely cannot execute a run.
+          Users move between these six roles; permissions within each are editable here. Sign in as any of them to see
+          the effect — navigation, action buttons and run controls all read this same set, live.
         </p>
       </section>
 
@@ -218,6 +240,7 @@ export function AdminUsers() {
         <UserEditor
           user={editing}
           affiliates={affiliates}
+          roles={roleList}
           existingEmails={users.filter((u) => u.id !== editing.id).map((u) => u.email.toLowerCase())}
           onCancel={() => setEditing(null)}
           onSave={async (next) => {
@@ -231,6 +254,7 @@ export function AdminUsers() {
         <UserEditor
           user={{ ...BLANK_USER, id: newId(), createdAt: new Date().toISOString() }}
           affiliates={affiliates}
+          roles={roleList}
           existingEmails={users.map((u) => u.email.toLowerCase())}
           isNew
           onCancel={() => setCreating(false)}
@@ -240,13 +264,83 @@ export function AdminUsers() {
           }}
         />
       )}
+
+      {editingRole && (
+        <RoleEditor
+          role={editingRole}
+          onCancel={() => setEditingRole(null)}
+          onSave={async (next) => {
+            await saveRole.mutateAsync(next);
+            setEditingRole(null);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function RoleEditor({
+  role,
+  onCancel,
+  onSave,
+}: {
+  role: Role;
+  onCancel: () => void;
+  onSave: (r: Role) => Promise<void>;
+}) {
+  const [permissions, setPermissions] = useState<string[]>(role.permissions);
+
+  const toggle = (p: string) =>
+    setPermissions((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
+      <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-1 text-[14px] font-bold text-navy-900">{role.name}</h2>
+        <p className="mb-4 text-[11px] leading-relaxed text-gray-500">{role.description}</p>
+
+        <div className="space-y-4">
+          {PERMISSION_GROUPS.map((g) => (
+            <fieldset key={g.label}>
+              <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">{g.label}</legend>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {g.permissions.map((p) => (
+                  <label key={p} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12px] hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={permissions.includes(p)}
+                      onChange={() => toggle(p)}
+                      className="accent-gold-500"
+                    />
+                    <span className="font-mono text-[11px] text-navy-900">{p}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void onSave({ ...role, permissions })}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+          >
+            Save permissions
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function UserEditor({
   user,
   affiliates,
+  roles,
   existingEmails,
   isNew,
   onCancel,
@@ -254,6 +348,7 @@ function UserEditor({
 }: {
   user: User;
   affiliates: Array<{ code: string; name: string }>;
+  roles: Role[];
   existingEmails: string[];
   isNew?: boolean;
   onCancel: () => void;
@@ -299,7 +394,7 @@ function UserEditor({
               onChange={(e) => set({ role: e.target.value as RoleCode })}
               className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
             >
-              {ROLE_LIST.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+              {roles.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
             </select>
           </div>
           <div>

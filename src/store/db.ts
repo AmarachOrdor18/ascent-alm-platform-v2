@@ -20,6 +20,7 @@ import type {
   LoadBatch,
   Position,
   ProcessRun,
+  Role,
   RuleMeta,
   RunResult,
   RunSchedule,
@@ -57,6 +58,7 @@ export class AscentDb extends Dexie {
   fxRates!: EntityTable<StoredFxRate, 'id'>;
   economicIndicators!: EntityTable<EconomicIndicator, 'id'>;
   holidayCalendars!: EntityTable<HolidayCalendar, 'id'>;
+  roles!: EntityTable<Role, 'code'>;
 
   constructor(name = 'ascent-alm') {
     super(name);
@@ -120,6 +122,14 @@ export class AscentDb extends Dexie {
     // that was never there.
     this.version(6).stores({
       stagedBatches: 'id, affiliateCode, domain, asOfDate, [affiliateCode+domain+asOfDate]',
+    });
+
+    // v7 makes role permissions editable. They were a hardcoded object in
+    // AuthContext, so an admin could see what a role could do but never
+    // change it — the "Roles are fixed in this build" line on Users & Roles
+    // was describing a limitation, not a design choice.
+    this.version(7).stores({
+      roles: 'code',
     });
   }
 }

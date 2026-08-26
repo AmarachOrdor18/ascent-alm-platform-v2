@@ -7,7 +7,8 @@
  */
 
 import type { Repository } from '@/store/repository';
-import type { LoadBatch, User } from '@/engine/types';
+import type { LoadBatch, Role, User } from '@/engine/types';
+import { ROLES } from '@/context/AuthContext';
 import {
   AFFILIATE_CURRENCIES,
   AFFILIATE_FX_RATES,
@@ -28,6 +29,9 @@ import {
   YIELD_CURVES,
 } from './reference';
 import { SEED_DEFAULT_RULES } from './defaultRules';
+
+/** The permission sets a fresh database starts with — editable afterward via Users & Roles. */
+const SEED_ROLES: Role[] = Object.values(ROLES);
 
 const SEED_USERS: User[] = [
   {
@@ -171,6 +175,7 @@ async function writeSeed(repo: Repository): Promise<void> {
   for (const curve of YIELD_CURVES) await repo.upsertYieldCurve(curve);
   for (const indicator of ECONOMIC_INDICATORS) await repo.upsertEconomicIndicator(indicator);
   for (const calendar of HOLIDAY_CALENDARS) await repo.upsertHolidayCalendar(calendar);
+  for (const role of SEED_ROLES) await repo.upsertRole(role);
   for (const user of SEED_USERS) await repo.upsertUser(user);
   for (const limit of SEED_LIMITS) await repo.upsertLimitConfig(limit);
   for (const connector of SEED_CONNECTORS) await repo.upsertConnector(connector);
@@ -246,6 +251,14 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingUserIds = new Set((await repo.listUsers()).map((u) => u.id));
   for (const seedUser of SEED_USERS) {
     if (!existingUserIds.has(seedUser.id)) await repo.upsertUser(seedUser);
+  }
+
+  // Roles were a hardcoded object with nowhere to persist an edit until this
+  // table existed — an existing database has zero rows here, not a row per
+  // role, so this is a real top-up, not a defensive no-op.
+  const existingRoleCodes = new Set((await repo.listRoles()).map((r) => r.code));
+  for (const seedRole of SEED_ROLES) {
+    if (!existingRoleCodes.has(seedRole.code)) await repo.upsertRole(seedRole);
   }
 
   // Same reasoning: Time Buckets, Behaviour Patterns and Forecast Scenarios

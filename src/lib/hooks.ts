@@ -19,6 +19,7 @@ import type {
   DimensionType,
   EconomicIndicator,
   HolidayCalendar,
+  Role,
   RoleCode,
   StoredCurrency,
   StoredFxRate,
@@ -260,6 +261,21 @@ export function useSaveUser() {
     (u) => repository.upsertUser(u),
     (u) => ({ id: u.id, detail: `${u.name} (${u.email}), ${u.role}, ${u.isActive ? 'active' : 'disabled'}` }),
     [['users']],
+  );
+}
+
+export function useRoles() {
+  return useQuery({ queryKey: ['roles'], queryFn: () => repository.listRoles() });
+}
+
+export function useSaveRole() {
+  return useAuditedMutation<Role>(
+    'Administration',
+    'Save',
+    'Role',
+    (r) => repository.upsertRole(r),
+    (r) => ({ id: r.code, detail: `${r.name}, ${r.permissions.length} permission(s)` }),
+    [['roles']],
   );
 }
 

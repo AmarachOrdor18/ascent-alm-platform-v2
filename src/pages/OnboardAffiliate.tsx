@@ -14,7 +14,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn } from '@/lib/cn';
@@ -428,11 +428,18 @@ export function OnboardAffiliate() {
 
             {step === 3 && (
               <Step title="Connectivity">
-                <p className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-                  Every domain must be fed by something. Where a connector is unavailable, declare{' '}
-                  <span className="font-bold">file substitution</span> with a cadence and a named owner — a deliberate
-                  configuration, not a workaround. Reconciliation holds a file-fed affiliate to the same standard.
-                </p>
+                <div className="mb-4 flex items-start justify-between gap-3 rounded-lg bg-navy-50 px-4 py-3">
+                  <p className="text-[11px] leading-relaxed text-navy-900">
+                    Every domain must be fed by something. Where a connector is unavailable, declare{' '}
+                    <span className="font-bold">file substitution</span> with a cadence and a named owner.
+                  </p>
+                  <Link
+                    href="/connectors"
+                    className="shrink-0 whitespace-nowrap text-[11px] font-bold text-navy-700 hover:underline"
+                  >
+                    Configure connectors →
+                  </Link>
+                </div>
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">

@@ -21,6 +21,7 @@ import type {
   LoadBatch,
   Position,
   ProcessRun,
+  Role,
   RuleMeta,
   RunResult,
   RunSchedule,
@@ -430,6 +431,15 @@ export class LocalRepository implements Repository {
 
   async upsertUser(user: User): Promise<void> {
     await this.database.users.put({ ...user, email: user.email.toLowerCase() });
+  }
+
+  // ── Roles ─────────────────────────────────────────────────────────────
+  async listRoles(): Promise<Role[]> {
+    return this.database.roles.toArray();
+  }
+
+  async upsertRole(role: Role): Promise<void> {
+    await this.database.roles.put(role);
   }
 
   // ── Reference data ────────────────────────────────────────────────────

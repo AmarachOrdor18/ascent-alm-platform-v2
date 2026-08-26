@@ -147,6 +147,8 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/custom-metrics', screenName: 'Custom Metrics' },
   { path: '/rules/ftp', screenName: 'FTP Rules' },
   { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
+  { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
+  { path: '/connectors', screenName: 'Connectors & Data Sources' },
   { path: '/management-reporting', screenName: 'Report Packs — Management' },
 ];
 
