@@ -143,14 +143,8 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/scenarios', screenName: 'Forecast Scenarios' },
   { path: '/rules/new-business', screenName: 'New Business' },
   { path: '/rules/transaction-strategies', screenName: 'Transaction Strategies' },
-  { path: '/rules/ftp', screenName: 'FTP Rules' },
-  { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
   { path: '/rules/filters', screenName: 'Filters' },
   { path: '/rules/custom-metrics', screenName: 'Custom Metrics' },
-  { path: '/gap-analysis', screenName: 'Maturity & Repricing Gap' },
-  { path: '/behavioural-analysis', screenName: 'Behavioural Analysis' },
-  { path: '/concentration', screenName: 'Concentration & Large Exposures' },
-  { path: '/profitability', screenName: 'Profitability Ratios' },
 ];
 
 /**

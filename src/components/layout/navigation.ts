@@ -36,6 +36,9 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'RISK MANAGEMENT',
     items: [
       { name: 'Liquidity Risk', path: '/liquidity-risk', permission: 'risk.view', phase: 6 },
+      { name: 'Maturity & Repricing Gap', path: '/gap-analysis', permission: 'risk.view', phase: 6 },
+      { name: 'Behavioural Analysis', path: '/behavioural-analysis', permission: 'risk.view', phase: 6 },
+      { name: 'Concentration & Large Exposures', path: '/concentration', permission: 'risk.view', phase: 6 },
       { name: 'Interest Rate Risk (IRRBB)', path: '/interest-rate-risk', permission: 'risk.view', phase: 6 },
       { name: 'Stress Testing', path: '/stress-testing', permission: 'risk.view', phase: 5 },
       { name: 'Limits & Breaches', path: '/limits', permission: 'risk.view', phase: 7 },
@@ -49,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Funds Transfer Pricing', path: '/ftp', permission: 'treasury.view', phase: 6 },
       { name: 'Balance Sheet', path: '/balance-sheet', permission: 'treasury.view', phase: 6 },
       { name: 'FX Position', path: '/fx-position', permission: 'treasury.view', phase: 6 },
+      { name: 'Profitability Ratios', path: '/profitability', permission: 'risk.view', phase: 6 },
     ],
   },
   {
@@ -93,6 +97,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'CONFIGURATION',
     items: [
       { name: 'Business Rules', path: '/rules', permission: 'rules.edit', phase: 4 },
+      { name: 'FTP Rules', path: '/rules/ftp', permission: 'rules.edit', phase: 4 },
+      { name: 'Adjustment Rules', path: '/rules/adjustments', permission: 'rules.edit', phase: 4 },
       { name: 'Validation Rules', path: '/validation-rules', permission: 'data.configure', phase: 3 },
     ],
   },
