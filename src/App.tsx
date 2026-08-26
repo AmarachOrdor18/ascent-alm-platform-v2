@@ -260,7 +260,7 @@ export function App() {
       <ScopeSync />
       <Switch>
         <Route path="/">
-          <Redirect to="/affiliates" />
+          <Redirect to="/dashboard" />
         </Route>
 
         {ROUTE_ORDER.map(({ path, screenName, Component }) => (

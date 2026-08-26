@@ -15,13 +15,18 @@
 
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
+import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { useScope } from '@/context/ScopeContext';
+import { useFxRates } from '@/lib/hooks';
+import { useRuns } from '@/lib/runHooks';
+import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
-import { formatPct } from '@/lib/format';
+import { formatPct, formatDate } from '@/lib/format';
 import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } from '@/engine/liquidity';
 import type { EveResult, NiiResult } from '@/engine/irrbb';
 import type { ProfitabilityResult } from '@/engine/profitability';
@@ -49,6 +54,26 @@ export function Dashboard() {
   const { run, results } = selected;
 
   const currency = run?.reportingCurrency ?? 'USD';
+
+  const { data: scopedRuns = [] } = useRuns(affiliateCode);
+  const { data: trendSeries } = useKriSeries(scopedRuns, ['lcrPercent', 'nsfrPercent']);
+  const { data: fxRates = [] } = useFxRates();
+
+  const trendData = (() => {
+    if (!trendSeries) return [];
+    const byDate = new Map<string, { asOfDate: string; lcr?: number; nsfr?: number }>();
+    for (const obs of trendSeries.get('lcrPercent') ?? []) {
+      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), lcr: obs.value });
+    }
+    for (const obs of trendSeries.get('nsfrPercent') ?? []) {
+      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), nsfr: obs.value });
+    }
+    return Array.from(byDate.values()).sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
+  })();
+
+  const rateRows = fxRates
+    .filter((r) => r.quote === 'USD' || r.base === 'USD')
+    .slice(0, 6);
 
   const lcr = payloadOf<LcrResult>(results, 'Lcr');
   const nsfr = payloadOf<NsfrResult>(results, 'Nsfr');
@@ -118,6 +143,53 @@ export function Dashboard() {
               <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
             </Link>
           ))}
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Liquidity position trend</h2>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">LCR and NSFR across every completed run for this scope</p>
+            <div style={{ width: '100%', height: 260 }}>
+              {trendData.length < 2 ? (
+                <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
+                  Only {trendData.length} as-of date{trendData.length === 1 ? '' : 's'} of history so far. A trend needs
+                  more than one run at different dates to plot.
+                </div>
+              ) : (
+                <ResponsiveContainer>
+                  <LineChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="asOfDate" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(d: string) => formatDate(d)} />
+                    <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
+                    <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} labelFormatter={(d: string) => formatDate(d)} contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Legend wrapperStyle={CHART_LEGEND_STYLE} />
+                    <ReferenceLine y={100} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" label={{ value: 'Regulatory minimum', fontSize: 10, fill: '#9AA1AE', position: 'insideTopLeft' }} />
+                    <Line type="monotone" dataKey="lcr" name="LCR" stroke={CHART_COLORS.primary} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    <Line type="monotone" dataKey="nsfr" name="NSFR" stroke={CHART_COLORS.accent} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rates &amp; curves</h2>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">Current FX rates against USD</p>
+            {rateRows.length === 0 ? (
+              <p className="text-[12px] text-gray-400">No FX rates loaded.</p>
+            ) : (
+              <div className="space-y-3">
+                {rateRows.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between text-[12px]">
+                    <span className="font-mono font-medium text-gray-600">
+                      {r.base}/{r.quote}
+                    </span>
+                    <span className="font-mono font-bold text-navy-900">{r.rate.toFixed(4)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         {breaches.length > 0 && (

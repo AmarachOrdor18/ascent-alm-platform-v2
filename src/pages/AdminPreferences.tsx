@@ -1,108 +1,107 @@
 /**
- * System Preferences — screen 57 (Phase 8).
+ * System Preferences — screen 57.
  *
- * System-level configuration and administrative settings.
+ * This used to be an entirely fabricated settings form: selects offering
+ * only the one option already "selected", toggles that didn't toggle, and
+ * a Save Changes button with no click handler at all. There is no
+ * system-wide settings entity in this data model for a form like that to
+ * write to honestly.
+ *
+ * What actually exists is real, just not editable from one screen: roles
+ * and permissions, retention windows, validation behaviour. This reads
+ * those facts from the code that enforces them and links to wherever each
+ * one is genuinely configured, rather than duplicating fake controls here.
  */
 
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { ROLES } from '@/context/AuthContext';
+
+const ROLE_LIST = Object.values(ROLES);
 
 export function AdminPreferences() {
-  const settings = [
-    {
-      category: 'System',
-      items: [
-        { name: 'Application Name', value: 'Ascent ALM Platform', type: 'text' },
-        { name: 'Default Currency', value: 'USD', type: 'select' },
-        { name: 'Timezone', value: 'UTC', type: 'select' },
-        { name: 'Date Format', value: 'YYYY-MM-DD', type: 'select' },
-      ],
-    },
-    {
-      category: 'Security',
-      items: [
-        { name: 'Session Timeout (minutes)', value: '30', type: 'number' },
-        { name: 'Password Policy', value: 'Strong (8+ chars, mixed)', type: 'select' },
-        { name: 'MFA Required', value: 'Yes', type: 'toggle' },
-        { name: 'Failed Login Lockout', value: '5 attempts', type: 'number' },
-      ],
-    },
-    {
-      category: 'Notifications',
-      items: [
-        { name: 'Email Notifications', value: 'Enabled', type: 'toggle' },
-        { name: 'Breach Alerts', value: 'Real-time', type: 'select' },
-        { name: 'Approval Requests', value: 'Daily Digest', type: 'select' },
-        { name: 'System Updates', value: 'Weekly', type: 'select' },
-      ],
-    },
-    {
-      category: 'Performance',
-      items: [
-        { name: 'Data Refresh Cadence', value: 'Daily', type: 'select' },
-        { name: 'Cache Duration (minutes)', value: '15', type: 'number' },
-        { name: 'Query Timeout (seconds)', value: '30', type: 'number' },
-        { name: 'Batch Size (rows)', value: '1000', type: 'number' },
-      ],
-    },
-  ];
-
   return (
     <>
       <ModuleHeader
         title="System Preferences"
-        description="System-level configuration and administrative settings"
+        description="How the platform is actually configured, and where to change each thing for real."
         asOfDate={null}
         scope="Ecobank Group"
-        metrics={[
-          { label: 'Configuration Categories', value: String(settings.length) },
-          { label: 'Settings Configured', value: '16' },
-          { label: 'Last Updated', value: 'August 25, 2026' },
-          { label: 'System Version', value: '2.0.0' },
-        ]}
       />
 
-      <div className="space-y-6">
-        {settings.map((category) => (
-          <div key={category.category} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">{category.category}</h3>
-            </div>
-            <div className="space-y-4">
-              {category.items.map((setting) => (
-                <div key={setting.name} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                  <div>
-                    <p className="text-[12px] font-bold text-navy-900">{setting.name}</p>
-                    <p className="text-[10px] text-gray-400">{setting.type}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {setting.type === 'toggle' ? (
-                      <div className="w-10 h-5 bg-gold-500 rounded-full relative cursor-pointer">
-                        <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full" />
-                      </div>
-                    ) : setting.type === 'select' ? (
-                      <select className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
-                        <option>{setting.value}</option>
-                      </select>
-                    ) : (
-                      <input
-                        type={setting.type === 'number' ? 'number' : 'text'}
-                        defaultValue={setting.value}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 w-32"
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Access &amp; roles</h3>
+          <p className="mb-4 text-[11px] text-gray-400">Six fixed roles; users move between them, roles themselves aren't editable here.</p>
+          <dl className="space-y-3 text-[12px]">
+            {ROLE_LIST.map((r) => (
+              <div key={r.code} className="flex items-center justify-between border-b border-gray-50 pb-2 last:border-0">
+                <dt className="text-gray-600">{r.name}</dt>
+                <dd className="font-mono text-gray-400">{r.permissions.length} permissions</dd>
+              </div>
+            ))}
+          </dl>
+          <Link href="/admin/users" className="mt-4 inline-block text-[11px] font-bold text-navy-700 hover:underline">
+            Manage users and role assignments →
+          </Link>
+        </section>
 
-      <div className="mt-6 flex justify-end">
-        <button className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 transition-colors">
-          Save Changes
-        </button>
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Data &amp; retention</h3>
+          <p className="mb-4 text-[11px] text-gray-400">Fixed platform behaviour, not per-affiliate settings.</p>
+          <dl className="space-y-3 text-[12px]">
+            <Row label="Load batch retention" value="24 monthly as-of dates, every version" />
+            <Row label="Expired data" value="Marked and hidden, never deleted" />
+            <Row label="Audit trail" value="Append-only, every event retained" />
+            <Row label="Audit log display cap" value="Most recent 500 events" />
+          </dl>
+          <Link href="/data-vintages" className="mt-4 inline-block text-[11px] font-bold text-navy-700 hover:underline">
+            View load history and retention →
+          </Link>
+        </section>
+
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Validation &amp; controls</h3>
+          <p className="mb-4 text-[11px] text-gray-400">Per-rule, configured on the screen that owns it.</p>
+          <dl className="space-y-3 text-[12px]">
+            <Row label="Blocking vs advisory" value="Set per validation rule" />
+            <Row label="Reconciliation tolerance" value="Set per affiliate, amount or %" />
+            <Row label="Limit thresholds" value="Amber/Red and regulatory floor, per limit" />
+          </dl>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/validation-rules" className="text-[11px] font-bold text-navy-700 hover:underline">
+              Validation Rules →
+            </Link>
+            <Link href="/gl-reconciliation" className="text-[11px] font-bold text-navy-700 hover:underline">
+              GL Reconciliation →
+            </Link>
+            <Link href="/limits" className="text-[11px] font-bold text-navy-700 hover:underline">
+              Limits &amp; Breaches →
+            </Link>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Notifications &amp; escalation</h3>
+          <p className="mb-4 text-[11px] text-gray-400">Configured per event, not a global switch.</p>
+          <dl className="space-y-3 text-[12px]">
+            <Row label="Alert rules" value="Event, channel, recipients and minimum severity, per rule" />
+            <Row label="Escalation" value="Optional, after a set number of hours to a second recipient list" />
+          </dl>
+          <Link href="/notifications" className="mt-4 inline-block text-[11px] font-bold text-navy-700 hover:underline">
+            Manage notification rules →
+          </Link>
+        </section>
       </div>
     </>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-gray-50 pb-2 last:border-0">
+      <dt className="text-gray-600">{label}</dt>
+      <dd className="text-right text-gray-400">{value}</dd>
+    </div>
   );
 }
