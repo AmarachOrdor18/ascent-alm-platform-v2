@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
 import { GROUP_CODE, useScope } from '@/context/ScopeContext';
+import { useBatches } from '@/lib/hooks';
 import { NAV_GROUPS } from './navigation';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -19,7 +20,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['OVERVIEW', 'RISK MANAGEMENT']));
   const { user, role, hasPermission, logout } = useAuth();
-  const { affiliateCode, setAffiliateCode, affiliates, asOfDate, run, currency } = useScope();
+  const { affiliateCode, setAffiliateCode, affiliates, run, currency } = useScope();
+  const { data: batches = [] } = useBatches();
+
+  // "As at" reflects the data actually on file, not a scope field nothing
+  // in the app ever writes to — it always read as "no data loaded" even
+  // right after a commit. The most recently committed batch in the current
+  // scope (any affiliate, at Group) is the real answer to "as at when".
+  const asOfDate = useMemo(() => {
+    const committed = batches
+      .filter((b) => b.status === 'Committed' && (affiliateCode === GROUP_CODE || b.affiliateCode === affiliateCode))
+      .sort((a, b) => b.asOfDate.localeCompare(a.asOfDate));
+    return committed[0]?.asOfDate ?? null;
+  }, [batches, affiliateCode]);
 
   const visibleGroups = useMemo(
     () =>
