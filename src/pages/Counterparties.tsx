@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
 import { useDimensionMembers, useSaveDimensionMembers } from '@/lib/hooks';
@@ -22,6 +23,8 @@ import type { DimensionMember } from '@/engine/types';
 
 interface Row {
   member: DimensionMember;
+  name: string;
+  code: string;
   depositBalance: number;
   sharePercent: number;
   currency: string;
@@ -60,6 +63,8 @@ export function Counterparties() {
         const exposure = byId.get(member.code);
         return {
           member,
+          name: member.name,
+          code: member.code,
           depositBalance: exposure?.amount ?? 0,
           sharePercent: total > 0 && exposure ? (exposure.amount / total) * 100 : 0,
           currency: exposure?.currency ?? 'NGN',
@@ -71,6 +76,12 @@ export function Counterparties() {
   const withExposure = rows.filter((r) => r.depositBalance > 0);
   const largest = withExposure[0] ?? null;
   const topFive = withExposure.slice(0, 5).reduce((s, r) => s + r.sharePercent, 0);
+
+  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
+    rows,
+    15,
+    ['name', 'code'],
+  );
 
   const handleAdd = () => {
     if (!draft.code.trim() || !draft.name.trim()) return;
@@ -161,10 +172,20 @@ export function Counterparties() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-3">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Register</h2>
+        <section className="table-datagrid-container lg:col-span-3">
+          <div className="border-b border-gray-100 bg-white/50 p-5">
+            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Register</h2>
+            <TableToolbar
+              searchValue={search}
+              onSearchChange={setSearch}
+              exportData={() => rows}
+              exportFilename="counterparties"
+              density={density}
+              onDensityChange={setDensity}
+            />
+          </div>
           <ResultTable
-            rows={rows}
+            rows={paged}
             columns={columns}
             rowKey={(r) => r.member.code}
             emptyMessage={isLoading ? 'Loading…' : 'No counterparties registered yet.'}
@@ -184,6 +205,7 @@ export function Counterparties() {
               </dl>
             )}
           />
+          <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
         </section>
 
         <section>
@@ -251,6 +273,11 @@ export function Counterparties() {
               Deposits carrying no counterparty are reported as unattributed in concentration analysis rather than being
               dropped or lumped together — either would distort the measure. The retail pool is deliberately aggregated,
               since no single retail depositor reaches the reporting threshold.
+            </p>
+            <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
+              The register itself is seeded for each onboarded affiliate, then grows the same way any dimension does —
+              added here directly, or created automatically from a position file&rsquo;s counterparty codes via Data
+              Upload&rsquo;s &ldquo;Create these from the file&rdquo; step.
             </p>
             <div className="mt-3">
               <StatusBadge

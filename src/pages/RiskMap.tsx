@@ -1,18 +1,19 @@
 /**
  * Liquidity Risk Map — screen 49.
  *
- * A colour-coded card per Live affiliate rather than a table, so risk
- * concentration across the Group reads at a glance. Each card's numbers
- * come from that affiliate's own latest completed run — deposit share is
- * that affiliate's deposits as a fraction of every Live affiliate's
- * deposits combined, not a regulatory concentration measure (that question
- * belongs to Concentration & Large Exposures; this one is Group funding
+ * A table, one row per Live affiliate — a card grid stops being scannable
+ * once the Group reaches its full 33 affiliates. Each row's numbers come
+ * from that affiliate's own latest completed run — deposit share is that
+ * affiliate's deposits as a fraction of every Live affiliate's deposits
+ * combined, not a regulatory concentration measure (that question belongs
+ * to Concentration & Large Exposures; this one is Group funding
  * diversification, a different question kept deliberately separate).
  */
 
 import { useQueries } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAffiliates, useFxRates } from '@/lib/hooks';
 import { useRuns, runKeys } from '@/lib/runHooks';
 import { repository } from '@/store/localRepository';
@@ -57,6 +58,7 @@ interface AffiliatePoint {
   totalAssets: number;
   totalLiabilities: number;
   depositTotal: number;
+  depositSharePercent: number | null;
   hasRun: boolean;
   severity: Severity;
 }
@@ -133,7 +135,7 @@ export function RiskMap() {
   const points: AffiliatePoint[] = raw.map((a) => {
     const depositSharePercent = a.hasRun && groupDepositTotal > 0 ? (a.depositTotal / groupDepositTotal) * 100 : null;
     const severity = a.hasRun ? classify(a.lcr, depositSharePercent) : 'No run';
-    return { ...a, severity };
+    return { ...a, depositSharePercent, severity };
   });
 
   const highCount = points.filter((p) => p.severity === 'High').length;
@@ -142,6 +144,57 @@ export function RiskMap() {
 
   const fmt = (n: number) =>
     `$${(Math.abs(n) >= 1_000_000_000 ? `${(n / 1_000_000_000).toFixed(2)}B` : `${(n / 1_000_000).toFixed(1)}M`)}`;
+
+  const columns: ResultColumn<AffiliatePoint>[] = [
+    {
+      key: 'affiliate',
+      header: 'Affiliate',
+      render: (p) => (
+        <div>
+          <p className="font-medium text-navy-900">{p.name}</p>
+          <p className="text-[10px] text-gray-400">{p.region}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'severity',
+      header: 'Severity',
+      render: (p) => <StatusBadge status={p.severity} tone={SEVERITY_STYLE[p.severity].tone} />,
+    },
+    {
+      key: 'lcr',
+      header: 'LCR',
+      align: 'right',
+      render: (p) => <span className="font-mono">{p.lcr !== null ? `${p.lcr.toFixed(1)}%` : '—'}</span>,
+    },
+    {
+      key: 'depositShare',
+      header: 'Deposit share',
+      align: 'right',
+      render: (p) => <span className="font-mono">{p.depositSharePercent !== null ? `${p.depositSharePercent.toFixed(1)}%` : '—'}</span>,
+    },
+    {
+      key: 'net',
+      header: 'Net position',
+      align: 'right',
+      render: (p) => {
+        const net = p.totalAssets - p.totalLiabilities;
+        return <span className="font-mono">{p.hasRun ? `${net >= 0 ? '' : '-'}${fmt(net)}` : '—'}</span>;
+      },
+    },
+    {
+      key: 'assets',
+      header: 'Total assets',
+      align: 'right',
+      render: (p) => <span className="font-mono text-gray-500">{p.hasRun ? fmt(p.totalAssets) : '—'}</span>,
+    },
+    {
+      key: 'liabilities',
+      header: 'Total liabilities',
+      align: 'right',
+      render: (p) => <span className="font-mono text-gray-500">{p.hasRun ? fmt(p.totalLiabilities) : '—'}</span>,
+    },
+  ];
 
   return (
     <>
@@ -183,50 +236,18 @@ export function RiskMap() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {points.map((p) => {
-              const style = SEVERITY_STYLE[p.severity];
-              const depositShare = groupDepositTotal > 0 ? (p.depositTotal / groupDepositTotal) * 100 : null;
-              const netPosition = p.totalAssets - p.totalLiabilities;
-              return (
-                <div
-                  key={p.code}
-                  className={`overflow-hidden rounded-xl border border-gray-100 shadow-sm ring-4 transition-all hover:shadow-md ${style.ring}`}
-                >
-                  <div className={`h-1.5 ${style.bar}`} />
-                  <div className="p-5">
-                    <div className="mb-3 flex items-start justify-between">
-                      <div>
-                        <p className="text-[13px] font-bold text-navy-900">{p.name}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{p.region}</p>
-                      </div>
-                      <StatusBadge status={p.severity} tone={style.tone} />
-                    </div>
-                    <div className="mb-3 grid grid-cols-2 gap-3">
-                      <Stat label="Deposit share" value={depositShare !== null ? `${depositShare.toFixed(1)}%` : '—'} />
-                      <Stat label="Net position" value={p.hasRun ? `${netPosition >= 0 ? '' : '-'}${fmt(netPosition)}` : '—'} />
-                      <Stat label="Total assets" value={p.hasRun ? fmt(p.totalAssets) : '—'} />
-                      <Stat label="Total liabilities" value={p.hasRun ? fmt(p.totalLiabilities) : '—'} />
-                    </div>
-                    <p className="border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-                      {primaryDriver(p.lcr, depositShare, p.severity)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ResultTable
+            rows={points}
+            columns={columns}
+            rowKey={(p) => p.code}
+            renderDetail={(p) => (
+              <p className="text-[11px] leading-relaxed text-gray-500">
+                {primaryDriver(p.lcr, p.depositSharePercent, p.severity)}
+              </p>
+            )}
+          />
         </div>
       )}
     </>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
-      <p className="text-[15px] font-bold text-navy-900">{value}</p>
-    </div>
   );
 }

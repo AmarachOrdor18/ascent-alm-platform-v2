@@ -21,7 +21,7 @@
  * Group Default folder's starting content.
  */
 
-import type { BehaviourPatternRule, ForecastScenarioRule, TimeBucketRule } from '@/engine/ruleTypes';
+import type { BehaviourPatternRule, ForecastScenarioRule, NewBusinessRule, TimeBucketRule } from '@/engine/ruleTypes';
 import { defaultLadder } from '@/engine/buckets';
 import { DEFAULT_BETAS, DEFAULT_PATTERNS } from '@/engine/behavioural';
 import { standardShocks } from '@/engine/irrbb';
@@ -67,8 +67,44 @@ export const SEED_FORECAST_SCENARIO_RULE: ForecastScenarioRule = {
   economicIndicatorCodes: [],
 };
 
+/**
+ * A run with no New Business rule is genuinely static, not implicitly
+ * defaulting to something — unlike the three above, there is no engine
+ * fallback to surface here. What was missing instead was a worked example:
+ * every other rule kind had at least one row to open and look at, and this
+ * one had zero, which read as broken rather than as "static is a real
+ * choice." This is one bank's actual growth plan, not a Group default.
+ */
+export const SEED_NEW_BUSINESS_RULE: NewBusinessRule = {
+  ...ruleMetaSeed('RULE-NEWBUSINESS-NG-FY26', 'NewBusiness', 'Nigeria — FY26 Growth Plan'),
+  kind: 'NewBusiness',
+  folder: 'Nigeria',
+  affiliateCode: 'NG',
+  lines: [
+    {
+      productCode: 'P-LOANS---CORPORATE--1-3Y',
+      currency: 'NGN',
+      method: 'TargetGrowthPercent',
+      value: 8,
+      timing: 'Distributed',
+      pricingMarginBps: 250,
+      maturityMix: { '0-30D': 0, '1-3M': 10, '3-6M': 15, '6-12M': 20, '1-3Y': 40, '3-5Y': 15, '5Y+': 0 },
+    },
+    {
+      productCode: 'P-CORPORATE-DEPOSITS---OPERATI',
+      currency: 'NGN',
+      method: 'TargetGrowthPercent',
+      value: 5,
+      timing: 'Distributed',
+      pricingMarginBps: 0,
+      maturityMix: { '0-30D': 60, '1-3M': 25, '3-6M': 10, '6-12M': 5, '1-3Y': 0, '3-5Y': 0, '5Y+': 0 },
+    },
+  ],
+};
+
 export const SEED_DEFAULT_RULES = [
   SEED_TIME_BUCKET_RULE,
   SEED_BEHAVIOUR_PATTERN_RULE,
   SEED_FORECAST_SCENARIO_RULE,
+  SEED_NEW_BUSINESS_RULE,
 ];

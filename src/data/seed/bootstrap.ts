@@ -162,6 +162,55 @@ const COTEIVOIRE_BATCH: LoadBatch = {
   committedAt: `${COTEIVOIRE_AS_OF}T09:05:00Z`,
 };
 
+/**
+ * Positions is the only domain that ever gets a LoadBatch from the demo
+ * seed data — GeneralLedger, MarketRates, FxRates, Counterparties and
+ * EconomicIndicators are genuinely populated (via the reference tables
+ * above) but never went through the batch/commit pipeline, so every
+ * affiliate's freshness always read "Never loaded" on five of its six
+ * domains regardless of how current the underlying data actually was.
+ * These are lightweight batch records — zero rows, since the data lives in
+ * its own table, not `positions` — that record honestly that the domain
+ * was in fact loaded, on the same date the rest of that affiliate's seed
+ * data was assembled.
+ */
+function referenceDomainBatch(
+  affiliateCode: string,
+  domain: LoadBatch['domain'],
+  asOfDate: string,
+  owner: string,
+): LoadBatch {
+  return {
+    id: `B-${affiliateCode}-${domain}-SEED`,
+    affiliateCode,
+    domain,
+    asOfDate,
+    version: 1,
+    fileName: `system — ${domain} reference feed`,
+    fileHash: `seed-${affiliateCode}-${domain}`,
+    rowCount: 0,
+    rowsAccepted: 0,
+    rowsRejected: 0,
+    status: 'Committed',
+    supersedesBatchId: null,
+    supersededReason: null,
+    uploadedBy: owner,
+    uploadedAt: `${asOfDate}T06:00:00Z`,
+    committedBy: owner,
+    committedAt: `${asOfDate}T06:00:00Z`,
+  };
+}
+
+const REFERENCE_DOMAIN_BATCHES: LoadBatch[] = [
+  ['NG', NIGERIA_AS_OF],
+  ['GH', GHANA_AS_OF],
+  ['CI', COTEIVOIRE_AS_OF],
+].flatMap(([code, asOf]) =>
+  (['GeneralLedger', 'MarketRates', 'FxRates', 'Counterparties', 'EconomicIndicators'] as const).map((domain) =>
+    referenceDomainBatch(code!, domain, asOf!, 'system-seed'),
+  ),
+);
+
 async function writeSeed(repo: Repository): Promise<void> {
   for (const affiliate of AFFILIATES) await repo.upsertAffiliate(affiliate);
   await repo.upsertDimensionMembers(ALL_DIMENSION_MEMBERS);
@@ -188,6 +237,8 @@ async function writeSeed(repo: Repository): Promise<void> {
   await repo.insertPositions(GHANA_POSITIONS);
   await repo.upsertBatch(COTEIVOIRE_BATCH);
   await repo.insertPositions(COTEIVOIRE_POSITIONS);
+
+  for (const batch of REFERENCE_DOMAIN_BATCHES) await repo.upsertBatch(batch);
 }
 
 const DIMENSION_TYPES = [
@@ -251,6 +302,14 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingUserIds = new Set((await repo.listUsers()).map((u) => u.id));
   for (const seedUser of SEED_USERS) {
     if (!existingUserIds.has(seedUser.id)) await repo.upsertUser(seedUser);
+  }
+
+  // Same reasoning: an existing database was seeded before the reference-
+  // domain batches above existed, so its three demo affiliates would show
+  // "Never loaded" on five of six domains forever without this top-up.
+  const existingBatchIds = new Set((await repo.listBatches()).map((b) => b.id));
+  for (const batch of REFERENCE_DOMAIN_BATCHES) {
+    if (!existingBatchIds.has(batch.id)) await repo.upsertBatch(batch);
   }
 
   // Roles were a hardcoded object with nowhere to persist an edit until this

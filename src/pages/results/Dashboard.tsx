@@ -99,6 +99,8 @@ export function Dashboard() {
     'nsfrPercent',
     'loanToDepositPercent',
     'survivalHorizonDays',
+    'niiSensitivityPercent',
+    'eveSensitivityPercentOfEquity',
   ]);
   const { data: fxRates = [] } = useFxRates();
   const { data: yieldCurves = [] } = useYieldCurves();
@@ -152,14 +154,17 @@ export function Dashboard() {
       : null,
   ].filter((r): r is { label: string; sublabel: string; value: string; delta: number | null } => r !== null);
 
+  // NII and EVE sensitivity — earnings and capital at risk from a 200bp
+  // shock, the pair a board actually asks about, rather than the
+  // regulatory liquidity ratios already sitting in the headline cards.
   const trendData = (() => {
     if (!trendSeries) return [];
-    const byDate = new Map<string, { asOfDate: string; lcr?: number; nsfr?: number }>();
-    for (const obs of trendSeries.get('lcrPercent') ?? []) {
-      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), lcr: obs.value });
+    const byDate = new Map<string, { asOfDate: string; nii?: number; eve?: number }>();
+    for (const obs of trendSeries.get('niiSensitivityPercent') ?? []) {
+      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), nii: obs.value });
     }
-    for (const obs of trendSeries.get('nsfrPercent') ?? []) {
-      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), nsfr: obs.value });
+    for (const obs of trendSeries.get('eveSensitivityPercentOfEquity') ?? []) {
+      byDate.set(obs.asOfDate, { ...(byDate.get(obs.asOfDate) ?? { asOfDate: obs.asOfDate }), eve: obs.value });
     }
     return Array.from(byDate.values()).sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
   })();
@@ -224,7 +229,7 @@ export function Dashboard() {
   ];
 
   // Everything else, read as a label next to a number, not a card.
-  const snapshot: Metric[] = [
+  const baseSnapshot: Metric[] = [
     { id: 'nii', label: 'NII sensitivity', value: formatPct(nii?.niiSensitivityPercent ?? null, 2), tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success', href: '/interest-rate-risk' },
     { id: 'eve', label: 'EVE sensitivity', value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2), tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success', href: '/interest-rate-risk' },
     { id: 'concentration', label: 'Largest depositor', value: formatPct(conc?.largestSharePercent ?? null), tone: conc?.largestSharePercent == null ? 'neutral' : conc.largestSharePercent > 10 ? 'danger' : conc.largestSharePercent > 5 ? 'warning' : 'success', href: '/concentration' },
@@ -232,7 +237,18 @@ export function Dashboard() {
     { id: 'nim', label: 'Net interest margin', value: formatPct(prof?.netInterestMarginPercent ?? null, 2), tone: 'neutral', href: '/profitability' },
   ];
 
-  const breaches = [...headline, ...snapshot].filter((m) => m.tone === 'danger');
+  const breaches = [...headline, ...baseSnapshot].filter((m) => m.tone === 'danger');
+
+  const snapshot: Metric[] = [
+    ...baseSnapshot,
+    {
+      id: 'inbreach',
+      label: 'In breach',
+      value: String(breaches.length),
+      tone: breaches.length > 0 ? 'danger' : 'success',
+      href: '/limits',
+    },
+  ];
 
   return (
     <>
@@ -279,8 +295,8 @@ export function Dashboard() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Liquidity position trend</h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">LCR and NSFR against the regulatory minimum, across every completed run for this scope</p>
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rate sensitivity trend</h2>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">NII and EVE sensitivity to a +200bp shock — earnings and capital at risk, across every completed run for this scope</p>
             <div style={{ width: '100%', height: 260 }}>
               {trendData.length < 2 ? (
                 <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
@@ -291,11 +307,11 @@ export function Dashboard() {
                 <ResponsiveContainer>
                   <AreaChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                     <defs>
-                      <linearGradient id="lcrFill" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="niiFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.25} />
                         <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
                       </linearGradient>
-                      <linearGradient id="nsfrFill" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="eveFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={CHART_COLORS.accent} stopOpacity={0.25} />
                         <stop offset="95%" stopColor={CHART_COLORS.accent} stopOpacity={0} />
                       </linearGradient>
@@ -303,11 +319,11 @@ export function Dashboard() {
                     <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="asOfDate" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(d: string) => formatDate(d)} />
                     <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
-                    <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} labelFormatter={(d: string) => formatDate(d)} contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} labelFormatter={(d: string) => formatDate(d)} contentStyle={CHART_TOOLTIP_STYLE} />
                     <Legend wrapperStyle={CHART_LEGEND_STYLE} />
-                    <ReferenceLine y={100} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" label={{ value: 'Regulatory minimum', fontSize: 10, fill: '#9AA1AE', position: 'insideTopLeft' }} />
-                    <Area type="monotone" dataKey="lcr" name="LCR" stroke={CHART_COLORS.primary} strokeWidth={2.5} fill="url(#lcrFill)" dot={{ r: 3 }} connectNulls />
-                    <Area type="monotone" dataKey="nsfr" name="NSFR" stroke={CHART_COLORS.accent} strokeWidth={2.5} fill="url(#nsfrFill)" dot={{ r: 3 }} connectNulls />
+                    <ReferenceLine y={0} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" />
+                    <Area type="monotone" dataKey="nii" name="NII sensitivity" stroke={CHART_COLORS.primary} strokeWidth={2.5} fill="url(#niiFill)" dot={{ r: 3 }} connectNulls />
+                    <Area type="monotone" dataKey="eve" name="EVE sensitivity" stroke={CHART_COLORS.accent} strokeWidth={2.5} fill="url(#eveFill)" dot={{ r: 3 }} connectNulls />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -355,7 +371,7 @@ export function Dashboard() {
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {snapshot.map((m) => (
                 <Link key={m.id} href={m.href} className="block rounded-lg bg-gray-50 p-3 hover:bg-gray-100">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>

@@ -11,6 +11,8 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { HierarchyBrowser } from '@/components/ui/HierarchyBrowser';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useDimensionMembers, useSaveDimensionMembers } from '@/lib/hooks';
 import { buildHierarchy } from '@/engine/dimensions';
@@ -67,6 +69,13 @@ export function Dimensions() {
   const definition = DIMENSIONS.find((d) => d.type === active)!;
   const roots = useMemo(() => buildHierarchy(members), [members]);
 
+  const shownMembers = selected.length > 0 ? members.filter((m) => selected.includes(m.code)) : members;
+  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
+    shownMembers,
+    15,
+    ['code', 'name', 'parentCode'],
+  );
+
   const handleAdd = () => {
     if (!draft.code.trim() || !draft.name.trim()) return;
     const parentCode = draft.parentCode || (roots[0]?.code ?? null);
@@ -103,6 +112,15 @@ export function Dimensions() {
         description="The seven dimensions every position is tagged with. Configuration data, so it carries no as-of date."
         asOfDate={null}
         scope="Group"
+        actions={
+          <InfoButton label="Where this data comes from">
+            The Group-standard hierarchies (Legal Entity, Common Chart of Accounts, Financial Element) and the initial
+            org units, GL accounts and counterparties for each onboarded affiliate are seeded when the platform starts.
+            From then on this is ordinary configuration data — add, edit or reparent a member here, or via the CSV
+            &ldquo;Create these from the file&rdquo; flow on Data Upload, which adds anything a position file references
+            that isn&rsquo;t mapped yet.
+          </InfoButton>
+        }
         metrics={[
           { label: 'Dimensions', value: String(DIMENSIONS.length) },
           { label: `${definition.label} members`, value: String(members.length) },
@@ -211,9 +229,19 @@ export function Dimensions() {
           <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
             {selected.length > 0 ? `Selected (${selected.length})` : `All ${definition.label} members`}
           </h2>
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="table-datagrid-container">
+            <div className="border-b border-gray-100 bg-white/50 p-5">
+              <TableToolbar
+                searchValue={search}
+                onSearchChange={setSearch}
+                exportData={() => shownMembers}
+                exportFilename={`dimensions-${active}`}
+                density={density}
+                onDensityChange={setDensity}
+              />
+            </div>
             <ResultTable
-              rows={selected.length > 0 ? members.filter((m) => selected.includes(m.code)) : members}
+              rows={paged}
               columns={columns}
               rowKey={(m) => m.code}
               emptyMessage={isLoading ? 'Loading…' : 'No members to show.'}
@@ -238,6 +266,7 @@ export function Dimensions() {
                 </dl>
               )}
             />
+            <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
           </div>
         </section>
       </div>

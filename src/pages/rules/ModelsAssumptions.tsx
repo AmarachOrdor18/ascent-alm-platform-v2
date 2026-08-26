@@ -131,13 +131,14 @@ export function ModelsAssumptions() {
     {
       key: 'status',
       header: 'Status',
+      className: 'whitespace-nowrap',
       render: (r) =>
         r.rules.length === 0 ? (
-          <StatusBadge status="Not configured" tone="warning" />
+          <StatusBadge status="Not configured" tone="warning" className="whitespace-nowrap" />
         ) : r.rules.some((x) => x.affiliateCode !== null) ? (
-          <StatusBadge status="Has affiliate overrides" tone="info" />
+          <StatusBadge status="Has affiliate overrides" tone="info" className="whitespace-nowrap" />
         ) : (
-          <StatusBadge status="Group standard" tone="success" />
+          <StatusBadge status="Group standard" tone="success" className="whitespace-nowrap" />
         ),
     },
     {
@@ -171,14 +172,6 @@ export function ModelsAssumptions() {
           { label: 'Inactive', value: String(inactive.length), tone: inactive.length > 0 ? 'warning' : 'neutral' },
         ]}
       />
-
-      {configured < REGISTRY.length && (
-        <div role="status" className="mb-6 rounded-lg bg-warning-bg px-4 py-3 text-[12px] leading-relaxed text-warning">
-          <span className="font-bold">{REGISTRY.length - configured} rule type(s) not yet configured.</span> A run
-          without a rule of a given type falls back to the engine defaults, and every result says which basis it used —
-          but a configured rule is the auditable one.
-        </div>
-      )}
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Registry</h2>

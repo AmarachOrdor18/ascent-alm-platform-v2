@@ -76,7 +76,7 @@ export function CommandPalette({ groups, collapsed }: { groups: NavGroup[]; coll
         aria-label="Search navigation"
         title={collapsed ? 'Search (⌘K)' : undefined}
         className={cn(
-          'mx-2 mb-2 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 py-2 text-left text-[12px] text-white/50 hover:border-white/20 hover:bg-white/10',
+          'mx-2 mb-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-white/10 bg-white/5 py-2 text-left text-[12px] text-white/50 hover:border-white/20 hover:bg-white/10',
           collapsed ? 'justify-center px-2' : 'px-3',
         )}
       >

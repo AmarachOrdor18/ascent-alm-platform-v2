@@ -89,21 +89,22 @@ export function HolidayCalendar() {
         ]}
       />
 
-      <div className="mb-6 flex flex-wrap gap-2">
-        {calendars.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setActiveId(c.id)}
-            className={
-              activeId === c.id
-                ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white'
-                : 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
-            }
-          >
-            {c.name}
-          </button>
-        ))}
+      <div className="mb-6 flex items-center gap-3">
+        <label htmlFor="calendar-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+          Calendar
+        </label>
+        <select
+          id="calendar-picker"
+          value={activeId ?? ''}
+          onChange={(e) => setActiveId(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+        >
+          {calendars.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
         {isLoading && <span className="text-[12px] text-gray-400">Loading…</span>}
       </div>
 
