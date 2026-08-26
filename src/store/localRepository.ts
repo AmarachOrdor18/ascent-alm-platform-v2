@@ -416,8 +416,12 @@ export class LocalRepository implements Repository {
   }
 
   // ── Users ─────────────────────────────────────────────────────────────
-  listUsers(): Promise<User[]> {
-    return this.database.users.orderBy('name').toArray();
+  // Sorted in memory rather than via orderBy('name') - the users store only
+  // indexes id, email, role and affiliateCode, and Dexie's orderBy requires
+  // the field itself to be indexed, not just present on the record.
+  async listUsers(): Promise<User[]> {
+    const users = await this.database.users.toArray();
+    return users.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
