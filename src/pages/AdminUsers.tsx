@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth, ROLES } from '@/context/AuthContext';
 import { useAffiliates, useUsers, useSaveUser } from '@/lib/hooks';
@@ -51,6 +52,12 @@ export function AdminUsers() {
     for (const u of users) m.set(u.role, (m.get(u.role) ?? 0) + 1);
     return m;
   }, [users]);
+
+  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
+    users,
+    10,
+    ['name', 'email', 'affiliateCode'],
+  );
 
   const columns: ResultColumn<User>[] = [
     {
@@ -126,10 +133,20 @@ export function AdminUsers() {
         }
       />
 
-      <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Users</h2>
+      <section className="mb-6 table-datagrid-container">
+        <div className="border-b border-gray-100 bg-white/50 p-5">
+          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Users</h2>
+          <TableToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            exportData={() => users}
+            exportFilename="users"
+            density={density}
+            onDensityChange={setDensity}
+          />
+        </div>
         <ResultTable
-          rows={users}
+          rows={paged}
           columns={columns}
           rowKey={(u) => u.id}
           emptyMessage={isLoading ? 'Loading…' : 'No users in the register.'}
@@ -173,6 +190,7 @@ export function AdminUsers() {
             );
           }}
         />
+        <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </section>
 
       <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">

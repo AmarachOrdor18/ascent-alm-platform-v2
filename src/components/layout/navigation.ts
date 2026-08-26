@@ -29,30 +29,30 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'OVERVIEW',
     items: [
-      { name: 'Dashboard', path: '/dashboard', permission: 'dashboard.view', phase: 6 },
+      { name: 'Executive Dashboard', path: '/dashboard', permission: 'dashboard.view', phase: 6 },
     ],
   },
   {
     label: 'RISK MANAGEMENT',
     items: [
       { name: 'Liquidity Risk', path: '/liquidity-risk', permission: 'risk.view', phase: 6 },
+      { name: 'Liquidity Risk Map', path: '/risk-map', permission: 'risk.view', phase: 7 },
       { name: 'Maturity & Repricing Gap', path: '/gap-analysis', permission: 'risk.view', phase: 6 },
-      { name: 'Behavioural Analysis', path: '/behavioural-analysis', permission: 'risk.view', phase: 6 },
       { name: 'Concentration & Large Exposures', path: '/concentration', permission: 'risk.view', phase: 6 },
       { name: 'Interest Rate Risk (IRRBB)', path: '/interest-rate-risk', permission: 'risk.view', phase: 6 },
       { name: 'Stress Testing', path: '/stress-testing', permission: 'risk.view', phase: 5 },
+      { name: 'Behavioural Analysis', path: '/behavioural-analysis', permission: 'risk.view', phase: 6 },
+      { name: 'Profitability Ratios', path: '/profitability', permission: 'risk.view', phase: 6 },
       { name: 'Limits & Breaches', path: '/limits', permission: 'risk.view', phase: 7 },
       { name: 'Key Risk Indicators', path: '/kri', permission: 'risk.view', phase: 7 },
-      { name: 'Liquidity Risk Map', path: '/risk-map', permission: 'risk.view', phase: 7 },
     ],
   },
   {
     label: 'TREASURY',
     items: [
       { name: 'Funds Transfer Pricing', path: '/ftp', permission: 'treasury.view', phase: 6 },
-      { name: 'Balance Sheet', path: '/balance-sheet', permission: 'treasury.view', phase: 6 },
+      { name: 'Balance Sheet Analytics', path: '/balance-sheet', permission: 'treasury.view', phase: 6 },
       { name: 'FX Position', path: '/fx-position', permission: 'treasury.view', phase: 6 },
-      { name: 'Profitability Ratios', path: '/profitability', permission: 'risk.view', phase: 6 },
     ],
   },
   {

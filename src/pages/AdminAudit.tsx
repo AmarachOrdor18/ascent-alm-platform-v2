@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuditEvents } from '@/lib/hooks';
 import type { AuditEvent } from '@/engine/types';
 
@@ -24,24 +25,22 @@ export function AdminAudit() {
 
   const [module, setModule] = useState<string>('ALL');
   const [outcome, setOutcome] = useState<string>('ALL');
-  const [query, setQuery] = useState('');
 
   const modules = useMemo(
     () => Array.from(new Set(events.map((e) => e.module))).sort(),
     [events],
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return events.filter((e) => {
-      if (module !== 'ALL' && e.module !== module) return false;
-      if (outcome !== 'ALL' && e.outcome !== outcome) return false;
-      if (q === '') return true;
-      return [e.userName, e.entity, e.entityId, e.detail, e.action]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
-    });
-  }, [events, module, outcome, query]);
+  const preFiltered = useMemo(
+    () => events.filter((e) => (module === 'ALL' || e.module === module) && (outcome === 'ALL' || e.outcome === outcome)),
+    [events, module, outcome],
+  );
+
+  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
+    preFiltered,
+    10,
+    ['userName', 'entity', 'entityId', 'detail', 'action'],
+  );
 
   const failures = events.filter((e) => e.outcome === 'Failure');
   const actors = new Set(events.map((e) => e.userId)).size;
@@ -91,7 +90,7 @@ export function AdminAudit() {
         asOfDate={null}
         metrics={[
           { label: 'Events recorded', value: String(events.length) },
-          { label: 'Showing', value: String(filtered.length) },
+          { label: 'Showing', value: String(totalItems) },
           { label: 'Distinct actors', value: String(actors) },
           {
             label: 'Failures',
@@ -101,57 +100,48 @@ export function AdminAudit() {
         ]}
       />
 
-      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-end gap-3">
-          <div>
-            <label htmlFor="af-module" className="mb-1 block text-[11px] font-medium text-gray-600">
-              Module
-            </label>
+      <section className="table-datagrid-container">
+        <div className="border-b border-gray-100 bg-white/50 p-5">
+          <TableToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            exportData={() => preFiltered}
+            exportFilename="audit-trail"
+            density={density}
+            onDensityChange={setDensity}
+          >
             <select
-              id="af-module"
               value={module}
-              onChange={(e) => setModule(e.target.value)}
-              className="rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+              onChange={(e) => {
+                setModule(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Filter by module"
+              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
             >
               <option value="ALL">All modules</option>
               {modules.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label htmlFor="af-outcome" className="mb-1 block text-[11px] font-medium text-gray-600">
-              Outcome
-            </label>
             <select
-              id="af-outcome"
               value={outcome}
-              onChange={(e) => setOutcome(e.target.value)}
-              className="rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+              onChange={(e) => {
+                setOutcome(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Filter by outcome"
+              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
             >
-              <option value="ALL">All</option>
+              <option value="ALL">All outcomes</option>
               <option value="Success">Success</option>
               <option value="Failure">Failure</option>
             </select>
-          </div>
-
-          <div className="flex-1 min-w-[200px]">
-            <label htmlFor="af-q" className="mb-1 block text-[11px] font-medium text-gray-600">
-              Search
-            </label>
-            <input
-              id="af-q"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="User, entity, detail…"
-              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
-            />
-          </div>
+          </TableToolbar>
         </div>
 
         <ResultTable
-          rows={filtered}
+          rows={paged}
           columns={columns}
           rowKey={(e) => e.id}
           emptyMessage={
@@ -174,13 +164,13 @@ export function AdminAudit() {
             </dl>
           )}
         />
-
-        <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-          Events are append-only and are written by the action itself, not by the screen — a run that fails records a
-          failure with its reason. The trail is capped at the most recent 500 here for rendering; the store keeps all
-          of them.
-        </p>
+        <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </section>
+
+      <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
+        Events are append-only and are written by the action itself, not by the screen. The trail is capped at the
+        most recent 500 here for rendering; the store keeps all of them.
+      </p>
     </>
   );
 }

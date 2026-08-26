@@ -12,17 +12,19 @@
 
 import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { useRules } from '@/lib/ruleHooks';
 import { ACTIVITY_CORE_UPLIFT } from '@/engine/behavioural';
-import { formatPct } from '@/lib/format';
+import { formatAmount, formatPct } from '@/lib/format';
 import type { DepositRunoffResult, RunoffLine } from '@/engine/behavioural';
 import type { BehaviourPatternRule } from '@/engine/ruleTypes';
 
@@ -152,6 +154,33 @@ export function BehaviouralAnalysis() {
                 and re-run.
               </p>
             )}
+
+            <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Balance vs. volatile, by {groupBy === 'tag' ? 'behavioural tag' : groupBy}
+              </h2>
+              <p className="mb-4 text-[11px] font-medium text-gray-400">
+                Volatile is the share the pattern models as likely to leave, not a fixed 12-month projection
+              </p>
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer>
+                  <BarChart data={grouped} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="group" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v: number) => formatAmount(v, currency)}
+                    />
+                    <Tooltip formatter={(value: number, name: string) => [formatAmount(value, currency), name]} contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Legend wrapperStyle={CHART_LEGEND_STYLE} />
+                    <Bar dataKey="balance" name="Balance" fill={CHART_COLORS.neutral} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="volatile" name="Volatile" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
