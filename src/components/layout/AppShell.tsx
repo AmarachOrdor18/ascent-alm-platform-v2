@@ -58,10 +58,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <nav
         aria-label="Main navigation"
-        className={cn('flex flex-col bg-navy-900 transition-all duration-200', collapsed ? 'w-16' : 'w-72')}
+        className={cn('flex h-full shrink-0 flex-col bg-navy-900 transition-all duration-200', collapsed ? 'w-16' : 'w-72')}
       >
         <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
           {/* White plate behind the mark: the Ecobank logo is dark teal and
@@ -180,8 +180,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </nav>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-6">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
           <div className="flex items-center gap-2">
             <div className="h-8 w-1 bg-gold-500 rounded-full"/>
             <div>

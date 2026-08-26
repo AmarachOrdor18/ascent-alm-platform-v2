@@ -1,151 +1,212 @@
 /**
- * Liquidity Risk Map — screen 49 (Phase 7).
+ * Liquidity Risk Map — screen 49.
  *
- * Colour-coded concentration risk per affiliate, visualizing liquidity risk exposure across the Group.
+ * Colour-coded risk positioning per affiliate. This used to plot a fixed
+ * five-affiliate array with invented LCR/NSFR/concentration figures baked
+ * into the component. It now reads each Live affiliate's latest completed
+ * run for the same three metrics the Liquidity Risk and Concentration
+ * screens already show, and classifies risk from those real figures
+ * against the thresholds stated in the legend below, rather than a number
+ * typed in alongside the mock array.
  */
 
+import { useQueries } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { useAffiliates } from '@/lib/hooks';
+import { useRuns, runKeys } from '@/lib/runHooks';
+import { repository } from '@/store/localRepository';
+import { metricValue } from '@/lib/metrics';
+import type { RunResult } from '@/engine/types';
+
+type RiskLevel = 'High' | 'Medium' | 'Low' | 'No run';
+
+const RISK_DOT: Record<RiskLevel, string> = {
+  High: 'bg-danger',
+  Medium: 'bg-warning',
+  Low: 'bg-success',
+  'No run': 'bg-gray-300',
+};
+
+const RISK_TEXT: Record<RiskLevel, string> = {
+  High: 'text-danger',
+  Medium: 'text-warning',
+  Low: 'text-success',
+  'No run': 'text-gray-400',
+};
+
+function classify(lcr: number | null, concentration: number | null): RiskLevel {
+  if (lcr === null || concentration === null) return 'No run';
+  if (lcr < 100 || concentration > 35) return 'High';
+  if (lcr <= 110 || concentration >= 25) return 'Medium';
+  return 'Low';
+}
+
+interface AffiliatePoint {
+  code: string;
+  name: string;
+  lcr: number | null;
+  nsfr: number | null;
+  concentration: number | null;
+  risk: RiskLevel;
+}
 
 export function RiskMap() {
+  const { data: affiliates = [] } = useAffiliates();
+  const { data: runs = [] } = useRuns();
 
-  // Mock risk map data - in real implementation this would come from the risk engine
-  const mockRiskData = [
-    { affiliateCode: 'NG', affiliateName: 'Ecobank Nigeria', lcr: 88.4, nsfr: 103.6, concentration: 32.1, overallRisk: 'High' },
-    { affiliateCode: 'GH', affiliateName: 'Ecobank Ghana', lcr: 145.2, nsfr: 118.3, concentration: 28.7, overallRisk: 'Low' },
-    { affiliateCode: 'CI', affiliateName: 'Ecobank Côte d\'Ivoire', lcr: 92.1, nsfr: 108.9, concentration: 35.4, overallRisk: 'Medium' },
-    { affiliateCode: 'SN', affiliateName: 'Ecobank Senegal', lcr: 156.8, nsfr: 125.4, concentration: 22.3, overallRisk: 'Low' },
-    { affiliateCode: 'TZ', affiliateName: 'Ecobank Tanzania', lcr: 78.9, nsfr: 95.2, concentration: 41.2, overallRisk: 'High' },
-  ];
+  const liveAffiliates = affiliates.filter((a) => a.code !== 'GROUP' && a.status === 'Live');
 
-  const riskColor = {
-    High: 'bg-danger',
-    Medium: 'bg-warning',
-    Low: 'bg-success',
-  } as const;
+  const latestRunByAffiliate = new Map<string, (typeof runs)[number]>();
+  for (const run of runs) {
+    if (run.status !== 'Completed') continue;
+    const held = latestRunByAffiliate.get(run.affiliateCode);
+    if (!held || run.createdAt > held.createdAt) latestRunByAffiliate.set(run.affiliateCode, run);
+  }
 
-  const riskTextColor = {
-    High: 'text-danger',
-    Medium: 'text-warning',
-    Low: 'text-success',
-  } as const;
+  const resultQueries = useQueries({
+    queries: liveAffiliates.map((a) => {
+      const runId = latestRunByAffiliate.get(a.code)?.id ?? null;
+      return {
+        queryKey: runKeys.results(runId ?? 'none'),
+        queryFn: (): Promise<RunResult[]> => (runId ? repository.listRunResults(runId) : Promise.resolve([])),
+        enabled: runId !== null,
+      };
+    }),
+  });
 
-  const highRiskCount = mockRiskData.filter((a) => a.overallRisk === 'High').length;
-  const mediumRiskCount = mockRiskData.filter((a) => a.overallRisk === 'Medium').length;
-  const lowRiskCount = mockRiskData.filter((a) => a.overallRisk === 'Low').length;
+  const points: AffiliatePoint[] = liveAffiliates.map((a, i) => {
+    const results = resultQueries[i]?.data ?? [];
+    const lcr = metricValue(results, 'lcrPercent');
+    const nsfr = metricValue(results, 'nsfrPercent');
+    const concentration = metricValue(results, 'largestDepositorSharePercent');
+    return { code: a.code, name: a.name, lcr, nsfr, concentration, risk: classify(lcr, concentration) };
+  });
+
+  const highCount = points.filter((p) => p.risk === 'High').length;
+  const mediumCount = points.filter((p) => p.risk === 'Medium').length;
+  const lowCount = points.filter((p) => p.risk === 'Low').length;
+  const noRunCount = points.filter((p) => p.risk === 'No run').length;
 
   return (
     <>
       <ModuleHeader
         title="Liquidity Risk Map"
-        description="Colour-coded concentration risk per affiliate, visualizing liquidity risk exposure across the Group"
+        description="Every Live affiliate's latest completed run, plotted by LCR against depositor concentration."
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'High Risk', value: String(highRiskCount), tone: 'danger' },
-          { label: 'Medium Risk', value: String(mediumRiskCount), tone: 'warning' },
-          { label: 'Low Risk', value: String(lowRiskCount), tone: 'success' },
-          { label: 'Total Affiliates', value: String(mockRiskData.length) },
+          { label: 'High risk', value: String(highCount), tone: highCount > 0 ? 'danger' : 'neutral' },
+          { label: 'Medium risk', value: String(mediumCount), tone: mediumCount > 0 ? 'warning' : 'neutral' },
+          { label: 'Low risk', value: String(lowCount), tone: 'success' },
+          { label: 'Live affiliates', value: String(liveAffiliates.length) },
         ]}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Risk Map Grid */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Affiliate Risk Matrix</h3>
-            <p className="text-[11px] text-gray-400 font-medium mt-1">LCR vs Concentration risk positioning</p>
-          </div>
-          <div className="relative h-80 bg-gray-50 rounded-lg p-4">
-            {/* Risk quadrant visualization */}
-            <div className="absolute inset-4 border-2 border-dashed border-gray-300 rounded-lg">
-              <div className="absolute top-2 left-2 text-[10px] text-gray-400 font-bold">High Concentration</div>
-              <div className="absolute top-2 right-2 text-[10px] text-gray-400 font-bold">Low Concentration</div>
-              <div className="absolute bottom-2 left-2 text-[10px] text-gray-400 font-bold">Low LCR</div>
-              <div className="absolute bottom-2 right-2 text-[10px] text-gray-400 font-bold">High LCR</div>
-              
-              {/* Plot affiliate positions */}
-              {mockRiskData.map((affiliate) => {
-                    const x = 20 + (100 - affiliate.concentration) * 0.6; // Invert concentration for x-axis
-                    const y = 80 - (affiliate.lcr - 70) * 0.5; // Scale LCR for y-axis
-                    return (
-                      <div
-                        key={affiliate.affiliateCode}
-                        className="absolute w-4 h-4 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-125 transition-transform"
-                        style={{
-                          left: `${x}%`,
-                          top: `${y}%`,
-                          backgroundColor: riskColor[affiliate.overallRisk as keyof typeof riskColor],
-                        }}
-                        title={`${affiliate.affiliateName}: LCR ${affiliate.lcr}%, Concentration ${affiliate.concentration}%`}
-                      />
-                    );
-                  })}
+      {liveAffiliates.length === 0 && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-sm text-gray-400 shadow-sm">
+          No affiliates are Live yet. This map plots the Group's Live affiliates once at least one is promoted.
+        </div>
+      )}
+
+      {liveAffiliates.length > 0 && (
+        <>
+          {noRunCount > 0 && (
+            <p className="mb-4 rounded-lg bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+              {noRunCount} of {liveAffiliates.length} Live affiliate(s) have no completed run yet and plot as gray, not a fabricated risk level.
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliate risk matrix</h3>
+                <p className="mt-1 text-[11px] font-medium text-gray-400">LCR against depositor concentration</p>
+              </div>
+              <div className="relative h-80 rounded-lg bg-gray-50 p-4">
+                <div className="absolute inset-4 rounded-lg border-2 border-dashed border-gray-300">
+                  <div className="absolute left-2 top-2 text-[10px] font-bold text-gray-400">High concentration</div>
+                  <div className="absolute right-2 top-2 text-[10px] font-bold text-gray-400">Low concentration</div>
+                  <div className="absolute bottom-2 left-2 text-[10px] font-bold text-gray-400">Low LCR</div>
+                  <div className="absolute bottom-2 right-2 text-[10px] font-bold text-gray-400">High LCR</div>
+
+                  {points
+                    .filter((p) => p.lcr !== null && p.concentration !== null)
+                    .map((p) => {
+                      const x = 20 + (100 - p.concentration!) * 0.6;
+                      const y = 80 - (p.lcr! - 70) * 0.5;
+                      return (
+                        <div
+                          key={p.code}
+                          className={`absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 transform rounded-full transition-transform hover:scale-125 ${RISK_DOT[p.risk]}`}
+                          style={{ left: `${Math.min(96, Math.max(4, x))}%`, top: `${Math.min(96, Math.max(4, y))}%` }}
+                          title={`${p.name}: LCR ${p.lcr!.toFixed(1)}%, concentration ${p.concentration!.toFixed(1)}%`}
+                        />
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk summary by affiliate</h3>
+                <p className="mt-1 text-[11px] font-medium text-gray-400">From each affiliate's latest completed run</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table-datagrid">
+                  <thead>
+                    <tr>
+                      <th>Affiliate</th>
+                      <th>LCR</th>
+                      <th>NSFR</th>
+                      <th>Concentration</th>
+                      <th>Overall risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {points.map((p) => (
+                      <tr key={p.code}>
+                        <td className="font-bold text-navy-900">{p.name}</td>
+                        <td className="font-mono">{p.lcr !== null ? `${p.lcr.toFixed(1)}%` : 'No run'}</td>
+                        <td className="font-mono">{p.nsfr !== null ? `${p.nsfr.toFixed(1)}%` : 'No run'}</td>
+                        <td className="font-mono">{p.concentration !== null ? `${p.concentration.toFixed(1)}%` : 'No run'}</td>
+                        <td>
+                          <span className={`rounded px-2 py-0.5 text-xs font-bold ${RISK_TEXT[p.risk]}`}>{p.risk}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
+        </>
+      )}
 
-        {/* Risk Summary Table */}
-        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Risk Summary by Affiliate</h3>
-            <p className="text-[11px] text-gray-400 font-medium mt-1">Detailed risk metrics and overall risk assessment</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="table-datagrid">
-              <thead>
-                <tr>
-                  <th>Affiliate</th>
-                  <th>LCR</th>
-                  <th>NSFR</th>
-                  <th>Concentration</th>
-                  <th>Overall Risk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockRiskData.map((affiliate) => (
-                  <tr key={affiliate.affiliateCode}>
-                    <td className="font-bold text-navy-900">{affiliate.affiliateName}</td>
-                    <td className="font-mono">{affiliate.lcr.toFixed(1)}%</td>
-                    <td className="font-mono">{affiliate.nsfr.toFixed(1)}%</td>
-                    <td className="font-mono">{affiliate.concentration.toFixed(1)}%</td>
-                    <td>
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${riskTextColor[affiliate.overallRisk as keyof typeof riskTextColor]}`}>
-                        {affiliate.overallRisk}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Risk Legend */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm mt-6">
+      <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <div className="mb-4">
-          <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Risk Assessment Criteria</h3>
+          <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk assessment criteria</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded bg-danger mt-0.5 shrink-0" />
+            <div className="mt-0.5 h-4 w-4 shrink-0 rounded bg-danger" />
             <div>
-              <p className="text-[12px] font-bold text-navy-900">High Risk</p>
-              <p className="text-[11px] text-gray-500">LCR &lt; 100% OR Concentration &gt; 35%</p>
+              <p className="text-[12px] font-bold text-navy-900">High risk</p>
+              <p className="text-[11px] text-gray-500">LCR below 100% or concentration above 35%</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded bg-warning mt-0.5 shrink-0" />
+            <div className="mt-0.5 h-4 w-4 shrink-0 rounded bg-warning" />
             <div>
-              <p className="text-[12px] font-bold text-navy-900">Medium Risk</p>
-              <p className="text-[11px] text-gray-500">LCR 100-110% OR Concentration 25-35%</p>
+              <p className="text-[12px] font-bold text-navy-900">Medium risk</p>
+              <p className="text-[11px] text-gray-500">LCR 100 to 110% or concentration 25 to 35%</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded bg-success mt-0.5 shrink-0" />
+            <div className="mt-0.5 h-4 w-4 shrink-0 rounded bg-success" />
             <div>
-              <p className="text-[12px] font-bold text-navy-900">Low Risk</p>
-              <p className="text-[11px] text-gray-500">LCR &gt; 110% AND Concentration &lt; 25%</p>
+              <p className="text-[12px] font-bold text-navy-900">Low risk</p>
+              <p className="text-[11px] text-gray-500">LCR above 110% and concentration below 25%</p>
             </div>
           </div>
         </div>

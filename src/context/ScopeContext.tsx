@@ -66,7 +66,13 @@ export function ScopeProvider({ children }: { children: React.ReactNode }) {
       },
       run,
       setRun,
-      currency: affiliate?.reportingCurrency ?? 'USD',
+      // The affiliate's own functional currency, not its reporting currency
+      // (which every affiliate here reports up to Group as, USD) — every
+      // results screen computes and displays in functional currency at
+      // affiliate scope, so the shell's badge showing reporting currency
+      // instead just looked wrong next to the actual figures underneath.
+      // Only Group scope, which genuinely consolidates through USD, shows USD.
+      currency: affiliateCode === GROUP_CODE ? 'USD' : (affiliate?.functionalCurrency ?? 'USD'),
       affiliates,
       setAffiliates,
     }),

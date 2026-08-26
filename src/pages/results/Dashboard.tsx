@@ -6,12 +6,14 @@
  * disagree — which they could in v1, where each screen recomputed from a
  * different unscoped query.
  *
- * Metrics can be pinned; the pinned set is a per-viewer convenience and is
- * kept in local storage rather than the database, because it says nothing
- * about the bank.
+ * Redesigned for density over explanation: a nine-tile grid of equally
+ * weighted cards, each carrying its own descriptive sentence, read as a
+ * wall of text rather than a dashboard. Four headline numbers now carry
+ * the eye first; the rest sit in a lighter label-and-value grid a step
+ * down, the same weighting a trading-floor dashboard uses.
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
@@ -24,47 +26,27 @@ import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } 
 import type { EveResult, NiiResult } from '@/engine/irrbb';
 import type { ProfitabilityResult } from '@/engine/profitability';
 
-const PIN_KEY = 'ascent.dashboard.pinned';
+type Tone = 'success' | 'warning' | 'danger' | 'neutral';
 
-interface Tile {
+interface Metric {
   id: string;
   label: string;
   value: string;
-  detail: string;
-  tone: 'success' | 'warning' | 'danger' | 'neutral';
+  tone: Tone;
   href: string;
 }
+
+const TONE_TEXT: Record<Tone, string> = {
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+  neutral: 'text-navy-900',
+};
 
 export function Dashboard() {
   const { affiliate, affiliateCode } = useScope();
   const selected = useSelectedRun();
   const { run, results } = selected;
-
-  const [pinned, setPinned] = useState<string[]>([]);
-
-  // Local storage can throw outright in a private window or with site data
-  // blocked, so both directions are guarded and the screen renders fine
-  // with nothing stored.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(PIN_KEY);
-      if (raw) setPinned(JSON.parse(raw) as string[]);
-    } catch {
-      /* no pinned set — not worth surfacing */
-    }
-  }, []);
-
-  const togglePin = (id: string) => {
-    setPinned((prev) => {
-      const next = prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id];
-      try {
-        localStorage.setItem(PIN_KEY, JSON.stringify(next));
-      } catch {
-        /* pinning is a convenience; failing to persist is not an error */
-      }
-      return next;
-    });
-  };
 
   const currency = run?.reportingCurrency ?? 'USD';
 
@@ -80,180 +62,92 @@ export function Dashboard() {
     'SurvivalHorizon',
   );
 
-  const band = (value: number | null, regulatory: number, internal: number): Tile['tone'] =>
+  const band = (value: number | null, regulatory: number, internal: number): Tone =>
     value === null ? 'neutral' : value < regulatory ? 'danger' : value < internal ? 'warning' : 'success';
 
-  const tiles: Tile[] = [
-    {
-      id: 'lcr',
-      label: 'Liquidity Coverage Ratio',
-      value: formatPct(lcr?.lcrPercent ?? null),
-      detail: lcr ? `HQLA over net 30-day outflows` : 'Not computed by this run',
-      tone: band(lcr?.lcrPercent ?? null, 100, 130),
-      href: '/liquidity-risk',
-    },
-    {
-      id: 'nsfr',
-      label: 'Net Stable Funding Ratio',
-      value: formatPct(nsfr?.nsfrPercent ?? null),
-      detail: 'Available over required stable funding',
-      tone: band(nsfr?.nsfrPercent ?? null, 100, 110),
-      href: '/liquidity-risk',
-    },
-    {
-      id: 'ldr',
-      label: 'Loan-to-Deposit',
-      value: formatPct(ldr?.ratioPercent ?? null),
-      // Lower is safer here, so the banding runs the other way.
-      detail: 'Lower is more liquid',
-      tone:
-        ldr?.ratioPercent == null ? 'neutral' : ldr.ratioPercent > 90 ? 'danger' : ldr.ratioPercent > 80 ? 'warning' : 'success',
-      href: '/liquidity-risk',
-    },
+  // The four numbers a treasury desk checks first.
+  const headline: Metric[] = [
+    { id: 'lcr', label: 'LCR', value: formatPct(lcr?.lcrPercent ?? null), tone: band(lcr?.lcrPercent ?? null, 100, 130), href: '/liquidity-risk' },
+    { id: 'nsfr', label: 'NSFR', value: formatPct(nsfr?.nsfrPercent ?? null), tone: band(nsfr?.nsfrPercent ?? null, 100, 110), href: '/liquidity-risk' },
     {
       id: 'survival',
       label: 'Survival horizon',
-      value: survival ? `${survival.survivalHorizonDays} days` : '—',
-      detail: survival?.survivesFullHorizon ? 'Survives the full 30-day scenario' : 'Buffer depletes inside 30 days',
+      value: survival ? `${survival.survivalHorizonDays}d` : 'No run',
       tone: survival == null ? 'neutral' : survival.survivalHorizonDays < 20 ? 'danger' : 'success',
       href: '/stress-testing',
     },
-    {
-      id: 'nii',
-      label: 'NII sensitivity',
-      value: formatPct(nii?.niiSensitivityPercent ?? null, 2),
-      detail: nii ? `At ${nii.shockBps > 0 ? '+' : ''}${nii.shockBps}bp over ${nii.horizonDays} days` : 'Not computed',
-      tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success',
-      href: '/interest-rate-risk',
-    },
-    {
-      id: 'eve',
-      label: 'EVE sensitivity',
-      value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2),
-      detail: eve ? `Against ${eve.capitalBasis.toLowerCase()}` : 'Not computed',
-      tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success',
-      href: '/interest-rate-risk',
-    },
-    {
-      id: 'concentration',
-      label: 'Largest depositor',
-      value: formatPct(conc?.largestSharePercent ?? null),
-      detail: conc ? `Top five hold ${formatPct(conc.topFiveSharePercent)}` : 'Not computed',
-      tone:
-        conc?.largestSharePercent == null
-          ? 'neutral'
-          : conc.largestSharePercent > 10
-            ? 'danger'
-            : conc.largestSharePercent > 5
-              ? 'warning'
-              : 'success',
-      href: '/concentration',
-    },
-    {
-      id: 'npl',
-      label: 'NPL ratio',
-      value: formatPct(prof?.nplRatioPercent ?? null, 2),
-      detail: prof ? `Coverage ${formatPct(prof.nplCoverageRatioPercent)}` : 'Not computed',
-      tone:
-        prof?.nplRatioPercent == null ? 'neutral' : prof.nplRatioPercent > 5 ? 'danger' : prof.nplRatioPercent > 3 ? 'warning' : 'success',
-      href: '/profitability',
-    },
-    {
-      id: 'nim',
-      label: 'Net interest margin',
-      value: formatPct(prof?.netInterestMarginPercent ?? null, 2),
-      detail: 'Net interest income over total assets',
-      tone: 'neutral',
-      href: '/profitability',
-    },
+    { id: 'ldr', label: 'Loan-to-Deposit', value: formatPct(ldr?.ratioPercent ?? null), tone: ldr?.ratioPercent == null ? 'neutral' : ldr.ratioPercent > 90 ? 'danger' : ldr.ratioPercent > 80 ? 'warning' : 'success', href: '/liquidity-risk' },
   ];
 
-  const breaches = tiles.filter((t) => t.tone === 'danger');
-  const ordered = [...tiles].sort((a, b) => Number(pinned.includes(b.id)) - Number(pinned.includes(a.id)));
+  // Everything else, read as a label next to a number, not a card.
+  const snapshot: Metric[] = [
+    { id: 'nii', label: 'NII sensitivity', value: formatPct(nii?.niiSensitivityPercent ?? null, 2), tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success', href: '/interest-rate-risk' },
+    { id: 'eve', label: 'EVE sensitivity', value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2), tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success', href: '/interest-rate-risk' },
+    { id: 'concentration', label: 'Largest depositor', value: formatPct(conc?.largestSharePercent ?? null), tone: conc?.largestSharePercent == null ? 'neutral' : conc.largestSharePercent > 10 ? 'danger' : conc.largestSharePercent > 5 ? 'warning' : 'success', href: '/concentration' },
+    { id: 'npl', label: 'NPL ratio', value: formatPct(prof?.nplRatioPercent ?? null, 2), tone: prof?.nplRatioPercent == null ? 'neutral' : prof.nplRatioPercent > 5 ? 'danger' : prof.nplRatioPercent > 3 ? 'warning' : 'success', href: '/profitability' },
+    { id: 'nim', label: 'Net interest margin', value: formatPct(prof?.netInterestMarginPercent ?? null, 2), tone: 'neutral', href: '/profitability' },
+  ];
+
+  const breaches = [...headline, ...snapshot].filter((m) => m.tone === 'danger');
 
   return (
     <>
       <ModuleHeader
         title="Dashboard"
-        description="Every figure below comes from one run, so the headline and the detail screens cannot disagree."
+        description="One run. Every number below reads off it."
         asOfDate={run?.asOfDate ?? null}
         scope={affiliate?.name ?? affiliateCode}
         currency={run?.reportingCurrency}
         metrics={[
-          { label: 'Elements computed', value: run ? String(results.length) : '—' },
-          {
-            label: 'Metrics in breach',
-            value: String(breaches.length),
-            tone: breaches.length > 0 ? 'danger' : 'success',
-          },
-          { label: 'Pinned', value: String(pinned.length) },
+          { label: 'Elements computed', value: run ? String(results.length) : '0' },
+          { label: 'In breach', value: String(breaches.length), tone: breaches.length > 0 ? 'danger' : 'success' },
         ]}
       />
 
       <ResultsFrame {...frameProps(selected)} requires={[]}>
-        {breaches.length > 0 && (
-          <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <StatusBadge status={`${breaches.length} in breach`} tone="danger" />
-              <span className="text-[12px] font-bold text-navy-900">Attention</span>
-            </div>
-            <ul className="space-y-1 text-[11px] text-gray-700">
-              {breaches.map((b) => (
-                <li key={b.id}>
-                  <Link href={b.href} className="font-bold text-navy-900 underline-offset-2 hover:underline">
-                    {b.label}
-                  </Link>{' '}
-                  at <span className="font-mono">{b.value}</span> — {b.detail}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {ordered.map((tile) => (
-            <article
-              key={tile.id}
-              className={`rounded-2xl border bg-white p-5 shadow-sm ${
-                tile.tone === 'danger'
-                  ? 'border-danger/30'
-                  : tile.tone === 'warning'
-                    ? 'border-warning/30'
-                    : 'border-gray-100'
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {headline.map((m) => (
+            <Link
+              key={m.id}
+              href={m.href}
+              className={`block rounded-xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${
+                m.tone === 'danger' ? 'border-danger/30' : m.tone === 'warning' ? 'border-warning/30' : 'border-gray-200'
               }`}
             >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{tile.label}</span>
-                <button
-                  type="button"
-                  onClick={() => togglePin(tile.id)}
-                  aria-pressed={pinned.includes(tile.id)}
-                  aria-label={pinned.includes(tile.id) ? `Unpin ${tile.label}` : `Pin ${tile.label}`}
-                  className={`text-[13px] leading-none ${pinned.includes(tile.id) ? 'text-gold-500' : 'text-gray-300 hover:text-gray-500'}`}
-                >
-                  ★
-                </button>
-              </div>
-              <p
-                className={`font-mono text-[26px] font-bold ${
-                  tile.tone === 'danger' ? 'text-danger' : tile.tone === 'warning' ? 'text-warning' : 'text-navy-900'
-                }`}
-              >
-                {tile.value}
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{tile.detail}</p>
-              <Link
-                href={tile.href}
-                className="mt-3 inline-block text-[11px] font-bold text-navy-700 underline-offset-2 hover:underline"
-              >
-                Open detail →
-              </Link>
-            </article>
+              <p className="text-[13px] font-medium text-gray-500">{m.label}</p>
+              <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+            </Link>
           ))}
         </div>
 
+        {breaches.length > 0 && (
+          <div className="mt-6 rounded-xl border border-danger/30 bg-danger/5 p-5">
+            <p className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">In breach</p>
+            <div className="space-y-2">
+              {breaches.map((b) => (
+                <Link key={b.id} href={b.href} className="flex items-center justify-between text-[13px]">
+                  <span className="font-medium text-navy-900 hover:underline">{b.label}</span>
+                  <StatusBadge status={b.value} tone="danger" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <section className="mt-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {snapshot.map((m) => (
+              <Link key={m.id} href={m.href} className="block rounded-lg bg-gray-50 p-3 hover:bg-gray-100">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
+                <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         {prof && (
-          <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <section className="mt-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Balance sheet shape</h2>
             <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
               <Stat label="Total assets" value={<Amount value={prof.totalAssets} currency={currency} />} />

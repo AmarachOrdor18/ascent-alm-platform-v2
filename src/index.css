@@ -338,6 +338,18 @@
   .font-mono {
     font-family: var(--font-mono);
   }
+
+  /* Every <select> across the app was padded ad hoc per screen (some as
+     tight as px-1 py-1), so the fix is one rule here rather than a sweep
+     through 30-odd files. !important is deliberate: a type selector is
+     the lowest-specificity rule there is, so it is the only way to beat
+     whatever utility classes already sit on each instance. */
+  select {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 1.75rem !important;
+  }
 }
 
 @layer utilities {
