@@ -343,12 +343,25 @@
      tight as px-1 py-1), so the fix is one rule here rather than a sweep
      through 30-odd files. !important is deliberate: a type selector is
      the lowest-specificity rule there is, so it is the only way to beat
-     whatever utility classes already sit on each instance. */
+     whatever utility classes already sit on each instance.
+
+     padding-right alone doesn't reliably create a gap before the arrow:
+     the browser's native arrow glyph sits in its own reserved zone at the
+     far edge regardless of padding in Chrome/Edge, so text can end up
+     nearly touching it. Turning the native appearance off and drawing the
+     arrow ourselves is what actually guarantees the gap. */
   select {
     padding-top: 0.5rem !important;
     padding-bottom: 0.5rem !important;
     padding-left: 0.75rem !important;
-    padding-right: 1.75rem !important;
+    padding-right: 2.25rem !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.6rem center !important;
+    background-size: 1rem !important;
   }
 }
 

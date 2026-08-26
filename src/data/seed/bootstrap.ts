@@ -235,6 +235,16 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
   for (const connector of SEED_CONNECTORS) {
     if (!existingConnectorIds.has(connector.id)) await repo.upsertConnector(connector);
   }
+
+  // Added after Login started reading the real user register instead of its
+  // own hardcoded list — a browser seeded before that change has an empty
+  // Users table, so sign-in fails with "no active user" even though the
+  // rest of the database is fine. Same add-only rule: a user already
+  // created or edited here is left untouched.
+  const existingUserIds = new Set((await repo.listUsers()).map((u) => u.id));
+  for (const seedUser of SEED_USERS) {
+    if (!existingUserIds.has(seedUser.id)) await repo.upsertUser(seedUser);
+  }
 }
 
 /**
