@@ -287,10 +287,10 @@ export function Dashboard() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
+          <section className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Key metrics this run</h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">LCR, NSFR, NIM and NPL for the run selected above</p>
-            <div style={{ width: '100%', height: 260 }}>
+            <div className="min-h-[260px] flex-1">
               {snapshotBars.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
                   No run selected yet.
