@@ -126,6 +126,34 @@ export interface RouteEntry {
 }
 
 /**
+ * Screens built but not in the sidebar nav — reached only via a link from
+ * another screen (a Dashboard tile, a rule-editor row) or a typed URL.
+ * `buildRouteOrder` used to source routes from `ALL_NAV_ITEMS` alone, so
+ * every one of these rendered "Screen not found" no matter how it was
+ * reached: the component existed in `BUILT` but the router never declared
+ * a `<Route>` for its path at all.
+ */
+const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
+  { path: '/rules/time-buckets', screenName: 'Time Buckets' },
+  { path: '/rules/product-characteristics', screenName: 'Product Characteristics' },
+  { path: '/rules/behaviour-patterns', screenName: 'Behaviour Patterns' },
+  { path: '/rules/patterns', screenName: 'Payment & Repricing Patterns' },
+  { path: '/rules/prepayment', screenName: 'Prepayment' },
+  { path: '/rules/discount-methods', screenName: 'Discount Methods' },
+  { path: '/rules/scenarios', screenName: 'Forecast Scenarios' },
+  { path: '/rules/new-business', screenName: 'New Business' },
+  { path: '/rules/transaction-strategies', screenName: 'Transaction Strategies' },
+  { path: '/rules/ftp', screenName: 'FTP Rules' },
+  { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
+  { path: '/rules/filters', screenName: 'Filters' },
+  { path: '/rules/custom-metrics', screenName: 'Custom Metrics' },
+  { path: '/gap-analysis', screenName: 'Maturity & Repricing Gap' },
+  { path: '/behavioural-analysis', screenName: 'Behavioural Analysis' },
+  { path: '/concentration', screenName: 'Concentration & Large Exposures' },
+  { path: '/profitability', screenName: 'Profitability Ratios' },
+];
+
+/**
  * Every route, in the order `Switch` evaluates them — first match wins.
  *
  * This is an ordered array rather than inline JSX because the order carries a
@@ -141,7 +169,7 @@ export interface RouteEntry {
  */
 /* eslint-disable react-refresh/only-export-components */
 export const buildRouteOrder = (): RouteEntry[] => {
-  const literal: RouteEntry[] = ALL_NAV_ITEMS.map((item) => {
+  const navLiteral: RouteEntry[] = ALL_NAV_ITEMS.map((item) => {
     const Built = BUILT[item.path];
     return {
       path: item.path,
@@ -150,11 +178,26 @@ export const buildRouteOrder = (): RouteEntry[] => {
     };
   });
 
+  const navPaths = new Set(navLiteral.map((r) => r.path));
+
+  // Every BUILT screen gets a route even when nothing in the sidebar points
+  // at it. UNLISTED_SCREENS supplies a readable name for the ones known
+  // ahead of time; anything left over (a future screen added to BUILT
+  // without updating this list) still gets a route, just with its path as
+  // the fallback name, so a broken link can never silently 404 again.
+  const unlisted: RouteEntry[] = Object.keys(BUILT)
+    .filter((path) => !navPaths.has(path))
+    .map((path) => ({
+      path,
+      screenName: UNLISTED_SCREENS.find((s) => s.path === path)?.screenName ?? path,
+      Component: BUILT[path]!,
+    }));
+
   const parameterised: RouteEntry[] = [
     { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail },
   ];
 
-  return [...literal, ...parameterised];
+  return [...navLiteral, ...unlisted, ...parameterised];
 }
 /* eslint-enable react-refresh/only-export-components */
 
