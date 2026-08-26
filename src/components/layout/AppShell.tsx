@@ -14,13 +14,14 @@ import { useAuth } from '@/context/AuthContext';
 import { GROUP_CODE, useScope } from '@/context/ScopeContext';
 import { useBatches } from '@/lib/hooks';
 import { NAV_GROUPS } from './navigation';
+import { CommandPalette } from './CommandPalette';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['OVERVIEW', 'RISK MANAGEMENT']));
   const { user, role, hasPermission, logout } = useAuth();
-  const { affiliateCode, setAffiliateCode, affiliates, run, currency } = useScope();
+  const { affiliateCode, setAffiliateCode, affiliates } = useScope();
   const { data: batches = [] } = useBatches();
 
   // "As at" reflects the data actually on file, not a scope field nothing
@@ -91,7 +92,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-4 px-2">
+        <div className="pt-3">
+          <CommandPalette groups={visibleGroups} collapsed={collapsed} />
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-1 px-2">
           {visibleGroups.map((group) => {
             const isExpanded = expandedGroups.has(group.label);
             const hasActiveItem = group.items.some((item) => location === item.path || location.startsWith(`${item.path}/`));
@@ -120,6 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <ul className={cn('mt-1 space-y-0.5', collapsed && 'px-1')}>
                     {group.items.map((item) => {
                       const active = location === item.path || location.startsWith(`${item.path}/`);
+                      const Icon = item.icon;
                       return (
                         <li key={item.path}>
                           <Link
@@ -127,21 +133,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                             aria-current={active ? 'page' : undefined}
                             title={collapsed ? item.name : undefined}
                             className={cn(
-                              'flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] transition-all duration-150',
+                              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] transition-all duration-150',
                               active
                                 ? 'bg-gold-500/10 text-gold-500 font-medium border-l-2 border-gold-500'
                                 : 'text-white/70 hover:bg-white/5 hover:text-white border-l-2 border-transparent',
                               collapsed && 'justify-center px-2'
                             )}
                           >
-                            {collapsed ? (
-                              <span className="text-[10px] font-bold">{item.name.charAt(0)}</span>
-                            ) : (
-                              <>
-                                <span className={cn('w-1 h-1 rounded-full transition-colors', active ? 'bg-gold-500' : 'bg-white/30')}/>
-                                {item.name}
-                              </>
-                            )}
+                            <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-gold-500' : 'text-white/50')} />
+                            {!collapsed && item.name}
                           </Link>
                         </li>
                       );
@@ -205,22 +205,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2 text-[11px] text-gray-500">
               <span className="font-bold uppercase tracking-wider text-gray-400">As at</span>
               <span className="font-mono text-navy-900">{asOfDate ? formatDate(asOfDate) : 'no data loaded'}</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-[11px] text-gray-500">
-              <span className="font-bold uppercase tracking-wider text-gray-400">Currency</span>
-              <span className="font-mono text-navy-900">{currency}</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-[11px]">
-              {run ? (
-                <>
-                  <span className="font-bold uppercase tracking-wider text-gray-400">Run</span>{' '}
-                  <span className="font-mono text-navy-900">{run.name}</span>
-                </>
-              ) : (
-                <span className="text-gray-400">No run selected</span>
-              )}
             </div>
           </div>
         </div>

@@ -15,7 +15,7 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'wouter';
-import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -23,7 +23,7 @@ import { Amount } from '@/components/ui/Amount';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
-import { useFxRates } from '@/lib/hooks';
+import { useFxRates, useYieldCurves, useEconomicIndicators } from '@/lib/hooks';
 import { useRuns } from '@/lib/runHooks';
 import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
@@ -32,6 +32,13 @@ import type { KriObservation } from '@/engine/kri';
 import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } from '@/engine/liquidity';
 import type { EveResult, NiiResult } from '@/engine/irrbb';
 import type { ProfitabilityResult } from '@/engine/profitability';
+
+/** Which curve and policy-rate indicator stand in for "the market" at each scope — Nigeria is the default at Group level since it has the fullest data. */
+const MARKET_BY_CURRENCY: Record<string, { curveCode: string; indicatorCode?: string; indicatorLabel?: string }> = {
+  NGN: { curveCode: 'NGN-NIBOR', indicatorCode: 'NG-MPR', indicatorLabel: 'CBN MPR' },
+  GHS: { curveCode: 'GHS-GHREF', indicatorCode: 'GH-MPR', indicatorLabel: 'BoG MPR' },
+  XOF: { curveCode: 'XOF-BCEAO' },
+};
 
 type Tone = 'success' | 'warning' | 'danger' | 'neutral';
 
@@ -94,6 +101,56 @@ export function Dashboard() {
     'survivalHorizonDays',
   ]);
   const { data: fxRates = [] } = useFxRates();
+  const { data: yieldCurves = [] } = useYieldCurves();
+  const { data: indicators = [] } = useEconomicIndicators();
+
+  const marketCurrency = affiliateCode !== 'GROUP' && affiliate ? affiliate.functionalCurrency : 'NGN';
+  const market = MARKET_BY_CURRENCY[marketCurrency];
+  const localCurve = market ? yieldCurves.find((c) => c.code === market.curveCode) : undefined;
+  const sofrCurve = yieldCurves.find((c) => c.code === 'USD-SOFR');
+  const policyIndicator = market?.indicatorCode ? indicators.find((i) => i.code === market.indicatorCode) : undefined;
+
+  const policyRateRow = (() => {
+    if (!policyIndicator || policyIndicator.observations.length === 0) return null;
+    const obs = [...policyIndicator.observations].sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
+    const latest = obs[obs.length - 1]!;
+    const prior = obs.length > 1 ? obs[obs.length - 2] : undefined;
+    const delta = prior ? latest.value - prior.value : null;
+    return {
+      label: 'Policy Rate',
+      sublabel: market?.indicatorLabel ?? policyIndicator.name,
+      value: `${latest.value.toFixed(2)}%`,
+      delta: delta !== null && Math.abs(delta) > 0.001 ? delta : null,
+    };
+  })();
+
+  const marketRows = [
+    policyRateRow,
+    localCurve?.terms.find((t) => t.tenorDays <= 1)
+      ? {
+          label: 'Interbank Rate',
+          sublabel: 'Overnight',
+          value: `${localCurve.terms.find((t) => t.tenorDays <= 1)!.ratePercent.toFixed(2)}%`,
+          delta: null,
+        }
+      : null,
+    localCurve && localCurve.terms.length > 0
+      ? {
+          label: `${localCurve.currency} Sovereign Yield`,
+          sublabel: `${localCurve.terms[localCurve.terms.length - 1]!.label} Benchmark`,
+          value: `${localCurve.terms[localCurve.terms.length - 1]!.ratePercent.toFixed(2)}%`,
+          delta: null,
+        }
+      : null,
+    sofrCurve?.terms.find((t) => t.tenorDays <= 1)
+      ? {
+          label: 'SOFR',
+          sublabel: 'Overnight',
+          value: `${sofrCurve.terms.find((t) => t.tenorDays <= 1)!.ratePercent.toFixed(2)}%`,
+          delta: null,
+        }
+      : null,
+  ].filter((r): r is { label: string; sublabel: string; value: string; delta: number | null } => r !== null);
 
   const trendData = (() => {
     if (!trendSeries) return [];
@@ -187,7 +244,6 @@ export function Dashboard() {
         currency={run?.reportingCurrency}
         metrics={[
           { label: 'In breach', value: String(breaches.length), tone: breaches.length > 0 ? 'danger' : 'success' },
-          { label: 'Elements computed', value: run ? String(results.length) : '0' },
         ]}
       />
 
@@ -224,7 +280,7 @@ export function Dashboard() {
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Liquidity position trend</h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">LCR and NSFR across every completed run for this scope</p>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">LCR and NSFR against the regulatory minimum, across every completed run for this scope</p>
             <div style={{ width: '100%', height: 260 }}>
               {trendData.length < 2 ? (
                 <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
@@ -233,34 +289,62 @@ export function Dashboard() {
                 </div>
               ) : (
                 <ResponsiveContainer>
-                  <LineChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                  <AreaChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <defs>
+                      <linearGradient id="lcrFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.25} />
+                        <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="nsfrFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={CHART_COLORS.accent} stopOpacity={0.25} />
+                        <stop offset="95%" stopColor={CHART_COLORS.accent} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="asOfDate" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(d: string) => formatDate(d)} />
                     <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
                     <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} labelFormatter={(d: string) => formatDate(d)} contentStyle={CHART_TOOLTIP_STYLE} />
                     <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                     <ReferenceLine y={100} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" label={{ value: 'Regulatory minimum', fontSize: 10, fill: '#9AA1AE', position: 'insideTopLeft' }} />
-                    <Line type="monotone" dataKey="lcr" name="LCR" stroke={CHART_COLORS.primary} strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                    <Line type="monotone" dataKey="nsfr" name="NSFR" stroke={CHART_COLORS.accent} strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                  </LineChart>
+                    <Area type="monotone" dataKey="lcr" name="LCR" stroke={CHART_COLORS.primary} strokeWidth={2.5} fill="url(#lcrFill)" dot={{ r: 3 }} connectNulls />
+                    <Area type="monotone" dataKey="nsfr" name="NSFR" stroke={CHART_COLORS.accent} strokeWidth={2.5} fill="url(#nsfrFill)" dot={{ r: 3 }} connectNulls />
+                  </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rates &amp; curves</h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">Current FX rates against USD</p>
-            {rateRows.length === 0 ? (
-              <p className="text-[12px] text-gray-400">No FX rates loaded.</p>
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Market &amp; Rate Monitor</h2>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">{marketCurrency} benchmarks, SOFR, and FX against USD</p>
+            {marketRows.length === 0 && rateRows.length === 0 ? (
+              <p className="text-[12px] text-gray-400">No market data loaded.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-gray-50">
+                {marketRows.map((r) => (
+                  <div key={r.label} className="flex items-center justify-between py-2.5">
+                    <div>
+                      <p className="text-[12px] font-bold text-navy-900">{r.label}</p>
+                      <p className="text-[10px] text-gray-400">{r.sublabel}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-[13px] font-bold text-navy-900">{r.value}</p>
+                      {r.delta !== null && (
+                        <p className={`flex items-center justify-end gap-0.5 text-[10px] font-bold ${r.delta > 0 ? 'text-success' : 'text-danger'}`}>
+                          {r.delta > 0 ? <ArrowUpIcon className="h-2.5 w-2.5" /> : <ArrowDownIcon className="h-2.5 w-2.5" />}
+                          {r.delta > 0 ? '+' : ''}{r.delta.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
                 {rateRows.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-[12px]">
-                    <span className="font-mono font-medium text-gray-600">
-                      {r.base}/{r.quote}
-                    </span>
-                    <span className="font-mono font-bold text-navy-900">{r.rate.toFixed(4)}</span>
+                  <div key={r.id} className="flex items-center justify-between py-2.5">
+                    <div>
+                      <p className="text-[12px] font-bold text-navy-900">{r.base}/{r.quote}</p>
+                      <p className="text-[10px] text-gray-400">Official rate</p>
+                    </div>
+                    <span className="font-mono text-[13px] font-bold text-navy-900">{r.rate.toFixed(4)}</span>
                   </div>
                 ))}
               </div>
@@ -268,31 +352,42 @@ export function Dashboard() {
           </section>
         </div>
 
-        {breaches.length > 0 && (
-          <div className="mt-6 rounded-2xl border border-danger/30 bg-danger/5 p-5">
-            <p className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">In breach</p>
-            <div className="space-y-2">
-              {breaches.map((b) => (
-                <Link key={b.id} href={b.href} className="flex items-center justify-between text-[13px]">
-                  <span className="font-medium text-navy-900 hover:underline">{b.label}</span>
-                  <StatusBadge status={b.value} tone="danger" />
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {snapshot.map((m) => (
+                <Link key={m.id} href={m.href} className="block rounded-lg bg-gray-50 p-3 hover:bg-gray-100">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
+                  <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
                 </Link>
               ))}
             </div>
-          </div>
-        )}
+          </section>
 
-        <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {snapshot.map((m) => (
-              <Link key={m.id} href={m.href} className="block rounded-lg bg-gray-50 p-3 hover:bg-gray-100">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
-                <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Active Breaches</h2>
+            {breaches.length === 0 ? (
+              <p className="text-[12px] text-gray-400">No active breaches for this scope.</p>
+            ) : (
+              <div className="space-y-1">
+                {breaches.map((b) => (
+                  <Link
+                    key={b.id}
+                    href={b.href}
+                    className="flex items-center justify-between rounded-lg px-1 py-2 hover:bg-gray-50"
+                  >
+                    <div>
+                      <p className="text-[12px] font-bold text-navy-900">{b.label}</p>
+                      <p className="text-[10px] text-gray-400">Current: {b.value}</p>
+                    </div>
+                    <StatusBadge status="Breach" tone="danger" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
 
         {prof && (
           <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
