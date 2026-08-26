@@ -1,200 +1,174 @@
 /**
- * Ad-Hoc Analysis — screen 55 (Phase 8).
+ * Ad-Hoc Analysis — screen 55.
  *
- * Custom query builder for on-demand analysis with real FX conversion capabilities.
+ * A real cross-affiliate comparison: pick metrics from the platform's own
+ * catalogue and affiliates from the platform's own register, and it reads
+ * each affiliate's latest completed run for the answer. Every metric here
+ * is a ratio or a day-count, so there is nothing to FX-convert — that claim
+ * on the previous mock screen described a capability nothing behind it had.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { useAffiliates } from '@/lib/hooks';
+import { useRuns, useRunResults } from '@/lib/runHooks';
+import { METRIC_SPECS, extractMetrics, formatMetric } from '@/lib/metrics';
 
 export function AdHoc() {
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
-  const [selectedAffiliates, setSelectedAffiliates] = useState<string[]>(['GROUP']);
-  const [dateRange, setDateRange] = useState({ start: '2026-08-01', end: '2026-08-25' });
-  const [currency, setCurrency] = useState('USD');
+  const { data: affiliates = [] } = useAffiliates();
+  const { data: runs = [] } = useRuns();
 
-  const availableMetrics = [
-    { id: 'lcr', name: 'Liquidity Coverage Ratio', category: 'Liquidity' },
-    { id: 'nsfr', name: 'Net Stable Funding Ratio', category: 'Liquidity' },
-    { id: 'loanToDeposit', name: 'Loan-to-Deposit Ratio', category: 'Liquidity' },
-    { id: 'niiSensitivity', name: 'NII Sensitivity', category: 'IRRBB' },
-    { id: 'eveSensitivity', name: 'EVE Sensitivity', category: 'IRRBB' },
-    { id: 'concentration', name: 'Deposit Concentration', category: 'Concentration' },
-    { id: 'gapAnalysis', name: 'Maturity Gap Analysis', category: 'Liquidity' },
-    { id: 'ftpMargin', name: 'FTP Margin Analysis', category: 'Treasury' },
-  ];
+  const [metricKeys, setMetricKeys] = useState<string[]>(['lcrPercent', 'nsfrPercent']);
+  const [affiliateCodes, setAffiliateCodes] = useState<string[]>([]);
+  const [ran, setRan] = useState(false);
 
-  const availableAffiliates = [
-    { code: 'GROUP', name: 'Ecobank Group (Consolidated)' },
-    { code: 'NG', name: 'Ecobank Nigeria' },
-    { code: 'GH', name: 'Ecobank Ghana' },
-    { code: 'CI', name: 'Ecobank Côte d\'Ivoire' },
-    { code: 'SN', name: 'Ecobank Senegal' },
-    { code: 'TZ', name: 'Ecobank Tanzania' },
-  ];
+  const liveAffiliates = affiliates.filter((a) => a.code !== 'GROUP');
 
-  const currencies = ['USD', 'NGN', 'GHS', 'XOF', 'ZMW', 'KES'];
+  const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
+    set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
-  const toggleMetric = (metricId: string) => {
-    setSelectedMetrics((prev) =>
-      prev.includes(metricId) ? prev.filter((id) => id !== metricId) : [...prev, metricId]
-    );
-  };
+  // The latest completed run per affiliate — the same "which run answers
+  // this" rule every results screen follows, applied across many affiliates
+  // instead of one.
+  const latestRunByAffiliate = useMemo(() => {
+    const map = new Map<string, (typeof runs)[number]>();
+    for (const run of runs) {
+      if (run.status !== 'Completed') continue;
+      const held = map.get(run.affiliateCode);
+      if (!held || run.createdAt > held.createdAt) map.set(run.affiliateCode, run);
+    }
+    return map;
+  }, [runs]);
 
-  const toggleAffiliate = (affiliateCode: string) => {
-    setSelectedAffiliates((prev) =>
-      prev.includes(affiliateCode) ? prev.filter((code) => code !== affiliateCode) : [...prev, affiliateCode]
-    );
-  };
+  const targets = (ran ? affiliateCodes : []).map((code) => ({
+    code,
+    name: affiliates.find((a) => a.code === code)?.name ?? code,
+    run: latestRunByAffiliate.get(code) ?? null,
+  }));
 
   return (
     <>
       <ModuleHeader
         title="Ad-Hoc Analysis"
-        description="Custom query builder for on-demand analysis with real FX conversion capabilities"
+        description="Pick metrics and affiliates from the platform's own catalogue and register — each read from its latest completed run."
         asOfDate={null}
-        scope="Ecobank Group"
         metrics={[
-          { label: 'Available Metrics', value: String(availableMetrics.length) },
-          { label: 'Affiliates', value: String(availableAffiliates.length) },
-          { label: 'Currencies', value: String(currencies.length) },
-          { label: 'Recent Queries', value: '5' },
+          { label: 'Metrics available', value: String(METRIC_SPECS.length) },
+          { label: 'Affiliates onboarded', value: String(liveAffiliates.length) },
+          { label: 'Runs with results', value: String(latestRunByAffiliate.size) },
+          { label: 'Selected', value: `${metricKeys.length} × ${affiliateCodes.length}` },
         ]}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Query Builder */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Select Metrics</h3>
-              <p className="text-[11px] text-gray-400 font-medium mt-1">Choose the risk metrics to analyze</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {availableMetrics.map((metric) => (
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Metrics</h2>
+            <p className="mb-4 text-[11px] text-gray-500">The same catalogue Limits and KRI read from — nothing metric-specific to this screen.</p>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {METRIC_SPECS.map((m) => (
                 <button
-                  key={metric.id}
-                  onClick={() => toggleMetric(metric.id)}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
-                    selectedMetrics.includes(metric.id)
-                      ? 'border-gold-500 bg-gold-50 text-navy-900'
-                      : 'border-gray-200 hover:border-navy-700 text-gray-600'
-                  }`}
+                  key={m.key}
+                  type="button"
+                  onClick={() => { toggle(metricKeys, setMetricKeys, m.key); setRan(false); }}
+                  className={`rounded-lg border p-3 text-left ${metricKeys.includes(m.key) ? 'border-gold-500 bg-gold-500/5' : 'border-gray-200 hover:border-navy-700'}`}
                 >
-                  <p className="text-[11px] font-bold">{metric.name}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{metric.category}</p>
+                  <p className="text-[11px] font-bold text-navy-900">{m.label}</p>
+                  <p className="mt-0.5 text-[10px] text-gray-400">{m.element}</p>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Scope & Parameters</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span className="block text-[11px] font-medium text-gray-700 mb-2">Affiliates</span>
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Affiliates selection">
-                  {availableAffiliates.map((affiliate) => (
-                    <button
-                      key={affiliate.code}
-                      onClick={() => toggleAffiliate(affiliate.code)}
-                      className={`px-3 py-1.5 rounded text-[11px] font-medium transition-colors ${
-                        selectedAffiliates.includes(affiliate.code)
-                          ? 'bg-navy-900 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {affiliate.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label htmlFor="currency-select" className="block text-[11px] font-medium text-gray-700 mb-2">Reporting Currency</label>
-                <select
-                  id="currency-select"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
+            <p className="mb-4 text-[11px] text-gray-500">Every onboarded affiliate, whatever its status — this is analysis, not the Group-consolidated view.</p>
+            <div className="flex flex-wrap gap-2">
+              {liveAffiliates.map((a) => (
+                <button
+                  key={a.code}
+                  type="button"
+                  onClick={() => { toggle(affiliateCodes, setAffiliateCodes, a.code); setRan(false); }}
+                  className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${affiliateCodes.includes(a.code) ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
-                  {currencies.map((ccy) => (
-                    <option key={ccy} value={ccy}>
-                      {ccy}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="date-start" className="block text-[11px] font-medium text-gray-700 mb-2">Date Range</label>
-                <div className="flex gap-2">
-                  <input
-                    id="date-start"
-                    type="date"
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                  />
-                  <input
-                    id="date-end"
-                    type="date"
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                  />
-                </div>
-              </div>
+                  {a.name}
+                  {!latestRunByAffiliate.has(a.code) && <span className="ml-1 text-warning">·no run</span>}
+                </button>
+              ))}
+              {liveAffiliates.length === 0 && <p className="text-[11px] text-gray-400">No affiliates onboarded yet.</p>}
             </div>
-          </div>
+          </section>
 
           <button
-            disabled={selectedMetrics.length === 0}
-            className="w-full rounded-lg bg-navy-900 py-3 text-[13px] font-bold text-white hover:bg-navy-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            onClick={() => setRan(true)}
+            disabled={metricKeys.length === 0 || affiliateCodes.length === 0}
+            className="w-full rounded-lg bg-navy-900 py-3 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Run Analysis
+            Run analysis
           </button>
         </div>
 
-        {/* Recent Queries */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Recent Queries</h3>
-            <p className="text-[11px] text-gray-400 font-medium mt-1">Quick access to your recent ad-hoc analyses</p>
-          </div>
-          <div className="space-y-3">
-            {[
-              { query: 'LCR & NSFR by Affiliate', date: 'Aug 25, 2026', currency: 'USD' },
-              { query: 'NII Sensitivity Analysis', date: 'Aug 24, 2026', currency: 'NGN' },
-              { query: 'Concentration Risk Report', date: 'Aug 23, 2026', currency: 'USD' },
-              { query: 'FTP Margin by Product', date: 'Aug 22, 2026', currency: 'USD' },
-              { query: 'Maturity Gap Analysis', date: 'Aug 21, 2026', currency: 'GHS' },
-            ].map((item, i) => (
-              <div key={i} className="p-3 border border-gray-100 rounded-lg hover:border-navy-700 transition-colors cursor-pointer">
-                <p className="text-[12px] font-bold text-navy-900">{item.query}</p>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[10px] text-gray-400">{item.date}</span>
-                  <span className="text-[10px] text-gray-400">{item.currency}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <aside className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">How this reads</h2>
+          <p className="text-[11px] leading-relaxed text-gray-500">
+            Each selected affiliate's <em>most recently completed</em> run supplies the figures — the same rule every
+            results screen follows. An affiliate with no completed run shows every metric as unmeasured rather than
+            zero, and one flagged &ldquo;no run&rdquo; above will read that way here too.
+          </p>
+        </aside>
       </div>
 
-      {selectedMetrics.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Analysis Results Preview</h3>
-            <p className="text-[11px] text-gray-400 font-medium mt-1">
-              {selectedMetrics.length} metric(s) selected for {selectedAffiliates.length} affiliate(s) in {currency}
-            </p>
-          </div>
-          <div className="p-8 bg-gray-50 rounded-lg text-center text-gray-400 text-sm">
-            Click "Run Analysis" to generate the ad-hoc report. Results will appear here with full FX conversion applied.
-          </div>
-        </div>
+      {ran && (
+        <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Results</h2>
+          <ResultsTable targets={targets} metricKeys={metricKeys} />
+        </section>
       )}
     </>
+  );
+}
+
+function ResultsTable({
+  targets, metricKeys,
+}: { targets: Array<{ code: string; name: string; run: { id: string; asOfDate: string } | null }>; metricKeys: string[] }) {
+  if (targets.length === 0) return <p className="text-[12px] text-gray-500">Nothing selected.</p>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
+            <th className="py-2 font-bold">Affiliate</th>
+            {metricKeys.map((key) => (
+              <th key={key} className="py-2 text-right font-bold">{METRIC_SPECS.find((m) => m.key === key)?.label ?? key}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {targets.map((t) => <AffiliateResultRow key={t.code} target={t} metricKeys={metricKeys} />)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** One row, one hook call — each affiliate's results are fetched by its own component instance. */
+function AffiliateResultRow({
+  target, metricKeys,
+}: { target: { code: string; name: string; run: { id: string; asOfDate: string } | null }; metricKeys: string[] }) {
+  const { data: results = [] } = useRunResults(target.run?.id ?? null);
+  const metrics = extractMetrics(results);
+
+  return (
+    <tr className="border-b border-gray-100">
+      <td className="py-2">
+        <span className="font-medium text-navy-900">{target.name}</span>
+        <span className="ml-2 font-mono text-[10px] text-gray-400">{target.run?.asOfDate ?? 'no run'}</span>
+      </td>
+      {metricKeys.map((key) => (
+        <td key={key} className="py-2 text-right font-mono">{formatMetric(metrics.get(key) ?? null, key)}</td>
+      ))}
+    </tr>
   );
 }

@@ -54,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'REPORTING',
     items: [
+      { name: 'ALCO Meetings', path: '/alco-meetings', permission: 'reporting.view', phase: 8 },
       { name: 'ALCO Reporting', path: '/alco-reporting', permission: 'reporting.view', phase: 8 },
       { name: 'Regulatory Reporting', path: '/regulatory-reporting', permission: 'reporting.view', phase: 8 },
       { name: 'Management Reporting', path: '/management-reporting', permission: 'reporting.view', phase: 8 },

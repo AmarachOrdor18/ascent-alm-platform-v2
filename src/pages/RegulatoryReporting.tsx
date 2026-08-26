@@ -1,213 +1,247 @@
 /**
- * Regulatory Reporting — screen 52 (Phase 8).
+ * Regulatory Reporting — screen 52.
  *
- * Generation of regulatory returns for different jurisdictions: CBN, Bank of Ghana, BCEAO, etc.
+ * Real returns, stored and stateful, each attachable to the run whose
+ * figures it reports. Submitting is maker-checker: whoever prepared a
+ * return may not be the one who marks it reviewed.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { RunPicker } from '@/components/layout/RunPicker';
+import { useAuth } from '@/context/AuthContext';
+import { useAffiliates } from '@/lib/hooks';
+import { regulatoryReturns, newId } from '@/lib/governanceHooks';
+import { useRuns, useRunResults } from '@/lib/runHooks';
+import { metricValue, formatMetric } from '@/lib/metrics';
+import { REGULATORY_MINIMA } from '@/engine/limits';
+import type { RegulatoryReturn, ReturnStatus } from '@/engine/types';
 
-interface RegulatoryReturn {
-  id: string;
-  jurisdiction: string;
-  returnName: string;
-  period: string;
-  status: 'Draft' | 'Submitted' | 'Accepted' | 'Rejected';
-  dueDate: string;
-  submittedDate?: string;
-  affiliateScope: string;
-}
+const STATUSES: ReturnStatus[] = ['Not started', 'In preparation', 'Under review', 'Submitted', 'Accepted', 'Rejected'];
+const STATUS_TONE: Record<ReturnStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  'Not started': 'neutral', 'In preparation': 'warning', 'Under review': 'warning',
+  Submitted: 'warning', Accepted: 'success', Rejected: 'danger',
+};
 
 export function RegulatoryReporting() {
-  const [selectedJurisdiction, setSelectedJurisdiction] = useState<'all' | 'CBN' | 'BoG' | 'BCEAO'>('all');
+  const { hasPermission, user } = useAuth();
+  const canEdit = hasPermission('reporting.manage') || hasPermission('run.execute');
+  const { data: rows = [], isLoading } = regulatoryReturns.useList();
+  const { data: affiliates = [] } = useAffiliates();
+  const { data: runs = [] } = useRuns();
+  const save = regulatoryReturns.useSave();
 
-  // Mock regulatory return data
-  const mockReturns: RegulatoryReturn[] = [
+  const [regulator, setRegulator] = useState<'all' | string>('all');
+  const [editing, setEditing] = useState<RegulatoryReturn | null>(null);
+
+  const regulators = useMemo(() => Array.from(new Set(rows.map((r) => r.regulator))), [rows]);
+  const filtered = regulator === 'all' ? rows : rows.filter((r) => r.regulator === regulator);
+
+  const overdue = rows.filter((r) => r.dueDate < new Date().toISOString().slice(0, 10) && !['Submitted', 'Accepted'].includes(r.status));
+  const inFlight = rows.filter((r) => r.status === 'In preparation' || r.status === 'Under review');
+  const accepted = rows.filter((r) => r.status === 'Accepted');
+
+  const blank = (): RegulatoryReturn => ({
+    id: newId('RET'),
+    name: '',
+    regulator: Object.keys(REGULATORY_MINIMA)[0] ?? 'CBN',
+    affiliateCode: affiliates.find((a) => a.code !== 'GROUP')?.code ?? '',
+    frequency: 'Monthly',
+    periodEnd: new Date().toISOString().slice(0, 10),
+    dueDate: new Date().toISOString().slice(0, 10),
+    status: 'Not started',
+    runId: null,
+    preparedBy: null,
+    reviewedBy: null,
+    submittedAt: null,
+    notes: '',
+  });
+
+  const submit = async (r: RegulatoryReturn) => {
+    if (r.preparedBy && r.preparedBy === user?.name) return; // segregation of duties, enforced not just suggested
+    await save.mutateAsync({ ...r, status: 'Submitted', reviewedBy: user?.name ?? r.reviewedBy, submittedAt: new Date().toISOString() });
+  };
+
+  const columns: ResultColumn<RegulatoryReturn>[] = [
+    { key: 'name', header: 'Return', render: (r) => <span className="font-medium text-navy-900">{r.name || '(untitled)'}</span> },
+    { key: 'regulator', header: 'Regulator', render: (r) => r.regulator },
+    { key: 'affiliate', header: 'Affiliate', render: (r) => <span className="font-mono text-[11px]">{r.affiliateCode}</span> },
+    { key: 'period', header: 'Period end', render: (r) => <span className="font-mono text-[11px]">{r.periodEnd}</span> },
+    { key: 'due', header: 'Due', render: (r) => <span className="font-mono text-[11px]">{r.dueDate}</span> },
+    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} tone={STATUS_TONE[r.status]} /> },
     {
-      id: 'RET-2026-08-CBN',
-      jurisdiction: 'CBN',
-      returnName: 'LCR & NSFR Return',
-      period: 'August 2026',
-      status: 'Draft',
-      dueDate: '2026-09-15',
-      affiliateScope: 'Nigeria',
-    },
-    {
-      id: 'RET-2026-08-BoG',
-      jurisdiction: 'Bank of Ghana',
-      returnName: 'Liquidity Risk Return',
-      period: 'August 2026',
-      status: 'Submitted',
-      dueDate: '2026-09-10',
-      submittedDate: '2026-09-05',
-      affiliateScope: 'Ghana',
-    },
-    {
-      id: 'RET-2026-07-CBN',
-      jurisdiction: 'CBN',
-      returnName: 'LCR & NSFR Return',
-      period: 'July 2026',
-      status: 'Accepted',
-      dueDate: '2026-08-15',
-      submittedDate: '2026-08-10',
-      affiliateScope: 'Nigeria',
-    },
-    {
-      id: 'RET-2026-07-BCEAO',
-      jurisdiction: 'BCEAO',
-      returnName: 'IRRBB Sensitivity Return',
-      period: 'July 2026',
-      status: 'Accepted',
-      dueDate: '2026-08-20',
-      submittedDate: '2026-08-15',
-      affiliateScope: 'Côte d\'Ivoire',
+      key: 'actions', header: '', render: (r) => (
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setEditing(r)} disabled={!canEdit} className="text-[11px] font-bold text-navy-900 hover:underline disabled:opacity-40">Edit</button>
+          {r.status === 'Under review' && (
+            <button type="button" onClick={() => void submit(r)} disabled={!canEdit || r.preparedBy === user?.name} title={r.preparedBy === user?.name ? 'The preparer cannot also submit' : undefined} className="text-[11px] font-bold text-navy-900 hover:underline disabled:opacity-40">
+              Submit
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
-
-  const filteredReturns = selectedJurisdiction === 'all' 
-    ? mockReturns 
-    : mockReturns.filter((r) => r.jurisdiction === selectedJurisdiction);
-
-  const draftCount = mockReturns.filter((r) => r.status === 'Draft').length;
-  const submittedCount = mockReturns.filter((r) => r.status === 'Submitted').length;
-  const acceptedCount = mockReturns.filter((r) => r.status === 'Accepted').length;
-
-  const jurisdictionColors = {
-    'CBN': 'bg-navy-100 text-navy-900',
-    'Bank of Ghana': 'bg-warning-bg text-warning',
-    'BCEAO': 'bg-success-bg text-success',
-  } as const;
 
   return (
     <>
       <ModuleHeader
         title="Regulatory Reporting"
-        description="Generation of regulatory returns for different jurisdictions: CBN, Bank of Ghana, BCEAO, etc."
+        description="Returns by jurisdiction, each attachable to the run supplying its figures. Submission is maker-checker."
         asOfDate={null}
-        scope="Ecobank Group"
         metrics={[
-          { label: 'Draft Returns', value: String(draftCount), tone: draftCount > 0 ? 'warning' : 'neutral' },
-          { label: 'Pending Review', value: String(submittedCount), tone: submittedCount > 0 ? 'warning' : 'neutral' },
-          { label: 'Accepted', value: String(acceptedCount), tone: 'success' },
-          { label: 'Total Returns', value: String(mockReturns.length) },
+          { label: 'Overdue', value: String(overdue.length), tone: overdue.length > 0 ? 'danger' : 'success' },
+          { label: 'In flight', value: String(inFlight.length), tone: inFlight.length > 0 ? 'warning' : 'neutral' },
+          { label: 'Accepted', value: String(accepted.length), tone: 'success' },
+          { label: 'Total', value: String(rows.length) },
         ]}
+        actions={
+          <button type="button" onClick={() => setEditing(blank())} disabled={!canEdit} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">
+            New return
+          </button>
+        }
       />
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          onClick={() => setSelectedJurisdiction('all')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedJurisdiction === 'all' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          All Jurisdictions
+        <button type="button" onClick={() => setRegulator('all')} className={`rounded-lg px-4 py-2 text-[12px] font-bold ${regulator === 'all' ? 'bg-navy-900 text-white' : 'border border-gray-200 bg-white text-gray-600 hover:border-navy-700'}`}>
+          All regulators
         </button>
-        <button
-          onClick={() => setSelectedJurisdiction('CBN')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedJurisdiction === 'CBN' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          CBN (Nigeria)
-        </button>
-        <button
-          onClick={() => setSelectedJurisdiction('BoG')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedJurisdiction === 'BoG' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          Bank of Ghana
-        </button>
-        <button
-          onClick={() => setSelectedJurisdiction('BCEAO')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedJurisdiction === 'BCEAO' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          BCEAO (UEMOA)
-        </button>
+        {regulators.map((reg) => (
+          <button key={reg} type="button" onClick={() => setRegulator(reg)} className={`rounded-lg px-4 py-2 text-[12px] font-bold ${regulator === reg ? 'bg-navy-900 text-white' : 'border border-gray-200 bg-white text-gray-600 hover:border-navy-700'}`}>
+            {reg}
+          </button>
+        ))}
       </div>
 
-      <div className="table-datagrid-container">
-        <div className="overflow-x-auto">
-          <table className="table-datagrid">
-            <thead>
-              <tr>
-                <th>Return</th>
-                <th>Jurisdiction</th>
-                <th>Period</th>
-                <th>Status</th>
-                <th>Due Date</th>
-                <th>Submitted</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredReturns.map((returnItem) => (
-                <tr key={returnItem.id}>
-                  <td>
-                    <p className="font-bold text-navy-900">{returnItem.returnName}</p>
-                    <p className="text-[11px] text-gray-400 font-medium mt-0.5">{returnItem.id}</p>
-                  </td>
-                  <td>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${jurisdictionColors[returnItem.jurisdiction as keyof typeof jurisdictionColors] || 'bg-gray-100 text-gray-600'}`}>
-                      {returnItem.jurisdiction}
-                    </span>
-                  </td>
-                  <td>{returnItem.period}</td>
-                  <td><StatusBadge status={returnItem.status} /></td>
-                  <td>{new Date(returnItem.dueDate).toLocaleDateString()}</td>
-                  <td>{returnItem.submittedDate ? new Date(returnItem.submittedDate).toLocaleDateString() : '—'}</td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button className="rounded bg-navy-900 px-3 py-1 text-[11px] font-bold text-white hover:bg-navy-700 transition-colors">
-                        Generate
-                      </button>
-                      {returnItem.status === 'Draft' && (
-                        <button className="rounded border border-gray-200 px-3 py-1 text-[11px] font-bold text-navy-900 hover:bg-gray-50 transition-colors">
-                          Submit
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredReturns.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="text-center text-gray-400 py-6">
-                    No regulatory returns found for the selected jurisdiction.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <ResultTable
+          rows={filtered}
+          columns={columns}
+          rowKey={(r) => r.id}
+          emptyMessage={isLoading ? 'Loading…' : 'No regulatory returns yet — add one for an affiliate and its regulator.'}
+          renderDetail={(r) => <ReturnDetail ret={r} />}
+        />
+      </section>
 
-      <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <div className="mb-4">
-          <h3 className="text-[12px] font-bold text-navy-900 tracking-widest uppercase">Regulatory Calendar</h3>
-          <p className="text-[11px] text-gray-400 font-medium mt-1">Upcoming filing deadlines by jurisdiction</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="border border-gray-100 rounded-lg p-4">
-            <p className="text-[11px] font-bold text-navy-900">CBN (Nigeria)</p>
-            <p className="text-[10px] text-gray-500 mt-1">Next filing: September 15, 2026</p>
-            <p className="text-[10px] text-gray-400">LCR & NSFR monthly return</p>
-          </div>
-          <div className="border border-gray-100 rounded-lg p-4">
-            <p className="text-[11px] font-bold text-navy-900">Bank of Ghana</p>
-            <p className="text-[10px] text-gray-500 mt-1">Next filing: September 10, 2026</p>
-            <p className="text-[10px] text-gray-400">Liquidity risk quarterly return</p>
-          </div>
-          <div className="border border-gray-100 rounded-lg p-4">
-            <p className="text-[11px] font-bold text-navy-900">BCEAO (UEMOA)</p>
-            <p className="text-[10px] text-gray-500 mt-1">Next filing: September 20, 2026</p>
-            <p className="text-[10px] text-gray-400">IRRBB sensitivity quarterly return</p>
-          </div>
-        </div>
-      </div>
+      {editing && (
+        <ReturnEditor
+          ret={editing}
+          affiliates={affiliates}
+          runs={runs}
+          onCancel={() => setEditing(null)}
+          onSave={async (r) => { await save.mutateAsync(r); setEditing(null); }}
+        />
+      )}
     </>
   );
 }
+
+function ReturnDetail({ ret }: { ret: RegulatoryReturn }) {
+  const { data: results = [] } = useRunResults(ret.runId);
+  const minima = REGULATORY_MINIMA[ret.regulator];
+  if (!ret.runId) return <p className="text-[11px] text-gray-500">No run attached — nothing to report yet.</p>;
+  if (results.length === 0) return <p className="text-[11px] text-gray-500">The attached run has no results.</p>;
+
+  return (
+    <div className="space-y-2 text-[11px]">
+      {Object.keys(minima ?? { lcrPercent: 100 }).map((key) => {
+        const value = metricValue(results, key);
+        const min = minima?.[key];
+        const breach = min !== undefined && value !== null && value < min;
+        return (
+          <div key={key} className="flex items-center justify-between">
+            <span className="text-gray-500">{key}</span>
+            <span className={`font-mono font-bold ${breach ? 'text-danger' : ''}`}>
+              {formatMetric(value, key)}{min !== undefined && ` (floor ${min}%)`}
+            </span>
+          </div>
+        );
+      })}
+      {ret.notes && <p className="mt-2 text-gray-600">{ret.notes}</p>}
+    </div>
+  );
+}
+
+function ReturnEditor({
+  ret, affiliates, runs, onCancel, onSave,
+}: { ret: RegulatoryReturn; affiliates: ReturnType<typeof useAffiliates>['data']; runs: ReturnType<typeof useRuns>['data']; onCancel: () => void; onSave: (r: RegulatoryReturn) => Promise<void> }) {
+  const [draft, setDraft] = useState(ret);
+  const set = (patch: Partial<RegulatoryReturn>) => setDraft((d) => ({ ...d, ...patch }));
+  const { user } = useAuth();
+
+  const canMarkReviewed = draft.preparedBy !== null && draft.preparedBy !== user?.name;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-4 text-[14px] font-bold text-navy-900">Regulatory return</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label htmlFor="rr-name" className="mb-1 block text-[11px] font-medium text-gray-600">Name</label>
+            <input id="rr-name" value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. LCR & NSFR Return" className={INPUT} />
+          </div>
+          <div>
+            <label htmlFor="rr-regulator" className="mb-1 block text-[11px] font-medium text-gray-600">Regulator</label>
+            <input id="rr-regulator" value={draft.regulator} onChange={(e) => set({ regulator: e.target.value })} className={INPUT} list="regulators" />
+            <datalist id="regulators">{Object.keys(REGULATORY_MINIMA).map((r) => <option key={r} value={r} />)}</datalist>
+          </div>
+          <div>
+            <label htmlFor="rr-affiliate" className="mb-1 block text-[11px] font-medium text-gray-600">Affiliate</label>
+            <select id="rr-affiliate" value={draft.affiliateCode} onChange={(e) => set({ affiliateCode: e.target.value })} className={INPUT}>
+              {(affiliates ?? []).filter((a) => a.code !== 'GROUP').map((a) => <option key={a.code} value={a.code}>{a.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="rr-frequency" className="mb-1 block text-[11px] font-medium text-gray-600">Frequency</label>
+            <select id="rr-frequency" value={draft.frequency} onChange={(e) => set({ frequency: e.target.value as RegulatoryReturn['frequency'] })} className={INPUT}>
+              {(['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Annual'] as const).map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="rr-status" className="mb-1 block text-[11px] font-medium text-gray-600">Status</label>
+            <select id="rr-status" value={draft.status} onChange={(e) => set({ status: e.target.value as ReturnStatus })} className={INPUT}>
+              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="rr-period" className="mb-1 block text-[11px] font-medium text-gray-600">Period end</label>
+            <input id="rr-period" type="date" value={draft.periodEnd} onChange={(e) => set({ periodEnd: e.target.value })} className={INPUT} />
+          </div>
+          <div>
+            <label htmlFor="rr-due" className="mb-1 block text-[11px] font-medium text-gray-600">Due date</label>
+            <input id="rr-due" type="date" value={draft.dueDate} onChange={(e) => set({ dueDate: e.target.value })} className={INPUT} />
+          </div>
+        </div>
+
+        <div className="mt-4"><RunPicker runs={runs ?? []} value={draft.runId} onChange={(runId) => set({ runId })} /></div>
+
+        <div className="mt-4 flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2 text-[11px]">
+          <span className="text-gray-500">Prepared by</span>
+          <span className="font-bold">{draft.preparedBy ?? '—'}</span>
+          <button type="button" onClick={() => set({ preparedBy: user?.name ?? null })} className="ml-auto rounded border border-gray-200 px-2 py-1 text-[10px] font-bold text-navy-900 hover:border-navy-700">
+            Claim as preparer
+          </button>
+        </div>
+        {draft.status === 'Under review' && (
+          <p className="mt-2 text-[10px] text-gray-400">
+            {canMarkReviewed ? 'A different reviewer than the preparer may submit this return.' : 'The preparer cannot also be the reviewer — sign in as someone else to submit.'}
+          </p>
+        )}
+
+        <div className="mt-4">
+          <label htmlFor="rr-notes" className="mb-1 block text-[11px] font-medium text-gray-600">Notes</label>
+          <textarea id="rr-notes" rows={2} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} className={INPUT} />
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">Cancel</button>
+          <button type="button" onClick={() => void onSave(draft)} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const INPUT = 'w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none';

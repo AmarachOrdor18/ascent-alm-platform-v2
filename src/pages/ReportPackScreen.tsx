@@ -1,0 +1,234 @@
+/**
+ * Shared engine behind ALCO Reporting and Management Reporting.
+ *
+ * A pack is a named set of sections, each pointing at a real calculation
+ * element on a real run. "Generate" does not invent a document — it checks
+ * off whichever elements the chosen run actually computed and reads their
+ * headline figure at generation time. Viewing a pack later re-reads the
+ * same run, so the figures shown are always what that run produced, not a
+ * snapshot that can drift from the source.
+ */
+
+import { useState } from 'react';
+import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { RunPicker } from '@/components/layout/RunPicker';
+import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
+import { reportPacks, newId } from '@/lib/governanceHooks';
+import { useRuns, useRunResults } from '@/lib/runHooks';
+import { METRIC_SPECS, formatMetric } from '@/lib/metrics';
+import type { CalculationElement, PackKind, PackSection, ReportPack } from '@/engine/types';
+
+interface SectionCandidate {
+  element: CalculationElement;
+  title: string;
+}
+
+const STATUS_TONE: Record<ReportPack['status'], 'success' | 'warning' | 'neutral'> = {
+  Draft: 'neutral', Generated: 'warning', Distributed: 'success',
+};
+
+export function ReportPackScreen({
+  kind, title, description, candidates,
+}: { kind: PackKind; title: string; description: string; candidates: SectionCandidate[] }) {
+  const { hasPermission, user } = useAuth();
+  const { affiliateCode } = useScope();
+  const canEdit = hasPermission('reporting.manage') || hasPermission('run.execute');
+  const { data: packs = [], isLoading } = reportPacks.useList();
+  const { data: runs = [] } = useRuns();
+  const save = reportPacks.useSave();
+  const remove = reportPacks.useRemove();
+
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [packName, setPackName] = useState('');
+
+  const rows = packs.filter((p) => p.kind === kind).sort((a, b) => (b.generatedAt ?? '').localeCompare(a.generatedAt ?? ''));
+  const generated = rows.filter((p) => p.status !== 'Draft').length;
+  const distributed = rows.filter((p) => p.status === 'Distributed').length;
+
+  const generate = async () => {
+    if (!runId) return;
+    const run = runs.find((r) => r.id === runId);
+    if (!run) return;
+
+    const sections: PackSection[] = candidates.map((c) => ({
+      id: newId('SEC'),
+      title: c.title,
+      source: c.element,
+      included: run.elements.includes(c.element),
+      commentary: '',
+    }));
+
+    const pack: ReportPack = {
+      id: newId('PACK'),
+      name: packName.trim() || `${title} — ${run.asOfDate}`,
+      kind,
+      affiliateCode: affiliateCode === 'GROUP' ? null : affiliateCode,
+      runId,
+      sections,
+      scheduleId: null,
+      status: 'Generated',
+      recipients: [],
+      generatedAt: new Date().toISOString(),
+      generatedBy: user?.name ?? 'unknown',
+      updatedBy: user?.name ?? 'unknown',
+      updatedAt: new Date().toISOString(),
+    };
+    await save.mutateAsync(pack);
+    setBuilding(false);
+    setRunId(null);
+    setPackName('');
+    setExpanded(pack.id);
+  };
+
+  const distribute = async (pack: ReportPack, recipients: string) => {
+    await save.mutateAsync({
+      ...pack,
+      status: 'Distributed',
+      recipients: recipients.split(',').map((s) => s.trim()).filter(Boolean),
+      updatedBy: user?.name ?? 'unknown',
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const columns: ResultColumn<ReportPack>[] = [
+    { key: 'name', header: 'Pack', render: (p) => <span className="font-medium text-navy-900">{p.name}</span> },
+    { key: 'generated', header: 'Generated', render: (p) => <span className="font-mono text-[11px]">{p.generatedAt?.slice(0, 10) ?? '—'}</span> },
+    { key: 'by', header: 'By', render: (p) => p.generatedBy ?? '—' },
+    { key: 'sections', header: 'Sections', align: 'right', render: (p) => <span className="font-mono">{p.sections.filter((s) => s.included).length}/{p.sections.length}</span> },
+    { key: 'status', header: 'Status', render: (p) => <StatusBadge status={p.status} tone={STATUS_TONE[p.status]} /> },
+    {
+      key: 'actions', header: '', render: (p) => (
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setExpanded(expanded === p.id ? null : p.id)} className="text-[11px] font-bold text-navy-900 hover:underline">
+            {expanded === p.id ? 'Hide' : 'View'}
+          </button>
+          <button type="button" onClick={() => void remove.mutateAsync(p.id)} disabled={!canEdit} className="text-[11px] font-bold text-danger hover:underline disabled:opacity-40">
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <ModuleHeader
+        title={title}
+        description={description}
+        asOfDate={null}
+        metrics={[
+          { label: 'Packs generated', value: String(generated) },
+          { label: 'Distributed', value: String(distributed) },
+          { label: 'Sections tracked', value: String(candidates.length) },
+          { label: 'Total', value: String(rows.length) },
+        ]}
+        actions={
+          <button type="button" onClick={() => setBuilding(true)} disabled={!canEdit} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">
+            Generate pack
+          </button>
+        }
+      />
+
+      {building && (
+        <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">New pack</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="pack-name" className="mb-1 block text-[11px] font-medium text-gray-600">Name (optional)</label>
+              <input id="pack-name" value={packName} onChange={(e) => setPackName(e.target.value)} placeholder={`${title} — auto-named from the run`} className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none" />
+            </div>
+            <RunPicker runs={runs} value={runId} onChange={setRunId} label="Source run" />
+          </div>
+          <p className="mt-3 text-[11px] text-gray-500">
+            Sections included are whichever of these the run actually computed — nothing is filled in for an element the run skipped.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {candidates.map((c) => (
+              <span key={c.element} className={`rounded border px-2 py-0.5 text-[10px] ${runId && runs.find((r) => r.id === runId)?.elements.includes(c.element) ? 'border-success/40 bg-success/5 text-success' : 'border-gray-200 text-gray-400'}`}>
+                {c.title}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={() => setBuilding(false)} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">Cancel</button>
+            <button type="button" onClick={() => void generate()} disabled={!runId} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">Generate</button>
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <ResultTable
+          rows={rows}
+          columns={columns}
+          rowKey={(p) => p.id}
+          emptyMessage={isLoading ? 'Loading…' : 'No packs generated yet.'}
+        />
+      </section>
+
+      {expanded && rows.find((p) => p.id === expanded) && (
+        <PackDetail pack={rows.find((p) => p.id === expanded)!} canEdit={canEdit} onDistribute={distribute} />
+      )}
+    </>
+  );
+}
+
+function PackDetail({
+  pack, canEdit, onDistribute,
+}: { pack: ReportPack; canEdit: boolean; onDistribute: (p: ReportPack, recipients: string) => Promise<void> }) {
+  const { data: results = [] } = useRunResults(pack.runId);
+  const [recipients, setRecipients] = useState(pack.recipients.join(', '));
+
+  const headline = (element: string): string => {
+    const spec = METRIC_SPECS.find((m) => m.element === element);
+    const result = results.find((r) => r.element === element);
+    if (!result) return '—';
+    if (!spec) return 'computed';
+    const value = spec.extract(result.payload as Record<string, unknown>);
+    return formatMetric(value, spec.key);
+  };
+
+  return (
+    <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+      <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">{pack.name}</h2>
+      <p className="mb-4 text-[11px] text-gray-500">
+        {pack.runId ? `Reading live from the attached run.` : 'No run attached.'} Generated {pack.generatedAt?.slice(0, 10)} by {pack.generatedBy}.
+      </p>
+
+      <div className="space-y-2">
+        {pack.sections.map((s) => (
+          <div key={s.id} className={`flex items-center justify-between rounded-lg px-3 py-2 text-[12px] ${s.included ? 'bg-gray-50' : 'bg-gray-50/50 text-gray-400'}`}>
+            <span>{s.title}{!s.included && ' (not computed by this run)'}</span>
+            <span className="font-mono font-bold">{s.included ? headline(s.source) : '—'}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        {pack.status === 'Distributed' ? (
+          <p className="text-[11px] text-gray-500">Distributed to: {pack.recipients.join(', ') || 'no recipients recorded'}</p>
+        ) : (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[200px]">
+              <label htmlFor="pack-recipients" className="mb-1 block text-[11px] font-medium text-gray-600">Recipients (comma-separated)</label>
+              <input id="pack-recipients" value={recipients} onChange={(e) => setRecipients(e.target.value)} className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none" />
+            </div>
+            <button
+              type="button"
+              onClick={() => void onDistribute(pack, recipients)}
+              disabled={!canEdit || !recipients.trim()}
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            >
+              Mark distributed
+            </button>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-gray-400">This platform does not send email — marking distributed records who it went to.</p>
+      </div>
+    </section>
+  );
+}
