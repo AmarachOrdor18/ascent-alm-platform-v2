@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/cn';
 
-type IconProps = React.SVGProps<SVGSVGElement>;
+export type IconProps = React.SVGProps<SVGSVGElement>;
 
 function BaseIcon({ children, className, ...props }: IconProps & { children: React.ReactNode }) {
   return (

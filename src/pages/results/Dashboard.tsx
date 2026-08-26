@@ -13,7 +13,7 @@
  * down, the same weighting a trading-floor dashboard uses.
  */
 
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'wouter';
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -21,17 +21,25 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
+import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates } from '@/lib/hooks';
 import { useRuns } from '@/lib/runHooks';
 import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatPct, formatDate } from '@/lib/format';
+import type { KriObservation } from '@/engine/kri';
 import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } from '@/engine/liquidity';
 import type { EveResult, NiiResult } from '@/engine/irrbb';
 import type { ProfitabilityResult } from '@/engine/profitability';
 
 type Tone = 'success' | 'warning' | 'danger' | 'neutral';
+
+interface Trend {
+  text: string;
+  /** Whether this change is good news for the metric, not just whether the number rose. */
+  good: boolean;
+}
 
 interface Metric {
   id: string;
@@ -39,6 +47,8 @@ interface Metric {
   value: string;
   tone: Tone;
   href: string;
+  icon?: ComponentType<IconProps>;
+  trend?: Trend;
 }
 
 const TONE_TEXT: Record<Tone, string> = {
@@ -48,6 +58,27 @@ const TONE_TEXT: Record<Tone, string> = {
   neutral: 'text-navy-900',
 };
 
+const TONE_ICON_BG: Record<Tone, string> = {
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  danger: 'bg-danger/10 text-danger',
+  neutral: 'bg-navy-100 text-navy-700',
+};
+
+/** Change since the previous as-of date for this scope — a gap in history means no trend, not a fabricated one. */
+function trendFrom(series: KriObservation[] | undefined, higherIsGood: boolean, decimals = 1): Trend | undefined {
+  if (!series || series.length < 2) return undefined;
+  const latest = series[series.length - 1]!.value;
+  const prior = series[series.length - 2]!.value;
+  const diff = latest - prior;
+  if (diff === 0) return undefined;
+  const rose = diff > 0;
+  return {
+    text: `${rose ? '+' : ''}${diff.toFixed(decimals)}${decimals === 0 ? 'd' : 'pp'} vs last run`,
+    good: rose === higherIsGood,
+  };
+}
+
 export function Dashboard() {
   const { affiliate, affiliateCode } = useScope();
   const selected = useSelectedRun();
@@ -56,7 +87,12 @@ export function Dashboard() {
   const currency = run?.reportingCurrency ?? 'USD';
 
   const { data: scopedRuns = [] } = useRuns(affiliateCode);
-  const { data: trendSeries } = useKriSeries(scopedRuns, ['lcrPercent', 'nsfrPercent']);
+  const { data: trendSeries } = useKriSeries(scopedRuns, [
+    'lcrPercent',
+    'nsfrPercent',
+    'loanToDepositPercent',
+    'survivalHorizonDays',
+  ]);
   const { data: fxRates = [] } = useFxRates();
 
   const trendData = (() => {
@@ -92,16 +128,42 @@ export function Dashboard() {
 
   // The four numbers a treasury desk checks first.
   const headline: Metric[] = [
-    { id: 'lcr', label: 'LCR', value: formatPct(lcr?.lcrPercent ?? null), tone: band(lcr?.lcrPercent ?? null, 100, 130), href: '/liquidity-risk' },
-    { id: 'nsfr', label: 'NSFR', value: formatPct(nsfr?.nsfrPercent ?? null), tone: band(nsfr?.nsfrPercent ?? null, 100, 110), href: '/liquidity-risk' },
+    {
+      id: 'lcr',
+      label: 'LCR',
+      value: formatPct(lcr?.lcrPercent ?? null),
+      tone: band(lcr?.lcrPercent ?? null, 100, 130),
+      href: '/liquidity-risk',
+      icon: ShieldCheckIcon,
+      trend: trendFrom(trendSeries?.get('lcrPercent'), true),
+    },
+    {
+      id: 'nsfr',
+      label: 'NSFR',
+      value: formatPct(nsfr?.nsfrPercent ?? null),
+      tone: band(nsfr?.nsfrPercent ?? null, 100, 110),
+      href: '/liquidity-risk',
+      icon: BarChartIcon,
+      trend: trendFrom(trendSeries?.get('nsfrPercent'), true),
+    },
     {
       id: 'survival',
       label: 'Survival horizon',
       value: survival ? `${survival.survivalHorizonDays}d` : 'No run',
       tone: survival == null ? 'neutral' : survival.survivalHorizonDays < 20 ? 'danger' : 'success',
       href: '/stress-testing',
+      icon: ClockIcon,
+      trend: trendFrom(trendSeries?.get('survivalHorizonDays'), true, 0),
     },
-    { id: 'ldr', label: 'Loan-to-Deposit', value: formatPct(ldr?.ratioPercent ?? null), tone: ldr?.ratioPercent == null ? 'neutral' : ldr.ratioPercent > 90 ? 'danger' : ldr.ratioPercent > 80 ? 'warning' : 'success', href: '/liquidity-risk' },
+    {
+      id: 'ldr',
+      label: 'Loan-to-Deposit',
+      value: formatPct(ldr?.ratioPercent ?? null),
+      tone: ldr?.ratioPercent == null ? 'neutral' : ldr.ratioPercent > 90 ? 'danger' : ldr.ratioPercent > 80 ? 'warning' : 'success',
+      href: '/liquidity-risk',
+      icon: PieChartIcon,
+      trend: trendFrom(trendSeries?.get('loanToDepositPercent'), false),
+    },
   ];
 
   // Everything else, read as a label next to a number, not a card.
@@ -131,22 +193,36 @@ export function Dashboard() {
 
       <ResultsFrame {...frameProps(selected)} requires={[]}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {headline.map((m) => (
-            <Link
-              key={m.id}
-              href={m.href}
-              className={`block rounded-xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${
-                m.tone === 'danger' ? 'border-danger/30' : m.tone === 'warning' ? 'border-warning/30' : 'border-gray-200'
-              }`}
-            >
-              <p className="text-[13px] font-medium text-gray-500">{m.label}</p>
-              <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
-            </Link>
-          ))}
+          {headline.map((m) => {
+            const Icon = m.icon;
+            return (
+              <Link
+                key={m.id}
+                href={m.href}
+                className="block rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex items-start justify-between">
+                  <p className="text-[13px] font-medium text-gray-500">{m.label}</p>
+                  {Icon && (
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TONE_ICON_BG[m.tone]}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+                <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+                {m.trend && (
+                  <p className={`mt-2 flex items-center gap-1 text-[11px] font-bold ${m.trend.good ? 'text-success' : 'text-danger'}`}>
+                    {m.trend.text.startsWith('+') ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
+                    {m.trend.text}
+                  </p>
+                )}
+              </Link>
+            );
+          })}
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Liquidity position trend</h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">LCR and NSFR across every completed run for this scope</p>
             <div style={{ width: '100%', height: 260 }}>
@@ -172,7 +248,7 @@ export function Dashboard() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rates &amp; curves</h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">Current FX rates against USD</p>
             {rateRows.length === 0 ? (
@@ -193,7 +269,7 @@ export function Dashboard() {
         </div>
 
         {breaches.length > 0 && (
-          <div className="mt-6 rounded-xl border border-danger/30 bg-danger/5 p-5">
+          <div className="mt-6 rounded-2xl border border-danger/30 bg-danger/5 p-5">
             <p className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">In breach</p>
             <div className="space-y-2">
               {breaches.map((b) => (
@@ -206,7 +282,7 @@ export function Dashboard() {
           </div>
         )}
 
-        <section className="mt-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {snapshot.map((m) => (
@@ -219,7 +295,7 @@ export function Dashboard() {
         </section>
 
         {prof && (
-          <section className="mt-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Balance sheet shape</h2>
             <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
               <Stat label="Total assets" value={<Amount value={prof.totalAssets} currency={currency} />} />
