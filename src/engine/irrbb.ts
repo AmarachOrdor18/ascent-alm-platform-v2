@@ -203,6 +203,8 @@ export interface EveResult {
   equity: number;
   durationGap: number | null;
   deltaEve: number | null;
+  /** ΔEVE for a 1bp parallel move — the standard PV01 sensitivity figure, independent of `shockBps`. */
+  pv01: number | null;
   eveSensitivityPercentOfEquity: number | null;
   eveSensitivityPercentOfTier1: number | null;
   /** BCBS supervisory outlier test: |ΔEVE| above 15% of Tier 1 capital. */
@@ -260,6 +262,7 @@ export function computeEveSensitivity(positions: Position[], ctx: IrrbbContext, 
       : null;
 
   const deltaEve = durationGap !== null ? -durationGap * (shockBps / 10_000) * totalAssets : null;
+  const pv01 = durationGap !== null ? -durationGap * (1 / 10_000) * totalAssets : null;
 
   const capital = ctx.tier1Capital ?? equity;
   const capitalBasis = ctx.tier1Capital !== null ? 'Tier 1 capital' : 'Balance-sheet equity';
@@ -273,6 +276,7 @@ export function computeEveSensitivity(positions: Position[], ctx: IrrbbContext, 
     equity,
     durationGap,
     deltaEve,
+    pv01,
     eveSensitivityPercentOfEquity: deltaEve !== null && equity > 0 ? (deltaEve / equity) * 100 : null,
     eveSensitivityPercentOfTier1: ctx.tier1Capital !== null ? percentOfCapital : null,
     isBaselOutlier: percentOfCapital !== null ? Math.abs(percentOfCapital) > 15 : null,

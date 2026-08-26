@@ -165,6 +165,10 @@ export function Irrbb() {
                   value={<span className="font-mono font-bold">{eve.durationGap?.toFixed(2) ?? '—'} yrs</span>}
                   bold
                 />
+                <Row
+                  label="PV01 (per 1bp)"
+                  value={eve.pv01 === null ? <span className="font-mono">—</span> : <Amount value={eve.pv01} currency={currency} colorBySign />}
+                />
                 <Row label="Total assets" value={<Amount value={eve.totalAssets} currency={currency} />} />
                 <Row label="Total liabilities" value={<Amount value={eve.totalLiabilities} currency={currency} />} />
                 <Row label={eve.capitalBasis} value={<Amount value={eve.equity} currency={currency} />} bold />

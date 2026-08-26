@@ -1,232 +1,372 @@
 /**
- * Notifications — screen 50 (Phase 7).
+ * Notifications — screen 50.
  *
- * Real-time notification feed for breaches, approvals, audit events, and system alerts.
+ * A real notification rule register. There is no event-instance log in the
+ * data model, so this used to fake one: six invented timestamped items,
+ * including a fabricated breach that echoed the one faked on the
+ * Remediation screen, with a "Mark all as read" button that had no
+ * handler. What the store actually holds is `NotificationRule` rows,
+ * configuration for *when* and *who* an alert reaches, so that is what
+ * this screen configures for real, matching the pattern Validation Rules
+ * and Limits already use.
  */
 
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { BellIcon } from '@/components/icons/Icons';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
+import { useAuth } from '@/context/AuthContext';
+import { useAffiliates } from '@/lib/hooks';
+import { notifications, newId } from '@/lib/governanceHooks';
+import type { NotificationChannel, NotificationRule, Severity } from '@/engine/types';
 
-interface Notification {
-  id: string;
-  type: 'breach' | 'approval' | 'audit' | 'system';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  priority: 'high' | 'medium' | 'low';
-}
+const CHANNELS: NotificationChannel[] = ['Email', 'SMS', 'In-App', 'Webhook'];
+const SEVERITIES: Severity[] = ['Low', 'Medium', 'High', 'Critical'];
+
+const emptyDraft = {
+  id: null as string | null,
+  name: '',
+  event: '',
+  channel: 'Email' as NotificationChannel,
+  recipients: '',
+  minimumSeverity: 'Medium' as Severity,
+  affiliateCode: '',
+  escalateAfterHours: '',
+  escalateTo: '',
+  isActive: true,
+};
 
 export function Notifications() {
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'unread' | 'breach' | 'approval'>('all');
+  const { user } = useAuth();
+  const { data: affiliates = [] } = useAffiliates();
+  const { data: rules = [], isLoading } = notifications.useList();
+  const save = notifications.useSave();
 
-  // Mock notification data
-  const mockNotifications: Notification[] = [
-    {
-      id: 'NOTIF-001',
-      type: 'breach',
-      title: 'LCR Breach Detected',
-      message: 'Group LCR has fallen to 88.4%, below the 100% regulatory minimum. Auto-remediation issue CR-1 created.',
-      timestamp: '2026-08-25T09:30:00Z',
-      read: false,
-      priority: 'high',
-    },
-    {
-      id: 'NOTIF-002',
-      type: 'approval',
-      title: 'Affiliate Activation Pending',
-      message: 'Ecobank Zambia go-live approval is pending your review. All onboarding steps completed.',
-      timestamp: '2026-08-25T08:15:00Z',
-      read: false,
-      priority: 'high',
-    },
-    {
-      id: 'NOTIF-003',
-      type: 'audit',
-      title: 'Rule Change Logged',
-      message: 'User Chinwe Okafor modified LCR warning threshold for NG affiliate from 110% to 105%.',
-      timestamp: '2026-08-24T16:45:00Z',
-      read: true,
-      priority: 'medium',
-    },
-    {
-      id: 'NOTIF-004',
-      type: 'system',
-      title: 'Data Upload Completed',
-      message: 'Ghana position book upload completed successfully. 7,421 positions validated and committed.',
-      timestamp: '2026-08-24T14:20:00Z',
-      read: true,
-      priority: 'low',
-    },
-    {
-      id: 'NOTIF-005',
-      type: 'breach',
-      title: 'Concentration Warning',
-      message: 'Deposit concentration for CI affiliate at 35.4% exceeds internal threshold of 35%.',
-      timestamp: '2026-08-24T11:00:00Z',
-      read: true,
-      priority: 'medium',
-    },
-    {
-      id: 'NOTIF-006',
-      type: 'approval',
-      title: 'Remediation Closure Approved',
-      message: 'Remediation issue CR-3 closure has been approved by Control Testing Lead.',
-      timestamp: '2026-08-23T17:30:00Z',
-      read: true,
-      priority: 'medium',
-    },
-  ];
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draft, setDraft] = useState(emptyDraft);
 
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
-  const breachCount = mockNotifications.filter((n) => n.type === 'breach').length;
-  const approvalCount = mockNotifications.filter((n) => n.type === 'approval').length;
+  const active = rules.filter((r) => r.isActive);
+  const withEscalation = rules.filter((r) => r.escalateAfterHours !== null);
 
-  const filteredNotifications = mockNotifications.filter((n) => {
-    if (selectedFilter === 'all') return true;
-    if (selectedFilter === 'unread') return !n.read;
-    if (selectedFilter === 'breach') return n.type === 'breach';
-    if (selectedFilter === 'approval') return n.type === 'approval';
-    return true;
-  });
+  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
+    rules,
+    10,
+    ['name', 'event', 'channel'],
+  );
 
-  const typeIcon = {
-    breach: '⚠️',
-    approval: '✋',
-    audit: '📋',
-    system: 'ℹ️',
-  } as const;
+  const openNew = () => {
+    setDraft(emptyDraft);
+    setEditorOpen(true);
+  };
 
-  const priorityColor = {
-    high: 'bg-danger',
-    medium: 'bg-warning',
-    low: 'bg-success',
-  } as const;
+  const openEdit = (rule: NotificationRule) => {
+    setDraft({
+      id: rule.id,
+      name: rule.name,
+      event: rule.event,
+      channel: rule.channel,
+      recipients: rule.recipients.join(', '),
+      minimumSeverity: rule.minimumSeverity,
+      affiliateCode: rule.affiliateCode ?? '',
+      escalateAfterHours: rule.escalateAfterHours !== null ? String(rule.escalateAfterHours) : '',
+      escalateTo: rule.escalateTo.join(', '),
+      isActive: rule.isActive,
+    });
+    setEditorOpen(true);
+  };
 
-  function formatTime(timestamp: string): string {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  const toggleActive = async (rule: NotificationRule) => {
+    if (!user) return;
+    await save.mutateAsync({ ...rule, isActive: !rule.isActive, updatedBy: user.name, updatedAt: new Date().toISOString() });
+  };
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  }
+  const handleSave = async () => {
+    if (!user || !draft.name || !draft.event) return;
+    await save.mutateAsync({
+      id: draft.id ?? newId('NOT'),
+      name: draft.name,
+      event: draft.event,
+      channel: draft.channel,
+      recipients: draft.recipients.split(',').map((r) => r.trim()).filter(Boolean),
+      minimumSeverity: draft.minimumSeverity,
+      affiliateCode: draft.affiliateCode || null,
+      escalateAfterHours: draft.escalateAfterHours ? Number(draft.escalateAfterHours) : null,
+      escalateTo: draft.escalateTo.split(',').map((r) => r.trim()).filter(Boolean),
+      isActive: draft.isActive,
+      updatedBy: user.name,
+      updatedAt: new Date().toISOString(),
+    });
+    setEditorOpen(false);
+  };
 
   return (
     <>
       <ModuleHeader
         title="Notifications"
-        description="Real-time notification feed for breaches, approvals, audit events, and system alerts"
+        description="Which events raise an alert, over which channel, to whom, and when it escalates."
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'Unread', value: String(unreadCount), tone: unreadCount > 0 ? 'warning' : 'success' },
-          { label: 'Breaches', value: String(breachCount), tone: breachCount > 0 ? 'danger' : 'neutral' },
-          { label: 'Approvals', value: String(approvalCount) },
-          { label: 'Total', value: String(mockNotifications.length) },
+          { label: 'Rules', value: String(rules.length) },
+          { label: 'Active', value: String(active.length), tone: 'success' },
+          { label: 'With escalation', value: String(withEscalation.length) },
+          { label: 'Channels used', value: String(new Set(rules.map((r) => r.channel)).size) },
         ]}
+        actions={
+          <button
+            type="button"
+            onClick={openNew}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+          >
+            New rule
+          </button>
+        }
       />
 
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          onClick={() => setSelectedFilter('all')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedFilter === 'all' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          All ({mockNotifications.length})
-        </button>
-        <button
-          onClick={() => setSelectedFilter('unread')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedFilter === 'unread' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          Unread ({unreadCount})
-        </button>
-        <button
-          onClick={() => setSelectedFilter('breach')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedFilter === 'breach' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          Breaches ({breachCount})
-        </button>
-        <button
-          onClick={() => setSelectedFilter('approval')}
-          className={`px-4 py-2 rounded-lg text-[12px] font-bold transition-colors ${
-            selectedFilter === 'approval' ? 'bg-navy-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-navy-700'
-          }`}
-        >
-          Approvals ({approvalCount})
-        </button>
-      </div>
-
-      <div className="table-datagrid-container">
-        <div className="overflow-x-auto">
-          <table className="table-datagrid">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Title</th>
-                <th>Message</th>
-                <th>Priority</th>
-                <th>Time</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredNotifications.map((notification) => (
-                <tr
-                  key={notification.id}
-                  className={!notification.read ? 'bg-navy-50/20' : ''}
-                >
-                  <td>
-                    <span className="text-lg" title={notification.type}>
-                      {typeIcon[notification.type]}
-                    </span>
-                  </td>
-                  <td>
-                    <p className={`font-bold text-navy-900 ${!notification.read ? 'font-extrabold' : ''}`}>{notification.title}</p>
-                  </td>
-                  <td>
-                    <p className="text-gray-600 max-w-md">{notification.message}</p>
-                  </td>
-                  <td>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${priorityColor[notification.priority]} text-white`}>
-                      {notification.priority}
-                    </span>
-                  </td>
-                  <td className="text-gray-500 text-[11px]">{formatTime(notification.timestamp)}</td>
-                  <td>
-                    {!notification.read && (
-                      <span className="inline-block w-2 h-2 rounded-full bg-gold-500" />
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filteredNotifications.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center text-gray-400 py-6">
-                    No notifications found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {!isLoading && rules.length === 0 && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
+          <BellIcon className="mx-auto mb-3 h-8 w-8 text-gray-300" />
+          <p className="text-sm text-gray-400">No notification rules configured yet. Click "New rule" to raise the first one.</p>
         </div>
-      </div>
+      )}
 
-      {unreadCount > 0 && (
-        <div className="mt-4 flex justify-end">
-          <button className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 transition-colors">
-            Mark All as Read
-          </button>
+      {(isLoading || rules.length > 0) && (
+        <div className="table-datagrid-container">
+          <div className="border-b border-gray-100 bg-white/50 p-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-navy-900">Notification rules</h3>
+              <p className="text-[11px] font-medium text-gray-400">One row per event this platform can raise an alert for.</p>
+            </div>
+            <TableToolbar
+              searchValue={search}
+              onSearchChange={setSearch}
+              exportData={() => rules}
+              exportFilename="notification-rules"
+              density={density}
+              onDensityChange={setDensity}
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table-datagrid">
+              <thead>
+                <tr>
+                  <th>Rule</th>
+                  <th>Event</th>
+                  <th>Channel</th>
+                  <th>Minimum severity</th>
+                  <th>Recipients</th>
+                  <th>Escalation</th>
+                  <th>Status</th>
+                  <th>Edit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-gray-400">
+                      Loading.
+                    </td>
+                  </tr>
+                )}
+                {paged.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <p className="font-bold text-navy-900">{r.name}</p>
+                      <p className="mt-0.5 text-[11px] font-medium text-gray-400">
+                        {r.affiliateCode ? affiliates.find((a) => a.code === r.affiliateCode)?.name ?? r.affiliateCode : 'Group-wide'}
+                      </p>
+                    </td>
+                    <td>{r.event}</td>
+                    <td>
+                      <span className="font-mono text-[11px]">{r.channel}</span>
+                    </td>
+                    <td>
+                      <StatusBadge status={r.minimumSeverity} tone={r.minimumSeverity === 'Critical' || r.minimumSeverity === 'High' ? 'danger' : r.minimumSeverity === 'Medium' ? 'warning' : 'success'} />
+                    </td>
+                    <td>
+                      <span className="text-[12px] text-gray-600">{r.recipients.length > 0 ? r.recipients.join(', ') : 'None set'}</span>
+                    </td>
+                    <td>
+                      {r.escalateAfterHours !== null ? (
+                        <span className="text-[12px] text-gray-600">
+                          After {r.escalateAfterHours}h to {r.escalateTo.join(', ') || 'nobody set'}
+                        </span>
+                      ) : (
+                        <span className="text-[12px] text-gray-300">None</span>
+                      )}
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => void toggleActive(r)}>
+                        <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} tone={r.isActive ? 'success' : 'neutral'} />
+                      </button>
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => openEdit(r)} className="text-[11px] font-bold text-navy-700 hover:underline">
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
+        </div>
+      )}
+
+      {editorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-4 text-[13px] font-bold uppercase tracking-wider text-navy-900">
+              {draft.id ? 'Edit notification rule' : 'New notification rule'}
+            </h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="not-name" className="mb-1 block text-[11px] text-gray-600">
+                    Name
+                  </label>
+                  <input
+                    id="not-name"
+                    value={draft.name}
+                    onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                    placeholder="e.g. LCR below floor"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="not-event" className="mb-1 block text-[11px] text-gray-600">
+                    Event
+                  </label>
+                  <input
+                    id="not-event"
+                    value={draft.event}
+                    onChange={(e) => setDraft((d) => ({ ...d, event: e.target.value }))}
+                    placeholder="e.g. Limit status turns Red"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="not-channel" className="mb-1 block text-[11px] text-gray-600">
+                    Channel
+                  </label>
+                  <select
+                    id="not-channel"
+                    value={draft.channel}
+                    onChange={(e) => setDraft((d) => ({ ...d, channel: e.target.value as NotificationChannel }))}
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  >
+                    {CHANNELS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="not-severity" className="mb-1 block text-[11px] text-gray-600">
+                    Minimum severity
+                  </label>
+                  <select
+                    id="not-severity"
+                    value={draft.minimumSeverity}
+                    onChange={(e) => setDraft((d) => ({ ...d, minimumSeverity: e.target.value as Severity }))}
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  >
+                    {SEVERITIES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="not-recipients" className="mb-1 block text-[11px] text-gray-600">
+                  Recipients (comma separated)
+                </label>
+                <input
+                  id="not-recipients"
+                  value={draft.recipients}
+                  onChange={(e) => setDraft((d) => ({ ...d, recipients: e.target.value }))}
+                  placeholder="name@ecobank.com, name2@ecobank.com"
+                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="not-affiliate" className="mb-1 block text-[11px] text-gray-600">
+                  Affiliate
+                </label>
+                <select
+                  id="not-affiliate"
+                  value={draft.affiliateCode}
+                  onChange={(e) => setDraft((d) => ({ ...d, affiliateCode: e.target.value }))}
+                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                >
+                  <option value="">Group-wide</option>
+                  {affiliates.map((a) => (
+                    <option key={a.code} value={a.code}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="not-escalate-hours" className="mb-1 block text-[11px] text-gray-600">
+                    Escalate after (hours, optional)
+                  </label>
+                  <input
+                    id="not-escalate-hours"
+                    type="number"
+                    min={0}
+                    value={draft.escalateAfterHours}
+                    onChange={(e) => setDraft((d) => ({ ...d, escalateAfterHours: e.target.value }))}
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="not-escalate-to" className="mb-1 block text-[11px] text-gray-600">
+                    Escalate to (comma separated)
+                  </label>
+                  <input
+                    id="not-escalate-to"
+                    value={draft.escalateTo}
+                    onChange={(e) => setDraft((d) => ({ ...d, escalateTo: e.target.value }))}
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-[12px] text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={draft.isActive}
+                  onChange={(e) => setDraft((d) => ({ ...d, isActive: e.target.checked }))}
+                />
+                Active
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditorOpen(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={!draft.name || !draft.event}
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Save rule
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
