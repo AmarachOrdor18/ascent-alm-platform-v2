@@ -212,10 +212,10 @@ export function RunHistory() {
           <table className="w-full text-[12px]">
             <thead>
               <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                <th className="py-2 font-bold">Metric</th>
-                <th className="py-2 text-right font-bold">A</th>
-                {right && <th className="py-2 text-right font-bold">B</th>}
-                {right && <th className="py-2 text-right font-bold">Change</th>}
+                <th className="py-2 px-3 font-bold">Metric</th>
+                <th className="py-2 px-3 text-right font-bold">A</th>
+                {right && <th className="py-2 px-3 text-right font-bold">B</th>}
+                {right && <th className="py-2 px-3 text-right font-bold">Change</th>}
               </tr>
             </thead>
             <tbody>
@@ -223,8 +223,8 @@ export function RunHistory() {
                 const improving = m.delta === null ? null : m.higherIsBetter ? m.delta > 0 : m.delta < 0;
                 return (
                   <tr key={m.label} className="border-b border-gray-100">
-                    <td className="py-2 font-medium text-navy-900">{m.label}</td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="py-2 px-3 font-medium text-navy-900">{m.label}</td>
+                    <td className="py-2 px-3 text-right font-mono">
                       {m.value === null ? (
                         <span className="text-gray-300">—</span>
                       ) : m.unit === 'percent' ? (
@@ -236,7 +236,7 @@ export function RunHistory() {
                       )}
                     </td>
                     {right && (
-                      <td className="py-2 text-right font-mono">
+                      <td className="py-2 px-3 text-right font-mono">
                         {m.other === null ? (
                           <span className="text-gray-300">—</span>
                         ) : m.unit === 'percent' ? (
@@ -250,7 +250,7 @@ export function RunHistory() {
                     )}
                     {right && (
                       <td
-                        className={`py-2 text-right font-mono ${
+                        className={`py-2 px-3 text-right font-mono ${
                           m.delta === null ? 'text-gray-300' : improving ? 'text-success' : 'text-danger'
                         }`}
                       >

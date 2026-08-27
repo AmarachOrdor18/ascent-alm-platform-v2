@@ -139,9 +139,9 @@ function ResultsTable({
       <table className="w-full text-[12px]">
         <thead>
           <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-            <th className="py-2 font-bold">Affiliate</th>
+            <th className="py-2 px-3 font-bold">Affiliate</th>
             {metricKeys.map((key) => (
-              <th key={key} className="py-2 text-right font-bold">{METRIC_SPECS.find((m) => m.key === key)?.label ?? key}</th>
+              <th key={key} className="py-2 px-3 text-right font-bold">{METRIC_SPECS.find((m) => m.key === key)?.label ?? key}</th>
             ))}
           </tr>
         </thead>
@@ -162,12 +162,12 @@ function AffiliateResultRow({
 
   return (
     <tr className="border-b border-gray-100">
-      <td className="py-2">
+      <td className="py-2 px-3">
         <span className="font-medium text-navy-900">{target.name}</span>
         <span className="ml-2 font-mono text-[10px] text-gray-400">{target.run?.asOfDate ?? 'no run'}</span>
       </td>
       {metricKeys.map((key) => (
-        <td key={key} className="py-2 text-right font-mono">{formatMetric(metrics.get(key) ?? null, key)}</td>
+        <td key={key} className="py-2 px-3 text-right font-mono">{formatMetric(metrics.get(key) ?? null, key)}</td>
       ))}
     </tr>
   );

@@ -295,8 +295,8 @@ export function AdjustmentRules() {
               <table className="w-full max-w-md text-[11px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-400">
-                    <th className="py-1 font-bold uppercase tracking-wider">If LCR is</th>
-                    <th className="py-1 text-right font-bold uppercase tracking-wider">Add-on</th>
+                    <th className="py-1 px-3 font-bold uppercase tracking-wider">If LCR is</th>
+                    <th className="py-1 px-3 text-right font-bold uppercase tracking-wider">Add-on</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -304,8 +304,8 @@ export function AdjustmentRules() {
                     const line = rule.adjustments.find((a) => a.method === 'LcrDriven')!;
                     return (
                       <tr key={lcr} className="border-b border-gray-100">
-                        <td className="py-1 font-mono">{lcr}%</td>
-                        <td className="py-1 text-right font-mono text-navy-900">
+                        <td className="py-1 px-3 font-mono">{lcr}%</td>
+                        <td className="py-1 px-3 text-right font-mono text-navy-900">
                           {formatBps(
                             resolveAdjustmentBps(
                               {

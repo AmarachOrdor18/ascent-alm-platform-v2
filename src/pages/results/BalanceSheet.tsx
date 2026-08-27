@@ -219,25 +219,25 @@ function PositionDetail({
     <table className="w-full text-[11px]">
       <thead>
         <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-          <th className="py-1.5 font-bold">Account</th>
-          <th className="py-1.5 font-bold">Product</th>
-          <th className="py-1.5 font-bold">Class</th>
-          <th className="py-1.5 text-right font-bold">Balance</th>
-          <th className="py-1.5 text-right font-bold">Lien</th>
-          <th className="py-1.5 font-bold">Matures</th>
-          <th className="py-1.5 font-bold">Quality</th>
+          <th className="py-1.5 px-3 font-bold">Account</th>
+          <th className="py-1.5 px-3 font-bold">Product</th>
+          <th className="py-1.5 px-3 font-bold">Class</th>
+          <th className="py-1.5 px-3 text-right font-bold">Balance</th>
+          <th className="py-1.5 px-3 text-right font-bold">Lien</th>
+          <th className="py-1.5 px-3 font-bold">Matures</th>
+          <th className="py-1.5 px-3 font-bold">Quality</th>
         </tr>
       </thead>
       <tbody>
         {matching.map((p) => (
           <tr key={p.id} className="border-b border-gray-50">
-            <td className="py-1.5 font-mono">{p.accountNumber}</td>
-            <td className="py-1.5">{p.productClass}</td>
-            <td className="py-1.5">{p.accountClass}</td>
-            <td className="py-1.5 text-right">
+            <td className="py-1.5 px-3 font-mono">{p.accountNumber}</td>
+            <td className="py-1.5 px-3">{p.productClass}</td>
+            <td className="py-1.5 px-3">{p.accountClass}</td>
+            <td className="py-1.5 px-3 text-right">
               <Amount value={convert(p.amount, p.currency, currency, fx)} currency={currency} />
             </td>
-            <td className="py-1.5 text-right">
+            <td className="py-1.5 px-3 text-right">
               {p.lienAmount > 0 ? (
                 <span title={p.lienReason ?? undefined}>
                   <Amount value={p.lienAmount} currency={p.currency} />
@@ -246,8 +246,8 @@ function PositionDetail({
                 <span className="text-gray-300">—</span>
               )}
             </td>
-            <td className="py-1.5 font-mono">{p.maturityDate ?? '—'}</td>
-            <td className="py-1.5">
+            <td className="py-1.5 px-3 font-mono">{p.maturityDate ?? '—'}</td>
+            <td className="py-1.5 px-3">
               <StatusBadge status={p.performingStatus} />
             </td>
           </tr>

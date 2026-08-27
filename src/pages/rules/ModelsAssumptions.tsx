@@ -179,27 +179,27 @@ export function ModelsAssumptions() {
               <table className="w-full text-[11px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-400">
-                    <th className="py-1 font-bold uppercase tracking-wider">Name</th>
-                    <th className="py-1 font-bold uppercase tracking-wider">Folder</th>
-                    <th className="py-1 font-bold uppercase tracking-wider">Scope</th>
-                    <th className="py-1 text-right font-bold uppercase tracking-wider">Version</th>
-                    <th className="py-1 font-bold uppercase tracking-wider">Owner</th>
+                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Name</th>
+                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Folder</th>
+                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Scope</th>
+                    <th className="py-1 px-3 text-right font-bold uppercase tracking-wider">Version</th>
+                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Owner</th>
                   </tr>
                 </thead>
                 <tbody>
                   {r.rules.map((rule) => (
                     <tr key={rule.id} className="border-b border-gray-100 last:border-0">
-                      <td className="py-1.5 font-medium text-navy-900">{rule.name}</td>
-                      <td className="py-1.5 font-mono text-gray-500">{rule.folder}</td>
-                      <td className="py-1.5">
+                      <td className="py-1.5 px-3 font-medium text-navy-900">{rule.name}</td>
+                      <td className="py-1.5 px-3 font-mono text-gray-500">{rule.folder}</td>
+                      <td className="py-1.5 px-3">
                         {rule.affiliateCode ? (
                           <span className="font-mono text-warning">{rule.affiliateCode}</span>
                         ) : (
                           <span className="text-gray-500">Group</span>
                         )}
                       </td>
-                      <td className="py-1.5 text-right font-mono">v{rule.version}</td>
-                      <td className="py-1.5 text-gray-500">{rule.updatedBy ?? rule.createdBy}</td>
+                      <td className="py-1.5 px-3 text-right font-mono">v{rule.version}</td>
+                      <td className="py-1.5 px-3 text-gray-500">{rule.updatedBy ?? rule.createdBy}</td>
                     </tr>
                   ))}
                 </tbody>

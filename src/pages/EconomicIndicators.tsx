@@ -184,19 +184,19 @@ export function EconomicIndicators() {
                   <tr className="border-b border-gray-200">
                     <th
                       scope="col"
-                      className="py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                      className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
                     >
                       Period
                     </th>
                     <th
                       scope="col"
-                      className="py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                      className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
                     >
                       Value
                     </th>
                     <th
                       scope="col"
-                      className="py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                      className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
                     >
                       Change
                     </th>
@@ -208,11 +208,11 @@ export function EconomicIndicators() {
                     const delta = prior ? o.value - prior.value : null;
                     return (
                       <tr key={o.asOfDate} className="border-b border-gray-100">
-                        <td className="py-2 font-mono text-navy-900">{formatDate(o.asOfDate)}</td>
-                        <td className="py-2 text-right font-mono">
+                        <td className="py-2 px-3 font-mono text-navy-900">{formatDate(o.asOfDate)}</td>
+                        <td className="py-2 px-3 text-right font-mono">
                           {o.value} {active.unit}
                         </td>
-                        <td className="py-2 text-right font-mono text-gray-500">
+                        <td className="py-2 px-3 text-right font-mono text-gray-500">
                           {delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(2)}`}
                         </td>
                       </tr>

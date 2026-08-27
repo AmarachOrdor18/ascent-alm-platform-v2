@@ -225,23 +225,23 @@ export function BulkOnboardAffiliates() {
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                    <th className="py-2 font-bold">Row</th>
-                    <th className="py-2 font-bold">Code</th>
-                    <th className="py-2 font-bold">Name</th>
-                    <th className="py-2 font-bold">Status</th>
-                    <th className="py-2 font-bold">Errors</th>
+                    <th className="py-2 px-3 font-bold">Row</th>
+                    <th className="py-2 px-3 font-bold">Code</th>
+                    <th className="py-2 px-3 font-bold">Name</th>
+                    <th className="py-2 px-3 font-bold">Status</th>
+                    <th className="py-2 px-3 font-bold">Errors</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.rowNumber} className="border-b border-gray-100 align-top">
-                      <td className="py-2 font-mono text-[11px] text-gray-500">{r.rowNumber}</td>
-                      <td className="py-2 font-mono text-[11px]">{r.code || '—'}</td>
-                      <td className="py-2 text-navy-900">{r.name || '—'}</td>
-                      <td className="py-2">
+                      <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{r.rowNumber}</td>
+                      <td className="py-2 px-3 font-mono text-[11px]">{r.code || '—'}</td>
+                      <td className="py-2 px-3 text-navy-900">{r.name || '—'}</td>
+                      <td className="py-2 px-3">
                         <StatusBadge status={r.errors.length === 0 ? 'Valid' : 'Error'} tone={r.errors.length === 0 ? 'success' : 'danger'} />
                       </td>
-                      <td className="py-2 text-[11px] text-danger">
+                      <td className="py-2 px-3 text-[11px] text-danger">
                         {r.errors.length > 0 && (
                           <ul className="list-disc space-y-0.5 pl-4">
                             {r.errors.map((e, i) => <li key={i}>{e}</li>)}

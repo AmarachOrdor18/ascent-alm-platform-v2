@@ -198,12 +198,12 @@ export function AffiliateDetail() {
           <table className="w-full text-[12px]">
             <thead>
               <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                <th className="py-2 font-bold">Domain</th>
-                <th className="py-2 font-bold">Fed by</th>
-                <th className="py-2 font-bold">Owner</th>
-                <th className="py-2 text-right font-bold">SLA</th>
-                <th className="py-2 text-right font-bold">Age</th>
-                <th className="py-2 font-bold">Freshness</th>
+                <th className="py-2 px-3 font-bold">Domain</th>
+                <th className="py-2 px-3 font-bold">Fed by</th>
+                <th className="py-2 px-3 font-bold">Owner</th>
+                <th className="py-2 px-3 text-right font-bold">SLA</th>
+                <th className="py-2 px-3 text-right font-bold">Age</th>
+                <th className="py-2 px-3 font-bold">Freshness</th>
               </tr>
             </thead>
             <tbody>
@@ -211,8 +211,8 @@ export function AffiliateDetail() {
                 const feed = affiliate.feeds.find((x) => x.domain === f.domain)!;
                 return (
                   <tr key={f.domain} className="border-b border-gray-100">
-                    <td className="py-2 font-medium text-navy-900">{f.domain}</td>
-                    <td className="py-2 text-gray-600">
+                    <td className="py-2 px-3 font-medium text-navy-900">{f.domain}</td>
+                    <td className="py-2 px-3 text-gray-600">
                       {feed.mode === 'File' ? (
                         <span className="text-warning">File substitution</span>
                       ) : feed.mode === 'Connector' ? (
@@ -221,12 +221,12 @@ export function AffiliateDetail() {
                         <span className="text-danger">Not configured</span>
                       )}
                     </td>
-                    <td className="py-2 text-gray-500">{feed.owner ?? '—'}</td>
-                    <td className="py-2 text-right font-mono text-gray-500">{f.slaDays}d</td>
-                    <td className="py-2 text-right font-mono text-gray-500">
+                    <td className="py-2 px-3 text-gray-500">{feed.owner ?? '—'}</td>
+                    <td className="py-2 px-3 text-right font-mono text-gray-500">{f.slaDays}d</td>
+                    <td className="py-2 px-3 text-right font-mono text-gray-500">
                       {f.ageDays === null ? '—' : `${f.ageDays}d`}
                     </td>
-                    <td className="py-2">
+                    <td className="py-2 px-3">
                       <StatusBadge status={f.status} tone={FRESHNESS_TONE[f.status]} />
                     </td>
                   </tr>

@@ -47,7 +47,7 @@ export function RuleRows<T>({
                   key={c.key}
                   scope="col"
                   className={cn(
-                    'py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400',
+                    'py-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400',
                     c.align === 'right' ? 'text-right' : 'text-left',
                   )}
                   style={c.width ? { width: c.width } : undefined}
@@ -55,13 +55,13 @@ export function RuleRows<T>({
                   {c.header}
                 </th>
               ))}
-              {!readOnly && <th scope="col" className="w-16 py-1.5" />}
+              {!readOnly && <th scope="col" className="w-16 py-1.5 px-3" />}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 1} className="py-6 text-center text-[12px] text-gray-400">
+                <td colSpan={columns.length + 1} className="py-6 px-3 text-center text-[12px] text-gray-400">
                   {emptyMessage}
                 </td>
               </tr>
@@ -74,7 +74,7 @@ export function RuleRows<T>({
                   </td>
                 ))}
                 {!readOnly && (
-                  <td className="py-1.5 text-right">
+                  <td className="py-1.5 px-3 text-right">
                     <button
                       type="button"
                       onClick={() => onChange(rows.filter((_, i) => i !== index))}

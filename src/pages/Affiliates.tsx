@@ -159,11 +159,11 @@ export function Affiliates() {
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-gray-400">
-                      <th className="py-1 font-bold uppercase tracking-wider">Domain</th>
-                      <th className="py-1 font-bold uppercase tracking-wider">Fed by</th>
-                      <th className="py-1 font-bold uppercase tracking-wider">SLA</th>
-                      <th className="py-1 font-bold uppercase tracking-wider">Last loaded</th>
-                      <th className="py-1 font-bold uppercase tracking-wider">Status</th>
+                      <th className="py-1 px-3 font-bold uppercase tracking-wider">Domain</th>
+                      <th className="py-1 px-3 font-bold uppercase tracking-wider">Fed by</th>
+                      <th className="py-1 px-3 font-bold uppercase tracking-wider">SLA</th>
+                      <th className="py-1 px-3 font-bold uppercase tracking-wider">Last loaded</th>
+                      <th className="py-1 px-3 font-bold uppercase tracking-wider">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -171,16 +171,16 @@ export function Affiliates() {
                       const feed = a.feeds.find((x) => x.domain === f.domain)!;
                       return (
                         <tr key={f.domain} className="border-b border-gray-100">
-                          <td className="py-1.5 font-medium text-navy-900">{f.domain}</td>
-                          <td className="py-1.5 text-gray-600">
+                          <td className="py-1.5 px-3 font-medium text-navy-900">{f.domain}</td>
+                          <td className="py-1.5 px-3 text-gray-600">
                             {feed.mode === 'File' ? 'File upload (substitution)' : feed.mode}
                             {feed.owner && <span className="text-gray-400"> · {feed.owner}</span>}
                           </td>
-                          <td className="py-1.5 font-mono text-gray-500">{f.slaDays}d</td>
-                          <td className="py-1.5 font-mono text-gray-500">
+                          <td className="py-1.5 px-3 font-mono text-gray-500">{f.slaDays}d</td>
+                          <td className="py-1.5 px-3 font-mono text-gray-500">
                             {f.lastLoadedAt ? formatDate(f.lastLoadedAt.slice(0, 10)) : '—'}
                           </td>
-                          <td className="py-1.5">
+                          <td className="py-1.5 px-3">
                             <StatusBadge status={f.status} tone={FRESHNESS_TONE[f.status]} />
                           </td>
                         </tr>

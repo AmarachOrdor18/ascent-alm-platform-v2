@@ -110,9 +110,9 @@ export function TimeBucketRules() {
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                      <th className="py-1.5 font-bold">Label</th>
-                      <th className="py-1.5 text-right font-bold">Upper bound (days)</th>
-                      <th className="py-1.5" />
+                      <th className="py-1.5 px-3 font-bold">Label</th>
+                      <th className="py-1.5 px-3 text-right font-bold">Upper bound (days)</th>
+                      <th className="py-1.5 px-3" />
                     </tr>
                   </thead>
                   <tbody>
@@ -134,7 +134,7 @@ export function TimeBucketRules() {
                             className={ruleInput}
                           />
                         </td>
-                        <td className="py-1.5">
+                        <td className="py-1.5 px-3">
                           <label htmlFor={`ub-${ladderIndex}-${i}`} className="sr-only">
                             Bucket {i + 1} upper bound
                           </label>

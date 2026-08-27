@@ -577,11 +577,11 @@ export function OnboardAffiliate() {
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                      <th className="py-2 font-bold">Domain</th>
-                      <th className="py-2 font-bold">Fed by</th>
-                      <th className="py-2 text-right font-bold">SLA (days)</th>
-                      <th className="py-2 font-bold">Owner</th>
-                      <th className="py-2 font-bold">Status</th>
+                      <th className="py-2 px-3 font-bold">Domain</th>
+                      <th className="py-2 px-3 font-bold">Fed by</th>
+                      <th className="py-2 px-3 text-right font-bold">SLA (days)</th>
+                      <th className="py-2 px-3 font-bold">Owner</th>
+                      <th className="py-2 px-3 font-bold">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -591,8 +591,8 @@ export function OnboardAffiliate() {
                       return (
                         <>
                           <tr key={domain} className="border-b border-gray-100 align-top">
-                            <td className="py-2 font-medium text-navy-900">{DOMAIN_LABEL[domain]}</td>
-                            <td className="py-2">
+                            <td className="py-2 px-3 font-medium text-navy-900">{DOMAIN_LABEL[domain]}</td>
+                            <td className="py-2 px-3">
                               <select
                                 aria-label={`${domain} feed mode`}
                                 value={feed.mode}
@@ -636,13 +636,13 @@ export function OnboardAffiliate() {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 text-right">
+                            <td className="py-2 px-3 text-right">
                               <input type="number" min={1} value={feed.slaDays} onChange={(e) => updateFeed(domain, { slaDays: Number(e.target.value) })} aria-label={`${domain} SLA days`} className="w-20 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
                             </td>
-                            <td className="py-2">
+                            <td className="py-2 px-3">
                               <input value={feed.owner ?? ''} onChange={(e) => updateFeed(domain, { owner: e.target.value || null })} placeholder="Named owner" aria-label={`${domain} owner`} className="w-40 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
                             </td>
-                            <td className="py-2">
+                            <td className="py-2 px-3">
                               <StatusBadge
                                 status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? (feed.connectorId ? 'Connected' : 'Not selected') : 'Not configured'}
                                 tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? (feed.connectorId ? 'success' : 'warning') : 'neutral'}
@@ -692,9 +692,9 @@ export function OnboardAffiliate() {
                 <table className="mb-6 w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                      <th className="py-2 font-bold">Group COA node</th>
-                      <th className="py-2 font-bold">Mapped local codes</th>
-                      <th className="py-2 font-bold">Add a local code</th>
+                      <th className="py-2 px-3 font-bold">Group COA node</th>
+                      <th className="py-2 px-3 font-bold">Mapped local codes</th>
+                      <th className="py-2 px-3 font-bold">Add a local code</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -702,17 +702,17 @@ export function OnboardAffiliate() {
                       const mapped = affiliateGlAccounts.filter((m) => m.attributes?.commonCoa === leaf.code);
                       return (
                         <tr key={leaf.code} className="border-b border-gray-100">
-                          <td className="py-2">
+                          <td className="py-2 px-3">
                             <span className="font-mono text-[11px] text-gray-500">{leaf.code}</span> <span className="text-navy-900">{leaf.name}</span>
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 px-3">
                             {mapped.length === 0 ? (
                               <span className="text-[11px] text-danger">Unmapped</span>
                             ) : (
                               <span className="font-mono text-[11px] text-navy-900">{mapped.map((m) => m.code).join(', ')}</span>
                             )}
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 px-3">
                             <div className="flex gap-2">
                               <input
                                 value={newLocalCode[leaf.code] ?? ''}
@@ -791,10 +791,10 @@ export function OnboardAffiliate() {
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                      <th className="py-2 font-bold">Metric</th>
-                      <th className="py-2 text-right font-bold">Regulatory minimum</th>
-                      <th className="py-2 text-right font-bold">Internal amber</th>
-                      <th className="py-2 text-right font-bold">Internal red</th>
+                      <th className="py-2 px-3 font-bold">Metric</th>
+                      <th className="py-2 px-3 text-right font-bold">Regulatory minimum</th>
+                      <th className="py-2 px-3 text-right font-bold">Internal amber</th>
+                      <th className="py-2 px-3 text-right font-bold">Internal red</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -802,8 +802,8 @@ export function OnboardAffiliate() {
                       const t = thresholdDraft[metric];
                       return (
                         <tr key={metric} className="border-b border-gray-100">
-                          <td className="py-2 font-medium text-navy-900">{METRIC_LABEL[metric] ?? metric}</td>
-                          <td className="py-2 text-right">
+                          <td className="py-2 px-3 font-medium text-navy-900">{METRIC_LABEL[metric] ?? metric}</td>
+                          <td className="py-2 px-3 text-right">
                             <span
                               className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 font-mono text-gray-500"
                               title="Locked — set by the regulator"
@@ -812,7 +812,7 @@ export function OnboardAffiliate() {
                               <ShieldCheckIcon className="h-3 w-3 shrink-0 text-gray-400" />
                             </span>
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-2 px-3 text-right">
                             <input
                               type="number"
                               value={t?.amberPercent ?? ''}
@@ -822,7 +822,7 @@ export function OnboardAffiliate() {
                             />
                             %
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-2 px-3 text-right">
                             <input
                               type="number"
                               value={t?.redPercent ?? ''}

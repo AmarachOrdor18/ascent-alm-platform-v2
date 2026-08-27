@@ -426,24 +426,24 @@ export function DataLoadPanel({
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                    <th className="py-2 font-bold">Rule</th>
-                    <th className="py-2 font-bold">Severity</th>
-                    <th className="py-2 font-bold">Row</th>
-                    <th className="py-2 font-bold">Description</th>
+                    <th className="py-2 px-3 font-bold">Rule</th>
+                    <th className="py-2 px-3 font-bold">Severity</th>
+                    <th className="py-2 px-3 font-bold">Row</th>
+                    <th className="py-2 px-3 font-bold">Description</th>
                   </tr>
                 </thead>
                 <tbody>
                   {validation.exceptions.slice(0, 30).map((e, i) => (
                     <tr key={`${e.ruleId}-${e.positionId}-${i}`} className="border-b border-gray-100">
-                      <td className="py-2 text-navy-900">{e.ruleName}</td>
-                      <td className="py-2">
+                      <td className="py-2 px-3 text-navy-900">{e.ruleName}</td>
+                      <td className="py-2 px-3">
                         <StatusBadge
                           status={e.severity}
                           tone={e.severity === 'Critical' || e.severity === 'High' ? 'danger' : 'warning'}
                         />
                       </td>
-                      <td className="py-2 font-mono text-[11px] text-gray-500">{e.positionId ?? '—'}</td>
-                      <td className="py-2 text-gray-600">{e.description}</td>
+                      <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{e.positionId ?? '—'}</td>
+                      <td className="py-2 px-3 text-gray-600">{e.description}</td>
                     </tr>
                   ))}
                 </tbody>

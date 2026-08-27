@@ -150,45 +150,45 @@ export function HolidayCalendar() {
                 <tr className="border-b border-gray-200">
                   <th
                     scope="col"
-                    className="py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Date
                   </th>
                   <th
                     scope="col"
-                    className="py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Holiday
                   </th>
                   <th
                     scope="col"
-                    className="py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Weekday
                   </th>
                   <th
                     scope="col"
-                    className="py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Type
                   </th>
-                  {canEdit && <th scope="col" className="py-2" />}
+                  {canEdit && <th scope="col" className="py-2 px-3" />}
                 </tr>
               </thead>
               <tbody>
                 {active.holidays.map((h) => (
                   <tr key={h.date} className="border-b border-gray-100">
-                    <td className="py-2 font-mono text-navy-900">{formatDate(h.date)}</td>
-                    <td className="py-2">{h.name}</td>
-                    <td className="py-2 text-gray-500">{DAY_NAMES[new Date(`${h.date}T00:00:00Z`).getUTCDay()]}</td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 px-3 font-mono text-navy-900">{formatDate(h.date)}</td>
+                    <td className="py-2 px-3">{h.name}</td>
+                    <td className="py-2 px-3 text-gray-500">{DAY_NAMES[new Date(`${h.date}T00:00:00Z`).getUTCDay()]}</td>
+                    <td className="py-2 px-3 text-right">
                       <StatusBadge
                         status={h.isException ? 'Exception' : 'Recurring'}
                         tone={h.isException ? 'warning' : 'neutral'}
                       />
                     </td>
                     {canEdit && (
-                      <td className="py-2 text-right">
+                      <td className="py-2 px-3 text-right">
                         <button
                           type="button"
                           onClick={() => handleRemove(h.date)}

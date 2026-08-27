@@ -155,19 +155,19 @@ export function YieldCurves() {
                   <tr className="border-b border-gray-200">
                     <th
                       scope="col"
-                      className="py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                      className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
                     >
                       Term
                     </th>
                     <th
                       scope="col"
-                      className="py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                      className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
                     >
                       Days
                     </th>
                     <th
                       scope="col"
-                      className="py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                      className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
                     >
                       Rate %
                     </th>
@@ -176,9 +176,9 @@ export function YieldCurves() {
                 <tbody>
                   {editing.terms.map((t, i) => (
                     <tr key={t.tenorDays} className="border-b border-gray-100">
-                      <td className="py-2 font-medium text-navy-900">{t.label}</td>
-                      <td className="py-2 text-right font-mono text-gray-500">{t.tenorDays}</td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 px-3 font-medium text-navy-900">{t.label}</td>
+                      <td className="py-2 px-3 text-right font-mono text-gray-500">{t.tenorDays}</td>
+                      <td className="py-2 px-3 text-right">
                         {canEdit ? (
                           <>
                             <label htmlFor={`term-${t.tenorDays}`} className="sr-only">

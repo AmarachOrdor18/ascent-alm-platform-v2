@@ -67,13 +67,13 @@ export function ResultTable<T>({
         {caption && <caption className="mb-2 text-left text-[11px] text-gray-500">{caption}</caption>}
         <thead>
           <tr className="border-b border-gray-200">
-            {renderDetail && <th scope="col" className="w-8 py-2" />}
+            {renderDetail && <th scope="col" className="w-8 py-2 px-3" />}
             {columns.map((col) => (
               <th
                 key={col.key}
                 scope="col"
                 className={cn(
-                  'py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400',
+                  'py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400',
                   col.align === 'right' ? 'text-right' : 'text-left',
                 )}
               >
@@ -87,7 +87,7 @@ export function ResultTable<T>({
                   <th
                     key={`${col.key}-delta`}
                     scope="col"
-                    className="py-2 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     {col.header} {priorLabel}
                   </th>
@@ -103,7 +103,7 @@ export function ResultTable<T>({
               <React.Fragment key={key}>
                 <tr className={cn('border-b border-gray-100', renderDetail && 'hover:bg-gray-50')}>
                   {renderDetail && (
-                    <td className="py-2">
+                    <td className="py-2 px-3">
                       <button
                         type="button"
                         onClick={() => toggle(key)}
@@ -118,7 +118,7 @@ export function ResultTable<T>({
                   {columns.map((col) => (
                     <td
                       key={col.key}
-                      className={cn('py-2', col.align === 'right' ? 'text-right' : 'text-left', col.className)}
+                      className={cn('py-2 px-3', col.align === 'right' ? 'text-right' : 'text-left', col.className)}
                     >
                       {col.render(row)}
                     </td>
@@ -131,7 +131,7 @@ export function ResultTable<T>({
                         const then = prior ? (col.compareValue?.(prior) ?? null) : null;
                         const delta = now !== null && then !== null ? now - then : null;
                         return (
-                          <td key={`${col.key}-delta`} className="py-2 text-right">
+                          <td key={`${col.key}-delta`} className="py-2 px-3 text-right">
                             <VarianceCell delta={delta} unit={col.compareUnit ?? 'plain'} />
                           </td>
                         );

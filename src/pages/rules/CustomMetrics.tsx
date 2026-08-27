@@ -183,8 +183,8 @@ export function CustomMetrics() {
                           {a.name}
                         </button>
                       </td>
-                      <td className="py-1 text-gray-500">{a.description}</td>
-                      <td className="py-1 text-right font-mono text-gray-400">{a.sample.toLocaleString()}</td>
+                      <td className="py-1 px-3 text-gray-500">{a.description}</td>
+                      <td className="py-1 px-3 text-right font-mono text-gray-400">{a.sample.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
