@@ -261,6 +261,7 @@ describe('affiliates and users', () => {
       id: 'U-1',
       name: 'Chinwe Okafor',
       email: 'Chinwe.Okafor@ecobank.com',
+      passwordHash: 'test',
       role: 'RISK_ANALYST',
       affiliateCode: 'NG',
       isActive: true,

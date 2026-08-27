@@ -476,7 +476,13 @@ export interface RunResult {
 // ─────────────────────────────────────────────────────────────────────────
 
 export type RoleCode =
-  'ADMIN' | 'RISK_ANALYST' | 'TREASURY_USER' | 'EXECUTIVE_VIEWER' | 'CONTROL_TESTER' | 'REPORTING_USER';
+  | 'ADMIN'
+  | 'RISK_ANALYST'
+  | 'TREASURY_USER'
+  | 'EXECUTIVE_VIEWER'
+  | 'CONTROL_TESTER'
+  | 'REPORTING_USER'
+  | 'AFFILIATE_ADMIN';
 
 export interface Role {
   code: RoleCode;
@@ -489,6 +495,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  /** SHA-256 hex digest — demo-grade credential storage, not production auth. */
+  passwordHash: string;
   role: RoleCode;
   affiliateCode: string;
   isActive: boolean;

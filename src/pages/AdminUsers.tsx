@@ -14,6 +14,7 @@ import { TableToolbar, TablePagination, useTableControls } from '@/components/ui
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth, ROLES } from '@/context/AuthContext';
 import { useAffiliates, useUsers, useSaveUser, useRoles, useSaveRole } from '@/lib/hooks';
+import { hashPassword } from '@/lib/passwordHash';
 import type { Role, RoleCode, User } from '@/engine/types';
 
 /** ROLES is the seed default, keyed by code; the screen wants them in a stable order as a fallback before the live table loads. */
@@ -24,9 +25,12 @@ const PERMISSION_GROUPS: Array<{ label: string; permissions: string[] }> = [
   { label: 'View', permissions: ['dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'data.view', 'audit.view'] },
   { label: 'Configure', permissions: ['data.configure', 'risk.configure', 'rules.edit'] },
   { label: 'Execute & generate', permissions: ['run.execute', 'reporting.generate', 'reporting.manage', 'approvals.approve'] },
-  { label: 'Manage', permissions: ['admin.manage', 'group.manage', 'limits.manage'] },
+  { label: 'Manage', permissions: ['admin.manage', 'group.manage', 'limits.manage', 'users.manage'] },
   { label: 'Commentary', permissions: ['commentary.write', 'commentary.review'] },
 ];
+
+/** Roles carrying one of these are never assignable by someone without `admin.manage` — the escalation guard. */
+const DANGEROUS_PERMISSIONS = ['admin.manage', 'group.manage'];
 
 function newId(): string {
   return `U-${Date.now().toString(36).toUpperCase()}`;
@@ -36,6 +40,7 @@ const BLANK_USER: User = {
   id: '',
   name: '',
   email: '',
+  passwordHash: '',
   role: 'RISK_ANALYST',
   affiliateCode: 'GROUP',
   isActive: true,
@@ -52,22 +57,40 @@ export function AdminUsers() {
   const saveRole = useSaveRole();
   const roleList = roles && roles.length > 0 ? roles : DEFAULT_ROLE_LIST;
   const save = useSaveUser();
-  const canEdit = hasPermission('admin.manage');
+  // Group-wide control (role definitions, cross-affiliate visibility) needs
+  // admin.manage. Day-to-day user provisioning also opens up to users.manage,
+  // held by an Affiliate Administrator scoped to their own affiliate only.
+  const canEditRoles = hasPermission('admin.manage');
+  const canManageUsers = canEditRoles || hasPermission('users.manage');
 
   const [editing, setEditing] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
-  const active = users.filter((u) => u.isActive);
+  // An Affiliate Administrator only ever sees and manages their own
+  // affiliate's users — never the full register.
+  const scopedUsers = canEditRoles
+    ? users
+    : users.filter((u) => u.affiliateCode === signedIn?.affiliateCode);
+
+  const assignableRoles = canEditRoles
+    ? roleList
+    : roleList.filter((r) => !r.permissions.some((p) => DANGEROUS_PERMISSIONS.includes(p)));
+
+  const assignableAffiliates = canEditRoles
+    ? affiliates
+    : affiliates.filter((a) => a.code === signedIn?.affiliateCode);
+
+  const active = scopedUsers.filter((u) => u.isActive);
   const withoutMfa = active.filter((u) => !u.mfaEnrolled);
   const byRole = useMemo(() => {
     const m = new Map<RoleCode, number>();
-    for (const u of users) m.set(u.role, (m.get(u.role) ?? 0) + 1);
+    for (const u of scopedUsers) m.set(u.role, (m.get(u.role) ?? 0) + 1);
     return m;
-  }, [users]);
+  }, [scopedUsers]);
 
   const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
-    users,
+    scopedUsers,
     10,
     ['name', 'email', 'affiliateCode'],
   );
@@ -138,7 +161,7 @@ export function AdminUsers() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            disabled={!canEdit}
+            disabled={!canManageUsers}
             className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             New user
@@ -184,14 +207,14 @@ export function AdminUsers() {
                   <button
                     type="button"
                     onClick={() => setEditing(u)}
-                    disabled={!canEdit}
+                    disabled={!canManageUsers}
                     className="rounded border border-gray-200 px-3 py-1.5 font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
-                    disabled={!canEdit || u.id === signedIn?.id}
+                    disabled={!canManageUsers || u.id === signedIn?.id}
                     title={u.id === signedIn?.id ? 'You cannot disable your own account' : undefined}
                     onClick={() => void save.mutateAsync({ ...u, isActive: !u.isActive })}
                     className="rounded border border-gray-200 px-3 py-1.5 font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
@@ -221,7 +244,8 @@ export function AdminUsers() {
                 <button
                   type="button"
                   onClick={() => setEditingRole(r)}
-                  disabled={!canEdit}
+                  disabled={!canEditRoles}
+                  title={canEditRoles ? undefined : 'Only a Group Administrator can edit role permissions'}
                   className="text-[11px] font-bold text-navy-700 hover:underline disabled:opacity-40"
                 >
                   Edit permissions
@@ -239,8 +263,9 @@ export function AdminUsers() {
       {editing && (
         <UserEditor
           user={editing}
-          affiliates={affiliates}
-          roles={roleList}
+          affiliates={assignableAffiliates}
+          roles={assignableRoles}
+          allowGroupScope={canEditRoles}
           existingEmails={users.filter((u) => u.id !== editing.id).map((u) => u.email.toLowerCase())}
           onCancel={() => setEditing(null)}
           onSave={async (next) => {
@@ -252,9 +277,15 @@ export function AdminUsers() {
 
       {creating && (
         <UserEditor
-          user={{ ...BLANK_USER, id: newId(), createdAt: new Date().toISOString() }}
-          affiliates={affiliates}
-          roles={roleList}
+          user={{
+            ...BLANK_USER,
+            id: newId(),
+            createdAt: new Date().toISOString(),
+            affiliateCode: canEditRoles ? BLANK_USER.affiliateCode : (signedIn?.affiliateCode ?? BLANK_USER.affiliateCode),
+          }}
+          affiliates={assignableAffiliates}
+          roles={assignableRoles}
+          allowGroupScope={canEditRoles}
           existingEmails={users.map((u) => u.email.toLowerCase())}
           isNew
           onCancel={() => setCreating(false)}
@@ -343,6 +374,7 @@ function UserEditor({
   roles,
   existingEmails,
   isNew,
+  allowGroupScope,
   onCancel,
   onSave,
 }: {
@@ -351,14 +383,28 @@ function UserEditor({
   roles: Role[];
   existingEmails: string[];
   isNew?: boolean;
+  allowGroupScope: boolean;
   onCancel: () => void;
   onSave: (u: User) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(user);
+  const [password, setPassword] = useState('');
+  const [saving, setSaving] = useState(false);
   const set = (patch: Partial<User>) => setDraft((d) => ({ ...d, ...patch }));
 
   const emailTaken = draft.email.trim() !== '' && existingEmails.includes(draft.email.trim().toLowerCase());
-  const canSave = draft.name.trim() !== '' && draft.email.trim() !== '' && !emailTaken;
+  const canSave =
+    draft.name.trim() !== '' && draft.email.trim() !== '' && !emailTaken && (!isNew || password.trim() !== '');
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const passwordHash = password.trim() !== '' ? await hashPassword(password.trim()) : draft.passwordHash;
+      await onSave({ ...draft, passwordHash });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
@@ -402,14 +448,29 @@ function UserEditor({
             <select
               id="u-scope"
               value={draft.affiliateCode}
+              disabled={!allowGroupScope}
+              title={allowGroupScope ? undefined : 'Your account can only provision users for its own affiliate'}
               onChange={(e) => set({ affiliateCode: e.target.value })}
-              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none disabled:opacity-70"
             >
-              <option value="GROUP">Ecobank Group</option>
+              {allowGroupScope && <option value="GROUP">Ecobank Group</option>}
               {affiliates.filter((a) => a.code !== 'GROUP').map((a) => (
                 <option key={a.code} value={a.code}>{a.name}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label htmlFor="u-password" className="mb-1 block text-[11px] font-medium text-gray-600">
+              Password
+            </label>
+            <input
+              id="u-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={isNew ? 'Required' : 'Leave blank to keep current password'}
+              className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+            />
           </div>
         </div>
 
@@ -430,11 +491,11 @@ function UserEditor({
           </button>
           <button
             type="button"
-            onClick={() => void onSave(draft)}
-            disabled={!canSave}
+            onClick={() => void handleSave()}
+            disabled={!canSave || saving}
             className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isNew ? 'Create user' : 'Save user'}
+            {saving ? 'Saving…' : isNew ? 'Create user' : 'Save user'}
           </button>
         </div>
       </div>

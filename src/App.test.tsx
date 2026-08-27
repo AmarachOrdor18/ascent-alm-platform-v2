@@ -18,6 +18,7 @@ const REPORTING_USER: User = {
   id: 'U-TEST-REPORTING',
   name: 'Test Reporting User',
   email: 'test-reporting@ecobank.com',
+  passwordHash: 'test',
   role: 'REPORTING_USER',
   affiliateCode: 'GH',
   isActive: true,

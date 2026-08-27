@@ -4,46 +4,61 @@
  * Reads the same real user register Users & Roles manages, rather than a
  * second, hardcoded copy of the same six identities — a user created there
  * is signed-in-able here without touching this file, and disabling one
- * there removes it from this list. Real authentication (MFA via otplib,
+ * there removes it from this list. Credential entry (email + password,
+ * checked against a hashed value on the User record) replaces a "pick
+ * yourself from a list" dropdown so a locked-down demo doesn't hand every
+ * visitor the full roster on sight. Real authentication (MFA via otplib,
  * Azure AD SSO via MSAL) is implemented in v1 and is out of scope here —
- * see build plan §15.
+ * see build plan §15; passwordHash.ts explains exactly how demo-grade this
+ * credential check is.
  */
 
-import { useEffect, useState } from 'react';
-import { ROLES, useAuth } from '@/context/AuthContext';
+import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { useUsers } from '@/lib/hooks';
+import { hashPassword } from '@/lib/passwordHash';
+
+const FEATURES = [
+  'Deterministic Basel III liquidity, IRRBB and stress-testing engine',
+  'Real segregation of duties — maker-checker on every approval',
+  'Full audit trail — every mutation traced to who, what, when',
+  'Affiliate-scoped access — each market sees only its own data',
+];
 
 export function Login() {
   const { login } = useAuth();
-  const { data: users = [], isLoading } = useUsers();
-  const active = users.filter((u) => u.isActive);
+  const { data: users = [] } = useUsers();
 
-  const [selectedId, setSelectedId] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!selectedId && active.length > 0) setSelectedId(active[0]!.id);
-  }, [active, selectedId]);
-
-  const account = active.find((u) => u.id === selectedId) ?? active[0] ?? null;
-  const role = account ? ROLES[account.role] : null;
+  const [error, setError] = useState<string | null>(null);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!account) return;
+    setError(null);
     setIsSubmitting(true);
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    login({ ...account, lastLoginAt: new Date().toISOString() });
-    setIsSubmitting(false);
+    try {
+      const account = users.find(
+        (u) => u.isActive && u.email.trim().toLowerCase() === email.trim().toLowerCase(),
+      );
+      const enteredHash = await hashPassword(password);
+      if (!account || account.passwordHash !== enteredHash) {
+        setError('Invalid email or password.');
+        return;
+      }
+      login({ ...account, lastLoginAt: new Date().toISOString() });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="flex h-screen bg-gray-50 w-full font-sans">
       {/* Left Panel */}
-      <div className="w-[40%] bg-navy-900 flex flex-col justify-between p-12 text-white">
+      <div className="w-[45%] bg-navy-900 flex flex-col justify-between p-12 text-white overflow-y-auto">
         <div>
-          <div className="mb-8">
+          <div className="mb-10">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1">
                 <img src="/logo-icon.png" alt="Ecobank" className="h-full w-full object-contain" />
@@ -54,20 +69,23 @@ export function Login() {
               </div>
             </div>
           </div>
-          <p className="text-gold-400 text-sm tracking-wide uppercase">Group Asset & Liability Management</p>
-          <div className="h-1 w-10 bg-gold-500 mt-6 mb-12 rounded-full"></div>
 
-          <div className="space-y-6">
-            {[
-              "Group-Wide Liquidity Risk & IRRBB Monitoring",
-              "Basel III-Aligned Stress Testing & Scenario Analysis",
-              "Regulatory-Grade Audit Trails & Segregation of Duties",
-            ].map((feature, i) => (
-              <div key={i} className="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gold-500 mr-3 shrink-0 mt-0.5">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
+          <p className="text-gold-400 text-sm tracking-wide uppercase">Group Asset & Liability Management</p>
+          <div className="h-1 w-10 bg-gold-500 mt-6 mb-6 rounded-full"></div>
+
+          <h2 className="text-[32px] font-bold leading-tight text-white">
+            Asset & Liability Management
+            <br />
+            <span className="text-gold-400">For Every Affiliate, One Platform.</span>
+          </h2>
+          <p className="mt-4 text-[14px] leading-relaxed text-gray-300">
+            Consolidated Group oversight and affiliate-level control in one system — every liquidity, interest-rate
+            and stress-testing number traceable back to the position data and assumptions it was calculated from.
+          </p>
+
+          <div className="mt-10 space-y-5 border-l-2 border-white/10 pl-5">
+            {FEATURES.map((feature, i) => (
+              <div key={i} className="border-l-2 border-gold-500 pl-4 -ml-[22px]">
                 <p className="text-gray-200 text-sm leading-relaxed">{feature}</p>
               </div>
             ))}
@@ -87,34 +105,16 @@ export function Login() {
             <p className="text-sm text-gray-500">Ascent ALM Platform — Ecobank Group</p>
           </div>
 
-          <div className="mb-6">
-            <label htmlFor="user-select" className="block text-sm font-medium text-gray-700 mb-2">Sign in as</label>
-            <select
-              id="user-select"
-              value={account?.id ?? ''}
-              onChange={(e) => setSelectedId(e.target.value)}
-              disabled={isLoading || active.length === 0}
-              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-gold-500"
-            >
-              {isLoading && <option>Loading users…</option>}
-              {!isLoading && active.length === 0 && <option>No active users</option>}
-              {active.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} — {ROLES[u.role].name}
-                </option>
-              ))}
-            </select>
-            {role && <p className="text-xs text-gray-400 mt-2">{role.description}</p>}
-          </div>
-
           <form onSubmit={handleSignIn} className="space-y-6">
             <div>
               <label htmlFor="email-input" className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
               <input
                 id="email-input"
                 type="email"
-                value={account?.email ?? ''}
-                readOnly
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                required
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-all text-gray-700"
               />
             </div>
@@ -127,11 +127,15 @@ export function Login() {
               <input
                 id="password-input"
                 type="password"
-                defaultValue="password123"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-all tracking-wider"
                 required
               />
             </div>
+
+            {error && <p className="text-xs font-medium text-danger">{error}</p>}
 
             <div className="flex items-center">
               <input type="checkbox" id="remember" defaultChecked className="h-4 w-4 text-gold-500 focus:ring-gold-500 border-gray-300 rounded" />
@@ -142,10 +146,10 @@ export function Login() {
 
             <button
               type="submit"
-              disabled={isSubmitting || !account}
+              disabled={isSubmitting || !email || !password}
               className="w-full py-3 px-4 bg-navy-900 hover:bg-navy-800 text-white font-medium rounded-md shadow hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-900 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Signing In…' : account ? `Sign In as ${account.name}` : 'Sign In'}
+              {isSubmitting ? 'Signing In…' : 'Sign In'}
             </button>
           </form>
 

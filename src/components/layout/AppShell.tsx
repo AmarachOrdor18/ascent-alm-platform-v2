@@ -84,7 +84,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             collapsed ? 'w-16' : 'w-72',
           )}
         >
-          <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
+          <div
+            className={cn(
+              'flex items-center border-b border-white/10',
+              // Collapsed: logo + toggle stacked, each centered — the row
+              // layout below needs ~72px of width for gap-3 + the button,
+              // which doesn't fit in the 64px collapsed rail (it overflowed
+              // outside the nav and sat underneath the main content, unclickable).
+              collapsed ? 'h-20 flex-col justify-center gap-1.5 px-1' : 'h-16 gap-3 px-4',
+            )}
+          >
             {/* White plate behind the mark: the Ecobank logo is dark teal and
               would disappear against the navy rail. */}
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white p-0.5">
@@ -100,7 +109,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => setCollapsed((c) => !c)}
               aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-              className="ml-auto rounded p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+              className={cn(
+                'rounded p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors',
+                !collapsed && 'ml-auto',
+              )}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -231,6 +243,27 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              aria-label="Go back"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
             <TourLauncher className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700" />
             <div className="ml-auto flex items-center gap-6">
               <div className="flex items-center gap-2">

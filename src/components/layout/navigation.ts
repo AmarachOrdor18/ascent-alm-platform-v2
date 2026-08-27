@@ -171,7 +171,7 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Approvals', path: '/admin', permission: 'risk.view', phase: 7, icon: AuthorizationQueueIcon },
   { name: 'Control Remediation', path: '/admin/remediation', permission: 'risk.view', phase: 7, icon: AlertIcon },
   { name: 'Notifications', path: '/admin/notifications', permission: 'dashboard.view', phase: 7, icon: BellIcon },
-  { name: 'Users, Roles & Permissions', path: '/admin/users', permission: 'admin.manage', phase: 8, icon: UsersIcon },
+  { name: 'Users, Roles & Permissions', path: '/admin/users', permission: 'users.manage', phase: 8, icon: UsersIcon },
   { name: 'System Preferences', path: '/admin/preferences', permission: 'admin.manage', phase: 8, icon: SettingsIcon },
   { name: 'Audit Log', path: '/admin/audit', permission: 'audit.view', phase: 8, icon: AuditIcon },
 ];

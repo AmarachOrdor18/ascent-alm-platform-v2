@@ -16,6 +16,7 @@ const ADMIN_USER: User = {
   id: 'U-TEST-ADMIN',
   name: 'Test Admin',
   email: 'test-admin@ecobank.com',
+  passwordHash: 'test',
   role: 'ADMIN',
   affiliateCode: 'GROUP',
   isActive: true,

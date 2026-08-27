@@ -22,7 +22,7 @@ const TABS: ModuleTab[] = [
   { key: 'approvals', label: 'Approvals', path: '/admin', permission: 'risk.view', Component: Approvals },
   { key: 'remediation', label: 'Control Remediation', path: '/admin/remediation', permission: 'risk.view', Component: Remediation },
   { key: 'notifications', label: 'Notifications', path: '/admin/notifications', permission: 'dashboard.view', Component: Notifications },
-  { key: 'users', label: 'Users, Roles & Permissions', path: '/admin/users', permission: 'admin.manage', Component: AdminUsers },
+  { key: 'users', label: 'Users, Roles & Permissions', path: '/admin/users', permission: 'users.manage', Component: AdminUsers },
   { key: 'preferences', label: 'System Preferences', path: '/admin/preferences', permission: 'admin.manage', Component: AdminPreferences },
   { key: 'audit', label: 'Audit Log', path: '/admin/audit', permission: 'audit.view', Component: AdminAudit },
 ];

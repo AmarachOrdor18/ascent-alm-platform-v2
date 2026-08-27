@@ -32,6 +32,7 @@ export const ROLES: Record<RoleCode, Role> = {
       'data.view',
       'admin.manage',
       'group.manage',
+      'users.manage',
       'data.configure',
       'risk.configure',
       'rules.edit',
@@ -99,6 +100,22 @@ export const ROLES: Record<RoleCode, Role> = {
     name: 'Reporting User',
     description: 'Generates and distributes regulatory, ALCO and management reports.',
     permissions: ['dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'reporting.generate'],
+  },
+  AFFILIATE_ADMIN: {
+    code: 'AFFILIATE_ADMIN',
+    name: 'Affiliate Administrator',
+    description:
+      'Local admin for one affiliate — provisions and manages that affiliate’s own users, runs its processes and sets its reporting thresholds. Never Group-wide, never able to grant Group Administrator access.',
+    permissions: [
+      'dashboard.view',
+      'risk.view',
+      'treasury.view',
+      'reporting.view',
+      'data.view',
+      'users.manage',
+      'run.execute',
+      'limits.manage',
+    ],
   },
 };
 

@@ -33,11 +33,20 @@ import { SEED_DEFAULT_RULES } from './defaultRules';
 /** The permission sets a fresh database starts with — editable afterward via Users & Roles. */
 const SEED_ROLES: Role[] = Object.values(ROLES);
 
+/**
+ * SHA-256 of 'Ecobank@2026' — every seed/demo account shares this one
+ * password, so signing in as a different person only means a different
+ * email. See src/lib/passwordHash.ts for why this is demo-grade, not
+ * production auth.
+ */
+const SEED_PASSWORD_HASH = '9a3931b8a44194a83d4ca4ebb8275eb4f3566694e43f600f2befc3831fc4c05c';
+
 const SEED_USERS: User[] = [
   {
     id: 'U-001',
     name: 'Adaeze Okonkwo',
     email: 'adaeze.okonkwo@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
     role: 'ADMIN',
     affiliateCode: 'GROUP',
     isActive: true,
@@ -49,6 +58,7 @@ const SEED_USERS: User[] = [
     id: 'U-002',
     name: 'Chinwe Okafor',
     email: 'chinwe.okafor@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
     role: 'RISK_ANALYST',
     affiliateCode: 'NG',
     isActive: true,
@@ -60,6 +70,7 @@ const SEED_USERS: User[] = [
     id: 'U-003',
     name: 'Aminata Traoré',
     email: 'aminata.traore@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
     role: 'TREASURY_USER',
     affiliateCode: 'CI',
     isActive: true,
@@ -71,6 +82,7 @@ const SEED_USERS: User[] = [
     id: 'U-004',
     name: 'Yaw Boateng',
     email: 'yaw.boateng@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
     role: 'EXECUTIVE_VIEWER',
     affiliateCode: 'GROUP',
     isActive: true,
@@ -82,6 +94,7 @@ const SEED_USERS: User[] = [
     id: 'U-005',
     name: 'Fatima Bello',
     email: 'fatima.bello@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
     role: 'CONTROL_TESTER',
     affiliateCode: 'NG',
     isActive: true,
@@ -93,8 +106,33 @@ const SEED_USERS: User[] = [
     id: 'U-006',
     name: 'Samuel Owusu',
     email: 'samuel.owusu@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
     role: 'REPORTING_USER',
     affiliateCode: 'GH',
+    isActive: true,
+    mfaEnrolled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    lastLoginAt: null,
+  },
+  {
+    id: 'U-007',
+    name: 'Ifeoma Nwachukwu',
+    email: 'ifeoma.nwachukwu@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
+    role: 'AFFILIATE_ADMIN',
+    affiliateCode: 'NG',
+    isActive: true,
+    mfaEnrolled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    lastLoginAt: null,
+  },
+  {
+    id: 'U-008',
+    name: 'Tunde Adeyemi',
+    email: 'tunde.adeyemi@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
+    role: 'TREASURY_USER',
+    affiliateCode: 'NG',
     isActive: true,
     mfaEnrolled: true,
     createdAt: '2026-01-01T00:00:00Z',

@@ -87,7 +87,11 @@ export function ResultsFrame({
 
         {available.length > 1 && (
           <div className="flex items-center gap-2">
-            <label htmlFor="run-select" className="text-[11px] text-gray-500">
+            <label
+              htmlFor="run-select"
+              className="text-[11px] text-gray-500"
+              title="Which completed calculation snapshot to show, within the affiliate/scope selected above."
+            >
               Run
             </label>
             <select

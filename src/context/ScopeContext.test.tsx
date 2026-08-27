@@ -17,6 +17,7 @@ const NIGERIA_USER: User = {
   id: 'U-TEST-NG',
   name: 'Test Nigeria User',
   email: 'test-ng@ecobank.com',
+  passwordHash: 'test',
   role: 'TREASURY_USER',
   affiliateCode: 'NG',
   isActive: true,
