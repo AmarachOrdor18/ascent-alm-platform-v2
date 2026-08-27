@@ -88,9 +88,18 @@ describe('route order', () => {
     expect(ROUTES.every((r) => r.screenName.length > 0)).toBe(true);
   });
 
-  it('covers all screens in navigation', () => {
-    // The actual number of screens - update this as navigation grows
-    expect(ALL_NAV_ITEMS.length).toBeGreaterThan(30);
+  it('keeps the sidebar to the ~13 module-level items the navigation redesign intends', () => {
+    // Deliberately small on purpose — individual screens are tabs inside a
+    // module (see src/pages/modules/*), not standing sidebar rows. This is
+    // the inverse of the pre-redesign invariant here (which asserted > 30).
+    expect(ALL_NAV_ITEMS.length).toBeGreaterThanOrEqual(10);
+    expect(ALL_NAV_ITEMS.length).toBeLessThanOrEqual(15);
+  });
+
+  it('registers every module tab path exactly once and gives it a real permission', () => {
+    const moduleTabRoutes = ROUTES.filter((r) => !ALL_NAV_ITEMS.some((i) => i.path === r.path) && r.path.includes('/'));
+    expect(moduleTabRoutes.length).toBeGreaterThan(0);
+    expect(moduleTabRoutes.every((r) => typeof r.permission === 'string' && r.permission.length > 0)).toBe(true);
   });
 });
 

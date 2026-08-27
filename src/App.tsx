@@ -26,49 +26,23 @@ const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login
 const Placeholder = lazy(() => import('@/pages/Placeholder').then((m) => ({ default: m.Placeholder })));
 const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) => ({ default: m.AffiliateDetail })));
 
-/** Screens built so far. Anything absent renders the placeholder. */
+/**
+ * Screens built so far. Anything absent renders the placeholder.
+ *
+ * Only paths that render a single, standalone screen live here. A screen
+ * that's now a tab inside a module (see `src/pages/modules/*`) is imported
+ * by its module wrapper instead — the wrapper is what's keyed here, once,
+ * under the module's default tab path; its other tab paths are declared in
+ * `MODULE_TAB_ROUTES` below, reusing the same lazy component so the same
+ * chunk isn't requested twice.
+ */
 const BUILT: Record<string, ComponentType> = {
-  // Phase 6 — results, every one reading from a run rather than recomputing
   '/dashboard': lazy(() => import('@/pages/results/Dashboard').then((m) => ({ default: m.Dashboard }))),
-  '/balance-sheet': lazy(() => import('@/pages/results/BalanceSheet').then((m) => ({ default: m.BalanceSheet }))),
-  '/liquidity-risk': lazy(() => import('@/pages/results/LiquidityRisk').then((m) => ({ default: m.LiquidityRisk }))),
-  '/gap-analysis': lazy(() => import('@/pages/results/GapAnalysis').then((m) => ({ default: m.GapAnalysis }))),
-  '/interest-rate-risk': lazy(() => import('@/pages/results/Irrbb').then((m) => ({ default: m.Irrbb }))),
-  '/ftp': lazy(() => import('@/pages/results/TransferPricing').then((m) => ({ default: m.TransferPricing }))),
-  '/behavioural-analysis': lazy(() =>
-    import('@/pages/results/BehaviouralAnalysis').then((m) => ({ default: m.BehaviouralAnalysis })),
-  ),
-  '/profitability': lazy(() => import('@/pages/results/Profitability').then((m) => ({ default: m.Profitability }))),
-  '/concentration': lazy(() => import('@/pages/results/Concentration').then((m) => ({ default: m.Concentration }))),
-  '/fx-position': lazy(() => import('@/pages/results/FxPosition').then((m) => ({ default: m.FxPosition }))),
 
-  // Phase 7 — monitoring & control
-  '/limits': lazy(() => import('@/pages/Limits').then((m) => ({ default: m.Limits }))),
-  '/kri': lazy(() => import('@/pages/Kri').then((m) => ({ default: m.Kri }))),
-  '/remediation': lazy(() => import('@/pages/Remediation').then((m) => ({ default: m.Remediation }))),
-  '/approvals': lazy(() => import('@/pages/Approvals').then((m) => ({ default: m.Approvals }))),
-  '/risk-map': lazy(() => import('@/pages/RiskMap').then((m) => ({ default: m.RiskMap }))),
-  '/notifications': lazy(() => import('@/pages/Notifications').then((m) => ({ default: m.Notifications }))),
-
-  // Phase 8 — reporting & admin
-  '/alco-meetings': lazy(() => import('@/pages/AlcoMeetings').then((m) => ({ default: m.AlcoMeetings }))),
-  '/regulatory-reporting': lazy(() => import('@/pages/RegulatoryReporting').then((m) => ({ default: m.RegulatoryReporting }))),
-  '/alco-reporting': lazy(() => import('@/pages/ReportPacks').then((m) => ({ default: m.AlcoReporting }))),
-  '/management-reporting': lazy(() => import('@/pages/ReportPacks').then((m) => ({ default: m.ManagementReporting }))),
-  '/ad-hoc': lazy(() => import('@/pages/AdHoc').then((m) => ({ default: m.AdHoc }))),
-  '/admin/users': lazy(() => import('@/pages/AdminUsers').then((m) => ({ default: m.AdminUsers }))),
-  '/admin/preferences': lazy(() => import('@/pages/AdminPreferences').then((m) => ({ default: m.AdminPreferences }))),
-  '/admin/audit': lazy(() => import('@/pages/AdminAudit').then((m) => ({ default: m.AdminAudit }))),
-
-  // Phase 5 — execution
-  '/runs/new': lazy(() => import('@/pages/ProcessRun').then((m) => ({ default: m.ProcessRun }))),
-  '/runs': lazy(() => import('@/pages/RunHistory').then((m) => ({ default: m.RunHistory }))),
-  '/scheduler': lazy(() => import('@/pages/BatchScheduler').then((m) => ({ default: m.BatchScheduler }))),
-  '/what-if': lazy(() => import('@/pages/WhatIf').then((m) => ({ default: m.WhatIf }))),
-  '/stress-testing': lazy(() => import('@/pages/StressTesting').then((m) => ({ default: m.StressTesting }))),
-
-  // Phase 4 — business rules, all on the shared RuleEditor shell
-  '/rules': lazy(() => import('@/pages/rules/ModelsAssumptions').then((m) => ({ default: m.ModelsAssumptions }))),
+  // Phase 4 — business rules sub-editors, all on the shared RuleEditor shell.
+  // The hub itself (previously `/rules`) is now the Configuration module's
+  // "Business Rules" tab — see ConfigurationModule.tsx — but every one of
+  // these 13 deep-linked editors it routes to is untouched.
   '/rules/time-buckets': lazy(() =>
     import('@/pages/rules/TimeBucketRules').then((m) => ({ default: m.TimeBucketRules })),
   ),
@@ -99,25 +73,147 @@ const BUILT: Record<string, ComponentType> = {
     import('@/pages/rules/CustomMetrics').then((m) => ({ default: m.CustomMetrics })),
   ),
 
-  // Phase 3 — setup and onboarding
+  // Setup and onboarding — untouched by the navigation redesign.
   '/affiliates': lazy(() => import('@/pages/Affiliates').then((m) => ({ default: m.Affiliates }))),
   '/affiliates/onboard': lazy(() => import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate }))),
   '/connectors': lazy(() => import('@/pages/Connectors').then((m) => ({ default: m.Connectors }))),
-  '/data-upload': lazy(() => import('@/pages/DataUpload').then((m) => ({ default: m.DataUpload }))),
-  '/data-vintages': lazy(() => import('@/pages/DataVintages').then((m) => ({ default: m.DataVintages }))),
-  '/validation-rules': lazy(() => import('@/pages/ValidationRules').then((m) => ({ default: m.ValidationRules }))),
-  '/gl-reconciliation': lazy(() => import('@/pages/GlReconciliation').then((m) => ({ default: m.GlReconciliation }))),
-
-  // Phase 2 — dimensions and reference data
-  '/dimensions': lazy(() => import('@/pages/Dimensions').then((m) => ({ default: m.Dimensions }))),
-  '/counterparties': lazy(() => import('@/pages/Counterparties').then((m) => ({ default: m.Counterparties }))),
-  '/yield-curves': lazy(() => import('@/pages/YieldCurves').then((m) => ({ default: m.YieldCurves }))),
-  '/fx-rates': lazy(() => import('@/pages/FxRates').then((m) => ({ default: m.FxRates }))),
-  '/economic-indicators': lazy(() =>
-    import('@/pages/EconomicIndicators').then((m) => ({ default: m.EconomicIndicators })),
-  ),
-  '/holiday-calendar': lazy(() => import('@/pages/HolidayCalendar').then((m) => ({ default: m.HolidayCalendar }))),
 };
+
+/**
+ * Module wrappers — one lazy-loaded component per module, reused across
+ * every one of that module's tab paths (see `MODULE_TAB_ROUTES` below).
+ * Each wrapper does its own internal lazy-loading of the individual screens
+ * it groups, so per-tab code-splitting is unchanged from before the
+ * redesign — see `src/pages/modules/*`.
+ */
+const LiquidityRiskModule = lazy(() =>
+  import('@/pages/modules/LiquidityRiskModule').then((m) => ({ default: m.LiquidityRiskModule })),
+);
+const IrrbbModule = lazy(() => import('@/pages/modules/IrrbbModule').then((m) => ({ default: m.IrrbbModule })));
+const StressTestingModule = lazy(() =>
+  import('@/pages/modules/StressTestingModule').then((m) => ({ default: m.StressTestingModule })),
+);
+const ConcentrationModule = lazy(() =>
+  import('@/pages/modules/ConcentrationModule').then((m) => ({ default: m.ConcentrationModule })),
+);
+const FtpProfitabilityModule = lazy(() =>
+  import('@/pages/modules/FtpProfitabilityModule').then((m) => ({ default: m.FtpProfitabilityModule })),
+);
+const BalanceSheetTreasuryModule = lazy(() =>
+  import('@/pages/modules/BalanceSheetTreasuryModule').then((m) => ({ default: m.BalanceSheetTreasuryModule })),
+);
+const ReportingModule = lazy(() =>
+  import('@/pages/modules/ReportingModule').then((m) => ({ default: m.ReportingModule })),
+);
+const DataManagementModule = lazy(() =>
+  import('@/pages/modules/DataManagementModule').then((m) => ({ default: m.DataManagementModule })),
+);
+const ExecutionModule = lazy(() =>
+  import('@/pages/modules/ExecutionModule').then((m) => ({ default: m.ExecutionModule })),
+);
+const ConfigurationModule = lazy(() =>
+  import('@/pages/modules/ConfigurationModule').then((m) => ({ default: m.ConfigurationModule })),
+);
+const AdministrationModule = lazy(() =>
+  import('@/pages/modules/AdministrationModule').then((m) => ({ default: m.AdministrationModule })),
+);
+
+BUILT['/risk/liquidity'] = LiquidityRiskModule;
+BUILT['/risk/irrbb'] = IrrbbModule;
+BUILT['/risk/stress-testing'] = StressTestingModule;
+BUILT['/risk/concentration'] = ConcentrationModule;
+BUILT['/treasury/ftp'] = FtpProfitabilityModule;
+BUILT['/treasury/balance-sheet'] = BalanceSheetTreasuryModule;
+BUILT['/reporting'] = ReportingModule;
+BUILT['/data/operations'] = DataManagementModule;
+BUILT['/execution'] = ExecutionModule;
+BUILT['/configuration'] = ConfigurationModule;
+BUILT['/admin'] = AdministrationModule;
+
+/**
+ * Every other tab path within a module — the module's default tab is
+ * already registered above (it's a `NAV_GROUPS` entry, so `buildRouteOrder`
+ * picks it up automatically); this covers the rest, all reusing the same
+ * module component, which reads the URL itself to pick the active tab (see
+ * `ModuleTabs.tsx`). The permission here is each module's own route-level
+ * gate — the loosest permission among its tabs — not the finer per-tab
+ * check `ModuleTabs` applies internally; see each module file's header
+ * comment for why that permission was chosen.
+ */
+const MODULE_TAB_ROUTES: RouteEntry[] = [
+  { path: '/risk/liquidity/risk-map', screenName: 'Liquidity Risk Map', Component: LiquidityRiskModule, permission: 'risk.view' },
+  { path: '/risk/liquidity/gap-analysis', screenName: 'Maturity & Repricing Gap', Component: LiquidityRiskModule, permission: 'risk.view' },
+  { path: '/risk/irrbb/behavioural-analysis', screenName: 'Behavioural Analysis', Component: IrrbbModule, permission: 'risk.view' },
+  { path: '/risk/stress-testing/what-if', screenName: 'What-If Builder', Component: StressTestingModule, permission: 'risk.view' },
+  { path: '/risk/concentration/limits', screenName: 'Limits & Breaches', Component: ConcentrationModule, permission: 'risk.view' },
+  { path: '/risk/concentration/kri', screenName: 'Key Risk Indicators', Component: ConcentrationModule, permission: 'risk.view' },
+  { path: '/treasury/ftp/profitability', screenName: 'Profitability Ratios', Component: FtpProfitabilityModule, permission: 'risk.view' },
+  { path: '/treasury/balance-sheet/fx-position', screenName: 'FX Position', Component: BalanceSheetTreasuryModule, permission: 'treasury.view' },
+  { path: '/reporting/report-packs', screenName: 'Report Packs', Component: ReportingModule, permission: 'reporting.view' },
+  { path: '/reporting/regulatory', screenName: 'Regulatory Reporting', Component: ReportingModule, permission: 'reporting.view' },
+  { path: '/reporting/ad-hoc', screenName: 'Ad-Hoc Analysis', Component: ReportingModule, permission: 'reporting.view' },
+  { path: '/data/operations/gl-reconciliation', screenName: 'GL Reconciliation', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/operations/vintages', screenName: 'Data Vintages & Load History', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/structure', screenName: 'Data Structure', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/structure/counterparties', screenName: 'Counterparty Register', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/reference-data', screenName: 'Reference Data', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/reference-data/fx-rates', screenName: 'Currency & FX Rates', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/reference-data/economic-indicators', screenName: 'Economic Indicators', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/reference-data/holiday-calendar', screenName: 'Holiday Calendar', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/execution/history', screenName: 'Run History', Component: ExecutionModule, permission: 'risk.view' },
+  { path: '/execution/scheduler', screenName: 'Batch Scheduler', Component: ExecutionModule, permission: 'risk.view' },
+  { path: '/configuration/validation-rules', screenName: 'Validation Rules', Component: ConfigurationModule, permission: 'rules.edit' },
+  { path: '/admin/remediation', screenName: 'Control Remediation', Component: AdministrationModule, permission: 'dashboard.view' },
+  { path: '/admin/notifications', screenName: 'Notifications', Component: AdministrationModule, permission: 'dashboard.view' },
+  { path: '/admin/users', screenName: 'Users, Roles & Permissions', Component: AdministrationModule, permission: 'dashboard.view' },
+  { path: '/admin/preferences', screenName: 'System Preferences', Component: AdministrationModule, permission: 'dashboard.view' },
+  { path: '/admin/audit', screenName: 'Audit Log', Component: AdministrationModule, permission: 'dashboard.view' },
+];
+
+/**
+ * Old flat URLs, preserved as redirects to their new hierarchical home
+ * rather than broken — bookmarks, typed URLs and any not-yet-updated
+ * internal link keep working, they just land one hop further along.
+ */
+const LEGACY_REDIRECTS: Array<{ from: string; to: string }> = [
+  { from: '/liquidity-risk', to: '/risk/liquidity' },
+  { from: '/risk-map', to: '/risk/liquidity/risk-map' },
+  { from: '/gap-analysis', to: '/risk/liquidity/gap-analysis' },
+  { from: '/interest-rate-risk', to: '/risk/irrbb' },
+  { from: '/behavioural-analysis', to: '/risk/irrbb/behavioural-analysis' },
+  { from: '/stress-testing', to: '/risk/stress-testing' },
+  { from: '/what-if', to: '/risk/stress-testing/what-if' },
+  { from: '/concentration', to: '/risk/concentration' },
+  { from: '/limits', to: '/risk/concentration/limits' },
+  { from: '/kri', to: '/risk/concentration/kri' },
+  { from: '/ftp', to: '/treasury/ftp' },
+  { from: '/profitability', to: '/treasury/ftp/profitability' },
+  { from: '/balance-sheet', to: '/treasury/balance-sheet' },
+  { from: '/fx-position', to: '/treasury/balance-sheet/fx-position' },
+  { from: '/alco-meetings', to: '/reporting' },
+  { from: '/alco-reporting', to: '/reporting/report-packs' },
+  { from: '/management-reporting', to: '/reporting/report-packs' },
+  { from: '/regulatory-reporting', to: '/reporting/regulatory' },
+  { from: '/ad-hoc', to: '/reporting/ad-hoc' },
+  { from: '/data', to: '/data/operations' },
+  { from: '/data-upload', to: '/data/operations' },
+  { from: '/gl-reconciliation', to: '/data/operations/gl-reconciliation' },
+  { from: '/data-vintages', to: '/data/operations/vintages' },
+  { from: '/dimensions', to: '/data/structure' },
+  { from: '/counterparties', to: '/data/structure/counterparties' },
+  { from: '/yield-curves', to: '/data/reference-data' },
+  { from: '/fx-rates', to: '/data/reference-data/fx-rates' },
+  { from: '/economic-indicators', to: '/data/reference-data/economic-indicators' },
+  { from: '/holiday-calendar', to: '/data/reference-data/holiday-calendar' },
+  { from: '/runs/new', to: '/execution' },
+  { from: '/runs', to: '/execution/history' },
+  { from: '/scheduler', to: '/execution/scheduler' },
+  { from: '/rules', to: '/configuration' },
+  { from: '/validation-rules', to: '/configuration/validation-rules' },
+  { from: '/approvals', to: '/admin' },
+  { from: '/remediation', to: '/admin/remediation' },
+  { from: '/notifications', to: '/admin/notifications' },
+];
 
 export interface RouteEntry {
   path: string;
@@ -151,7 +247,6 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
   { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
   { path: '/connectors', screenName: 'Connectors & Data Sources' },
-  { path: '/management-reporting', screenName: 'Report Packs — Management' },
 ];
 
 /**
@@ -162,7 +257,6 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
 const UNLISTED_PERMISSION: Record<string, string> = {
   '/affiliates/onboard': 'group.manage',
   '/connectors': 'data.view',
-  '/management-reporting': 'reporting.view',
 };
 
 function permissionForUnlisted(path: string): string {
@@ -217,7 +311,7 @@ export const buildRouteOrder = (): RouteEntry[] => {
     { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail, permission: 'dashboard.view' },
   ];
 
-  return [...navLiteral, ...unlisted, ...parameterised];
+  return [...navLiteral, ...unlisted, ...MODULE_TAB_ROUTES, ...parameterised];
 }
 /* eslint-enable react-refresh/only-export-components */
 
@@ -313,6 +407,12 @@ export function App() {
         <Route path="/">
           <Redirect to="/dashboard" />
         </Route>
+
+        {LEGACY_REDIRECTS.map(({ from, to }) => (
+          <Route key={from} path={from}>
+            <Redirect to={to} />
+          </Route>
+        ))}
 
         {ROUTE_ORDER.map(({ path, screenName, Component, permission }) => (
           <Route key={path} path={path}>

@@ -13,7 +13,7 @@ import { formatDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
 import { GROUP_CODE, useScope } from '@/context/ScopeContext';
 import { useBatches } from '@/lib/hooks';
-import { NAV_GROUPS } from './navigation';
+import { NAV_GROUPS, SEARCH_INDEX } from './navigation';
 import { CommandPalette } from './CommandPalette';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -41,6 +41,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         ...group,
         items: group.items.filter((item) => hasPermission(item.permission)),
       })).filter((group) => group.items.length > 0),
+    [hasPermission],
+  );
+
+  // Cmd/Ctrl+K searches every individual screen (SEARCH_INDEX), not just the
+  // 13 sidebar-visible modules — collapsing the sidebar shouldn't make a
+  // screen harder to find, just less prominent as a standing link.
+  const visibleSearchItems = useMemo(
+    () => SEARCH_INDEX.filter((item) => hasPermission(item.permission)),
     [hasPermission],
   );
 
@@ -100,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="pt-3">
-          <CommandPalette groups={visibleGroups} collapsed={collapsed} />
+          <CommandPalette items={visibleSearchItems} collapsed={collapsed} />
         </div>
 
         <div className="flex-1 overflow-y-auto py-1 px-2">

@@ -7,16 +7,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/cn';
-import type { NavGroup } from './navigation';
+import type { NavItem } from './navigation';
 
-export function CommandPalette({ groups, collapsed }: { groups: NavGroup[]; collapsed?: boolean }) {
+export function CommandPalette({ items, collapsed }: { items: NavItem[]; collapsed?: boolean }) {
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const items = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
