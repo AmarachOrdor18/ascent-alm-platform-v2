@@ -330,7 +330,8 @@ function ConnectorEditor({
           <ConnectorFields connector={draft} onChange={setDraft} />
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-6 py-4">
+          {problems.length > 0 && <span className="text-[11px] text-danger">{problems[0]}</span>}
           <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
             Cancel
           </button>
@@ -338,6 +339,7 @@ function ConnectorEditor({
             type="button"
             disabled={problems.length > 0}
             onClick={() => void onSave(draft)}
+            title={problems[0]}
             className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
           >
             Save

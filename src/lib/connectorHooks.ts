@@ -49,7 +49,11 @@ export function newConnector(): Connector {
     status: 'Planned',
     statusReason: 'Not yet assessed.',
     endpoint: '',
-    authMode: 'ApiKey',
+    // 'None' rather than 'ApiKey' — otherwise a brand-new, not-yet-specified
+    // connector is immediately blocked on a credential reference nobody has
+    // typed yet, for a reason buried at the bottom of a long form. Set the
+    // real auth mode once it's actually known.
+    authMode: 'None',
     credentialRef: '',
     cadenceDays: 1,
     scheduleWindow: '',

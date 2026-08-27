@@ -666,7 +666,7 @@ export function OnboardAffiliate() {
                                     onClick={() => startNewConnector(domain)}
                                     className="w-full rounded-lg border border-navy-700 px-3 py-1.5 text-[11px] font-bold text-navy-700 hover:bg-navy-50"
                                   >
-                                    Configure this affiliate&rsquo;s own connector →
+                                    Configure
                                   </button>
                                 </div>
                               )}
@@ -679,8 +679,8 @@ export function OnboardAffiliate() {
                             </td>
                             <td className="py-2">
                               <StatusBadge
-                                status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? (feed.connectorId ? 'Connected' : 'Connector not chosen') : 'Not configured'}
-                                tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? (feed.connectorId ? 'success' : 'danger') : 'neutral'}
+                                status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? (feed.connectorId ? 'Connected' : 'Not selected') : 'Not configured'}
+                                tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? (feed.connectorId ? 'success' : 'warning') : 'neutral'}
                               />
                             </td>
                           </tr>
@@ -690,12 +690,16 @@ export function OnboardAffiliate() {
                                 <div className="rounded-lg border border-navy-700 bg-white p-4">
                                   <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-navy-900">New connector for {DOMAIN_LABEL[domain]}</h3>
                                   <ConnectorFields connector={newConnectorDraft} onChange={setNewConnectorDraft} />
-                                  <div className="mt-4 flex justify-end gap-2">
+                                  <div className="mt-4 flex items-center justify-end gap-2">
+                                    {validateConnector(newConnectorDraft).length > 0 && (
+                                      <span className="text-[11px] text-danger">{validateConnector(newConnectorDraft)[0]}</span>
+                                    )}
                                     <button type="button" onClick={() => { setAddingConnectorFor(null); setNewConnectorDraft(null); }} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">Cancel</button>
                                     <button
                                       type="button"
                                       disabled={validateConnector(newConnectorDraft).length > 0}
                                       onClick={() => void saveNewConnector()}
+                                      title={validateConnector(newConnectorDraft)[0]}
                                       className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                                     >
                                       Save connector
