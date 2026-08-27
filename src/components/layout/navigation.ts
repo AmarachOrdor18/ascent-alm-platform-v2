@@ -166,6 +166,7 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Validation Rules', path: '/configuration/validation-rules', permission: 'data.configure', phase: 3, icon: CheckCircleIcon },
 
   { name: 'Affiliates', path: '/affiliates', permission: 'dashboard.view', phase: 3, icon: BriefcaseIcon },
+  { name: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', phase: 2, icon: CorporateActionsIcon },
 
   { name: 'Approvals', path: '/admin', permission: 'risk.view', phase: 7, icon: AuthorizationQueueIcon },
   { name: 'Control Remediation', path: '/admin/remediation', permission: 'risk.view', phase: 7, icon: AlertIcon },

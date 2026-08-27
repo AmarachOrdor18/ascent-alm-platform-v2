@@ -74,9 +74,7 @@ const BUILT: Record<string, ComponentType> = {
   ),
 
   // Setup and onboarding — untouched by the navigation redesign.
-  '/affiliates': lazy(() => import('@/pages/Affiliates').then((m) => ({ default: m.Affiliates }))),
   '/affiliates/onboard': lazy(() => import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate }))),
-  '/connectors': lazy(() => import('@/pages/Connectors').then((m) => ({ default: m.Connectors }))),
 };
 
 /**
@@ -117,6 +115,9 @@ const ConfigurationModule = lazy(() =>
 const AdministrationModule = lazy(() =>
   import('@/pages/modules/AdministrationModule').then((m) => ({ default: m.AdministrationModule })),
 );
+const GroupAffiliateModule = lazy(() =>
+  import('@/pages/modules/GroupAffiliateModule').then((m) => ({ default: m.GroupAffiliateModule })),
+);
 
 BUILT['/risk/liquidity'] = LiquidityRiskModule;
 BUILT['/risk/irrbb'] = IrrbbModule;
@@ -129,6 +130,7 @@ BUILT['/data/operations'] = DataManagementModule;
 BUILT['/execution'] = ExecutionModule;
 BUILT['/configuration'] = ConfigurationModule;
 BUILT['/admin'] = AdministrationModule;
+BUILT['/affiliates'] = GroupAffiliateModule;
 
 /**
  * Every other tab path within a module — the module's default tab is
@@ -168,6 +170,7 @@ const MODULE_TAB_ROUTES: RouteEntry[] = [
   { path: '/admin/users', screenName: 'Users, Roles & Permissions', Component: AdministrationModule, permission: 'dashboard.view' },
   { path: '/admin/preferences', screenName: 'System Preferences', Component: AdministrationModule, permission: 'dashboard.view' },
   { path: '/admin/audit', screenName: 'Audit Log', Component: AdministrationModule, permission: 'dashboard.view' },
+  { path: '/connectors', screenName: 'Connectors & Data Sources', Component: GroupAffiliateModule, permission: 'dashboard.view' },
 ];
 
 /**
@@ -246,7 +249,6 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/ftp', screenName: 'FTP Rules' },
   { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
   { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
-  { path: '/connectors', screenName: 'Connectors & Data Sources' },
 ];
 
 /**
@@ -256,7 +258,6 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
  */
 const UNLISTED_PERMISSION: Record<string, string> = {
   '/affiliates/onboard': 'group.manage',
-  '/connectors': 'data.view',
 };
 
 function permissionForUnlisted(path: string): string {
