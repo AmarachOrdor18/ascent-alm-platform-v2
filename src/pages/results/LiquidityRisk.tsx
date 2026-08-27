@@ -11,7 +11,7 @@ import { Amount } from '@/components/ui/Amount';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, usePositions } from '@/lib/hooks';
-import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
+import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatAmount, formatPct } from '@/lib/format';
 import { buildFxTable } from '@/engine/fx';
 import { computeDepositsByAffiliate, type LcrResult, type LiquidityGapResult, type LoanToDepositResult, type NsfrResult } from '@/engine/liquidity';
@@ -215,8 +215,6 @@ export function LiquidityRisk() {
                   value={<Amount value={lcr.excludedEncumbered} currency={currency} />}
                 />
               </dl>
-
-              <Methodology text={methodologyOf(results, 'Lcr')} />
             </section>
           )}
 
@@ -256,8 +254,6 @@ export function LiquidityRisk() {
                   }
                 />
               </dl>
-
-              <Methodology text={methodologyOf(results, 'Nsfr')} />
             </section>
           )}
         </div>
@@ -269,7 +265,6 @@ export function LiquidityRisk() {
               <InfoButton label="Why this table exists">A chart is not an audit trail.</InfoButton>
             </h2>
             <GapLadderTable buckets={activeGap.buckets} currency={currency} priorBuckets={priorGap?.buckets} />
-            <Methodology text={methodologyOf(results, 'LiquidityGap')} />
           </section>
         )}
 
@@ -378,7 +373,3 @@ function Row({
   );
 }
 
-function Methodology({ text }: { text: string | null }) {
-  if (!text) return null;
-  return <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">{text}</p>;
-}

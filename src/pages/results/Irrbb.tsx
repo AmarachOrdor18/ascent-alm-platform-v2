@@ -10,7 +10,7 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, usePositions, useYieldCurves } from '@/lib/hooks';
-import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
+import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatPct, formatAmount } from '@/lib/format';
 import { buildFxTable } from '@/engine/fx';
 import { defaultLadder } from '@/engine/buckets';
@@ -221,8 +221,6 @@ export function Irrbb() {
                   bold
                 />
               </dl>
-
-              <Methodology text={methodologyOf(results, 'NiiSensitivity')} />
             </section>
           )}
 
@@ -281,35 +279,9 @@ export function Irrbb() {
                   value={<span className="font-mono font-bold">{formatPct(eve.eveSensitivityPercentOfEquity, 2)}</span>}
                 />
               </dl>
-
-              <Methodology text={methodologyOf(results, 'EveSensitivity')} />
             </section>
           )}
         </div>
-
-        {eve?.durationGap !== null && eve !== null && (
-          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-              Reading the gap
-              <InfoButton label="Why duration is approximated">
-                Duration is approximated per position rather than computed from full cash flows — ledger-grain data
-                does not carry the schedule a full revaluation needs, which is the same constraint Oracle names when
-                it prescribes non-cash-flow methods for this data shape.
-              </InfoButton>
-            </h2>
-            <p className="text-[11px] leading-relaxed text-gray-600">
-              A duration gap of <span className="font-mono font-bold text-navy-900">{eve.durationGap!.toFixed(2)}</span>{' '}
-              years means assets reprice{' '}
-              {eve.durationGap! > 0 ? 'more slowly than' : eve.durationGap! < 0 ? 'faster than' : 'in step with'}{' '}
-              liabilities.{' '}
-              {eve.durationGap! > 0
-                ? 'A rate rise therefore reduces economic value: asset prices fall further than liability values do.'
-                : eve.durationGap! < 0
-                  ? 'A rate rise therefore adds economic value: liability values fall further than asset prices do.'
-                  : 'The book is broadly immunised against a parallel move at this level of approximation.'}
-            </p>
-          </section>
-        )}
       </ResultsFrame>
     </>
   );
@@ -374,7 +346,3 @@ function Row({
   );
 }
 
-function Methodology({ text }: { text: string | null }) {
-  if (!text) return null;
-  return <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">{text}</p>;
-}

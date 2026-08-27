@@ -127,8 +127,7 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Balance Sheet Analytics', path: '/treasury/balance-sheet', permission: 'treasury.view', phase: 6, icon: FundAccountingIcon },
   { name: 'FX Position', path: '/treasury/balance-sheet/fx-position', permission: 'treasury.view', phase: 6, icon: ArrowUpDownIcon },
 
-  { name: 'ALCO Meetings', path: '/reporting', permission: 'reporting.view', phase: 8, icon: CalendarIcon },
-  { name: 'Report Packs', path: '/reporting/report-packs', permission: 'reporting.view', phase: 8, icon: FileTextIcon },
+  { name: 'Report Packs', path: '/reporting', permission: 'reporting.view', phase: 8, icon: FileTextIcon },
   { name: 'Regulatory Reporting', path: '/reporting/regulatory', permission: 'reporting.view', phase: 8, icon: RegulatoryIcon },
   { name: 'Ad-Hoc Analysis', path: '/reporting/ad-hoc', permission: 'reporting.view', phase: 8, icon: SearchIcon },
 

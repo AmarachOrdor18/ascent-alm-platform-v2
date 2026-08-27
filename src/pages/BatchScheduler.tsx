@@ -103,11 +103,6 @@ export function BatchScheduler() {
         }
       />
 
-      <div className="mb-6 rounded-2xl border border-gold-500/40 bg-gold-500/5 p-4 text-[11px] leading-relaxed text-navy-900">
-        <span className="font-bold">How this fires.</span> No timer runs while this tab is closed — due occurrences
-        accumulate as the backlog below instead.
-      </div>
-
       {error && (
         <div className="mb-6 rounded-lg border border-danger/30 bg-danger/5 p-4 text-[12px] text-danger">{error}</div>
       )}

@@ -5,7 +5,7 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { useScope } from '@/context/ScopeContext';
-import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
+import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { useDimensionMembers } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
 import type { ConcentrationEntry, ConcentrationResult } from '@/engine/liquidity';
@@ -147,17 +147,6 @@ export function Concentration() {
               </div>
             </div>
 
-            {conc.unattributedAmount > 0 && (
-              <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-                <span className="font-bold">
-                  <Amount value={conc.unattributedAmount} currency={currency} /> of deposits carry no counterparty.
-                </span>{' '}
-                They are held out of the concentration measure rather than dropped or lumped into a single bucket —
-                either would distort it, the first by understating the base and the second by inventing a very large
-                depositor. Map them on the Counterparties screen and re-run to bring them in.
-              </p>
-            )}
-
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
@@ -187,10 +176,6 @@ export function Concentration() {
                   all of them.
                 </p>
               )}
-
-              <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-                {methodologyOf(results, 'Concentration')}
-              </p>
             </section>
           </>
         )}

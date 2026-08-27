@@ -4,7 +4,6 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { InfoButton } from '@/components/ui/InfoButton';
 import { Amount } from '@/components/ui/Amount';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
@@ -141,30 +140,6 @@ export function TransferPricing() {
         }
       />
 
-      <p className="mb-6 flex items-start gap-1.5 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-        <span>
-          Every loan and deposit is priced against an internal transfer rate before its margin counts as this desk's
-          own — that's what separates "we lent at 18%" from "we lent at 18% against a 12% cost of funds, so this desk
-          earned 6%." It's how Treasury and business-unit profitability connect: Treasury owns the balance-sheet
-          liquidity/rate risk centrally, and FTP is the price it charges each business unit for that funding — see{' '}
-          <Link href="/treasury/ftp/profitability" className="font-bold underline">
-            Profitability Ratios
-          </Link>{' '}
-          for what falls out once every position carries a margin.
-        </span>
-        <InfoButton label="What is FTP, in plain terms?">
-          <p className="mb-1.5">
-            <span className="font-bold">Funds Transfer Pricing (FTP)</span> is an internal price, not a customer
-            rate — the rate one part of the bank effectively charges (or pays) another for funding.
-          </p>
-          <p>
-            A loan books not just the customer rate, but a transfer rate too (the cost of the funding backing it).
-            The gap between the two is the margin actually attributable to the business unit — separate from
-            Treasury's own funding and liquidity cost, which sits elsewhere.
-          </p>
-        </InfoButton>
-      </p>
-
       <ResultsFrame
         {...frameProps(selected)}
         requires={['TransferPricing']}
@@ -172,17 +147,6 @@ export function TransferPricing() {
       >
         {ftp && (
           <>
-            {ftp.unpriced > 0 && (
-              <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-                <span className="font-bold">
-                  <Amount value={ftp.unpriced} currency={currency} /> of balances could not be priced.
-                </span>{' '}
-                Either no curve point exists at the position&apos;s tenor, or the position carries no external rate.
-                They are reported as unpriced rather than contributing zero margin, which would quietly understate the
-                book. Load the missing curve on the Yield Curves screen, or attach an FTP rule that names one.
-              </p>
-            )}
-
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Margin by business unit
@@ -257,10 +221,6 @@ export function TransferPricing() {
                   not this sample.
                 </p>
               )}
-
-              <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-                {methodologyOf(results, 'TransferPricing')}
-              </p>
             </section>
           </>
         )}

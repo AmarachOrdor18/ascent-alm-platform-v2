@@ -47,14 +47,6 @@ export function ForecastScenarios() {
           ? 'A shock beyond ±1000bp is almost certainly a data-entry error.'
           : null
       }
-      guidance={
-        <>
-          <span className="font-bold">Generic curve shapes.</span> BCBS parametrises its shocks per currency, with
-          country-specific magnitudes. These are the standard shapes at a 200bp parallel magnitude — enough to show
-          genuine directional sensitivity, and labelled as an approximation rather than presented as the exact
-          supervisory calibration.
-        </>
-      }
       renderBody={(rule, update, readOnly) => (
         <div className="space-y-5">
           {!readOnly && (

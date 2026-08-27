@@ -106,17 +106,6 @@ export function AdHoc() {
             Run analysis
           </button>
         </div>
-
-        <aside className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-1.5">
-            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">How this reads</h2>
-            <InfoButton label="Why this matters">
-              Each selected affiliate's <em>most recently completed</em> run supplies the figures — the same rule every
-              results screen follows. An affiliate with no completed run shows every metric as unmeasured rather than
-              zero, and one flagged &ldquo;no run&rdquo; above will read that way here too.
-            </InfoButton>
-          </div>
-        </aside>
       </div>
 
       {ran && (

@@ -140,10 +140,7 @@ export function Kri() {
             <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
               <span className="font-bold text-navy-900">
                 Only {observationCount} observation{observationCount === 1 ? '' : 's'} available.
-              </span>{' '}
-              Below three points there is no trend worth fitting, so the indicators report their level and say the
-              trend is unknown rather than extrapolating from two points. Run more as-of dates — the Batch Scheduler
-              backlog will produce them in one pass.
+              </span>
             </p>
           )}
 

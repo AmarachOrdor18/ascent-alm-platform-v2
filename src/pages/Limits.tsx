@@ -166,10 +166,6 @@ export function Limits() {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-[11px] leading-relaxed text-gray-600">
-              A regulatory floor is not a matter of appetite, so a temporary limit cannot relax it — the two are
-              evaluated separately and this line reports the statutory one.
-            </p>
           </div>
         )}
 

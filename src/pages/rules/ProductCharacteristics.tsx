@@ -177,13 +177,6 @@ export function ProductCharacteristics() {
         }
         return null;
       }}
-      guidance={
-        <>
-          <span className="font-bold">This replaces the regex-based product engine.</span> Every factor the liquidity
-          and IRRBB calculations read is a value here, so a new product is configured rather than coded — which is what
-          RFP §1.1 asks for.
-        </>
-      }
       renderBody={(rule, update, readOnly) => (
         <div className="space-y-4">
           <RuleRows<ProductAssumption>

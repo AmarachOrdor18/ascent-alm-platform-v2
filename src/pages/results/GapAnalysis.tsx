@@ -42,14 +42,6 @@ export function GapAnalysis() {
   );
   const nonSensitive = repricing?.buckets.find((b) => b.bucket === NON_RATE_SENSITIVE);
 
-  // The single number that says whether the two ladders actually differ.
-  const divergence =
-    maturity && repricing
-      ? Math.abs(
-          (maturity.contractual.buckets[0]?.gap ?? 0) - (repricing.buckets[0]?.gap ?? 0),
-        )
-      : null;
-
   return (
     <>
       <ModuleHeader
@@ -101,26 +93,6 @@ export function GapAnalysis() {
         requires={['LiquidityGap', 'RepricingGap']}
         elementLabels={{ LiquidityGap: 'the maturity gap', RepricingGap: 'the repricing gap' }}
       >
-        {divergence !== null && (
-          <div className="mb-6 flex items-center gap-1.5 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-            <p>
-              {divergence > 0 ? (
-                <>
-                  <span className="font-bold">The two ladders differ.</span> The front bucket alone diverges by{' '}
-                  <Amount value={divergence} currency={currency} /> between the maturity and repricing bases.
-                </>
-              ) : (
-                <span className="font-bold">The two ladders agree in the front bucket.</span>
-              )}
-            </p>
-            <InfoButton label="Why this matters">
-              {divergence > 0
-                ? 'That gap is the floating-rate book, which reprices long before it matures.'
-                : 'That happens when the book is entirely fixed-rate, since a fixed instrument reprices only at maturity. Worth confirming against the loan book rather than assuming.'}
-            </InfoButton>
-          </div>
-        )}
-
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center gap-1.5">
             <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
@@ -184,12 +156,6 @@ export function GapAnalysis() {
           </section>
         )}
 
-        {!bucketRule && (
-          <p className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
-            This run used the engine default ladder — no Time Bucket rule was attached. Attaching one on the Process
-            Run screen lets the ladder be governed and versioned like any other assumption.
-          </p>
-        )}
       </ResultsFrame>
     </>
   );

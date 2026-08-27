@@ -171,13 +171,6 @@ export function NewBusiness() {
         }
         return null;
       }}
-      guidance={
-        <>
-          <span className="font-bold">Static or dynamic.</span> A run with no new-business rule models only the existing
-          book running off. Attach one and the run projects originations too — which is what makes a growth scenario
-          possible at all.
-        </>
-      }
       renderBody={(rule, update, readOnly) => (
         <div className="space-y-5">
           <RuleRows<ForecastBalanceLine>

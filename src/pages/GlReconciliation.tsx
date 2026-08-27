@@ -240,7 +240,6 @@ export function GlReconciliation() {
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
             Upload the trial balance above to reconcile against {positions.length} position{positions.length === 1 ? '' : 's'}.
           </p>
-          <p className="mt-3 font-mono text-[11px] text-gray-400">demo_data/ghana_gl_trial_balance_2026-07.csv</p>
         </section>
       ) : (
         result && (

@@ -139,12 +139,6 @@ export function PrepaymentRules() {
           ? 'CPR is an annual rate between 0 and 1 — 0.15 means 15% a year.'
           : null
       }
-      guidance={
-        <>
-          <span className="font-bold">Assumed, not fitted.</span> A fitted prepayment model needs contract-level
-          history. Assets with no matching rule are reported as unmodelled rather than assumed not to prepay.
-        </>
-      }
       renderBody={(rule, update, readOnly) => (
         <RuleRows<PrepaymentAssumption>
           rows={rule.assumptions}
@@ -325,13 +319,6 @@ export function Patterns() {
       checkDependencies={checkDependencies}
       summarise={(r) => `${r.patternType} · ${r.phases.length} phase(s) · code ${r.amortizationCode}`}
       validate={(r) => allocationError(r.phases.map((p) => p.percent))}
-      guidance={
-        <>
-          Oracle reserves amortisation codes <span className="font-mono">1000–69999</span> for payment patterns and{' '}
-          <span className="font-mono">70000–99999</span> for behaviour patterns. The code is what links an instrument
-          record to its schedule.
-        </>
-      }
       renderBody={(rule, update, readOnly) => (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

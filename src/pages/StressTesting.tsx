@@ -225,8 +225,7 @@ export function StressTesting() {
                       {outliers.length === 1 ? 'One shock' : `${outliers.length} shocks`} breach the 15% outlier
                       threshold
                     </span>{' '}
-                    — {outliers.map((o) => o.label).join(', ')}. Under BCBS 368 that makes the bank an outlier and
-                    invites supervisory scrutiny of the banking-book position.
+                    — {outliers.map((o) => o.label).join(', ')}.
                   </>
                 ) : (
                   <>

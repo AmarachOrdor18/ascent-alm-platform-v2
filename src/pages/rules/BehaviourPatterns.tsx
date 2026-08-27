@@ -94,13 +94,6 @@ export function BehaviourPatterns() {
         }
         return null;
       }}
-      guidance={
-        <>
-          <span className="font-bold">Assumptions, not fitted coefficients.</span> These are published-style rates by
-          deposit type. Fitting them to observed withdrawals needs multi-period position history, which accumulates only
-          once several as-of dates are loaded — the platform says so rather than implying a model it does not have.
-        </>
-      }
       renderBody={(rule, update, readOnly) => (
         <div className="space-y-6">
           {rule.patterns.map((pattern, patternIndex) => {

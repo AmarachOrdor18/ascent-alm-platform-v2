@@ -99,10 +99,6 @@ const SCREEN_CONTENT: Record<string, { dataIn: string; why: string; tag?: TourTa
     tag: 'Result',
   },
   '/reporting': {
-    dataIn: 'Organisational — not itself a calculation.',
-    why: 'Where committee packs and their supporting materials are organised.',
-  },
-  '/reporting/report-packs': {
     dataIn: 'A completed run’s results.',
     why: 'The ALCO pack and the Management pack, generated from a real run — not typed into a table by hand.',
     tag: 'Result',
