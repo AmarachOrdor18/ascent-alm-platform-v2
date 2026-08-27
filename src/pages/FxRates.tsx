@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
 import { useCurrencies, useFxRates, useSaveCurrency, useSaveFxRate, useAffiliates } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
@@ -26,9 +27,34 @@ export function FxRates() {
   const canEdit = hasPermission('data.configure');
 
   const [edits, setEdits] = useState<Record<string, number>>({});
+  const [newRate, setNewRate] = useState({ code: '', rate: '' });
 
   const asOfDate = rates[0]?.asOfDate ?? null;
   const table = buildFxTable('USD', rates, asOfDate ?? '');
+
+  // Currencies that don't already have a rate row — editing an existing pair happens inline in the table instead.
+  const ratelessCurrencies = currencies.filter((c) => c.code !== 'USD' && !rates.some((r) => r.base === c.code));
+
+  const addRate = () => {
+    if (!newRate.code || newRate.rate === '') return;
+    const value = Number(newRate.rate);
+    if (Number.isNaN(value) || value <= 0) return;
+    saveRate.mutate(
+      {
+        id: `FX-${newRate.code}-USD`,
+        base: newRate.code,
+        quote: 'USD',
+        rate: value,
+        asOfDate: asOfDate ?? new Date().toISOString().slice(0, 10),
+        source: 'Manual entry',
+        updatedBy: 'current-user',
+        updatedAt: new Date().toISOString(),
+      },
+      { onSuccess: () => setNewRate({ code: '', rate: '' }) },
+    );
+  };
+
+  const rolesControls = useTableControls(currencies, 8, ['code', 'name']);
 
   // Every currency an affiliate transacts in must be convertible, or a Group run will fail.
   const requiredCurrencies = Array.from(
@@ -132,6 +158,58 @@ export function FxRates() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
           <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Exchange rates</h2>
+
+          {canEdit && (
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
+              <div>
+                <label htmlFor="new-rate-currency" className="mb-1 block text-[11px] text-gray-600">
+                  Currency
+                </label>
+                <select
+                  id="new-rate-currency"
+                  value={newRate.code}
+                  onChange={(e) => setNewRate({ ...newRate, code: e.target.value })}
+                  disabled={ratelessCurrencies.length === 0}
+                  className="w-40 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                >
+                  <option value="">
+                    {ratelessCurrencies.length === 0 ? 'Every currency has a rate' : 'Select…'}
+                  </option>
+                  {ratelessCurrencies.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} — {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="new-rate-value" className="mb-1 block text-[11px] text-gray-600">
+                  Rate (per USD)
+                </label>
+                <input
+                  id="new-rate-value"
+                  type="number"
+                  step="any"
+                  value={newRate.rate}
+                  onChange={(e) => setNewRate({ ...newRate, rate: e.target.value })}
+                  className="w-32 rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addRate}
+                disabled={saveRate.isPending || !newRate.code || newRate.rate === ''}
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              >
+                {saveRate.isPending ? 'Saving…' : 'Add rate'}
+              </button>
+              <p className="w-full text-[11px] text-gray-500">
+                To change an existing pair's rate, edit it directly in the table below — this only adds a currency
+                that doesn't have a rate yet.
+              </p>
+            </div>
+          )}
+
           <ResultTable
             rows={rates}
             columns={columns}
@@ -156,41 +234,68 @@ export function FxRates() {
         </section>
 
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Currency roles</h2>
-          <ul className="space-y-3">
-            {currencies.map((c) => (
-              <li key={c.code} className="border-b border-gray-50 pb-3 last:border-0">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="font-mono text-[12px] font-bold text-navy-900">
-                    {c.symbol} {c.code}
+          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Currency roles</h2>
+          <TableToolbar
+            searchValue={rolesControls.search}
+            onSearchChange={rolesControls.setSearch}
+            exportData={() => currencies}
+            exportFilename="currency-roles"
+            density={rolesControls.density}
+            onDensityChange={rolesControls.setDensity}
+          />
+          <ResultTable
+            rows={rolesControls.paged}
+            rowKey={(c) => c.code}
+            emptyMessage="No currencies."
+            columns={[
+              {
+                key: 'currency',
+                header: 'Currency',
+                render: (c) => (
+                  <span>
+                    <span className="font-mono text-[12px] font-bold text-navy-900">
+                      {c.symbol} {c.code}
+                    </span>
+                    <span className="block text-[11px] text-gray-500">{c.name}</span>
                   </span>
-                  <StatusBadge status={c.role} tone={c.role === 'Functional' ? 'info' : 'neutral'} />
-                </div>
-                <p className="mb-1 text-[11px] text-gray-500">{c.name}</p>
-                {canEdit && c.role !== 'Functional' && (
-                  <>
-                    <label htmlFor={`role-${c.code}`} className="sr-only">
-                      {c.code} role
-                    </label>
-                    <select
-                      id={`role-${c.code}`}
-                      value={c.role}
-                      onChange={(e) =>
-                        saveCurrency.mutate({ ...c, role: e.target.value as CurrencyRole } satisfies StoredCurrency)
-                      }
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                    >
-                      {ROLES.filter((r) => r !== 'Functional').map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+                ),
+              },
+              {
+                key: 'role',
+                header: 'Role',
+                render: (c) =>
+                  canEdit && c.role !== 'Functional' ? (
+                    <>
+                      <label htmlFor={`role-${c.code}`} className="sr-only">
+                        {c.code} role
+                      </label>
+                      <select
+                        id={`role-${c.code}`}
+                        value={c.role}
+                        onChange={(e) =>
+                          saveCurrency.mutate({ ...c, role: e.target.value as CurrencyRole } satisfies StoredCurrency)
+                        }
+                        className="rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      >
+                        {ROLES.filter((r) => r !== 'Functional').map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <StatusBadge status={c.role} tone={c.role === 'Functional' ? 'info' : 'neutral'} />
+                  ),
+              },
+            ]}
+          />
+          <TablePagination
+            currentPage={rolesControls.page}
+            totalItems={rolesControls.totalItems}
+            pageSize={rolesControls.pageSize}
+            onPageChange={rolesControls.setPage}
+          />
 
           <dl className="mt-5 space-y-2 border-t border-gray-100 pt-4">
             {ROLES.map((r) => (
