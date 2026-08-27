@@ -623,44 +623,53 @@ export function OnboardAffiliate() {
                       const usable = availableFor(connectors, domain);
                       return (
                         <>
-                          <tr key={domain} className="border-b border-gray-100">
+                          <tr key={domain} className="border-b border-gray-100 align-top">
                             <td className="py-2 font-medium text-navy-900">{DOMAIN_LABEL[domain]}</td>
                             <td className="py-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <select
-                                  aria-label={`${domain} feed mode`}
-                                  value={feed.mode}
-                                  onChange={(e) => {
-                                    const mode = e.target.value as FeedMode;
-                                    // Never auto-pick a connector — a connector already marked "Available" here
-                                    // (e.g. Flexcube) belongs to whichever affiliate actually configured it, not
-                                    // this one by default. The Administrator has to deliberately choose it or
-                                    // set up this affiliate's own via "+ New connector".
-                                    updateFeed(domain, { mode, connectorId: mode === 'Connector' ? null : null });
-                                  }}
-                                  className="rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                                >
-                                  <option value="NotConfigured">Not configured</option>
-                                  <option value="Connector">Connector</option>
-                                  <option value="File">File substitution</option>
-                                </select>
-                                {feed.mode === 'Connector' && (
-                                  <select
-                                    aria-label={`${domain} connector`}
-                                    value={feed.connectorId ?? ''}
-                                    onChange={(e) => updateFeed(domain, { connectorId: e.target.value || null })}
-                                    className="rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none"
+                              <select
+                                aria-label={`${domain} feed mode`}
+                                value={feed.mode}
+                                onChange={(e) => {
+                                  const mode = e.target.value as FeedMode;
+                                  // Never auto-pick a connector — a connector already marked "Available" here
+                                  // (e.g. Flexcube) belongs to whichever affiliate actually configured it, not
+                                  // this one by default. This affiliate gets its own via "Configure a connector".
+                                  updateFeed(domain, { mode, connectorId: mode === 'Connector' ? null : null });
+                                }}
+                                className="mb-2 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                              >
+                                <option value="NotConfigured">Not configured</option>
+                                <option value="Connector">Connector</option>
+                                <option value="File">File substitution</option>
+                              </select>
+                              {feed.mode === 'Connector' && (
+                                <div className="space-y-1.5">
+                                  {usable.length > 0 && (
+                                    <div>
+                                      <label htmlFor={`existing-${domain}`} className="mb-0.5 block text-[10px] text-gray-400">
+                                        Reuse a shared connector (e.g. a Group-wide feed) — only if this affiliate genuinely uses the same one
+                                      </label>
+                                      <select
+                                        id={`existing-${domain}`}
+                                        aria-label={`${domain} connector`}
+                                        value={feed.connectorId ?? ''}
+                                        onChange={(e) => updateFeed(domain, { connectorId: e.target.value || null })}
+                                        className="w-full rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none"
+                                      >
+                                        <option value="">— select —</option>
+                                        {usable.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                      </select>
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => startNewConnector(domain)}
+                                    className="w-full rounded-lg border border-navy-700 px-3 py-1.5 text-[11px] font-bold text-navy-700 hover:bg-navy-50"
                                   >
-                                    <option value="">{usable.length === 0 ? '— none available, add new —' : '— select —'}</option>
-                                    {usable.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                  </select>
-                                )}
-                                {feed.mode === 'Connector' && (
-                                  <button type="button" onClick={() => startNewConnector(domain)} className="text-[11px] font-bold text-navy-700 hover:underline">
-                                    + New connector
+                                    Configure this affiliate&rsquo;s own connector →
                                   </button>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </td>
                             <td className="py-2 text-right">
                               <input type="number" min={1} value={feed.slaDays} onChange={(e) => updateFeed(domain, { slaDays: Number(e.target.value) })} aria-label={`${domain} SLA days`} className="w-20 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
