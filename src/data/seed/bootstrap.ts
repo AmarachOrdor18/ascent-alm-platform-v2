@@ -302,9 +302,17 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
     if (!existingConnectorIds.has(connector.id)) await repo.upsertConnector(connector);
   }
 
-  const existingUserIds = new Set((await repo.listUsers()).map((u) => u.id));
+  // Also patches (never overwrites other fields on) an existing seed user missing passwordHash —
+  // added after some databases were already seeded, so a plain "insert if missing" top-up would
+  // leave those accounts permanently unable to log in.
+  const existingUserById = new Map((await repo.listUsers()).map((u) => [u.id, u]));
   for (const seedUser of SEED_USERS) {
-    if (!existingUserIds.has(seedUser.id)) await repo.upsertUser(seedUser);
+    const existing = existingUserById.get(seedUser.id);
+    if (!existing) {
+      await repo.upsertUser(seedUser);
+    } else if (!existing.passwordHash) {
+      await repo.upsertUser({ ...existing, passwordHash: seedUser.passwordHash });
+    }
   }
 
   const existingBatchIds = new Set((await repo.listBatches()).map((b) => b.id));

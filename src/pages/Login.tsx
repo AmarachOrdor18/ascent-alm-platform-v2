@@ -5,9 +5,9 @@ import { hashPassword } from '@/lib/passwordHash';
 
 const FEATURES = [
   'Deterministic Basel III liquidity, IRRBB and stress-testing engine',
-  'Real segregation of duties — maker-checker on every approval',
-  'Full audit trail — every mutation traced to who, what, when',
-  'Affiliate-scoped access — each market sees only its own data',
+  'Real segregation of duties, with maker-checker on every approval',
+  'Full audit trail, with every mutation traced to who, what and when',
+  'Affiliate-scoped access, so each market sees only its own data',
 ];
 
 export function Login() {
@@ -41,20 +41,20 @@ export function Login() {
   return (
     <div className="flex h-screen bg-gray-50 w-full font-sans">
       {/* Left Panel */}
-      <div className="w-[45%] bg-navy-900 flex flex-col justify-between p-12 text-white overflow-y-auto">
-        <div>
-          <div className="mb-10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1">
-                <img src="/logo-icon.png" alt="Ecobank" className="h-full w-full object-contain" />
-              </div>
-              <div>
-                <h1 className="text-[20px] font-bold tracking-wide">Ecobank</h1>
-                <p className="text-[12px] text-white/60">ALM Platform</p>
-              </div>
+      <div className="w-[45%] bg-navy-900 flex flex-col p-12 text-white overflow-y-auto">
+        <div className="mb-10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1">
+              <img src="/logo-icon.png" alt="Ecobank" className="h-full w-full object-contain" />
+            </div>
+            <div>
+              <h1 className="text-[20px] font-bold tracking-wide">Ecobank</h1>
+              <p className="text-[12px] text-white/60">ALM Platform</p>
             </div>
           </div>
+        </div>
 
+        <div className="flex flex-1 flex-col justify-center">
           <p className="text-gold-400 text-sm tracking-wide uppercase">Group Asset & Liability Management</p>
           <div className="h-1 w-10 bg-gold-500 mt-6 mb-6 rounded-full"></div>
 
@@ -64,8 +64,9 @@ export function Login() {
             <span className="text-gold-400">For Every Affiliate, One Platform.</span>
           </h2>
           <p className="mt-4 text-[14px] leading-relaxed text-gray-300">
-            Consolidated Group oversight and affiliate-level control in one system — every liquidity, interest-rate
-            and stress-testing number traceable back to the position data and assumptions it was calculated from.
+            Consolidated Group oversight and affiliate-level control in one system, with every liquidity,
+            interest-rate and stress-testing number traceable back to the position data and assumptions it was
+            calculated from.
           </p>
 
           <div className="mt-10 space-y-5 border-l-2 border-white/10 pl-5">
@@ -87,7 +88,7 @@ export function Login() {
         <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-100 p-10 my-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-navy-900 mb-2">Sign In</h2>
-            <p className="text-sm text-gray-500">Ascent ALM Platform — Ecobank Group</p>
+            <p className="text-sm text-gray-500">Ascent ALM Platform, Ecobank Group</p>
           </div>
 
           <form onSubmit={handleSignIn} className="space-y-6">
