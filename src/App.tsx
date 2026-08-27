@@ -176,7 +176,7 @@ const MODULE_TAB_ROUTES: RouteEntry[] = [
   { path: '/admin/users', screenName: 'Users, Roles & Permissions', Component: AdministrationModule, permission: 'dashboard.view' },
   { path: '/admin/preferences', screenName: 'System Preferences', Component: AdministrationModule, permission: 'dashboard.view' },
   { path: '/admin/audit', screenName: 'Audit Log', Component: AdministrationModule, permission: 'dashboard.view' },
-  { path: '/connectors', screenName: 'Connectors & Data Sources', Component: GroupAffiliateModule, permission: 'dashboard.view' },
+  { path: '/connectors', screenName: 'Connectors & Data Sources', Component: DataManagementModule, permission: 'data.view' },
 ];
 
 /**

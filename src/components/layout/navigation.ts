@@ -95,7 +95,9 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'GROUP & AFFILIATE MANAGEMENT',
-    items: [{ name: 'Group & Affiliate Management', path: '/affiliates', permission: 'dashboard.view', phase: 3, icon: BriefcaseIcon }],
+    items: [
+      { name: 'Group & Affiliate Management', path: '/affiliates', permission: 'dashboard.view', phase: 3, icon: BriefcaseIcon },
+    ],
   },
   {
     label: 'ADMINISTRATION',
@@ -139,6 +141,7 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Currency & FX Rates', path: '/data/reference-data/fx-rates', permission: 'data.view', phase: 2, icon: NairaIcon },
   { name: 'Economic Indicators', path: '/data/reference-data/economic-indicators', permission: 'data.view', phase: 2, icon: BarChartIcon },
   { name: 'Holiday Calendar', path: '/data/reference-data/holiday-calendar', permission: 'data.view', phase: 2, icon: CalendarIcon },
+  { name: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', phase: 2, icon: CorporateActionsIcon },
 
   { name: 'Process Run', path: '/execution', permission: 'run.execute', phase: 5, icon: RefreshIcon },
   { name: 'Run History', path: '/execution/history', permission: 'risk.view', phase: 5, icon: HistoryIcon },
@@ -148,7 +151,6 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Validation Rules', path: '/configuration/validation-rules', permission: 'data.configure', phase: 3, icon: CheckCircleIcon },
 
   { name: 'Affiliates', path: '/affiliates', permission: 'dashboard.view', phase: 3, icon: BriefcaseIcon },
-  { name: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', phase: 2, icon: CorporateActionsIcon },
 
   { name: 'Approvals', path: '/admin', permission: 'risk.view', phase: 7, icon: AuthorizationQueueIcon },
   { name: 'Control Remediation', path: '/admin/remediation', permission: 'risk.view', phase: 7, icon: AlertIcon },
