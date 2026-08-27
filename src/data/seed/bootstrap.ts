@@ -120,6 +120,8 @@ const NIGERIA_BATCH: LoadBatch = {
   uploadedAt: `${NIGERIA_AS_OF}T09:00:00Z`,
   committedBy: 'system-seed',
   committedAt: `${NIGERIA_AS_OF}T09:05:00Z`,
+  reconciledBy: null,
+  reconciledAt: null,
 };
 
 const GHANA_BATCH: LoadBatch = {
@@ -140,6 +142,8 @@ const GHANA_BATCH: LoadBatch = {
   uploadedAt: `${GHANA_AS_OF}T09:00:00Z`,
   committedBy: 'system-seed',
   committedAt: `${GHANA_AS_OF}T09:05:00Z`,
+  reconciledBy: null,
+  reconciledAt: null,
 };
 
 const COTEIVOIRE_BATCH: LoadBatch = {
@@ -160,6 +164,8 @@ const COTEIVOIRE_BATCH: LoadBatch = {
   uploadedAt: `${COTEIVOIRE_AS_OF}T09:00:00Z`,
   committedBy: 'system-seed',
   committedAt: `${COTEIVOIRE_AS_OF}T09:05:00Z`,
+  reconciledBy: null,
+  reconciledAt: null,
 };
 
 /**
@@ -198,6 +204,8 @@ function referenceDomainBatch(
     uploadedAt: `${asOfDate}T06:00:00Z`,
     committedBy: owner,
     committedAt: `${asOfDate}T06:00:00Z`,
+    reconciledBy: null,
+    reconciledAt: null,
   };
 }
 

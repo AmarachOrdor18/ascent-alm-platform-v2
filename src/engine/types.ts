@@ -83,6 +83,12 @@ export interface DomainFeed {
   owner: string | null;
 }
 
+/** Internal risk appetite for one limit metric — always inside the regulatory floor. */
+export interface InternalThreshold {
+  amberPercent: number;
+  redPercent: number;
+}
+
 export interface Affiliate {
   code: string;
   name: string;
@@ -100,6 +106,12 @@ export interface Affiliate {
   holidayCalendarId: string | null;
   legalEntityCode: string;
   feeds: DomainFeed[];
+  /** true = use Group's rule set as-is; false = this affiliate's rules can diverge (onboarding step 5). */
+  inheritGroupRules: boolean;
+  /** Per-metric internal amber/red, on top of the regulatory minimum — Ecobank's own appetite, set per affiliate. Keyed by the same metric names as REGULATORY_MINIMA (e.g. 'lcrPercent'). */
+  internalThresholds: Record<string, InternalThreshold>;
+  /** The onboarding governance attestation for step 6 — distinct from the threshold values themselves. */
+  limitsConfirmed: boolean;
   createdAt: string;
 }
 
@@ -378,6 +390,9 @@ export interface LoadBatch {
   uploadedAt: string;
   committedBy: string | null;
   committedAt: string | null;
+  /** Set when a GeneralLedger batch has been reconciled against positions and signed off — see `reconcile()` in engine/reconciliation.ts. Null for domains reconciliation doesn't apply to. */
+  reconciledBy: string | null;
+  reconciledAt: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

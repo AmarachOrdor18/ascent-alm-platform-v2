@@ -13,6 +13,7 @@ import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useBatches, usePositions, useSaveAffiliate } from '@/lib/hooks';
+import { approvals } from '@/lib/governanceHooks';
 import { checkAllDomains } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
 import type { AffiliateStatus } from '@/engine/types';
@@ -21,10 +22,17 @@ const TODAY = '2026-08-25';
 
 const FRESHNESS_TONE = { Fresh: 'success', Due: 'warning', Stale: 'danger', 'Never loaded': 'neutral' } as const;
 
-/** Onboarding → Testing → Live, with Suspended reachable from Live. */
+/**
+ * Onboarding → Testing is a direct admin action (the wizard's "Submit for
+ * approval" already does this); Testing → Live is deliberately absent here
+ * — it only happens through Approvals now (`Approvals.tsx`'s `decide()`),
+ * so the person who submits an affiliate can no longer also promote it
+ * themselves just because they hold `group.manage`. Suspended ↔ Live is
+ * unrelated to onboarding and stays a direct admin toggle.
+ */
 const NEXT_STATUS: Record<AffiliateStatus, AffiliateStatus[]> = {
   Onboarding: ['Testing'],
-  Testing: ['Live', 'Onboarding'],
+  Testing: [],
   Live: ['Suspended'],
   Suspended: ['Live'],
 };
@@ -40,6 +48,10 @@ export function AffiliateDetail() {
 
   const affiliate = affiliates.find((a) => a.code === params?.code);
   const { data: positions = [] } = usePositions(affiliate?.code);
+  const { data: approvalRequests = [] } = approvals.useList(affiliate?.code);
+  const pendingActivation = approvalRequests.find(
+    (r) => r.status === 'Pending' && r.module === 'Affiliates' && r.action === 'Activate',
+  );
 
   if (!affiliate) {
     return (
@@ -76,7 +88,14 @@ export function AffiliateDetail() {
           },
         ]}
         actions={
-          canManage ? (
+          affiliate.status === 'Testing' ? (
+            <Link
+              href="/admin"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+            >
+              {pendingActivation ? 'Pending approval — view in Approvals' : 'Raise activation in Approvals →'}
+            </Link>
+          ) : canManage ? (
             <>
               {NEXT_STATUS[affiliate.status].map((next) => (
                 <button
@@ -85,10 +104,10 @@ export function AffiliateDetail() {
                   onClick={() => save.mutate({ ...affiliate, status: next })}
                   disabled={save.isPending}
                   className={
-                    next === 'Live'
-                      ? 'rounded-lg bg-success px-4 py-2 text-[12px] font-bold text-white hover:opacity-90 disabled:opacity-40'
-                      : next === 'Suspended'
-                        ? 'rounded-lg bg-danger px-4 py-2 text-[12px] font-bold text-white hover:opacity-90 disabled:opacity-40'
+                    next === 'Suspended'
+                      ? 'rounded-lg bg-danger px-4 py-2 text-[12px] font-bold text-white hover:opacity-90 disabled:opacity-40'
+                      : next === 'Live'
+                        ? 'rounded-lg bg-success px-4 py-2 text-[12px] font-bold text-white hover:opacity-90 disabled:opacity-40'
                         : 'rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40'
                   }
                 >

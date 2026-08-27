@@ -198,6 +198,9 @@ describe('vintage helpers', () => {
       { domain: 'Positions', mode: 'File', connectorId: null, slaDays: 30, owner: 'Ops' },
       { domain: 'FxRates', mode: 'Connector', connectorId: 'C-1', slaDays: 1, owner: 'Treasury' },
     ],
+    inheritGroupRules: true,
+    internalThresholds: {},
+    limitsConfirmed: true,
     createdAt: '2026-01-01T00:00:00Z',
   };
 
@@ -219,6 +222,8 @@ describe('vintage helpers', () => {
     uploadedAt: '2026-07-31T09:00:00Z',
     committedBy: 'ops',
     committedAt: '2026-07-31T09:05:00Z',
+    reconciledBy: null,
+    reconciledAt: null,
     ...over,
   });
 

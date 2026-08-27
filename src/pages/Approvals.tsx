@@ -14,7 +14,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
-import { useAffiliates } from '@/lib/hooks';
+import { useAffiliates, useSaveAffiliate } from '@/lib/hooks';
 import { approvals, approvalBlockedReason, newId } from '@/lib/governanceHooks';
 import type { ApprovalRequest } from '@/engine/types';
 
@@ -33,6 +33,7 @@ export function Approvals() {
   const { data: affiliates = [] } = useAffiliates();
   const { data: requests = [], isLoading } = approvals.useList();
   const save = approvals.useSave();
+  const saveAffiliate = useSaveAffiliate();
 
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
   const [newOpen, setNewOpen] = useState(false);
@@ -56,6 +57,15 @@ export function Approvals() {
     ['module', 'entityLabel', 'summary', 'requestedBy'],
   );
 
+  /**
+   * Approving is the checker action; for an affiliate activation request
+   * that means actually applying the Testing → Live transition, not just
+   * recording that someone said yes. Before this, the ApprovalRequest row
+   * and the affiliate it names had no connection at all — an approved
+   * request just sat there while `AffiliateDetail.tsx`'s "Move to Live"
+   * button did the real work unsupervised. Rejecting leaves the affiliate
+   * exactly where it was, in Testing, for the maker to revisit.
+   */
   const decide = (request: ApprovalRequest, status: 'Approved' | 'Rejected') => {
     if (!user || !canDecide) return;
     void save.mutateAsync({
@@ -65,6 +75,13 @@ export function Approvals() {
       decidedAt: new Date().toISOString(),
       decisionNote: status === 'Rejected' ? 'Rejected from the Approvals queue.' : null,
     });
+
+    if (status === 'Approved' && request.module === 'Affiliates' && request.action === 'Activate') {
+      const affiliate = affiliates.find((a) => a.code === request.entityId);
+      if (affiliate && affiliate.status === 'Testing') {
+        saveAffiliate.mutate({ ...affiliate, status: 'Live' });
+      }
+    }
   };
 
   const handleRaise = async () => {

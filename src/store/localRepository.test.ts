@@ -29,6 +29,9 @@ function affiliate(code: string, overrides: Partial<Affiliate> = {}): Affiliate 
     holidayCalendarId: null,
     legalEntityCode: `LE-${code}`,
     feeds: [],
+    inheritGroupRules: true,
+    internalThresholds: {},
+    limitsConfirmed: false,
     createdAt: '2026-01-01T00:00:00Z',
     ...overrides,
   };
@@ -290,6 +293,8 @@ describe('staged batches', () => {
       uploadedAt: '2026-08-01T00:00:00Z',
       committedBy: null,
       committedAt: null,
+      reconciledBy: null,
+      reconciledAt: null,
     };
     return {
       id,
@@ -363,7 +368,7 @@ describe('reset', () => {
         id: 'B-1', affiliateCode: 'NG', domain: 'Positions', asOfDate: '2026-07-31', version: 1,
         fileName: 'f.csv', fileHash: 'h', rowCount: 1, rowsAccepted: 1, rowsRejected: 0, status: 'Staged',
         supersedesBatchId: null, supersededReason: null, uploadedBy: 't', uploadedAt: '2026-08-01T00:00:00Z',
-        committedBy: null, committedAt: null,
+        committedBy: null, committedAt: null, reconciledBy: null, reconciledAt: null,
       },
       positions: [position('P-2')],
       savedAt: '2026-08-01T00:00:00Z',

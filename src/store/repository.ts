@@ -88,6 +88,7 @@ export interface Repository {
   listAffiliates(): Promise<Affiliate[]>;
   getAffiliate(code: string): Promise<Affiliate | null>;
   upsertAffiliate(affiliate: Affiliate): Promise<void>;
+  deleteAffiliate(code: string): Promise<void>;
 
   // Dimensions
   listDimensionMembers(dimension: DimensionType): Promise<DimensionMember[]>;

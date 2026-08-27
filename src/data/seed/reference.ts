@@ -52,6 +52,9 @@ export const AFFILIATES: Affiliate[] = [
     holidayCalendarId: null,
     legalEntityCode: 'LE-GROUP',
     feeds: [],
+    inheritGroupRules: true,
+    internalThresholds: {},
+    limitsConfirmed: true,
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
@@ -75,6 +78,13 @@ export const AFFILIATES: Affiliate[] = [
       { domain: 'Counterparties', mode: 'File', connectorId: null, slaDays: 90, owner: 'Credit Risk' },
       { domain: 'EconomicIndicators', mode: 'File', connectorId: null, slaDays: 30, owner: 'Group Research' },
     ],
+    inheritGroupRules: true,
+    internalThresholds: {
+      lcrPercent: { amberPercent: 110, redPercent: 100 },
+      nsfrPercent: { amberPercent: 110, redPercent: 100 },
+      loanToDepositPercent: { amberPercent: 72, redPercent: 65 },
+    },
+    limitsConfirmed: true,
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
@@ -101,6 +111,14 @@ export const AFFILIATES: Affiliate[] = [
       { domain: 'Counterparties', mode: 'NotConfigured', connectorId: null, slaDays: 90, owner: null },
       { domain: 'EconomicIndicators', mode: 'File', connectorId: null, slaDays: 30, owner: 'Group Research' },
     ],
+    inheritGroupRules: true,
+    // Steps 1–6 are done (Bank of Ghana carries no loan-to-deposit minimum — see REGULATORY_MINIMA);
+    // only the initial data load remains, so resuming this affiliate lands directly on step 7.
+    internalThresholds: {
+      lcrPercent: { amberPercent: 110, redPercent: 100 },
+      nsfrPercent: { amberPercent: 110, redPercent: 100 },
+    },
+    limitsConfirmed: true,
     createdAt: '2026-07-15T00:00:00Z',
   },
   {
@@ -118,6 +136,9 @@ export const AFFILIATES: Affiliate[] = [
     holidayCalendarId: null,
     legalEntityCode: 'LE-CI',
     feeds: [],
+    inheritGroupRules: true,
+    internalThresholds: {},
+    limitsConfirmed: false,
     createdAt: '2026-07-31T00:00:00Z',
   },
 ];

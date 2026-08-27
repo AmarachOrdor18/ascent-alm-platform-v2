@@ -307,6 +307,18 @@ export function useSaveAffiliate() {
   );
 }
 
+/** Abandons an incomplete onboarding record — only ever called on a `status: 'Onboarding'` affiliate; see OnboardAffiliate.tsx and Affiliates.tsx. */
+export function useDeleteAffiliate() {
+  return useAuditedMutation(
+    'Affiliates',
+    'Delete',
+    'Affiliate',
+    (affiliate: Affiliate) => repository.deleteAffiliate(affiliate.code),
+    (affiliate) => ({ id: affiliate.code, detail: `${affiliate.name} — onboarding abandoned` }),
+    [keys.affiliates],
+  );
+}
+
 // ── Load batches ─────────────────────────────────────────────────────────
 export function useSaveBatch() {
   return useAuditedMutation(

@@ -25,6 +25,9 @@ import { useAffiliates } from '@/lib/hooks';
 const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login })));
 const Placeholder = lazy(() => import('@/pages/Placeholder').then((m) => ({ default: m.Placeholder })));
 const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) => ({ default: m.AffiliateDetail })));
+const OnboardAffiliateResume = lazy(() =>
+  import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate })),
+);
 
 /**
  * Screens built so far. Anything absent renders the placeholder.
@@ -75,6 +78,9 @@ const BUILT: Record<string, ComponentType> = {
 
   // Setup and onboarding — untouched by the navigation redesign.
   '/affiliates/onboard': lazy(() => import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate }))),
+  '/affiliates/bulk-onboard': lazy(() =>
+    import('@/pages/BulkOnboardAffiliates').then((m) => ({ default: m.BulkOnboardAffiliates })),
+  ),
 };
 
 /**
@@ -249,6 +255,7 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/ftp', screenName: 'FTP Rules' },
   { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
   { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
+  { path: '/affiliates/bulk-onboard', screenName: 'Bulk Onboard Affiliates' },
 ];
 
 /**
@@ -258,6 +265,7 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
  */
 const UNLISTED_PERMISSION: Record<string, string> = {
   '/affiliates/onboard': 'group.manage',
+  '/affiliates/bulk-onboard': 'group.manage',
 };
 
 function permissionForUnlisted(path: string): string {
@@ -309,6 +317,7 @@ export const buildRouteOrder = (): RouteEntry[] => {
     }));
 
   const parameterised: RouteEntry[] = [
+    { path: '/affiliates/onboard/:code', screenName: 'Resume Onboarding', Component: OnboardAffiliateResume, permission: 'group.manage' },
     { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail, permission: 'dashboard.view' },
   ];
 

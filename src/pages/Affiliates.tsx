@@ -7,11 +7,12 @@
  * Group at last quarter's rate.
  */
 
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
-import { useAffiliates, useBatches } from '@/lib/hooks';
+import { useAuth } from '@/context/AuthContext';
+import { useAffiliates, useBatches, useDeleteAffiliate } from '@/lib/hooks';
 import { checkAllDomains, type FreshnessCheck } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
 import type { Affiliate } from '@/engine/types';
@@ -26,10 +27,19 @@ const FRESHNESS_TONE = {
 } as const;
 
 export function Affiliates() {
+  const [, navigate] = useLocation();
+  const { hasPermission } = useAuth();
+  const canOnboard = hasPermission('group.manage');
   const { data: affiliates = [], isLoading } = useAffiliates();
   const { data: batches = [] } = useBatches();
+  const deleteAffiliate = useDeleteAffiliate();
 
   const rows = affiliates.filter((a) => a.code !== 'GROUP');
+
+  const cancelOnboarding = (a: Affiliate) => {
+    if (!window.confirm(`Abandon onboarding for ${a.name}? This deletes the record — it cannot be undone.`)) return;
+    deleteAffiliate.mutate(a);
+  };
 
   const freshnessFor = (a: Affiliate): FreshnessCheck[] => checkAllDomains(a, batches, TODAY);
 
@@ -51,7 +61,10 @@ export function Affiliates() {
       key: 'name',
       header: 'Affiliate',
       render: (a) => (
-        <Link href={`/affiliates/${a.code}`} className="font-medium text-navy-900 hover:text-navy-700 hover:underline">
+        <Link
+          href={a.status === 'Onboarding' ? `/affiliates/onboard/${a.code}` : `/affiliates/${a.code}`}
+          className="font-medium text-navy-900 hover:text-navy-700 hover:underline"
+        >
           {a.name}
         </Link>
       ),
@@ -71,6 +84,30 @@ export function Affiliates() {
         const worst = worstFreshness(a);
         return <StatusBadge status={worst} tone={FRESHNESS_TONE[worst]} />;
       },
+    },
+    {
+      key: 'onboarding',
+      header: '',
+      render: (a) =>
+        a.status === 'Onboarding' && canOnboard ? (
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/affiliates/onboard/${a.code}`)}
+              className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={() => cancelOnboarding(a)}
+              className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-danger hover:border-danger"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null,
+      align: 'right',
     },
   ];
 
@@ -96,12 +133,22 @@ export function Affiliates() {
           },
         ]}
         actions={
-          <Link
-            href="/affiliates/onboard"
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
-          >
-            Onboard affiliate
-          </Link>
+          canOnboard ? (
+            <div className="flex gap-2">
+              <Link
+                href="/affiliates/bulk-onboard"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+              >
+                Bulk onboard
+              </Link>
+              <Link
+                href="/affiliates/onboard"
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+              >
+                Onboard affiliate
+              </Link>
+            </div>
+          ) : null
         }
       />
 

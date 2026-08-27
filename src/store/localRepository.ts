@@ -55,6 +55,10 @@ export class LocalRepository implements Repository {
     await this.database.affiliates.put(affiliate);
   }
 
+  async deleteAffiliate(code: string): Promise<void> {
+    await this.database.affiliates.delete(code);
+  }
+
   // ── Dimensions ────────────────────────────────────────────────────────
   listDimensionMembers(dimension: DimensionType): Promise<DimensionMember[]> {
     return this.database.dimensionMembers.where('dimension').equals(dimension).toArray();
