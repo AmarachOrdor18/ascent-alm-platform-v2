@@ -167,6 +167,7 @@ export const CURRENCIES: StoredCurrency[] = [
   { code: 'GHS', name: 'Ghanaian Cedi', symbol: 'GH₵', role: 'Reporting', isActive: true },
   { code: 'XOF', name: 'West African CFA Franc', symbol: 'CFA', role: 'Reporting', isActive: true },
   { code: 'EUR', name: 'Euro', symbol: '€', role: 'Active', isActive: true },
+  { code: 'ZMW', name: 'Zambian Kwacha', symbol: 'ZK', role: 'Active', isActive: true },
 ];
 
 /** Rates are units of the base per one USD, the Group functional currency. */

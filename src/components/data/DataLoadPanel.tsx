@@ -87,6 +87,7 @@ export function DataLoadPanel({
   const [busy, setBusy] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [autoMapping, setAutoMapping] = useState(false);
+  const [justCommitted, setJustCommitted] = useState<{ fileName: string; rowCount: number } | null>(null);
 
   // Resume a previously saved staging session for this exact affiliate,
   // domain and as-of date — same reasoning as DataUpload.tsx: without this,
@@ -129,6 +130,7 @@ export function DataLoadPanel({
 
   const handleFile = async (file: File) => {
     setBusy(true);
+    setJustCommitted(null);
     try {
       const text = await file.text();
       const hash = await hashFile(text);
@@ -196,6 +198,7 @@ export function DataLoadPanel({
       {
         onSuccess: () => {
           const committed = { ...staged.batch, status: 'Committed' as const };
+          setJustCommitted({ fileName: staged.batch.fileName, rowCount: staged.positions.length });
           setStaged(null);
           onCommitted?.(committed);
         },
@@ -341,10 +344,16 @@ export function DataLoadPanel({
           />
         </div>
         {busy && <span className="text-[12px] text-gray-400">Parsing…</span>}
-        {!staged && !busy && (
+        {!staged && !busy && !justCommitted && (
           <span className="text-[11px] text-gray-400">As of {asOfDate} · {affiliate.name}</span>
         )}
       </div>
+
+      {justCommitted && !staged && (
+        <div role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success">
+          <span className="font-bold">✓ Committed.</span> {justCommitted.fileName} — {justCommitted.rowCount} row{justCommitted.rowCount === 1 ? '' : 's'} for {domain}.
+        </div>
+      )}
 
       {supersede?.superseded && !staged && (
         <div className="mb-4 rounded-lg bg-warning-bg px-4 py-3">
@@ -547,7 +556,7 @@ export function DataLoadPanel({
         </>
       )}
 
-      {!staged && (
+      {!staged && !justCommitted && (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-[13px] font-bold text-navy-900">No batch staged for {domain}</p>
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">

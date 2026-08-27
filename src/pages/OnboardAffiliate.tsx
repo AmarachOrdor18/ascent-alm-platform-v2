@@ -207,7 +207,7 @@ export function OnboardAffiliate() {
     setNewConnectorDraft(null);
   };
 
-  const complete3 = !!affiliate && affiliate.feeds.every((f) => f.mode !== 'NotConfigured');
+  const complete3 = !!affiliate && affiliate.feeds.every((f) => f.mode === 'File' || (f.mode === 'Connector' && !!f.connectorId));
 
   // ── Step 4 — COA & organisation ──────────────────────────────────────
   const commonCoaLeaves = useMemo(() => commonCoa.filter((m) => m.isLeaf), [commonCoa]);
@@ -326,8 +326,26 @@ export function OnboardAffiliate() {
     setLedgerErrors(result.errors.length);
   };
 
+  // `identityFxTable` is single-currency — it has no real cross-currency
+  // conversion, so reconciliation only works when the positions and the
+  // uploaded ledger are already stated in the affiliate's own functional
+  // currency. `convert()` throws rather than silently returning a wrong
+  // number when that's not true, which is correct, but letting that
+  // exception reach the wizard would crash the whole onboarding session
+  // over a currency mismatch — this reports it inline instead.
+  const reconciliationError = useMemo(() => {
+    if (!affiliate || ledgerRows.length === 0) return null;
+    const mismatched = new Set(
+      [...committedPositions.map((p) => p.currency), ...ledgerRows.map((l) => l.currency)].filter(
+        (c) => c !== affiliate.functionalCurrency,
+      ),
+    );
+    if (mismatched.size === 0) return null;
+    return `The uploaded data is stated in ${Array.from(mismatched).join(', ')}, but this affiliate's functional currency is ${affiliate.functionalCurrency}. Reconciliation compares like-for-like — either the functional currency or the source file needs to change.`;
+  }, [affiliate, committedPositions, ledgerRows]);
+
   const reconciliation = useMemo(() => {
-    if (!affiliate || !positionsBatch || ledgerRows.length === 0) return null;
+    if (!affiliate || !positionsBatch || ledgerRows.length === 0 || reconciliationError) return null;
     return reconcile(committedPositions, ledgerRows, {
       reportingCurrency: affiliate.functionalCurrency,
       fx: identityFxTable(affiliate.functionalCurrency, positionsBatch.asOfDate),
@@ -335,7 +353,7 @@ export function OnboardAffiliate() {
       toleranceAmount: 1000,
       tolerancePercent: 5,
     });
-  }, [affiliate, positionsBatch, committedPositions, ledgerRows]);
+  }, [affiliate, positionsBatch, committedPositions, ledgerRows, reconciliationError]);
 
   const signOffReconciliation = () => {
     if (!affiliate || !positionsBatch || !reconciliation?.canSignOff || !user) return;
@@ -614,7 +632,11 @@ export function OnboardAffiliate() {
                                   value={feed.mode}
                                   onChange={(e) => {
                                     const mode = e.target.value as FeedMode;
-                                    updateFeed(domain, { mode, connectorId: mode === 'Connector' ? (usable[0]?.id ?? null) : null });
+                                    // Never auto-pick a connector — a connector already marked "Available" here
+                                    // (e.g. Flexcube) belongs to whichever affiliate actually configured it, not
+                                    // this one by default. The Administrator has to deliberately choose it or
+                                    // set up this affiliate's own via "+ New connector".
+                                    updateFeed(domain, { mode, connectorId: mode === 'Connector' ? null : null });
                                   }}
                                   className="rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                                 >
@@ -629,7 +651,7 @@ export function OnboardAffiliate() {
                                     onChange={(e) => updateFeed(domain, { connectorId: e.target.value || null })}
                                     className="rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none"
                                   >
-                                    {usable.length === 0 && <option value="">— none available —</option>}
+                                    <option value="">{usable.length === 0 ? '— none available, add new —' : '— select —'}</option>
                                     {usable.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                   </select>
                                 )}
@@ -647,7 +669,10 @@ export function OnboardAffiliate() {
                               <input value={feed.owner ?? ''} onChange={(e) => updateFeed(domain, { owner: e.target.value || null })} placeholder="Named owner" aria-label={`${domain} owner`} className="w-40 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
                             </td>
                             <td className="py-2">
-                              <StatusBadge status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? 'Connected' : 'Not configured'} tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? 'success' : 'neutral'} />
+                              <StatusBadge
+                                status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? (feed.connectorId ? 'Connected' : 'Connector not chosen') : 'Not configured'}
+                                tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? (feed.connectorId ? 'success' : 'danger') : 'neutral'}
+                              />
                             </td>
                           </tr>
                           {addingConnectorFor === domain && newConnectorDraft && (
@@ -881,6 +906,10 @@ export function OnboardAffiliate() {
                           className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
                         />
                         {ledgerFile && <p className="mt-2 text-[11px] text-gray-500">{ledgerFile.name} · {ledgerRows.length} row(s) parsed{ledgerErrors > 0 ? `, ${ledgerErrors} error(s)` : ''}</p>}
+
+                        {reconciliationError && (
+                          <p className="mt-3 rounded-lg bg-danger-bg px-4 py-3 text-[11px] leading-relaxed text-danger">{reconciliationError}</p>
+                        )}
 
                         {reconciliation && (
                           <div className="mt-4">
