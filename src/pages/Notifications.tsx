@@ -1,16 +1,3 @@
-/**
- * Notifications — screen 50.
- *
- * A real notification rule register. There is no event-instance log in the
- * data model, so this used to fake one: six invented timestamped items,
- * including a fabricated breach that echoed the one faked on the
- * Remediation screen, with a "Mark all as read" button that had no
- * handler. What the store actually holds is `NotificationRule` rows,
- * configuration for *when* and *who* an alert reaches, so that is what
- * this screen configures for real, matching the pattern Validation Rules
- * and Limits already use.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

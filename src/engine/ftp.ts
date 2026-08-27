@@ -1,17 +1,5 @@
-/**
- * Funds transfer pricing.
- *
- * Oracle splits TP methods into two families (ALM UG §7.18): cash-flow
- * methods, which need contract-level origination and maturity data, and
- * non-cash-flow methods, which work on ledger-grain balances. Oracle is
- * explicit that ledger data "does not have the required financial details to
- * generate cash flows, thus preventing you from applying cash flow
- * methodologies to this data".
- *
- * This platform is ledger-grain, so it implements the non-cash-flow family.
- * That is Oracle's own prescribed answer for this data shape, not a
- * simplification we invented.
- */
+// This platform is ledger-grain, so transfer pricing implements the non-cash-flow method family (spread/rate
+// based), not methods requiring contract-level origination and maturity data.
 
 import type { CurrencyCode, Position } from './types';
 
@@ -70,13 +58,7 @@ export interface AdjustmentRule {
   lcrCapBps?: number;
 }
 
-/**
- * Resolve one adjustment to a basis-point add-on.
- *
- * The LCR-driven method makes internal funding more expensive as the
- * liquidity buffer thins, which is a real treasury policy shape. Its
- * coefficients are illustrative, not calibrated to Ecobank.
- */
+/** Resolve one adjustment to a basis-point add-on. The LCR-driven method makes internal funding more expensive as the liquidity buffer thins. */
 export function resolveAdjustmentBps(rule: AdjustmentRule, currentLcrPercent: number | null): number {
   if (rule.method === 'FixedRate') return rule.fixedBps ?? 0;
   if (currentLcrPercent === null) return 0;
@@ -92,14 +74,8 @@ export interface AdjustmentBreakdown {
   bps: number;
 }
 
-/**
- * Stack every applicable adjustment onto a position.
- *
- * Oracle allows more than one adjustment type on a single product, so this
- * returns the full breakdown rather than a single blended number — RFP §2.1
- * asks specifically for "Base FTP and Liquidity Premium" as separable
- * components, and v1 produced only one group-wide premium.
- */
+// Returns the full breakdown rather than a single blended number, since more than one adjustment type can
+// apply to a single product.
 export function adjustmentsFor(
   position: Position,
   rules: AdjustmentRule[],
@@ -140,14 +116,8 @@ export interface FtpResult {
   methodology: string;
 }
 
-/**
- * Which method and curve apply to a slice of the book.
- *
- * Oracle assigns a transfer-pricing method per product (ALM UG Ch. 8): the
- * mortgage book and the overnight desk are not priced the same way. The
- * assignment keys on the Common Chart of Accounts code, so it survives the
- * three affiliates' incompatible local GL schemes.
- */
+// Keys on the Common Chart of Accounts code rather than a local GL code, so the assignment survives affiliates
+// with incompatible local GL schemes.
 export interface FtpAssignmentInput {
   commonCoaCode: string;
   method: TpMethod;
@@ -160,18 +130,8 @@ function tenorDaysFor(position: Position, asOfDate: string): number {
   return Math.max(0, Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${asOfDate}T00:00:00Z`)) / 86_400_000));
 }
 
-/**
- * Compute transfer rates and FTP-adjusted margin.
- *
- * Standard treasury convention: an asset is *charged* the transfer rate for
- * the internal funds it consumes and keeps `(external rate − transfer rate)`;
- * a liability is *credited* the transfer rate for the funding it provides
- * and keeps `(transfer rate − external cost)`.
- *
- * Margin is attributed to the organisational unit. v1 attributed it to the
- * affiliate because position data carried no business-unit dimension — that
- * dimension now exists.
- */
+// Standard treasury convention: an asset is charged the transfer rate and keeps (external rate − transfer
+// rate); a liability is credited the transfer rate and keeps (transfer rate − external cost).
 export function computeFtp(
   positions: Position[],
   curves: YieldCurve[],
@@ -239,9 +199,6 @@ export function computeFtp(
     });
   }
 
-  // Attribution reads the org unit off the line itself. It previously
-  // re-filtered `positions` and matched by array index, which was correct
-  // only for as long as the two orders stayed in step.
   const byUnit = new Map<string, number>();
   for (const line of lines) {
     if (line.marginContribution === null) continue;

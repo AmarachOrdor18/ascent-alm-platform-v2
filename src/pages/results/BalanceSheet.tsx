@@ -1,15 +1,3 @@
-/**
- * Balance Sheet — screen 36.
- *
- * The only results screen that reads positions rather than a computed
- * element, because the balance sheet *is* the positions. It reads the exact
- * batches the run pinned, so it shows the same book the risk figures were
- * derived from — not whatever has been loaded since.
- *
- * Rolls up along any dimension and drills to the individual account, which
- * is the P-07 defect: v1 had no route from a total to its constituents.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
@@ -47,8 +35,7 @@ export function BalanceSheet() {
     run?.asOfDate,
   );
 
-  // Pin to the run's own data version. Without this the screen would drift
-  // away from the risk figures the moment a new batch is committed.
+  // Pin to the run's own data version so figures don't drift as new batches land.
   const positions = useMemo(() => {
     if (!run) return [];
     if (run.positionBatchIds.length === 0) return allPositions;
@@ -208,7 +195,6 @@ export function BalanceSheet() {
   );
 }
 
-/** The accounts behind one roll-up line — closes P-07. */
 function PositionDetail({
   positions,
   code,

@@ -1,12 +1,3 @@
-/**
- * A gap ladder — bars per bucket, cumulative gap as a line.
- *
- * Used by liquidity gap, repricing gap and the behavioural comparison, so
- * the three read identically. The cumulative line is what a banker actually
- * looks at: a single negative bucket is normal, a cumulative gap that never
- * closes is not.
- */
-
 import {
   Bar,
   CartesianGrid,
@@ -48,8 +39,6 @@ export function GapLadderChart({
             contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--gray-200))' }}
           />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          {/* Zero is the meaningful reference on a gap chart, unlike on a
-              ratio chart where v1 drew it and called it a threshold. */}
           <ReferenceLine y={0} stroke="hsl(var(--gray-400))" strokeWidth={1} />
           <Bar dataKey="assets" name="Assets" fill="hsl(var(--teal-700))" radius={[2, 2, 0, 0]} />
           <Bar dataKey="liabilities" name="Liabilities" fill="hsl(var(--amber-500))" radius={[2, 2, 0, 0]} />
@@ -67,7 +56,6 @@ export function GapLadderChart({
   );
 }
 
-/** The same ladder as numbers, because a chart is not an audit trail. */
 export function GapLadderTable({
   buckets,
   currency,

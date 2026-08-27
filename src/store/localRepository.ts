@@ -1,11 +1,3 @@
-/**
- * IndexedDB-backed implementation of `Repository`.
- *
- * Writes that touch more than one table go through `db.transaction` — v1 had
- * zero transactions, so a mid-file ingestion failure left positions written
- * but exceptions and audit events missing (engineering register §3.3).
- */
-
 import { db, AscentDb } from './db';
 import type { Dependency, PositionQuery, Repository, RuleQuery, StagedBatch } from './repository';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
@@ -72,7 +64,6 @@ export class LocalRepository implements Repository {
   async queryPositions(query: PositionQuery): Promise<Position[]> {
     let rows: Position[];
 
-    // Use the narrowest available index rather than scanning the table.
     if (query.affiliateCode && query.asOfDate) {
       rows = await this.database.positions
         .where('[affiliateCode+asOfDate]')
@@ -191,11 +182,6 @@ export class LocalRepository implements Repository {
     await this.database.rules.delete(id);
   }
 
-  /**
-   * Dependency checking is real, not decorative — deleting a Time Bucket rule
-   * that an active run or scenario references is blocked, and the blockers
-   * are named. See build plan §6.
-   */
   async checkDependencies(id: string): Promise<Dependency[]> {
     const [rules, runs] = await Promise.all([this.database.rules.toArray(), this.database.runs.toArray()]);
     const deps: Dependency[] = [];
@@ -255,8 +241,7 @@ export class LocalRepository implements Repository {
   }
 
   // ── Governance, monitoring and reporting ──────────────────────────────
-  // Each of these is scoped the same way: a null affiliateCode means the
-  // row is Group-wide and applies everywhere.
+  // A null affiliateCode means the row is Group-wide and applies everywhere.
   private scoped<T extends { affiliateCode?: string | null }>(rows: T[], affiliateCode?: string): T[] {
     if (!affiliateCode || affiliateCode === 'GROUP') return rows;
     return rows.filter((r) => r.affiliateCode == null || r.affiliateCode === affiliateCode);
@@ -362,8 +347,7 @@ export class LocalRepository implements Repository {
   // ── Limits ────────────────────────────────────────────────────────────
   async listLimitConfigs(affiliateCode?: string): Promise<LimitConfig[]> {
     const rows = await this.database.limitConfigs.toArray();
-    // A limit with a null affiliate is a Group-wide default and applies
-    // everywhere, so it is returned alongside the affiliate's own.
+    // A null affiliate is a Group-wide default, returned alongside the affiliate's own.
     return rows
       .filter((r) => !affiliateCode || r.affiliateCode === null || r.affiliateCode === affiliateCode)
       .sort((a, b) => a.label.localeCompare(b.label));
@@ -421,9 +405,8 @@ export class LocalRepository implements Repository {
   }
 
   // ── Users ─────────────────────────────────────────────────────────────
-  // Sorted in memory rather than via orderBy('name') - the users store only
-  // indexes id, email, role and affiliateCode, and Dexie's orderBy requires
-  // the field itself to be indexed, not just present on the record.
+  // Sorted in memory: Dexie's orderBy requires an index on the field, and
+  // 'name' isn't one of the indexes on the users store.
   async listUsers(): Promise<User[]> {
     const users = await this.database.users.toArray();
     return users.sort((a, b) => a.name.localeCompare(b.name));
@@ -458,8 +441,7 @@ export class LocalRepository implements Repository {
   }
 
   async upsertYieldCurve(curve: StoredYieldCurve): Promise<void> {
-    // Terms are kept sorted on write so every reader — interpolation
-    // included — can rely on the ordering.
+    // Kept sorted on write so every reader, interpolation included, can rely on the ordering.
     await this.database.yieldCurves.put({
       ...curve,
       terms: [...curve.terms].sort((a, b) => a.tenorDays - b.tenorDays),

@@ -1,16 +1,3 @@
-/**
- * Bulk Onboard Affiliates — Excel workbook import.
- *
- * Upload → Parse → Validate → Preview → Confirm Import → create Onboarding
- * records. Nothing is created until Confirm Import, and only rows that pass
- * every check in `parseAffiliateWorkbook` are ever written — an invalid row
- * is skipped whole, never partially created. Each created affiliate is
- * built the same way the interactive wizard builds one (status
- * `Onboarding`, same GlAccount/OrgUnit dimension writes for COA and
- * organisation mapping) — steps 5–7 (assumptions, limits, initial data
- * load, reconciliation, approval) are never bulk-created; the Administrator
- * still opens each affiliate afterwards to finish those.
- */
 import { useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

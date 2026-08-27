@@ -1,18 +1,3 @@
-/**
- * Behavioural modelling — non-maturity deposit run-off, prepayment, betas.
- *
- * RFP §2.1 asks, in these words, for the "Run off profile of customer
- * deposits based on type (Core/Non-Core)". v1 applied a single flat annual
- * decay rate per product regex and had no core/volatile concept at all.
- *
- * Oracle's mechanic (ALM UG Ch. 11.3) is the one adopted here: for each
- * non-maturity product, allocate its balance across tenor tiers, each tier
- * tagged Core or Volatile, percentages summing to 100%. That profile is what
- * makes a *behavioural* maturity ladder different from a contractual one —
- * v1's Behavioural/Contractual toggle rendered identical data in both modes
- * because no separate model existed.
- */
-
 import type { BehaviouralTag, IsoDate, Position } from './types';
 import { addDays } from './dates';
 
@@ -45,20 +30,12 @@ export class InvalidBehaviourPatternError extends Error {
   }
 }
 
-/** Oracle requires the tiers of a non-maturity pattern to sum to 100%. So do we. */
 export function validateBehaviourPattern(pattern: BehaviourPattern): void {
   const total = pattern.tiers.reduce((s, t) => s + t.percent, 0);
   if (Math.abs(total - 100) > 0.0001) throw new InvalidBehaviourPatternError(pattern.name, total);
 }
 
-/**
- * Default patterns, calibrated to the Basel LCR deposit taxonomy.
- *
- * These are *assumptions*, not coefficients fitted to observed withdrawals.
- * Fitting requires multi-period position history, which the platform only
- * begins accumulating once several as-of dates have been loaded — the same
- * honest position v1 took, retained here.
- */
+// Calibrated to the Basel LCR deposit taxonomy. Assumptions, not coefficients fitted to observed withdrawals.
 export const DEFAULT_PATTERNS: BehaviourPattern[] = [
   {
     id: 'BP-RETAIL-CORE',
@@ -131,14 +108,7 @@ function patternFor(tag: BehaviouralTag, patterns: BehaviourPattern[]): Behaviou
   return patterns.find((p) => p.appliesTo.includes(tag)) ?? null;
 }
 
-/**
- * Split deposits into core and volatile balances.
- *
- * Deposits whose behavioural tag has no matching pattern are reported as
- * `unmodelled` rather than being defaulted into a core or volatile bucket —
- * inventing a split would be exactly the kind of plausible-looking figure
- * this codebase refuses to produce.
- */
+// Deposits whose tag has no matching pattern are reported as unmodelled rather than defaulted into a bucket.
 export function computeDepositRunoff(
   positions: Position[],
   patterns: BehaviourPattern[] = DEFAULT_PATTERNS,
@@ -168,12 +138,10 @@ export function computeDepositRunoff(
       continue;
     }
 
-    // Stress shifts balance from core to volatile: a run makes stickier
-    // money leave sooner. Capped so the volatile share cannot exceed 100%.
+    // Stress shifts balance from core to volatile, capped so the volatile share cannot exceed 100%.
     const patternVolatile = pattern.tiers.filter((t) => t.type === 'Volatile').reduce((s, t) => s + t.percent, 0);
 
-    // A quiet account is stickier than its product implies, so part of the
-    // volatile share is reclassified as core before stress is applied.
+    // A quiet account is stickier than its product implies, so part of the volatile share is reclassified as core first.
     const activity = classifyActivity(p);
     const uplift = ACTIVITY_CORE_UPLIFT[activity];
     const adjustedVolatile = patternVolatile * (1 - uplift);
@@ -214,15 +182,7 @@ export function computeDepositRunoff(
   };
 }
 
-/**
- * Re-date non-maturity deposits by their behavioural profile.
- *
- * This is what makes the behavioural liquidity gap genuinely different from
- * the contractual one: a current account with no contractual maturity is
- * spread across the tenor tiers of its pattern instead of landing entirely
- * in the earliest bucket. Each tier becomes its own synthetic position, so
- * the balance total is unchanged.
- */
+// Each tier becomes its own synthetic position spread across the pattern's tenors; the balance total is unchanged.
 export function applyBehaviouralMaturity(
   positions: Position[],
   asOfDate: IsoDate,
@@ -258,17 +218,7 @@ export function applyBehaviouralMaturity(
 
 export type ActivityLevel = 'Active' | 'Low' | 'Dormant' | 'Unknown';
 
-/**
- * Classify an account by its movement.
- *
- * Turnover is the behavioural signal the platform previously had no access
- * to. Product type says a current account is volatile; turnover says whether
- * *this* current account has moved at all this quarter. A dormant balance is
- * materially stickier than an active one of the same product, and treating
- * them identically is why assumption-based run-off models drift.
- *
- * Returns `Unknown` rather than guessing when no turnover was loaded.
- */
+// Returns 'Unknown' rather than guessing when no turnover was loaded.
 export function classifyActivity(position: Position): ActivityLevel {
   const t = position.turnover;
   if (!t) return 'Unknown';
@@ -276,20 +226,13 @@ export function classifyActivity(position: Position): ActivityLevel {
   const monthlyMovement = Math.abs(t.monthlyCredit) + Math.abs(t.monthlyDebit);
   if (monthlyMovement === 0) return 'Dormant';
 
-  // Movement as a share of the balance: a large account moving a token
-  // amount is behaviourally quiet even though the absolute figure is big.
+  // Movement as a share of the balance: a large account moving a token amount is behaviourally quiet.
   const turnoverRatio = position.amount > 0 ? monthlyMovement / position.amount : 0;
   if (turnoverRatio < 0.02) return 'Low';
   return 'Active';
 }
 
-/**
- * How much of a deposit's volatile share to reclassify as core, by activity.
- *
- * A dormant balance behaves like core money regardless of its product
- * classification; an active one behaves like its product suggests. These are
- * assumptions, stated rather than fitted.
- */
+// A dormant balance behaves like core money regardless of its product classification. Assumptions, not fitted.
 export const ACTIVITY_CORE_UPLIFT: Record<ActivityLevel, number> = {
   Dormant: 0.5,
   Low: 0.25,
@@ -307,14 +250,7 @@ export interface DepositBeta {
   beta: number;
 }
 
-/**
- * Pass-through assumptions.
- *
- * Without these, NII sensitivity assumes 100% pass-through of a rate rise to
- * depositors, which no bank experiences — stickier balances reprice least
- * (defect P-11). Core retail money is the slowest to reprice; wholesale
- * non-operational balances track the market almost fully.
- */
+// Core retail money is the slowest to reprice; wholesale non-operational balances track the market almost fully.
 export const DEFAULT_BETAS: DepositBeta[] = [
   { behaviouralTag: 'Core', beta: 0.35 },
   { behaviouralTag: 'Non-Core', beta: 0.65 },
@@ -330,15 +266,7 @@ export interface BetaAdjustedNii {
   methodology: string;
 }
 
-/**
- * Adjust a ΔNII figure for deposit betas.
- *
- * Only the liability leg is damped: assets reprice contractually, deposits
- * reprice at management's discretion. A bank with a negative repricing gap —
- * more liabilities than assets repricing — therefore looks *less* exposed to
- * a rate rise once betas are applied, which is the real effect and the
- * reason the adjustment matters.
- */
+// Only the liability leg is damped: assets reprice contractually, deposits reprice at management's discretion.
 export function applyDepositBetas(
   positions: Position[],
   shockBps: number,

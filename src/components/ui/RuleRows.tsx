@@ -1,11 +1,3 @@
-/**
- * Editable row table for rule bodies.
- *
- * Most rules are a list of rows with a few typed fields each — product
- * assumptions, adjustment stacks, transaction lines. This renders that shape
- * so each rule body stays short enough to read in one screen.
- */
-
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 

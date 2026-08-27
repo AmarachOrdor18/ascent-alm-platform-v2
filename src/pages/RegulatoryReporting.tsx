@@ -1,11 +1,3 @@
-/**
- * Regulatory Reporting — screen 52.
- *
- * Real returns, stored and stateful, each attachable to the run whose
- * figures it reports. Submitting is maker-checker: whoever prepared a
- * return may not be the one who marks it reviewed.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

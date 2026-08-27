@@ -1,13 +1,3 @@
-/**
- * A small (i) button that reveals explanatory text on click.
- *
- * Several screens carried a full paragraph of methodology/rationale always
- * visible on the page — real, non-obvious information, but read once and
- * then in the way every time after. This keeps it one click away instead of
- * permanent, for the reader who wants it without it being read by everyone
- * who doesn't.
- */
-
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 

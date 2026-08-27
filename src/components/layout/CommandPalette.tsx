@@ -1,9 +1,3 @@
-/**
- * Cmd/Ctrl+K search over the sidebar's own navigation map — no separate
- * index to keep in sync, it searches exactly what's already permission-
- * filtered for this user.
- */
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/cn';

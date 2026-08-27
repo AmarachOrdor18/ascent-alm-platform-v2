@@ -1,15 +1,4 @@
-/**
- * Recurrence for scheduled runs.
- *
- * Pure date arithmetic, so it can be tested without a clock: every function
- * takes the reference date as an argument rather than reading `Date.now()`.
- *
- * The honest constraint: this platform executes in the browser, so no timer
- * fires while the tab is closed. What the scheduler actually provides is a
- * *backlog* — the list of occurrences that fell due since the last run —
- * which the app presents when someone opens it. `dueOccurrences` is that
- * calculation, and the screen says so plainly.
- */
+// Pure date arithmetic: every function takes the reference date as an argument rather than reading `Date.now()`.
 
 import { addDays, addMonths, toIso } from './dates';
 import type { HolidayCalendar, IsoDate, RunSchedule, ScheduleFrequency } from './types';

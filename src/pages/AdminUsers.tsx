@@ -1,12 +1,3 @@
-/**
- * Users & Roles — screen 56.
- *
- * Reads the real user register rather than a fabricated list. The six roles
- * and their permissions are the ones the application actually gates on, so
- * what this screen shows about a role is what that role can do — the sidebar
- * and every action button read the same table.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
@@ -17,10 +8,8 @@ import { useAffiliates, useUsers, useSaveUser, useRoles, useSaveRole } from '@/l
 import { hashPassword } from '@/lib/passwordHash';
 import type { Role, RoleCode, User } from '@/engine/types';
 
-/** ROLES is the seed default, keyed by code; the screen wants them in a stable order as a fallback before the live table loads. */
 const DEFAULT_ROLE_LIST = Object.values(ROLES);
 
-/** Every permission string checked anywhere in the app, grouped for a readable checklist. */
 const PERMISSION_GROUPS: Array<{ label: string; permissions: string[] }> = [
   { label: 'View', permissions: ['dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'data.view', 'audit.view'] },
   { label: 'Configure', permissions: ['data.configure', 'risk.configure', 'rules.edit'] },
@@ -29,7 +18,7 @@ const PERMISSION_GROUPS: Array<{ label: string; permissions: string[] }> = [
   { label: 'Commentary', permissions: ['commentary.write', 'commentary.review'] },
 ];
 
-/** Roles carrying one of these are never assignable by someone without `admin.manage` — the escalation guard. */
+// Roles carrying one of these are never assignable by someone without `admin.manage`.
 const DANGEROUS_PERMISSIONS = ['admin.manage', 'group.manage'];
 
 function newId(): string {
@@ -57,9 +46,7 @@ export function AdminUsers() {
   const saveRole = useSaveRole();
   const roleList = roles && roles.length > 0 ? roles : DEFAULT_ROLE_LIST;
   const save = useSaveUser();
-  // Group-wide control (role definitions, cross-affiliate visibility) needs
-  // admin.manage. Day-to-day user provisioning also opens up to users.manage,
-  // held by an Affiliate Administrator scoped to their own affiliate only.
+  // Role definitions need admin.manage; day-to-day provisioning also opens up to users.manage.
   const canEditRoles = hasPermission('admin.manage');
   const canManageUsers = canEditRoles || hasPermission('users.manage');
 
@@ -67,8 +54,6 @@ export function AdminUsers() {
   const [creating, setCreating] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
-  // An Affiliate Administrator only ever sees and manages their own
-  // affiliate's users — never the full register.
   const scopedUsers = canEditRoles
     ? users
     : users.filter((u) => u.affiliateCode === signedIn?.affiliateCode);

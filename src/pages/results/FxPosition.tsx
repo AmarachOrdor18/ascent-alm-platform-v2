@@ -1,15 +1,3 @@
-/**
- * FX Position & Cross-Currency Funding — screen 44.
- *
- * Net open position per currency against capital, and how much of the book
- * is funded in a currency other than the one it lends in.
- *
- * This closes defect P-12: v1 had no FX position anywhere, in a Group that
- * runs thirty-three currencies. For an affiliate borrowing dollars to lend
- * local currency, the funding mismatch is the risk — not the balance sheet
- * total.
- */
-
 import { useMemo, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
@@ -22,9 +10,7 @@ import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resu
 import { formatPct } from '@/lib/format';
 import type { FxPositionLine, FxPositionResult } from '@/engine/profitability';
 
-/** The single-currency limit most regulators in the footprint apply. */
 const SINGLE_CURRENCY_LIMIT_PCT = 10;
-/** And the aggregate limit across all currencies. */
 const AGGREGATE_LIMIT_PCT = 20;
 
 export function FxPosition() {

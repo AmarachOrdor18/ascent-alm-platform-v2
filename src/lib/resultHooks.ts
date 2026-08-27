@@ -1,16 +1,3 @@
-/**
- * Reading results off a run.
- *
- * Every screen in section E answers the same first question — *which run am
- * I looking at?* — so it is answered once, here, rather than ten times.
- *
- * The selected run lives in scope context, which clears it whenever the
- * affiliate or as-of date changes. That is deliberate: a run belongs to one
- * affiliate and one date, and carrying it across a scope change would show
- * the previous affiliate's numbers under the new affiliate's name. That is
- * exactly the v1 defect (D-01) this design exists to make impossible.
- */
-
 import { useEffect, useMemo } from 'react';
 import { useScope } from '@/context/ScopeContext';
 import { useBatches } from './hooks';
@@ -32,6 +19,7 @@ export interface SelectedRun {
 }
 
 export function useSelectedRun(): SelectedRun {
+  // `run` is cleared by scope context whenever the affiliate or as-of date changes.
   const { affiliateCode, run, setRun } = useScope();
   const { data: runs = [], isLoading } = useRuns(affiliateCode);
   const { data: batches = [] } = useBatches();
@@ -44,8 +32,7 @@ export function useSelectedRun(): SelectedRun {
     [runs],
   );
 
-  // Default to the most recent completed run rather than showing an empty
-  // screen. An explicit selection always wins — this only fills the gap.
+  // Default to the most recent completed run; an explicit selection always wins.
   useEffect(() => {
     if (run === null && available.length > 0) setRun(available[0]!);
   }, [run, available, setRun]);
@@ -69,10 +56,7 @@ export function useSelectedRun(): SelectedRun {
   };
 }
 
-/**
- * The five props `<ResultsFrame>` always needs, so ten screens do not each
- * spell out the same wiring.
- */
+/** The props `<ResultsFrame>` needs. */
 export function frameProps(selected: SelectedRun) {
   return {
     run: selected.run,

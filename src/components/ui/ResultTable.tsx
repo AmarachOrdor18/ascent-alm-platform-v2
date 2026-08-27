@@ -1,12 +1,3 @@
-/**
- * A result table with a prior-period column and drill-through built in.
- *
- * Closes practitioner defects P-06 (no month-on-month anywhere in v1) and
- * P-07 (no drill-down from a metric to its constituents). Both are
- * conventions here rather than per-screen decisions: a column declares how
- * to render, and the table supplies variance and row expansion.
- */
-
 import React, { useState } from 'react';
 import { cn } from '@/lib/cn';
 import { formatDelta, formatPct } from '@/lib/format';
@@ -32,10 +23,7 @@ interface ResultTableProps<T> {
   rows: T[];
   columns: ResultColumn<T>[];
   rowKey: (row: T) => string;
-  /**
-   * Prior-period rows, keyed the same way. When supplied, every column with
-   * a `compareValue` gains a variance column.
-   */
+  /** Prior-period rows, keyed the same way; enables variance columns. */
   priorRows?: T[];
   priorLabel?: string;
   /** Drill-through: what a row expands into. Absence of this disables expansion. */

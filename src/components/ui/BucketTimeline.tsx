@@ -1,14 +1,3 @@
-/**
- * A drag-to-set boundary timeline for an ascending ladder of day-count
- * cutoffs. Unlike an allocation bar, dragging one marker doesn't trade
- * against its neighbour by a fixed total — it just has to stay between
- * them, since a bucket ladder is a sequence, not a 100% split.
- *
- * Plotted on a log scale: a ladder typically runs from a few days to
- * several years, and a linear axis would crush every short-end boundary
- * that actually needs the most precision into a sliver of pixels.
- */
-
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { paletteTone } from './TierAllocationBar';
@@ -40,6 +29,7 @@ export function BucketTimeline({ buckets, onChangeBoundary, readOnly }: BucketTi
   const lastBound = bounded[bounded.length - 1] ?? 30;
   const maxDays = Math.max(30, Math.ceil(lastBound * 1.3));
 
+  // Log scale so short-end boundaries keep enough precision.
   const toFraction = (days: number) => Math.log(days + 1) / Math.log(maxDays + 1);
   const toDays = (fraction: number) => Math.exp(fraction * Math.log(maxDays + 1)) - 1;
 

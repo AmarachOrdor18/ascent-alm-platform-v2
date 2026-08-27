@@ -1,19 +1,3 @@
-/**
- * Limits & Breaches — screen 45.
- *
- * Every figure is evaluated from the selected run, through
- * `engine/limits.ts`. That module has existed since phase 1 and was never
- * called: this screen previously rendered a hardcoded array, which meant it
- * could assert an LCR of 88.4% in breach while the Liquidity Risk screen,
- * reading the same run, reported it comfortably above the floor. Two screens
- * disagreeing about one number is the failure this rebuild exists to remove.
- *
- * Two things are kept apart that most systems conflate: the regulator's
- * floor, which is not negotiable, and the bank's own appetite, which sits
- * above it. A limit can be within appetite and still breach the minimum, or
- * the reverse, and the screen reports which.
- */
-
 import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -367,8 +351,7 @@ function LimitEditor({
   const [draft, setDraft] = useState(config);
   const set = (patch: Partial<LimitConfig>) => setDraft((d) => ({ ...d, ...patch }));
 
-  // A higher-is-better limit must degrade downward, and vice versa. Thresholds
-  // out of order would silently invert the whole evaluation.
+  // Thresholds out of order would silently invert the evaluation.
   const ordered =
     draft.direction === 'higher-is-better'
       ? draft.greenThreshold >= draft.amberThreshold && draft.amberThreshold >= draft.redThreshold

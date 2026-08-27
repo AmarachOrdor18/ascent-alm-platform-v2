@@ -1,15 +1,3 @@
-/**
- * Concentration & Large Exposures — screen 43.
- *
- * Depositor concentration by counterparty, which is what RFP §2.1 asks for.
- *
- * v1 grouped deposits by affiliate and labelled the result "depositor
- * concentration" (defect D-04). That answers how funding is spread across
- * the Group — a real question, but not this one, and not the one a regulator
- * asks. The question here is whether a handful of names could take the
- * funding base with them.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
@@ -29,6 +17,12 @@ function hhiBand(hhi: number | null): { label: string; tone: 'success' | 'warnin
   if (hhi < 2500) return { label: 'Moderately concentrated', tone: 'warning' };
   return { label: 'Highly concentrated', tone: 'danger' };
 }
+
+const TONE_TEXT: Record<'success' | 'warning' | 'danger', string> = {
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+};
 
 export function Concentration() {
   const { affiliate, affiliateCode } = useScope();
@@ -136,30 +130,19 @@ export function Concentration() {
                 <p className="mt-1 text-[20px] font-bold text-navy-900">
                   <Amount value={conc.totalDeposits} currency={currency} mono={false} />
                 </p>
-                <p className="mt-1 text-[11px] text-gray-500">
-                  across {conc.byCounterparty.length} identified counterparties
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Herfindahl index</p>
+                <p className={`mt-1 text-[20px] font-bold ${conc.herfindahlIndex === null ? 'text-navy-900' : TONE_TEXT[band.tone]}`}>
+                  {conc.herfindahlIndex === null ? '—' : Math.round(conc.herfindahlIndex)}
                 </p>
               </div>
 
               <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Herfindahl</p>
-                <p className="mt-1 text-[20px] font-bold text-navy-900">
-                  {conc.herfindahlIndex === null ? '—' : Math.round(conc.herfindahlIndex)}
-                </p>
-                <div className="mt-1">
-                  <StatusBadge status={band.label} tone={band.tone} />
-                </div>
-              </div>
-
-              <div
-                className={`rounded-2xl border bg-white p-5 shadow-sm ${largeExposures > 0 ? 'border-danger/30' : 'border-gray-100'}`}
-              >
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Above 10% each</p>
                 <p className={`mt-1 text-[20px] font-bold ${largeExposures > 0 ? 'text-danger' : 'text-navy-900'}`}>
                   {largeExposures}
-                </p>
-                <p className="mt-1 text-[11px] text-gray-500">
-                  {largeExposures > 0 ? 'single-name funding risk' : 'no single name dominates'}
                 </p>
               </div>
             </div>

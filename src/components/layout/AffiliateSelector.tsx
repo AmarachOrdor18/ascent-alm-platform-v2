@@ -1,21 +1,3 @@
-/**
- * The affiliate a single-entity screen is working on — Data Upload, GL
- * Reconciliation, Connectors, Validation Rules.
- *
- * Deliberately independent of the global Scope switcher at the top of the
- * page. That switcher only lists Group and *Live* affiliates, by design: it
- * drives dashboards and consolidated views, and an affiliate still being
- * onboarded should not appear in a Group-wide report. But these four screens
- * are the ones you use precisely *because* an affiliate has not gone live
- * yet — uploading its first position book, reconciling it, configuring its
- * connectors. Restricting them to the same Live-only list would make it
- * impossible to work on anything before it was already finished.
- *
- * So this lists every affiliate regardless of status, defaults to whatever
- * the global Scope switcher currently shows, and lets the choice diverge
- * from it without changing what the rest of the app displays.
- */
-
 import type { AffiliateStatus } from '@/engine/types';
 
 const STATUS_TONE: Record<AffiliateStatus, string> = {
@@ -40,6 +22,7 @@ export function AffiliateSelector({
   value: string | undefined;
   onChange: (code: string) => void;
 }) {
+  // Deliberately independent of the global Scope switcher (which only lists Live affiliates); this lists every affiliate regardless of status.
   const options = affiliates.filter((a) => a.code !== 'GROUP');
   const current = options.find((a) => a.code === value);
 

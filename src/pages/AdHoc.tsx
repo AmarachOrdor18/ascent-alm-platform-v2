@@ -1,13 +1,3 @@
-/**
- * Ad-Hoc Analysis — screen 55.
- *
- * A real cross-affiliate comparison: pick metrics from the platform's own
- * catalogue and affiliates from the platform's own register, and it reads
- * each affiliate's latest completed run for the answer. Every metric here
- * is a ratio or a day-count, so there is nothing to FX-convert — that claim
- * on the previous mock screen described a capability nothing behind it had.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
@@ -29,9 +19,6 @@ export function AdHoc() {
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
-  // The latest completed run per affiliate — the same "which run answers
-  // this" rule every results screen follows, applied across many affiliates
-  // instead of one.
   const latestRunByAffiliate = useMemo(() => {
     const map = new Map<string, (typeof runs)[number]>();
     for (const run of runs) {

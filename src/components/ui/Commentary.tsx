@@ -1,12 +1,3 @@
-/**
- * Analyst commentary and review sign-off, attachable to any result.
- *
- * Closes practitioner defects P-16 (nowhere to write "LCR fell 12pts on the
- * Eurobond maturity") and P-17 (results were never attested before going to
- * ALCO). Both are standing expectations in a risk function, and neither
- * existed anywhere in v1.
- */
-
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from './StatusBadge';
@@ -51,8 +42,7 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
     }
   };
 
-  // A maker cannot approve their own commentary — the same segregation the
-  // workflow engine enforces on approvals.
+  // A maker cannot approve their own commentary.
   const reviewerIsAuthor = record !== null && record.authorName === record.reviewedBy;
   const mayReview = canReview && record !== null && record.reviewState !== 'Approved' && !reviewerIsAuthor;
 

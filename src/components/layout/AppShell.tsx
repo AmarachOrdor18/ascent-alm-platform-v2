@@ -1,11 +1,3 @@
-/**
- * Application shell — sidebar navigation, scope bar, content region.
- *
- * The scope bar is deliberately part of the shell rather than each screen:
- * affiliate, as-of date and the selected run are what results are derived
- * from, so they belong to the frame, not to individual pages.
- */
-
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/cn';
@@ -25,10 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { affiliateCode, setAffiliateCode, affiliates } = useScope();
   const { data: batches = [] } = useBatches();
 
-  // "As at" reflects the data actually on file, not a scope field nothing
-  // in the app ever writes to — it always read as "no data loaded" even
-  // right after a commit. The most recently committed batch in the current
-  // scope (any affiliate, at Group) is the real answer to "as at when".
+  // "As at" is derived from the most recently committed batch, not a scope field (nothing writes to it).
   const asOfDate = useMemo(() => {
     const committed = batches
       .filter((b) => b.status === 'Committed' && (affiliateCode === GROUP_CODE || b.affiliateCode === affiliateCode))
@@ -45,18 +34,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     [hasPermission],
   );
 
-  // Cmd/Ctrl+K searches every individual screen (SEARCH_INDEX), not just the
-  // 13 sidebar-visible modules — collapsing the sidebar shouldn't make a
-  // screen harder to find, just less prominent as a standing link.
+  // Cmd/Ctrl+K searches every screen (SEARCH_INDEX), not just the sidebar-visible modules.
   const visibleSearchItems = useMemo(
     () => SEARCH_INDEX.filter((item) => hasPermission(item.permission)),
     [hasPermission],
   );
 
-  // A user assigned to one affiliate sees only that affiliate here, unless
-  // group.manage says otherwise — that's the segregation Group vs
-  // affiliate-level access is supposed to mean, not just a label on the
-  // user record nothing actually enforced.
+  // A user assigned to one affiliate sees only that affiliate here, unless group.manage says otherwise.
   const restrictedToOwn = user !== null && user.affiliateCode !== GROUP_CODE && !hasPermission('group.manage');
   const selectable = restrictedToOwn
     ? affiliates.filter((a) => a.code === user!.affiliateCode)
@@ -87,15 +71,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div
             className={cn(
               'flex items-center border-b border-white/10',
-              // Collapsed: logo + toggle stacked, each centered — the row
-              // layout below needs ~72px of width for gap-3 + the button,
-              // which doesn't fit in the 64px collapsed rail (it overflowed
-              // outside the nav and sat underneath the main content, unclickable).
+              // Collapsed: stack logo + toggle, centered — the row layout doesn't fit the 64px collapsed rail.
               collapsed ? 'h-20 flex-col justify-center gap-1.5 px-1' : 'h-16 gap-3 px-4',
             )}
           >
-            {/* White plate behind the mark: the Ecobank logo is dark teal and
-              would disappear against the navy rail. */}
+            {/* White plate behind the mark: the logo is dark and would disappear against the navy rail. */}
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white p-0.5">
               <img src="/logo-icon.png" alt="Ecobank" className="h-full w-full object-contain" />
             </div>

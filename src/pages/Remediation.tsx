@@ -1,15 +1,3 @@
-/**
- * Control Remediation — screen 47.
- *
- * A real issue register. This used to render three invented issues (one
- * echoing a fake LCR breach also faked on the Notifications screen), claim
- * a Kafka-driven auto-open and a Workflow Engine closure gate that did not
- * exist, and wire "Advance to {stage}" to an empty comment. It now reads
- * and writes `RemediationIssue` rows through the governance store, stage
- * advances are recorded, and closing an issue is blocked when the person
- * closing it is also its owner.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

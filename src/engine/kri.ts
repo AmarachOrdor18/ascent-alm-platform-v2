@@ -1,15 +1,3 @@
-/**
- * Key risk indicators — trend-based early warning.
- *
- * RFP §2.3 asks for indicators that "help monitor and manage risks related
- * to liquidity, interest rates, market fluctuations and operational
- * challenges". The distinction from limit monitoring is deliberate: a limit
- * asks *are we outside appetite now*, a KRI asks *are we heading there*.
- *
- * A KRI can therefore fire while every limit is still green — which is the
- * whole point of an early-warning indicator.
- */
-
 import type { IsoDate, LimitStatus } from './types';
 
 export interface KriObservation {
@@ -51,14 +39,7 @@ export interface KriEvaluation {
   narrative: string;
 }
 
-/**
- * Evaluate a KRI over its observation window.
- *
- * The slope is a least-squares fit rather than a first-to-last difference,
- * so one anomalous month does not read as a trend. With fewer than three
- * observations there is no trend to speak of and the result says so instead
- * of extrapolating from two points.
- */
+// Slope is a least-squares fit rather than first-to-last, so one anomalous month doesn't read as a trend.
 export function evaluateKri(definition: KriDefinition, observations: KriObservation[]): KriEvaluation {
   const sorted = [...observations].sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
   const window = sorted.slice(-definition.windowSize);

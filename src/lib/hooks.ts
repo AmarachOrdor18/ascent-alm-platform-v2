@@ -1,11 +1,3 @@
-/**
- * Data hooks over the repository.
- *
- * Screens depend on these, never on Dexie. Every mutation invalidates its
- * query key and writes an audit event, so "who changed this configuration
- * and when" is answerable without anyone remembering to log it.
- */
-
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -66,12 +58,7 @@ function auditEvent(
   };
 }
 
-/**
- * Wraps a repository write so every configuration change lands in the audit
- * trail. RFP §2.14 asks for "full transaction history and user activity
- * audit logs"; doing it here rather than per screen is what makes that
- * true rather than aspirational.
- */
+// Wraps a repository write so every configuration change lands in the audit trail.
 function useAuditedMutation<T>(
   module: string,
   action: string,
@@ -102,31 +89,10 @@ export function useAffiliates() {
   return useQuery({ queryKey: keys.affiliates, queryFn: () => repository.listAffiliates() });
 }
 
-/**
- * Resolve the scope's affiliate for a screen that operates on exactly one
- * entity — data upload, GL reconciliation, connector configuration,
- * validation rules.
- *
- * `GROUP` is a genuine row in the affiliates table (Ecobank Group,
- * functional currency USD, seeded in reference.ts) because Process Run and
- * the results screens need a real record to represent a Group-consolidated
- * view. But it represents a *consolidation*, not an entity with its own
- * position book or general ledger, and `affiliates.find(a => a.code ===
- * affiliateCode)` cannot tell those two cases apart — when the global scope
- * switcher is left on "Ecobank Group (Consolidated)", that lookup matches
- * the GROUP row directly, handing a single-entity screen a currency of USD
- * while `usePositions('GROUP', asOfDate)` fetches every affiliate's
- * positions, unfiltered. Reconciling that mixture against an identity FX
- * table (USD-only) fails on the first non-USD row it meets — which is
- * exactly the "No FX rate available to convert NGN to USD" crash: GL
- * Reconciliation is a per-entity control, so it cannot run at Group scope,
- * but nothing stopped the lookup from pretending it was one.
- *
- * This never returns the GROUP row. Screens that legitimately consolidate
- * across the Group — Process Run, Stress Testing, What-If — are unaffected;
- * they already special-case `affiliateCode === 'GROUP'` or build a real,
- * multi-currency FX table rather than an identity one.
- */
+// Resolve the scope's affiliate for a screen that operates on exactly one entity
+// (data upload, GL reconciliation, connector configuration, validation rules).
+// Never returns the GROUP row, since that represents a consolidation rather
+// than an entity with its own position book or general ledger.
 export function resolveSingleAffiliate<T extends { code: string; createdAt: string }>(
   affiliates: T[],
   affiliateCode: string,
@@ -135,11 +101,7 @@ export function resolveSingleAffiliate<T extends { code: string; createdAt: stri
     const exact = affiliates.find((a) => a.code === affiliateCode);
     if (exact) return exact;
   }
-  // Deterministic rather than whatever order the store happens to return.
-  // `listAffiliates()` orders by primary key, so a plain `.find(code !==
-  // 'GROUP')` silently picked Côte d'Ivoire over Nigeria — "CI" sorts before
-  // "NG" alphabetically, which has nothing to do with which affiliate the
-  // fallback should sensibly mean. Earliest-onboarded is at least a reason.
+  // Sorted by createdAt for a deterministic fallback rather than store order.
   return [...affiliates].filter((a) => a.code !== 'GROUP').sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
 }
 
@@ -334,10 +296,8 @@ export function useSaveBatch() {
   );
 }
 
-/**
- * Commit a staged batch: write the rows and mark the batch committed, with
- * any previous version for the same as-of date superseded.
- */
+// Commit a staged batch: write the rows and mark the batch committed, with
+// any previous version for the same as-of date superseded.
 export function useCommitBatch() {
   const client = useQueryClient();
   const { user } = useAuth();
@@ -366,8 +326,6 @@ export function useCommitBatch() {
         supersedesBatchId: supersedes?.id ?? null,
         supersededReason: reason,
       });
-      // The rows now live in the real positions table; the staged copy would
-      // otherwise sit there forever pointing at data that has moved on.
       await repository.deleteStagedBatch(batch.id);
       if (user) {
         await repository.recordAuditEvent(
@@ -391,11 +349,7 @@ export function useCommitBatch() {
   });
 }
 
-/**
- * A previously staged (uncommitted) upload for this exact affiliate, domain
- * and as-of date, if one was saved. Lets Data Upload resume where it left
- * off instead of the parsed rows evaporating the moment the tab is closed.
- */
+// A previously staged (uncommitted) upload for this exact affiliate, domain and as-of date, if one was saved.
 export function useStagedBatchFor(affiliateCode: string | undefined, domain: DataDomain, asOfDate: string) {
   return useQuery({
     queryKey: ['stagedBatches', affiliateCode ?? 'NONE', domain, asOfDate],

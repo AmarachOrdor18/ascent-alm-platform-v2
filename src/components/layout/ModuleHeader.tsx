@@ -1,12 +1,3 @@
-/**
- * Standard header for every screen.
- *
- * The as-of date is a required prop, not an option. v1 had no as-of date
- * anywhere in the application (practitioner register P-01, the first thing
- * a banker asks), and making it required is what stops a screen shipping
- * without one.
- */
-
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { formatAsAt } from '@/lib/format';
@@ -16,7 +7,6 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 export interface HeaderMetric {
   label: string;
   value: string;
-  /** Prior-period movement, already formatted. */
   delta?: string;
   tone?: 'success' | 'warning' | 'danger' | 'neutral';
 }
@@ -24,16 +14,10 @@ export interface HeaderMetric {
 interface ModuleHeaderProps {
   title: string;
   description: string;
-  /**
-   * The reporting date these figures are stated as at. `null` is legitimate
-   * only on configuration screens, which are not as-of dated.
-   */
+  /** `null` is legitimate only on configuration screens, which are not as-of dated. */
   asOfDate: IsoDate | null;
-  /** The currency the figures on this screen are stated in. */
   currency?: CurrencyCode;
-  /** Scope label — the affiliate or Group this screen is showing. */
   scope?: string;
-  /** Freshness or staleness warning from the data-lifecycle check. */
   staleWarning?: string | null;
   metrics?: HeaderMetric[];
   actions?: ReactNode;

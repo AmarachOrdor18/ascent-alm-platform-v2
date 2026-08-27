@@ -1,15 +1,3 @@
-/**
- * Time Bucket Rules — screen 16.
- *
- * Three independent ladders, per Oracle (ALM UG Ch. 15): income simulation,
- * interest-rate gap and liquidity gap. They answer different questions and
- * therefore want different granularity — a liquidity ladder needs daily
- * detail at the short end, a repricing ladder monthly out to several years.
- *
- * The previous platform hardcoded one five-bucket ladder in five files and
- * used it for everything.
- */
-
 import { RuleEditor, RuleField, ruleInput, ruleNumber } from '@/components/ui/RuleEditor';
 import { BucketTimeline } from '@/components/ui/BucketTimeline';
 import { useAuth } from '@/context/AuthContext';
@@ -190,8 +178,7 @@ export function TimeBucketRules() {
                   <button
                     type="button"
                     onClick={() => {
-                      // Insert before the open-ended terminal bucket, which
-                      // must stay last.
+                      // Insert before the open-ended terminal bucket, which must stay last.
                       const last = ladder.buckets[ladder.buckets.length - 1]!;
                       const prior = ladder.buckets[ladder.buckets.length - 2];
                       const bound = (prior?.upperBoundDays ?? 30) * 2;

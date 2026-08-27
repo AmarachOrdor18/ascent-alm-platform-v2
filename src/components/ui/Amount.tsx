@@ -1,11 +1,3 @@
-/**
- * Renders a monetary amount in its own currency.
- *
- * Use this rather than formatting inline — it is the mechanism that stops
- * defect P-02 (a Nigerian balance sheet rendered with a dollar sign) from
- * reappearing screen by screen.
- */
-
 import { cn } from '@/lib/cn';
 import { formatAmount, type AmountFormatOptions } from '@/lib/format';
 import type { CurrencyCode } from '@/engine/types';
@@ -37,8 +29,7 @@ export function Amount({ value, currency, colorBySign = false, mono = true, clas
         colorBySign && value > 0 && 'text-success',
         className,
       )}
-      // The full-precision value stays available on hover, since the display
-      // form is abbreviated to B/M/K.
+      // Full-precision value on hover; display is abbreviated to B/M/K.
       title={formatAmount(value, currency, { compact: false, showCode: true })}
     >
       {formatAmount(value, currency, options)}

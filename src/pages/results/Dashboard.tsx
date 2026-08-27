@@ -1,18 +1,3 @@
-/**
- * Dashboard — screen 35.
- *
- * The one screen that is *meant* to be a dashboard. Everything here comes
- * off a single run, so the headline numbers and the detail screens can never
- * disagree — which they could in v1, where each screen recomputed from a
- * different unscoped query.
- *
- * Redesigned for density over explanation: a nine-tile grid of equally
- * weighted cards, each carrying its own descriptive sentence, read as a
- * wall of text rather than a dashboard. Four headline numbers now carry
- * the eye first; the rest sit in a lighter label-and-value grid a step
- * down, the same weighting a trading-floor dashboard uses.
- */
-
 import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'wouter';
 import { useMemo } from 'react';
@@ -171,11 +156,7 @@ export function Dashboard() {
   const conc = payloadOf<ConcentrationResult>(results, 'Concentration');
   const prof = payloadOf<ProfitabilityResult>(results, 'ProfitabilityRatios');
 
-  // The six BCBS supervisory rate shocks, same battery as Stress Testing,
-  // recomputed from this scope's own positions at the run's as-of date —
-  // capital at risk under every prescribed scenario side by side, not just
-  // the one shock this run happened to be configured with. This is what
-  // actually answers "where is our interest rate risk concentrated."
+  // All six BCBS supervisory rate shocks, recomputed from this scope's own positions at the run's as-of date.
   const shockPositionsScope = run?.affiliateCode ?? affiliateCode;
   const { data: shockPositions = [] } = usePositions(shockPositionsScope, run?.asOfDate ?? undefined);
   const shockRows = useMemo(() => {

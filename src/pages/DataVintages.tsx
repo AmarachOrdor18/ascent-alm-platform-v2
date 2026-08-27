@@ -1,12 +1,3 @@
-/**
- * Data Vintages & Load History — screen 7.
- *
- * Every upload is a load batch with a version, a file hash, an uploader and
- * a row count. Reloading an as-of date creates a new version and supersedes
- * the previous one, with a reason; the old version is retained, because a
- * run that consumed it must still be able to show what it actually computed.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

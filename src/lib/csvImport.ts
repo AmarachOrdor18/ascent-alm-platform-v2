@@ -1,16 +1,3 @@
-/**
- * CSV import for position books and ledger extracts.
- *
- * Deliberately forgiving about *shape* and strict about *content*: column
- * order does not matter and unknown columns are ignored, but a value that
- * cannot be parsed is reported as a row error rather than coerced. A file
- * that half-imports silently is worse than one that refuses.
- *
- * Parsing produces rows; `validatePositions` then decides whether they may
- * be committed. Those are separate steps on purpose — a row can parse
- * perfectly and still fail a business rule.
- */
-
 import type {
   AccountClass,
   AccrualBasis,
@@ -42,13 +29,7 @@ export interface ImportResult<T> {
   headerColumns: string[];
 }
 
-/**
- * Split CSV text into rows.
- *
- * Handles quoted fields containing commas, escaped double quotes, and both
- * line-ending conventions — all of which appear in real core-banking
- * exports, usually in an account name.
- */
+/** Split CSV text into rows, handling quoted fields and both line-ending conventions. */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -236,14 +217,7 @@ export interface PositionImportContext {
   defaultLegalEntityCode?: string;
 }
 
-/**
- * Parse a position book.
- *
- * Amounts are taken as positive magnitudes with the category carrying the
- * sign, which is how the engine reasons. Core systems often export
- * liabilities negative, so a negative amount on a liability row is treated
- * as a sign convention and normalised rather than rejected.
- */
+/** Parse a position book. */
 export function importPositions(text: string, ctx: PositionImportContext): ImportResult<Position> {
   const table = parseCsv(text);
   if (table.length === 0) {
@@ -298,8 +272,7 @@ export function importPositions(text: string, ctx: PositionImportContext): Impor
       productCode: optionalText(get('productcode')) ?? productCodeFrom(optionalText(get('productclass')) ?? ''),
       productClass: optionalText(get('productclass')) ?? 'Unclassified',
       currency: (optionalText(get('currency')) ?? ctx.defaultCurrency ?? 'USD').toUpperCase(),
-      // Sign convention: liabilities often export negative. Normalise to a
-      // magnitude, since the category already carries the direction.
+      // Sign convention: liabilities often export negative; normalise to a magnitude since category carries the direction.
       amount: Math.abs(rawAmount),
       legalEntityCode: optionalText(get('legalentitycode')) ?? ctx.defaultLegalEntityCode ?? `LE-${ctx.affiliateCode}`,
       orgUnitCode: optionalText(get('orgunitcode')) ?? '',

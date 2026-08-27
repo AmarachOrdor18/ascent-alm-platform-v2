@@ -1,18 +1,3 @@
-/**
- * Batch Scheduler — screen 32.
- *
- * Oracle runs ALM as a scheduled batch: the monthly pack fires on the same
- * day each month, against the same rules, so a figure can be re-derived a
- * year later (ALM UG Ch. 35). The previous platform had no concept of a
- * recurring run at all.
- *
- * One thing is stated plainly on the screen rather than hidden: this
- * platform executes in the browser, so nothing fires while the tab is
- * closed. What the scheduler gives you is the *backlog* — which occurrences
- * fell due and were never produced — and a one-click way to clear it. A
- * scheduler that quietly never fires would be worse than none.
- */
-
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -444,14 +429,7 @@ function ScheduleForm({
   );
 }
 
-/**
- * The next few dates, so the recurrence is visible before it is saved.
- *
- * The preview shows the unadjusted recurrence — no holiday roll — because a
- * form that silently moved the dates you just chose is harder to reason
- * about than one showing exactly what you asked for. The list screen applies
- * the calendar.
- */
+// Unadjusted recurrence — no holiday roll — so the preview matches exactly what was entered; the list screen applies the calendar.
 function dueOccurrencesPreview(schedule: RunSchedule): string[] {
   const dates: string[] = [];
   let cursor = schedule.lastRunDate ?? schedule.startDate;

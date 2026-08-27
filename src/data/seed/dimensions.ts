@@ -1,19 +1,3 @@
-/**
- * The seven dimensions, built out to what each is actually for.
- *
- * An earlier version of this seed was structurally thin — three GL accounts
- * per affiliate on an identical coding scheme, no subsidiaries, no branch
- * level, no counterparty group links. That defeated the point of several
- * dimensions, most obviously the Common Chart of Accounts: it exists because
- * local charts differ, so giving every affiliate the same scheme made the
- * mapping meaningless.
- *
- * Here the three affiliates deliberately use three *incompatible* local GL
- * schemes, all mapping onto one Group standard. That is the mechanism that
- * makes 33 balance sheets comparable, and it is only visible if the local
- * schemes genuinely differ.
- */
-
 import type { DimensionMember, DimensionType, GlLevel } from '@/engine/types';
 
 function node(
@@ -35,13 +19,7 @@ function node(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Legal Entity — the affiliate as a legal entity, plus subsidiaries
-//
-// Subsidiaries matter because they consolidate into the affiliate but are
-// separately licensed and separately reported. A securities subsidiary is
-// not a bank and is not subject to LCR.
-// ─────────────────────────────────────────────────────────────────────────
+// Legal Entity — affiliates plus their subsidiaries
 
 export const LEGAL_ENTITIES: DimensionMember[] = [
   node('LegalEntity', 'LE-GROUP', 'Ecobank Transnational Incorporated', null, false, {
@@ -92,13 +70,7 @@ export const LEGAL_ENTITIES: DimensionMember[] = [
   }),
 ];
 
-// ─────────────────────────────────────────────────────────────────────────
-// Organisational Unit — Retail / Corporate / Treasury / Wealth, with the
-// branch or regional level beneath.
-//
-// The branch level is what makes segment P&L and FTP attribution real: a
-// transfer rate charged to "Retail Banking" tells a regional head nothing.
-// ─────────────────────────────────────────────────────────────────────────
+// Organisational Unit — Retail / Corporate / Treasury / Wealth, with branch/region beneath
 
 const SEGMENTS: Array<{ suffix: string; name: string }> = [
   { suffix: 'RET', name: 'Retail Banking' },
@@ -107,14 +79,12 @@ const SEGMENTS: Array<{ suffix: string; name: string }> = [
   { suffix: 'WLT', name: 'Wealth Management' },
 ];
 
-/** Regions beneath Retail, which is where a branch network actually sits. */
 const REGIONS: Record<string, string[]> = {
   NG: ['Lagos', 'South-West', 'North Central', 'South-South', 'South-East'],
   GH: ['Greater Accra', 'Ashanti', 'Northern'],
   CI: ['Abidjan', 'Intérieur'],
 };
 
-/** Corporate books split by client size, which is how coverage is organised. */
 const CORPORATE_DESKS = ['Large Corporates', 'Mid-Market', 'Public Sector'];
 
 const AFFILIATE_LABEL: Record<string, string> = { NG: 'Nigeria', GH: 'Ghana', CI: "Côte d'Ivoire" };
@@ -162,9 +132,7 @@ function slug(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
-// ─────────────────────────────────────────────────────────────────────────
 // Common Chart of Accounts — the Group standard every local GL maps onto
-// ─────────────────────────────────────────────────────────────────────────
 
 export const COMMON_COA: DimensionMember[] = [
   node('CommonCoa', 'COA-ROOT', 'Ecobank Group Chart of Accounts', null, false),
@@ -187,24 +155,9 @@ export const COMMON_COA: DimensionMember[] = [
   node('CommonCoa', 'COA-32', 'Reserves & Retained Earnings', 'COA-3', true),
 ];
 
-// ─────────────────────────────────────────────────────────────────────────
-// General Ledger Account — the affiliate's *local* chart
-//
-// Three levels, as real charts are: a two-digit category, a four-digit
-// group, and a six-digit account, where each code embeds its parent.
-// Categories follow the accounting equation, which is the convention core
-// banking systems use:
-//
-//   10  Fixed assets        40  Liabilities
-//   20  Current assets      50  Income
-//   30  Equity              60  Expenses
-//
-// The three affiliates deliberately use three *incompatible* schemes —
-// Nigeria numeric, Ghana letter-prefixed, Côte d'Ivoire SYSCOHADA. They are
-// not interchangeable, and that is the point: the Common COA mapping is what
-// makes them comparable at Group. A seed where every affiliate shared one
-// scheme would hide the problem the dimension solves.
-// ─────────────────────────────────────────────────────────────────────────
+// General Ledger Account — the affiliate's local chart (two-digit category /
+// four-digit group / six-digit account). Category codes: 10 Fixed assets,
+// 20 Current assets, 30 Equity, 40 Liabilities, 50 Income, 60 Expenses.
 
 export interface LocalGlAccount {
   code: string;
@@ -315,9 +268,7 @@ export const GL_ACCOUNTS: DimensionMember[] = [
   ]),
 ];
 
-// ─────────────────────────────────────────────────────────────────────────
 // Financial Element — what is being measured
-// ─────────────────────────────────────────────────────────────────────────
 
 export const FINANCIAL_ELEMENTS: DimensionMember[] = [
   node('FinancialElement', 'FE-ROOT', 'Financial Elements', null, false),
@@ -336,14 +287,8 @@ export const FINANCIAL_ELEMENTS: DimensionMember[] = [
   node('FinancialElement', 'FE-1680', 'Cumulative Liquidity Gap', 'FE-GAP', true),
 ];
 
-// ─────────────────────────────────────────────────────────────────────────
-// Counterparty — obligor or depositor, with a group-exposure link
-//
-// The group link is what single-obligor limits and large-exposure reporting
-// actually run on: three separately-named companies under one parent are one
-// exposure for limit purposes. Without it, a concentration measure counts
-// them as three and understates the risk.
-// ─────────────────────────────────────────────────────────────────────────
+// Counterparty — obligor or depositor, with a group-exposure link for
+// single-obligor limit aggregation (related names count as one exposure)
 
 interface Cp {
   code: string;
@@ -410,9 +355,6 @@ const COUNTERPARTY_LEAVES: Cp[] = [
     affiliate: 'GH',
     note: 'Aggregated: no single retail depositor reaches the reporting threshold',
   },
-  // Three separately-named obligors under one parent. For single-obligor
-  // limits these are ONE exposure, which is exactly what the group link
-  // exists to capture.
   {
     code: 'CP-NG-OBLIGOR-01',
     name: 'Industrial Group — Cement Division',

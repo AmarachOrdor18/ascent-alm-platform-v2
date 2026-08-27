@@ -1,12 +1,3 @@
-/**
- * Formatting helpers.
- *
- * v1's `formatUsd` hardcoded a `$` and was used on every page for every
- * currency, so a Nigerian deposit book of NGN 560bn rendered as "$560.0B"
- * (practitioner register P-02). Currency is a required argument here, and
- * `formatUsd` deliberately does not exist.
- */
-
 import type { CurrencyCode, IsoDate } from '@/engine/types';
 
 /** Symbols for the currencies the Group actually reports in. Others fall back to the ISO code. */
@@ -79,7 +70,7 @@ export function formatDelta(value: number | null, digits = 1): string {
   return `${value > 0 ? '+' : ''}${value.toFixed(digits)}`;
 }
 
-/** `2026-07-31` → `31 Jul 2026`. The as-of date appears on every result (P-01). */
+/** `2026-07-31` → `31 Jul 2026`. */
 export function formatDate(date: IsoDate | null): string {
   if (!date) return '—';
   const parsed = new Date(`${date}T00:00:00Z`);

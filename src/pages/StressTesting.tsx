@@ -1,14 +1,3 @@
-/**
- * Stress Testing — screen 34.
- *
- * The regulatory battery, as opposed to the free-form exploration on the
- * What-If Builder: the six BCBS supervisory shocks run together, the outlier
- * test applied to each, and the liquidity survival horizon under a severe
- * run. Nothing here is configurable by design — the shocks are prescribed,
- * and a screen that let you tune them would be answering a different
- * question.
- */
-
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -299,13 +288,6 @@ export function StressTesting() {
   );
 }
 
-/**
- * The buffer depleting day by day.
- *
- * Rendered as a table rather than a chart because the question an ALCO asks
- * is "which day do we break", and a date is easier to read off a row than
- * off an axis.
- */
 function SurvivalTimeline({ timeline, currency }: { timeline: SurvivalDay[]; currency: string }) {
   const columns: ResultColumn<SurvivalDay>[] = [
     { key: 'day', header: 'Day', render: (d) => <span className="font-mono">{d.day}</span> },
@@ -334,8 +316,7 @@ function SurvivalTimeline({ timeline, currency }: { timeline: SurvivalDay[]; cur
     },
   ];
 
-  // Every third day plus the breaking point — thirty rows is a scroll, and
-  // the day the buffer runs out must never be the one that gets sampled out.
+  // Sample every third day, but always include the day the buffer is exhausted.
   const firstExhausted = timeline.find((d) => d.isExhausted);
   const sampled = timeline.filter((d) => d.day % 3 === 0 || d.day === 1 || d.day === firstExhausted?.day);
 

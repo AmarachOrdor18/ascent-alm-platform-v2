@@ -1,12 +1,3 @@
-/**
- * Counterparty Register — screen 11.
- *
- * Without this dimension, depositor concentration is not computable. The
- * previous platform grouped deposits by *affiliate*, which answers how
- * deposits are spread across the Group — a different question from the one
- * RFP §2.1 and every regulator actually asks (defect D-04).
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -39,8 +30,6 @@ export function Counterparties() {
 
   const [draft, setDraft] = useState({ code: '', name: '', sector: 'Corporate' });
 
-  // Exposure is read from committed positions so the register is not just a
-  // list of names — it shows what each counterparty is actually worth.
   const { data: positions = [] } = useQuery({
     queryKey: ['positions', affiliateCode],
     queryFn: () => repository.queryPositions(affiliateCode === 'GROUP' ? {} : { affiliateCode }),

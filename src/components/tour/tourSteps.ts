@@ -1,18 +1,5 @@
-/**
- * Role-based guided tour — step scripts.
- *
- * Deliberately data, not markup: one small overlay component (`Tour.tsx`)
- * reads whichever list matches the signed-in role and walks the user
- * through it, navigating to each step's real route in turn. No existing
- * screen is touched to build this — the tour is a layer on top, the same
- * way `ModuleHeader` metrics or `InfoButton` tooltips are additive rather
- * than a redesign.
- *
- * Content mirrors `ALM_PLATFORM_USER_GUIDE.md` (the full written version of
- * this same journey), condensed to tour-length sentences. Every `path`
- * below is a real route this platform serves today.
- */
-import type { RoleCode } from '@/engine/types';
+import type { Role } from '@/engine/types';
+import { SEARCH_INDEX } from '@/components/layout/navigation';
 
 export type TourTag = 'Input' | 'Reference data' | 'Assumptions' | 'Result' | 'Control';
 
@@ -20,7 +7,8 @@ export interface TourStep {
   id: string;
   path: string;
   title: string;
-  body: string;
+  dataIn: string;
+  why: string;
   tag?: TourTag;
 }
 
@@ -29,255 +17,230 @@ const INTRO: TourStep = {
   id: 'intro',
   path: '/dashboard',
   title: 'What is ALM, and what does this platform do?',
-  body: 'A bank owns things (loans, investments) and owes things (deposits, borrowings) that don’t match up perfectly. ALM is managing the risk in that mismatch — can the bank pay depositors on time, and what do moving interest rates do to it. This platform takes the bank’s real position data, market data and behavioural assumptions, and computes those risk numbers — for one affiliate, or the whole Group.',
+  dataIn: 'Nothing yet — this is the orientation step.',
+  why: 'A bank owns things (loans, investments) and owes things (deposits, borrowings) that don’t match up perfectly. ALM is managing the risk in that mismatch — can the bank pay depositors on time, and what do moving interest rates do to it. Everything that follows takes the bank’s real position data, market data and behavioural assumptions, and computes those risk numbers.',
 };
 
-const ROLE_STEPS: Record<RoleCode, TourStep[]> = {
-  ADMIN: [
-    INTRO,
-    {
-      id: 'affiliates',
-      path: '/affiliates',
-      title: 'Affiliates',
-      body: 'Every affiliate bank in the Group, with how fresh its data is. This is your directory — and where a new affiliate gets onboarded.',
-    },
-    {
-      id: 'onboard',
-      path: '/affiliates/onboard',
-      title: 'Onboard Affiliate',
-      body: 'Seven steps, all on one screen — legal profile, currencies, connectivity, chart-of-accounts mapping, limits, and the initial data load. Nothing here sends you to a separate screen partway through.',
-    },
-    {
-      id: 'connectors',
-      path: '/connectors',
-      title: 'Connectors & Data Sources',
-      body: 'The shared catalogue of systems like Flexcube and Reuters. Once a domain has a connector configured, it becomes the authoritative feed — manual upload is blocked for that domain so it can’t be silently bypassed.',
-      tag: 'Control',
-    },
-    {
-      id: 'dimensions',
-      path: '/data/structure',
-      title: 'Dimensions & Hierarchies',
-      body: 'How every position is classified — legal entity, business unit, product, GL account, counterparty. Set up once per affiliate, then it’s ordinary configuration data, not something re-entered per run.',
-      tag: 'Reference data',
-    },
-    {
-      id: 'reference',
-      path: '/data/reference-data',
-      title: 'Reference Data',
-      body: 'Yield curves, FX rates, economic indicators, holiday calendars — the market and calendar data every calculation reads. A missing FX rate fails a Group run rather than silently dropping that currency.',
-      tag: 'Reference data',
-    },
-    {
-      id: 'configuration',
-      path: '/configuration',
-      title: 'Business Rules & Validation Rules',
-      body: 'The assumptions the engine models with — behavioural patterns, prepayment, discount methods — and the rules that decide what counts as valid position data in the first place.',
-      tag: 'Assumptions',
-    },
-    {
-      id: 'admin',
-      path: '/admin',
-      title: 'Administration & Governance',
-      body: 'You’re usually the checker in Approvals — maker-checker means whoever submits an affiliate for activation can’t also approve it. Audit Log is the full trail underneath everything else in the platform.',
-      tag: 'Control',
-    },
-  ],
-
-  RISK_ANALYST: [
-    INTRO,
-    {
-      id: 'data-ops',
-      path: '/data/operations',
-      title: 'Data Operations',
-      body: 'Check what’s actually loaded and how fresh it is before trusting any run — a stale feed doesn’t announce itself on the results screens.',
-      tag: 'Input',
-    },
-    {
-      id: 'liquidity',
-      path: '/risk/liquidity',
-      title: 'Liquidity Risk',
-      body: 'Can the bank meet its short-term obligations? LCR, NSFR and the liquidity gap, all computed from the same selected run.',
-      tag: 'Result',
-    },
-    {
-      id: 'irrbb',
-      path: '/risk/irrbb',
-      title: 'IRRBB & Behavioural Risk',
-      body: 'How interest-rate moves affect the balance sheet’s value (EVE) versus next year’s earnings (NII) — genuinely different questions that can point in different directions.',
-      tag: 'Result',
-    },
-    {
-      id: 'stress',
-      path: '/risk/stress-testing',
-      title: 'Stress Testing & Scenario Analysis',
-      body: 'The six BCBS supervisory shocks, run against this scope’s own book. What-If Builder is here too, for a scenario that isn’t one of the six.',
-      tag: 'Result',
-    },
-    {
-      id: 'concentration',
-      path: '/risk/concentration',
-      title: 'Concentration & Risk Monitoring',
-      body: 'Exposure, then limits, then the trend (KRIs) — in that order. A limit means nothing without first knowing what’s actually exposed.',
-      tag: 'Result',
-    },
-    {
-      id: 'rules',
-      path: '/configuration',
-      title: 'Business Rules',
-      body: 'You’re usually the one tuning the behavioural and prepayment assumptions here, not just reading their downstream effect on the results screens.',
-      tag: 'Assumptions',
-    },
-  ],
-
-  TREASURY_USER: [
-    INTRO,
-    {
-      id: 'balance-sheet',
-      path: '/treasury/balance-sheet',
-      title: 'Balance Sheet & Treasury',
-      body: 'The shape of the balance sheet, and FX Position — which is a calculated result read from a completed run, not something you upload.',
-      tag: 'Result',
-    },
-    {
-      id: 'ftp',
-      path: '/treasury/ftp',
-      title: 'Funds Transfer Pricing',
-      body: 'Every position is priced against an internal transfer rate before its margin counts as a business unit’s own — that’s what separates a loan’s headline rate from what the desk actually earned.',
-      tag: 'Result',
-    },
-    {
-      id: 'profitability',
-      path: '/treasury/ftp/profitability',
-      title: 'Profitability Ratios',
-      body: 'Net interest margin, NPL ratio, non-earning assets — what falls out once every position carries a transfer-priced margin.',
-      tag: 'Result',
-    },
-    {
-      id: 'liquidity',
-      path: '/risk/liquidity',
-      title: 'Liquidity Risk',
-      body: 'You’re a heavy consumer of this even though Risk owns the methodology — funding decisions start with what this screen shows.',
-      tag: 'Result',
-    },
-    {
-      id: 'rules',
-      path: '/configuration',
-      title: 'Business Rules — FTP & Transaction Strategies',
-      body: 'The rules that actually drive your own FTP numbers are configured here.',
-      tag: 'Assumptions',
-    },
-  ],
-
-  EXECUTIVE_VIEWER: [
-    INTRO,
-    {
-      id: 'dashboard',
-      path: '/dashboard',
-      title: 'Executive Dashboard',
-      body: 'One run, every number on this screen reads off it — click any tile to drill into the screen behind it.',
-      tag: 'Result',
-    },
-    {
-      id: 'liquidity',
-      path: '/risk/liquidity',
-      title: 'Liquidity Risk',
-      body: 'Read-only for you — drill into any number, but the assumptions and limits behind it are configured elsewhere.',
-      tag: 'Result',
-    },
-    {
-      id: 'limits',
-      path: '/risk/concentration/limits',
-      title: 'Limits & Breaches',
-      body: 'Where a number has turned red, and why. The regulator’s floor and the bank’s own appetite are shown as two separate lines, never blended into one.',
-      tag: 'Control',
-    },
-    {
-      id: 'reporting',
-      path: '/reporting',
-      title: 'Reporting & ALCO',
-      body: 'The packaged view for committee and board — the same numbers, written up for people who don’t log into the platform directly.',
-      tag: 'Result',
-    },
-    {
-      id: 'affiliates',
-      path: '/affiliates',
-      title: 'Affiliates',
-      body: 'The Group-wide picture across every affiliate bank, and which ones are Live versus still onboarding.',
-    },
-  ],
-
-  REPORTING_USER: [
-    INTRO,
-    {
-      id: 'alco',
-      path: '/reporting',
-      title: 'ALCO Meetings',
-      body: 'Where committee packs and their supporting materials are organised.',
-    },
-    {
-      id: 'packs',
-      path: '/reporting/report-packs',
-      title: 'Report Packs',
-      body: 'The ALCO pack and the Management pack — generated from a real run, not typed into a table by hand.',
-      tag: 'Result',
-    },
-    {
-      id: 'regulatory',
-      path: '/reporting/regulatory',
-      title: 'Regulatory Reporting',
-      body: 'Statutory submissions, built the same way as the ALCO pack — one real run behind every figure.',
-      tag: 'Result',
-    },
-    {
-      id: 'adhoc',
-      path: '/reporting/ad-hoc',
-      title: 'Ad-Hoc Analysis',
-      body: 'For the one-off request that doesn’t fit any standing report.',
-    },
-  ],
-
-  CONTROL_TESTER: [
-    INTRO,
-    {
-      id: 'upload',
-      path: '/data/operations',
-      title: 'Data Upload & Staging',
-      body: 'Staged rows are editable; committed rows are not — after commit, the only routes are a brand-new version or a reasoned adjustment. Nothing is ever silently edited.',
-      tag: 'Control',
-    },
-    {
-      id: 'reconciliation',
-      path: '/data/operations/gl-reconciliation',
-      title: 'GL Reconciliation',
-      body: 'The position book compared against the trial balance. A variance inside tolerance needs an approved plug; anything outside tolerance blocks sign-off entirely and goes back to the affiliate.',
-      tag: 'Control',
-    },
-    {
-      id: 'validation',
-      path: '/configuration/validation-rules',
-      title: 'Validation Rules',
-      body: 'The rules that decide what counts as valid position data before it can even be staged.',
-      tag: 'Control',
-    },
-    {
-      id: 'limits',
-      path: '/risk/concentration/limits',
-      title: 'Limits & Breaches',
-      body: 'Read-only for you — useful for checking a control’s actual downstream effect on the risk numbers.',
-      tag: 'Result',
-    },
-    {
-      id: 'audit',
-      path: '/admin/audit',
-      title: 'Audit Log',
-      body: 'The evidence trail for every change made anywhere in the platform — who, what, and when.',
-      tag: 'Control',
-    },
-  ],
+/** Keyed by path — one entry per real screen in SEARCH_INDEX. */
+const SCREEN_CONTENT: Record<string, { dataIn: string; why: string; tag?: TourTag }> = {
+  '/dashboard': {
+    dataIn: 'The selected run’s results.',
+    why: 'One glance at whether the bank is healthy right now — every tile links to the screen behind it.',
+    tag: 'Result',
+  },
+  '/risk/liquidity': {
+    dataIn: 'Positions, FX rates, the selected run.',
+    why: 'Can the bank meet its short-term obligations — LCR, NSFR and the liquidity gap.',
+    tag: 'Result',
+  },
+  '/risk/liquidity/risk-map': {
+    dataIn: 'Every Live affiliate’s Liquidity Risk numbers.',
+    why: 'One table across every affiliate, so a Group-level liquidity problem is visible at a glance instead of affiliate by affiliate.',
+    tag: 'Result',
+  },
+  '/risk/liquidity/gap-analysis': {
+    dataIn: 'Positions, bucketed by contractual and behavioural maturity.',
+    why: 'When cash actually arrives versus when a rate resets — two different ladders, off the same positions.',
+    tag: 'Result',
+  },
+  '/risk/irrbb': {
+    dataIn: 'Positions, yield curves, behavioural assumptions.',
+    why: 'EVE, NII and PV01 — how a rate move hits the balance sheet’s value versus next year’s earnings. Genuinely different questions.',
+    tag: 'Result',
+  },
+  '/risk/irrbb/behavioural-analysis': {
+    dataIn: 'Positions, behavioural pattern assumptions from Business Rules.',
+    why: 'How customers actually behave versus their contract’s stated terms — the input IRRBB and liquidity both quietly depend on.',
+    tag: 'Result',
+  },
+  '/risk/stress-testing': {
+    dataIn: 'Positions, the six BCBS supervisory shocks.',
+    why: 'Capital impact under every prescribed regulatory scenario, side by side — not just the one shock a run happened to use.',
+    tag: 'Result',
+  },
+  '/risk/stress-testing/what-if': {
+    dataIn: 'Positions, a scenario you define.',
+    why: 'For the scenario that isn’t one of the six regulatory shocks — build your own and see the impact.',
+    tag: 'Result',
+  },
+  '/risk/concentration': {
+    dataIn: 'Positions, the Counterparty Register.',
+    why: 'What share of deposits sits with one depositor — a concentration risk the total balance alone can hide.',
+    tag: 'Result',
+  },
+  '/risk/concentration/limits': {
+    dataIn: 'Every evaluated metric, against its configured thresholds.',
+    why: 'Where a number has crossed red, and whether it’s the regulator’s floor or the bank’s own internal appetite — always shown separately.',
+    tag: 'Control',
+  },
+  '/risk/concentration/kri': {
+    dataIn: 'Limit evaluations across a scope’s run history.',
+    why: 'The trend, not just today’s snapshot — is this getting worse, not just is it bad right now.',
+    tag: 'Result',
+  },
+  '/treasury/ftp': {
+    dataIn: 'Positions, yield curves, FTP rules.',
+    why: 'Prices every position against an internal transfer rate — separates a desk’s real margin from Treasury’s own funding cost.',
+    tag: 'Result',
+  },
+  '/treasury/ftp/profitability': {
+    dataIn: 'Positions, FTP results.',
+    why: 'Net interest margin, NPL ratio, non-earning assets — what falls out once every position carries a transfer-priced margin.',
+    tag: 'Result',
+  },
+  '/treasury/balance-sheet': {
+    dataIn: 'Positions, the selected run.',
+    why: 'The shape of what the bank owns and owes, at a glance.',
+    tag: 'Result',
+  },
+  '/treasury/balance-sheet/fx-position': {
+    dataIn: 'Positions and FX rates, from a completed run.',
+    why: 'Net open position per currency — this is calculated from a run, never something you upload directly.',
+    tag: 'Result',
+  },
+  '/reporting': {
+    dataIn: 'Organisational — not itself a calculation.',
+    why: 'Where committee packs and their supporting materials are organised.',
+  },
+  '/reporting/report-packs': {
+    dataIn: 'A completed run’s results.',
+    why: 'The ALCO pack and the Management pack, generated from a real run — not typed into a table by hand.',
+    tag: 'Result',
+  },
+  '/reporting/regulatory': {
+    dataIn: 'A completed run’s results.',
+    why: 'Statutory submissions, built the same way as the ALCO pack — one real run behind every figure.',
+    tag: 'Result',
+  },
+  '/reporting/ad-hoc': {
+    dataIn: 'A completed run’s results.',
+    why: 'For the one-off request that doesn’t fit any standing report.',
+    tag: 'Result',
+  },
+  '/data/operations': {
+    dataIn: 'A CSV file — or nothing, if this domain already has a configured connector.',
+    why: 'Where the position book (and other domains) actually enters the platform. Staged rows are editable; committed rows are not.',
+    tag: 'Input',
+  },
+  '/data/operations/gl-reconciliation': {
+    dataIn: 'Committed positions, an uploaded trial balance.',
+    why: 'Checks the detailed position data agrees with the accounting ledger before either is trusted downstream.',
+    tag: 'Control',
+  },
+  '/data/operations/vintages': {
+    dataIn: 'Every load batch, past and present.',
+    why: 'The full history of what was loaded, when, by whom — including versions a later load superseded.',
+    tag: 'Control',
+  },
+  '/data/structure': {
+    dataIn: 'Seeded at onboarding; grows from a position file that references a new code.',
+    why: 'How every position is classified — legal entity, business unit, product, GL account, counterparty.',
+    tag: 'Reference data',
+  },
+  '/data/structure/counterparties': {
+    dataIn: 'Seeded per affiliate, or added manually or from a position file.',
+    why: 'Who the bank’s obligors and depositors actually are — what makes concentration computable at all.',
+    tag: 'Reference data',
+  },
+  '/data/reference-data': {
+    dataIn: 'Entered manually, per currency.',
+    why: 'Yield curves used for discounting, and for FTP’s internal transfer rate.',
+    tag: 'Reference data',
+  },
+  '/data/reference-data/fx-rates': {
+    dataIn: 'Entered manually.',
+    why: 'Every consolidated Group figure converts through these — a missing rate fails the calculation rather than silently dropping that currency.',
+    tag: 'Reference data',
+  },
+  '/data/reference-data/economic-indicators': {
+    dataIn: 'Entered manually, one observation at a time.',
+    why: 'Macro series (inflation, policy rates) that drive behavioural assumptions and stress-scenario narratives.',
+    tag: 'Reference data',
+  },
+  '/data/reference-data/holiday-calendar': {
+    dataIn: 'Entered manually, per jurisdiction.',
+    why: 'A payment due on a holiday shifts to the next business day — which can move it into a different liquidity bucket.',
+    tag: 'Reference data',
+  },
+  '/execution': {
+    dataIn: 'Everything before it — positions, reference data, assumptions.',
+    why: 'The actual calculation step. Nothing earlier in the journey is anything but preparing its inputs.',
+    tag: 'Input',
+  },
+  '/execution/history': {
+    dataIn: 'Every run that’s been executed.',
+    why: 'Read-only record of every run — what it used as inputs, and what it produced.',
+  },
+  '/execution/scheduler': {
+    dataIn: 'Configured run and load schedules.',
+    why: 'Automates when a run, or a load, is expected to happen.',
+  },
+  '/configuration': {
+    dataIn: 'Configured by an Administrator or Risk Analyst.',
+    why: 'The assumptions the engine models with — behavioural patterns, prepayment, discount methods.',
+    tag: 'Assumptions',
+  },
+  '/configuration/validation-rules': {
+    dataIn: 'Configured; applied to every uploaded file.',
+    why: 'The rules that decide what counts as valid position data before it can even be staged.',
+    tag: 'Control',
+  },
+  '/affiliates': {
+    dataIn: 'Every affiliate’s own record.',
+    why: 'The Group directory — who’s Live, who’s still onboarding, and how fresh each one’s data is.',
+  },
+  '/connectors': {
+    dataIn: 'Configured per system, per affiliate.',
+    why: 'The shared catalogue of systems like Flexcube and Reuters — and whether each affiliate’s domains are fed by one, or by a declared file substitution.',
+    tag: 'Control',
+  },
+  '/admin': {
+    dataIn: 'Requests raised by a maker.',
+    why: 'Segregation of duties — whoever raises a request can’t also decide it. This is where an onboarded affiliate actually goes Live.',
+    tag: 'Control',
+  },
+  '/admin/remediation': {
+    dataIn: 'Findings raised against a control.',
+    why: 'Tracks a control weakness from identification through to closure.',
+    tag: 'Control',
+  },
+  '/admin/notifications': {
+    dataIn: 'System and workflow events.',
+    why: 'What needs your attention, gathered in one place.',
+  },
+  '/admin/users': {
+    dataIn: 'Configured by an Administrator.',
+    why: 'Who can do what — the permission model every other screen in this tour is actually enforcing.',
+    tag: 'Control',
+  },
+  '/admin/preferences': {
+    dataIn: 'Configured by an Administrator.',
+    why: 'Platform-wide settings.',
+  },
+  '/admin/audit': {
+    dataIn: 'Every audited mutation across the platform.',
+    why: 'The evidence trail — who changed what, and when.',
+    tag: 'Control',
+  },
 };
 
-export function tourStepsFor(role: RoleCode | null | undefined): TourStep[] {
+/** Full, permission-filtered journey for a role — real coverage, not a curated highlight reel. */
+export function tourStepsFor(role: Role | null | undefined): TourStep[] {
   if (!role) return [INTRO];
-  return ROLE_STEPS[role] ?? [INTRO];
+
+  const screens: TourStep[] = SEARCH_INDEX.filter((item) => role.permissions.includes(item.permission)).map(
+    (item) => {
+      const content = SCREEN_CONTENT[item.path];
+      return {
+        id: item.path,
+        path: item.path,
+        title: item.name,
+        dataIn: content?.dataIn ?? 'See the screen for its inputs.',
+        why: content?.why ?? '',
+        tag: content?.tag,
+      };
+    },
+  );
+
+  return [INTRO, ...screens];
 }

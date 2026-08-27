@@ -1,15 +1,3 @@
-/**
- * New Business Assumptions — screen 23.
- *
- * Oracle's Forecast Balance rule (ALM UG Ch. 27), with pricing margin and
- * maturity mix folded in. This is what introduces the **Static vs Dynamic**
- * run axis: static models the existing book running off, dynamic layers new
- * volume on top.
- *
- * Without it there is no answer to "what if the loan book grows 15%?" —
- * which is most of what strategic planning asks.
- */
-
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { TierAllocationBar, paletteTone, type AllocationSegment } from '@/components/ui/TierAllocationBar';

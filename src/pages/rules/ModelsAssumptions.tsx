@@ -1,15 +1,3 @@
-/**
- * Models & Assumptions — screen 29.
- *
- * The registry over every rule type: what is configured, who owns it, when
- * it last changed, and where it diverges from the Group standard.
- *
- * Model governance is a standing regulatory expectation, and the question it
- * asks is not "what are the assumptions" but "who changed them, when, and
- * with whose approval". That is answerable here because every rule carries
- * a version, an owner and an audit trail.
- */
-
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -69,8 +57,7 @@ interface RegistryRow {
 }
 
 export function ModelsAssumptions() {
-  // One hook per rule kind. The count is fixed and known at compile time, so
-  // this is a stable hook order despite looking like a loop.
+  // Fixed-length array of hook calls — stable hook order despite looking like a loop.
   const queries = [
     useRules('TimeBucket'),
     useRules('ProductCharacteristic'),
@@ -134,7 +121,7 @@ export function ModelsAssumptions() {
       className: 'whitespace-nowrap',
       render: (r) =>
         r.rules.length === 0 ? (
-          <StatusBadge status="Not configured" tone="warning" className="whitespace-nowrap" />
+          <span className="text-[11px] font-medium text-gray-400 whitespace-nowrap">Not configured</span>
         ) : r.rules.some((x) => x.affiliateCode !== null) ? (
           <StatusBadge status="Has affiliate overrides" tone="info" className="whitespace-nowrap" />
         ) : (

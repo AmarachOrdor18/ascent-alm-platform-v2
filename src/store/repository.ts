@@ -1,11 +1,4 @@
-/**
- * The data-access contract.
- *
- * Pages and hooks depend on this interface, never on Dexie directly. That is
- * what makes the later swap to a microservice backend a single new file
- * (`HttpRepository`) rather than a rewrite — see build plan §5, rule 2.
- */
-
+// Pages and hooks depend on this interface, never on Dexie directly.
 import type {
   Affiliate,
   AuditEvent,
@@ -39,16 +32,7 @@ import type {
 
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 
-/**
- * An uploaded batch that has been staged but not committed.
- *
- * "Save as staged" previously wrote only the `LoadBatch` metadata row —
- * status, row counts, the filename — while the parsed positions themselves
- * lived in the upload screen's React state alone. Leaving the screen or
- * refreshing discarded them, so the batch record left behind pointed at
- * data that no longer existed anywhere. This is the whole staged unit,
- * batch and rows together, so it survives a navigation and can be resumed.
- */
+/** An uploaded batch that has been staged but not committed. */
 export interface StagedBatch {
   id: string;
   affiliateCode: string;

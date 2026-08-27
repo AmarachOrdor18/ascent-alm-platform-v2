@@ -1,15 +1,3 @@
-/**
- * Liquidity Risk — screen 37.
- *
- * LCR, NSFR and loan-to-deposit with their components exposed, plus the
- * contractual and behavioural gap ladders side by side.
- *
- * Side by side, not a toggle. v1 had a Behavioural/Contractual switch that
- * rendered identical data in both positions, because no behavioural model
- * existed behind it (defect D-05). Showing both at once makes the difference
- * the subject rather than something you have to flip back and forth to see.
- */
-
 import { useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';

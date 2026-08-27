@@ -1,15 +1,3 @@
-/**
- * Profitability Ratios — screen 42.
- *
- * Margin, earning-asset efficiency and asset quality. The NPL block is the
- * [R2] addition: v1 had no credit-quality field at all, so a bank with a
- * five per cent NPL ratio and one with none looked identical on every
- * screen.
- *
- * Ratios that cannot be computed from the data loaded render as an em dash
- * with the reason, rather than as zero.
- */
-
 import type { ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';

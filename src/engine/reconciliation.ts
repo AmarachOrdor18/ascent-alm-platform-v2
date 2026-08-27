@@ -1,15 +1,3 @@
-/**
- * Instrument-to-general-ledger reconciliation.
- *
- * Oracle (ALM UG §7.3) defines reconciliation as comparing instrument-table
- * balances against the management ledger at a chosen level — one dimension
- * (GL account) or several (GL account within organisational unit) — and
- * posting plug entries where the variance sits inside tolerance.
- *
- * This is what banks actually do at month-end, and it is the mechanism that
- * lets a file-fed affiliate be held to the same standard as an API-fed one.
- */
-
 import type { CurrencyCode, IsoDate, Position } from './types';
 import { convert, type FxTable } from './fx';
 
@@ -69,14 +57,7 @@ function keyFor(glAccountCode: string, orgUnitCode: string | null, level: Reconc
   return level === 'GlAccountByOrgUnit' ? `${glAccountCode}|${orgUnitCode ?? '—'}` : glAccountCode;
 }
 
-/**
- * Reconcile positions against ledger balances.
- *
- * A variance inside tolerance yields a suggested plug entry, which is a
- * *proposal* requiring maker-checker approval — never an automatic
- * adjustment. Anything outside tolerance blocks sign-off and goes back to
- * the affiliate, which is the point of the control.
- */
+// A variance inside tolerance yields a suggested plug entry requiring maker-checker approval, never an automatic adjustment.
 export function reconcile(
   positions: Position[],
   ledger: LedgerBalance[],
@@ -108,9 +89,7 @@ export function reconcile(
     ledgerByKey.set(key, slot);
   }
 
-  // Union of both sides: an account present in one and absent from the other
-  // is the most important thing reconciliation finds, so neither side alone
-  // may drive the row set.
+  // Union of both sides: an account present in one and absent from the other must still appear.
   const keys = new Set([...instrumentByKey.keys(), ...ledgerByKey.keys()]);
   const lines: ReconciliationLine[] = [];
   const suggestedPlugs: PlugEntry[] = [];

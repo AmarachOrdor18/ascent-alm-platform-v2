@@ -1,16 +1,3 @@
-/**
- * Pulling monitorable metrics out of a run's results.
- *
- * `engine/limits.ts` and `engine/kri.ts` both take a metric value keyed by a
- * `metricKey`. Nothing connected those keys to the payloads a run actually
- * produces, so both modules sat complete and unused while the monitoring
- * screens rendered hardcoded numbers instead.
- *
- * This is that connection, declared as a table rather than a switch so the
- * set of monitorable metrics is legible in one place and a new one is a line
- * rather than a code path.
- */
-
 import type { CalculationElement, RunResult } from '@/engine/types';
 
 export interface MetricSpec {
@@ -59,15 +46,7 @@ export const METRIC_SPECS: MetricSpec[] = [
 
 export const METRIC_BY_KEY = new Map(METRIC_SPECS.map((m) => [m.key, m]));
 
-/**
- * Every monitorable metric this result set can supply.
- *
- * A key is absent from the map only when the run did not compute its element.
- * A key present with `null` means the element ran but could not produce a
- * figure — `LCR` over zero net outflows, for instance. The two are different
- * and the screens report them differently: one is "not measured", the other
- * is "not computable from this book".
- */
+/** Absent from the map means the run didn't compute that element; `null` means it did but couldn't produce a figure (e.g. LCR over zero net outflows). */
 export function extractMetrics(results: RunResult[]): Map<string, number | null> {
   const byElement = new Map(results.map((r) => [r.element, r.payload as Record<string, unknown>]));
   const out = new Map<string, number | null>();

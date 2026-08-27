@@ -1,17 +1,9 @@
-/**
- * Ecobank Ghana — seed balance sheet, as at 2026-07-31.
- *
- * Synthetic data representing Ghana affiliate positions for demo purposes.
- * Figures are in GHS millions.
- *
- * Synthetic data. Not sourced from any real institution.
- */
-
 import type { Position } from '@/engine/types';
 
 export const GHANA_AS_OF = '2026-07-31';
 export const GHANA_BATCH_ID = 'B-GH-2026-07';
 
+// Amounts are in GHS millions.
 export const GHANA_POSITIONS: Position[] = [
   {
     id: 'GH-POS001',

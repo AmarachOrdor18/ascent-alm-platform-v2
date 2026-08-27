@@ -1,9 +1,3 @@
-/**
- * Shared recharts styling, matched to the sibling ecobank-alm-platform
- * build so a chart looks like it belongs to the same product regardless of
- * which screen it's on.
- */
-
 export const CHART_COLORS = {
   primary: '#01607E',
   accent: '#B6CB2A',

@@ -1,12 +1,3 @@
-/**
- * Per-route error boundary.
- *
- * v1 had none, so a single render exception blanked the whole application
- * (engineering register §3.7). Wrapping each route means a failure is
- * contained to one screen and the shell, navigation and other screens keep
- * working.
- */
-
 import React from 'react';
 
 interface Props {

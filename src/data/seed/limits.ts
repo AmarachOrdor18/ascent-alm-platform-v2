@@ -1,25 +1,9 @@
-/**
- * The starting limit framework.
- *
- * Two distinct things get conflated in most risk systems and are kept apart
- * here: the **regulator's floor**, which is not negotiable, and the bank's
- * **internal appetite**, which sits above it and is where management wants
- * to be told. `LimitConfig` carries both, and a breach of the regulatory
- * minimum is reported separately from a breach of appetite.
- *
- * Thresholds below are illustrative starting points, not Ecobank's actual
- * risk appetite — they are editable on the Limits screen, and the screen
- * says so rather than implying these figures came from the bank.
- */
-
 import { REGULATORY_MINIMA, type LimitConfig } from '@/engine/limits';
 
 const STAMP = { updatedBy: 'SEED', updatedAt: '2026-01-01T00:00:00.000Z', isActive: true };
 
-/**
- * Group-wide defaults. `affiliateCode: null` means the limit applies
- * everywhere unless an affiliate-specific one overrides it.
- */
+// Thresholds below are illustrative starting points, not Ecobank's actual risk appetite — editable on the Limits screen.
+// `affiliateCode: null` means the limit applies everywhere unless an affiliate-specific one overrides it.
 export const SEED_LIMITS: LimitConfig[] = [
   {
     id: 'LIM-LCR', metricKey: 'lcrPercent', label: 'Liquidity Coverage Ratio',
@@ -72,7 +56,7 @@ export const SEED_LIMITS: LimitConfig[] = [
   {
     id: 'LIM-EVE', metricKey: 'eveSensitivityPercent', label: 'EVE Sensitivity (% of capital)',
     affiliateCode: null, direction: 'higher-is-better',
-    // BCBS 368 makes a bank an outlier below -15%. Appetite bites earlier.
+    // BCBS 368 outlier threshold is -15%.
     greenThreshold: -8, amberThreshold: -12, redThreshold: -15,
     regulatoryMinimum: -15, ...STAMP,
   },
@@ -89,9 +73,7 @@ export const SEED_LIMITS: LimitConfig[] = [
     regulatoryMinimum: 20, ...STAMP,
   },
 
-  // Nigeria's regulator sets a loan-to-deposit *floor*, not a ceiling: the
-  // CBN pushes banks to lend. The Group ceiling still applies, so Nigeria
-  // gets its own limit and this is exactly why limits are per-affiliate.
+  // CBN sets a loan-to-deposit floor for Nigeria, not a ceiling; the Group ceiling still applies.
   {
     id: 'LIM-LDR-NG', metricKey: 'loanToDepositPercent', label: 'Loan-to-Deposit Ratio (CBN floor)',
     affiliateCode: 'NG', direction: 'higher-is-better',

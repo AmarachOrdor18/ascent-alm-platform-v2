@@ -1,12 +1,3 @@
-/**
- * Tree selector for dimension hierarchies.
- *
- * Used by almost every rule and by the Process Run scope picker. Selecting a
- * rollup node selects everything beneath it — picking "Retail Banking" must
- * capture every branch under it, not just positions tagged with the rollup
- * code itself.
- */
-
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { buildHierarchy, descendantCodes, type HierarchyNode } from '@/engine/dimensions';

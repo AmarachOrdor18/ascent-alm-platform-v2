@@ -1,14 +1,3 @@
-/**
- * Product dimension.
- *
- * Generated from the same workbook sheet as the positions, using the same
- * code-derivation rule, so a position can never reference a product code
- * the dimension does not contain. Hand-maintaining these two lists let them
- * drift, and every product lookup silently missed.
- *
- * Regenerate with scratchpad/genproducts.py if the workbook changes.
- */
-
 import type { DimensionMember } from '@/engine/types';
 
 function node(code: string, name: string, parentCode: string | null, isLeaf: boolean): DimensionMember {
@@ -19,6 +8,7 @@ function leaf(code: string, name: string, parentCode: string): DimensionMember {
   return node(code, name, parentCode, true);
 }
 
+// Regenerate with scratchpad/genproducts.py if the workbook changes.
 export const PRODUCTS: DimensionMember[] = [
   node('P-ROOT', 'All Products', null, false),
   node('P-ASSETS', 'Assets', 'P-ROOT', false),

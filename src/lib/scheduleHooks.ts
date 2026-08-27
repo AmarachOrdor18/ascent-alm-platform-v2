@@ -1,12 +1,3 @@
-/**
- * Schedules — read, write, and fire.
- *
- * Firing a schedule clones its template run, stamps the new as-of date, and
- * executes it through the same path as a manual run. There is deliberately
- * no second execution route: a scheduled run and a hand-started one produce
- * results the same way, so a figure cannot depend on how it was triggered.
- */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -52,13 +43,7 @@ export interface FireOccurrence {
   occurrenceDate: IsoDate;
 }
 
-/**
- * Execute one occurrence.
- *
- * The template run is copied rather than reused, so the schedule's history
- * is a series of distinct, independently auditable runs. `asOfDate` comes
- * from the occurrence, not from the template.
- */
+/** Execute one occurrence by cloning the template run, using the occurrence's `asOfDate`. */
 export function useFireOccurrence() {
   const client = useQueryClient();
   const { user } = useAuth();
@@ -83,9 +68,7 @@ export function useFireOccurrence() {
 
       const outcome = await execute.mutateAsync(cloned);
 
-      // Advance the watermark only on success. A failed occurrence stays in
-      // the backlog, because the pack it was meant to produce still does not
-      // exist.
+      // Advance the watermark only on success; a failed occurrence stays in the backlog.
       if (outcome.run.status === 'Completed') {
         await repository.upsertSchedule({
           ...schedule,

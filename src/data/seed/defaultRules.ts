@@ -1,25 +1,6 @@
-/**
- * Rule types that ship with a real engine default, seeded as real rules.
- *
- * Time Buckets and Behaviour Patterns aren't optional the way Filters or
- * Custom Metrics are: `assembleInputs` falls back to `defaultLadder()` and
- * `DEFAULT_PATTERNS` whenever no rule is attached to a run, so a
- * calculation is always happening on *some* basis. The Models & Assumptions
- * registry showed these as "Not configured" regardless, which reads as
- * "nothing is happening" when something demonstrably is - and there was
- * nowhere to see or change what that basis actually was without reading
- * the engine source.
- *
- * Forecast Scenarios has the same shape of problem one level deeper: a run
- * with no scenario selected always used a flat 200bp shock in engine/run.ts,
- * and until runHooks.ts started reading `forecastScenarioIds`, selecting a
- * scenario didn't change that either.
- *
- * These three are seeded as ordinary, versioned, editable rules - editing
- * one and re-running genuinely changes the figures the same way editing any
- * other rule does. They are not a special "defaults" concept; they are the
- * Group Default folder's starting content.
- */
+// TimeBucket, BehaviourPattern and ForecastScenario rules mirror real engine fallbacks (defaultLadder(),
+// DEFAULT_PATTERNS, standardShocks) — a run always calculates on some basis even with no rule attached, so
+// these are seeded as ordinary, versioned, editable rules rather than left implicit.
 
 import type { BehaviourPatternRule, ForecastScenarioRule, NewBusinessRule, TimeBucketRule } from '@/engine/ruleTypes';
 import { defaultLadder } from '@/engine/buckets';
@@ -67,14 +48,8 @@ export const SEED_FORECAST_SCENARIO_RULE: ForecastScenarioRule = {
   economicIndicatorCodes: [],
 };
 
-/**
- * A run with no New Business rule is genuinely static, not implicitly
- * defaulting to something — unlike the three above, there is no engine
- * fallback to surface here. What was missing instead was a worked example:
- * every other rule kind had at least one row to open and look at, and this
- * one had zero, which read as broken rather than as "static is a real
- * choice." This is one bank's actual growth plan, not a Group default.
- */
+// Unlike the three rules above, NewBusiness has no engine fallback — a run with none is genuinely static.
+// This entry is Nigeria's actual FY26 growth plan, not a Group default.
 export const SEED_NEW_BUSINESS_RULE: NewBusinessRule = {
   ...ruleMetaSeed('RULE-NEWBUSINESS-NG-FY26', 'NewBusiness', 'Nigeria — FY26 Growth Plan'),
   kind: 'NewBusiness',

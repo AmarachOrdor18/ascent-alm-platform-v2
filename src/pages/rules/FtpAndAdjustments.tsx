@@ -1,17 +1,3 @@
-/**
- * FTP Rules (screen 25) and Adjustment Rules (screen 26).
- *
- * Oracle splits transfer pricing into cash-flow and non-cash-flow method
- * families, and is explicit that ledger-grain data supports only the second
- * (ALM UG §7.18). This platform is ledger-grain, so the methods offered are
- * Oracle's own prescribed answer for this data shape — not a simplification
- * we invented.
- *
- * Adjustments stack as separate named add-ons, because RFP §2.1 asks for
- * "Base FTP and Liquidity Premium" as distinguishable components. The
- * previous platform produced one blended group-wide premium.
- */
-
 import { RuleEditor, RuleField } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { useAuth } from '@/context/AuthContext';

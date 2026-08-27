@@ -1,15 +1,3 @@
-/**
- * Executing a process run.
- *
- * The orchestrator in `engine/run.ts` is pure — it takes data and returns
- * results. This is the layer that assembles its inputs from the store, calls
- * it, and persists what comes back.
- *
- * Results are written once and never recomputed. A run from last month keeps
- * reporting the figures it actually produced, against the data version and
- * rule versions it consumed.
- */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -41,13 +29,8 @@ export function useRunResults(runId: string | null) {
   });
 }
 
-/**
- * Gather everything the engine needs.
- *
- * Rules referenced by the run are read at execution time, so a run records
- * the versions it actually used rather than whatever is current when someone
- * later opens the result.
- */
+// Rules are read at execution time so the run records the versions it
+// actually used, not whatever is current when the result is later opened.
 async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   const [positions, fxRates, orgUnitMembers, productMembers, storedCurves] = await Promise.all([
     repository.queryPositions({}),
@@ -69,26 +52,20 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
     ? await repository.getRule<ForecastScenarioRule>(run.forecastScenarioIds[0])
     : null;
 
-  // The engine's NII/EVE sensitivity take one shock magnitude, not a full
-  // per-bucket curve (computeAllShocks reduces the same way for the six
-  // standard shocks). Selecting a scenario used to be recorded on the run
-  // and then never read here at all, so choosing one changed nothing about
-  // the actual figures - the 200bp fallback in engine/run.ts always won.
+  // The engine's NII/EVE sensitivity takes one shock magnitude, not a full
+  // per-bucket curve, so the scenario's bucket shocks are averaged here.
   const scenarioShockBps = scenarioRule
     ? Object.values(scenarioRule.shockByBucket).reduce((s, v) => s + v, 0) /
       (Object.values(scenarioRule.shockByBucket).length || 1)
     : undefined;
 
-  // Fall back to engine defaults where no rule is attached, and the result's
-  // methodology string says which basis was used.
   const liquidityLadder =
     bucketRule?.ladders.find((l) => l.kind === 'LiquidityGap') ?? defaultLadder('LiquidityGap');
   const repricingLadder =
     bucketRule?.ladders.find((l) => l.kind === 'RepricingGap') ?? defaultLadder('RepricingGap');
 
-  // Only curves as at or before the run date. A curve published after the
-  // as-of date did not exist when these balances were struck, and pricing
-  // the book off it would be hindsight.
+  // Only curves as at or before the run date — a curve published later did
+  // not exist when these balances were struck.
   const yieldCurves: YieldCurve[] = storedCurves
     .filter((c) => c.isActive && c.asOfDate <= run.asOfDate)
     .map((c) => ({

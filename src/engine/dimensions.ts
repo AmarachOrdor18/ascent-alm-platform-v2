@@ -1,15 +1,3 @@
-/**
- * Dimension hierarchies — rollup, filtering and scope resolution.
- *
- * The dimensional model was the largest gap in the first revision of the
- * build plan: v1 sliced every figure by affiliate and a product *string*,
- * so it could not answer "show me Corporate Banking's repricing gap",
- * reconcile to a general ledger, or compute depositor concentration.
- *
- * OFSAA seeds six key processing dimensions plus Country and Customer, and
- * every fact carries them as columns.
- */
-
 import type { DimensionMember, DimensionType, Position } from './types';
 
 /** Index a dimension's members for repeated lookup. */
@@ -17,13 +5,7 @@ export function indexMembers(members: DimensionMember[]): Map<string, DimensionM
   return new Map(members.map((m) => [m.code, m]));
 }
 
-/**
- * Every descendant of a node, inclusive.
- *
- * Selecting a rollup node in a hierarchy browser must include everything
- * beneath it — picking "Retail Banking" has to capture every branch under
- * it, not just positions tagged with the rollup code itself.
- */
+/** Every descendant of a node, inclusive — selecting a rollup node must include everything beneath it. */
 export function descendantCodes(members: DimensionMember[], rootCode: string): string[] {
   const childrenOf = new Map<string, string[]>();
   for (const m of members) {
@@ -189,19 +171,9 @@ export function unmappedCodes(positions: Position[], dimension: DimensionType, m
 }
 
 /**
- * Dimension members a "map from this file" action would create for a set of
- * unmapped codes — without touching the store, so what gets created is
- * testable independent of how it gets persisted.
- *
- * A newly onboarded affiliate's local GL codes do not exist as dimension
- * members until someone creates them, but the file that references them
- * already carries what is needed to do so: a GL code's product class is a
- * real name, taken from the upload rather than invented.
- *
- * `CommonCoa` is deliberately unsupported. That taxonomy is Group-governed
- * and small, so a code it doesn't recognise is more likely a typo in the
- * source data than a genuinely new classification — auto-creating it would
- * hide the mistake rather than surface it.
+ * Dimension members a "map from this file" action would create for a set of unmapped codes, without touching
+ * the store. `CommonCoa` is deliberately unsupported: that taxonomy is Group-governed and small, so an
+ * unrecognised code is more likely a typo than a genuinely new classification.
  */
 export function deriveMembersFromFile(
   dimension: DimensionType,

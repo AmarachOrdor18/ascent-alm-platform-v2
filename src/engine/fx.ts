@@ -1,17 +1,3 @@
-/**
- * Currency conversion.
- *
- * This module exists because of defect D-02: v1's aggregation helper was
- * literally `Number(p.amount)` with no currency check anywhere, so LCR,
- * NSFR, the maturity gap, loan-to-deposit and concentration all summed NGN,
- * GHS, XOF and USD as if they were one unit. Across a 33-affiliate Group
- * that makes every consolidated figure meaningless.
- *
- * OFSAA distinguishes three currency roles (ALM UG §7.6): a single
- * functional currency, reporting currencies that intermediate consolidation,
- * and other active currencies the institution transacts in.
- */
-
 import type { CurrencyCode } from './types';
 
 /** Rates expressed as units of the quote currency per one unit of the base. */
@@ -40,13 +26,7 @@ export class MissingFxRateError extends Error {
   }
 }
 
-/**
- * Convert an amount between currencies via the table's pivot.
- *
- * Throws rather than silently returning the unconverted amount when a rate
- * is missing. A wrong number that looks right is the failure mode this
- * module exists to prevent, so the caller is forced to handle it.
- */
+// Throws rather than silently returning the unconverted amount when a rate is missing.
 export function convert(amount: number, from: CurrencyCode, to: CurrencyCode, fx: FxTable): number {
   if (from === to) return amount;
   if (amount === 0) return 0;
@@ -69,12 +49,7 @@ export function missingRates(currencies: CurrencyCode[], to: CurrencyCode, fx: F
   return Array.from(new Set(currencies)).filter((c) => c !== to && c !== fx.pivot && fx.toPivot[c] === undefined);
 }
 
-/**
- * Build a table from a list of pairwise rates.
- *
- * Rates quoted against the pivot are taken directly; the reciprocal is used
- * where a pair is quoted the other way round.
- */
+// Rates quoted against the pivot are taken directly; the reciprocal is used where a pair is quoted the other way round.
 export function buildFxTable(pivot: CurrencyCode, rates: FxRate[], asOfDate: string): FxTable {
   const toPivot: Record<CurrencyCode, number> = { [pivot]: 1 };
   for (const r of rates) {

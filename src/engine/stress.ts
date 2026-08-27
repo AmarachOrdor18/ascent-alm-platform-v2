@@ -1,15 +1,3 @@
-/**
- * Liquidity stress testing and survival horizon.
- *
- * RFP §2.1 requires stress testing "under a determined survival horizon".
- * v1 computed no survival horizon at all (defect D-07) — this module is that
- * requirement.
- *
- * It also adds counterbalancing capacity (defect P-10): the buffer a bank
- * can actually draw on under stress is its unencumbered liquid assets plus
- * committed undrawn lines, not simply its HQLA stock.
- */
-
 import type { CurrencyCode, IsoDate, Position } from './types';
 import { convert, type FxTable } from './fx';
 import { addDays } from './dates';
@@ -33,14 +21,7 @@ export interface CounterbalancingCapacity {
   methodology: string;
 }
 
-/**
- * What the bank can realise under stress.
- *
- * Encumbered assets are excluded — pledged collateral cannot be sold twice.
- * Undrawn commitments the bank has *granted* are an outflow, not capacity;
- * only lines available *to* the bank count, which is why they are read from
- * the asset side.
- */
+// Encumbered assets are excluded; only lines available to the bank count as capacity, not lines it has granted.
 export function computeCounterbalancingCapacity(
   positions: Position[],
   ctx: StressContext,
@@ -114,17 +95,7 @@ export interface SurvivalHorizonResult {
   methodology: string;
 }
 
-/**
- * Day-by-day depletion of the liquidity buffer under a stressed outflow.
- *
- * The profile is two-phase — a front-loaded run followed by a steadier
- * tail — which is the shape a deposit run actually takes, and matches the
- * Ecobank mock workbook's stress sheet.
- *
- * This is an assumed profile, not a behavioural model fitted to observed
- * withdrawals. Fitting one needs multi-period history, which the platform
- * begins accumulating only once several as-of dates have been loaded.
- */
+// Assumed two-phase profile, not a behavioural model fitted to observed withdrawals.
 export function computeSurvivalHorizon(
   openingBuffer: number,
   profile: OutflowProfile,
@@ -147,7 +118,6 @@ export function computeSurvivalHorizon(
     const remainingBuffer = openingBuffer - cumulative;
     const isExhausted = remainingBuffer < 0;
 
-    // The survival horizon is the last day the buffer is still non-negative.
     if (isExhausted && !breached) {
       survival = day - 1;
       breached = true;

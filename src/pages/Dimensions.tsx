@@ -1,11 +1,3 @@
-/**
- * Dimensions & Hierarchies — screen 10.
- *
- * The dimensional model was the largest gap in the first platform: without
- * it there is no way to answer "show me Corporate Banking's repricing gap",
- * reconcile to a general ledger, or compute depositor concentration.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { HierarchyBrowser } from '@/components/ui/HierarchyBrowser';

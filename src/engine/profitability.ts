@@ -1,12 +1,3 @@
-/**
- * Profitability and asset-quality ratios.
- *
- * The NPL ratio closes defect D-10. v1 returned `null` with the note
- * "requires a loan-performance/arrears feed that is not yet ingested" —
- * an honest gap, but a gap against an explicit RFP §2.1 requirement. It is
- * closed by one field: `performingStatus` on the position.
- */
-
 import type { CurrencyCode, Position } from './types';
 import { convert, type FxTable } from './fx';
 import { isLoan, isDeposit } from './liquidity';
@@ -121,14 +112,7 @@ export interface FxPositionResult {
   methodology: string;
 }
 
-/**
- * Net open position per currency — a treasury staple in a Group running
- * 33 currencies, and absent from v1 entirely (defect P-12).
- *
- * The aggregate is the sum of absolute net positions, which is the
- * conservative "shorthand" measure most regulators apply rather than netting
- * long against short across currencies.
- */
+// The aggregate sums absolute net positions rather than netting long against short across currencies.
 export function computeFxPosition(
   positions: Position[],
   ctx: ProfitabilityContext,

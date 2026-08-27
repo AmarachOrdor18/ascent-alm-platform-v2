@@ -1,15 +1,3 @@
-/**
- * Interest Rate Risk in the Banking Book — screen 39.
- *
- * The earnings view (ΔNII) and the economic-value view (ΔEVE) from the run,
- * with the duration gap that drives the second one shown rather than left
- * implicit.
- *
- * The capital basis is named on the screen. v1 used ten per cent of assets
- * as a proxy for equity, which makes the outlier test meaningless — a bank
- * with thin capital looked identical to one with thick capital.
- */
-
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';

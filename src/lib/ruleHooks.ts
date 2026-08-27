@@ -1,11 +1,3 @@
-/**
- * One generic hook serving all fourteen rule types.
- *
- * The uniformity of `RuleMeta` is what makes this possible: every rule is
- * listed, saved, deleted and dependency-checked the same way, so each screen
- * calls `useRules('TimeBucket')` and gets everything.
- */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -24,13 +16,7 @@ export function useRules<T extends RuleMeta>(kind: RuleKind) {
 
 let auditCounter = 0;
 
-/**
- * Save and delete, with an audit event for each.
- *
- * Configuration changes reach the audit trail without each screen
- * remembering to log — RFP §2.14 asks for user activity logs, and doing it
- * here is what makes that true rather than aspirational.
- */
+/** Save and delete, with an audit event for each. */
 export function useRuleMutations<T extends RuleMeta>(kind: RuleKind) {
   const client = useQueryClient();
   const { user } = useAuth();

@@ -1,12 +1,3 @@
-/**
- * Interest Rates & Yield Curves — screen 12.
- *
- * OFSAA calls this an Interest Rate Code and hangs rate format, compounding
- * basis and accrual basis off it (ALM UG §5.2.2). Those attributes are not
- * decoration: the same quoted 19% means different cash flows under annual
- * versus simple compounding, and under 30/360 versus Actual/365.
- */
-
 import { useEffect, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -52,9 +43,6 @@ export function YieldCurves() {
     );
   };
 
-  // The curve is stored as discrete term points; the engine interpolates
-  // between them. Showing the interpolated value makes that visible rather
-  // than leaving it as an implementation detail.
   const probeRate = editing
     ? interpolateCurve(
         { currency: editing.currency, indexCode: editing.code, points: editing.terms, asOfDate: editing.asOfDate },
@@ -326,7 +314,7 @@ function Select({
   );
 }
 
-/** A long-end rate below the short end — the shape Nigeria has actually run. */
+// Inverted: long-end rate below the short end.
 function isInverted(curve: StoredYieldCurve): boolean {
   if (curve.terms.length < 2) return false;
   const first = curve.terms[0]!;

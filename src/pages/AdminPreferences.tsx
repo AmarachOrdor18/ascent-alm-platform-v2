@@ -1,18 +1,3 @@
-/**
- * System Preferences — screen 57.
- *
- * This used to be an entirely fabricated settings form: selects offering
- * only the one option already "selected", toggles that didn't toggle, and
- * a Save Changes button with no click handler at all. There is no
- * system-wide settings entity in this data model for a form like that to
- * write to honestly.
- *
- * What actually exists is real, just not editable from one screen: roles
- * and permissions, retention windows, validation behaviour. This reads
- * those facts from the code that enforces them and links to wherever each
- * one is genuinely configured, rather than duplicating fake controls here.
- */
-
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ROLES } from '@/context/AuthContext';
@@ -20,6 +5,7 @@ import { useRoles } from '@/lib/hooks';
 
 const DEFAULT_ROLE_LIST = Object.values(ROLES);
 
+// No system-wide settings entity exists in this data model; this page is read-only and links out to where each setting is actually configured.
 export function AdminPreferences() {
   const { data: roles } = useRoles();
   const roleList = roles && roles.length > 0 ? roles : DEFAULT_ROLE_LIST;

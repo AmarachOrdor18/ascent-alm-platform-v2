@@ -1,12 +1,3 @@
-/**
- * Report Packs — screens 53 and 54 folded into one, tab-switched.
- *
- * ALCO Reporting and Management Reporting are the same pack machinery
- * (ReportPackScreen) pointed at two different section lists — not two
- * screens, one screen configured twice. This was the honest thing to
- * fold: two separate sidebar rows for what's genuinely one tool.
- */
-
 import { useState } from 'react';
 import { ReportPackScreen } from './ReportPackScreen';
 

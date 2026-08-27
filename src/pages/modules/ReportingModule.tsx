@@ -1,11 +1,3 @@
-/**
- * Reporting & ALCO module.
- *
- * "Report Packs" already carries its own ALCO/Management sub-tabs
- * (`ReportPacks.tsx`) — that nested tab bar is untouched and simply renders
- * beneath this module's own tab row, exactly the nested-tabs shape used for
- * Data Management.
- */
 import { lazy } from 'react';
 import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 

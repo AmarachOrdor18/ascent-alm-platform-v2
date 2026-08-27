@@ -1,12 +1,3 @@
-/**
- * Affiliates — screen 3.
- *
- * The directory, with a data-freshness column. Freshness is the column that
- * stops a platform quietly reporting confident numbers off three-month-old
- * data: a stale FX rate does not announce itself, it simply consolidates the
- * Group at last quarter's rate.
- */
-
 import { Link, useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -43,7 +34,6 @@ export function Affiliates() {
 
   const freshnessFor = (a: Affiliate): FreshnessCheck[] => checkAllDomains(a, batches, TODAY);
 
-  /** The worst status across a affiliate's domains — what the directory shows. */
   const worstFreshness = (a: Affiliate): FreshnessCheck['status'] => {
     const checks = freshnessFor(a);
     if (checks.length === 0) return 'Never loaded';

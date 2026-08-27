@@ -1,16 +1,3 @@
-/**
- * Transaction Strategies — screen 24.
- *
- * This is what makes a what-if strategic rather than only a rate shock.
- * Oracle's step 5 is "simulate market changes… changing asset mixes, or
- * shifting funding strategies" — those are *decisions*, not shocks, and
- * Oracle models them as transactions inside a scenario (ALM UG Ch. 32).
- *
- * "Issue a $200m Eurobond" and "sell 30% of the bill portfolio" are the
- * questions an ALCO actually asks. The previous platform could shock rates
- * and run-off, but had no way to express either.
- */
-
 import { RuleEditor } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { Amount } from '@/components/ui/Amount';

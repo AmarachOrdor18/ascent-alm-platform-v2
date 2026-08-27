@@ -1,20 +1,3 @@
-/**
- * Process Run — screen 30.
- *
- * This is the concept that makes the platform an ALM system rather than a
- * reporting layer:
- *
- *   as-of date + scope + currency + rule set + scenario → an immutable,
- *   named, timestamped result set
- *
- * Results screens read *from a run*, never from live recomputation. That
- * gives reproducibility, run-to-run comparison, an audit trail, and a real
- * answer to "what assumptions produced this number?".
- *
- * It is also why the previous platform's affiliate-switcher defect cannot
- * recur: a run is scoped by construction, so there is no unscoped query.
- */
-
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -69,11 +52,8 @@ export function ProcessRun() {
 
   const affiliate = affiliates.find((a) => a.code === affiliateCode) ?? affiliates.find((a) => a.code !== 'GROUP');
 
-  // A Group run isn't itself a data-loading entity - it has no positions of
-  // its own, ever - so its available dates are the union of whatever every
-  // real affiliate has actually committed, not a literal "GROUP" batch that
-  // was never going to exist. This was the reason a Group run always failed
-  // with "No as-of date with committed data" no matter what was loaded.
+  // A Group run has no positions of its own; its available dates are the
+  // union of what each real affiliate has committed.
   const dates =
     affiliateCode === 'GROUP'
       ? Array.from(

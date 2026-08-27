@@ -1,17 +1,3 @@
-/**
- * The shared rule-management shell.
- *
- * Oracle devotes a whole chapter to the fact that every business rule is
- * managed identically (ALM UG Ch. 8): a summary page with search, then
- * create / view-edit / copy / delete / check-dependencies. Building that
- * once is what makes fourteen configuration screens affordable — each one
- * supplies a small body and inherits the rest.
- *
- * It also makes the application feel *standard*, which is most of why Oracle
- * works this way: a user who has configured one rule has configured all of
- * them.
- */
-
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader, type HeaderMetric } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -74,8 +60,7 @@ export function RuleEditor<T extends RuleMeta>({
   const editing = draft ?? selected;
   const isNew = draft !== null && !rules.some((r) => r.id === draft.id);
 
-  // A rule marked Read-Only is owned elsewhere — typically the Group default
-  // folder — and an affiliate user may read but not change it.
+  // Read-Only rules are owned elsewhere (typically the Group default folder).
   const readOnly = !canEdit || (editing?.accessType === 'Read-Only' && !isNew);
 
   const filtered = useMemo(() => {
@@ -115,8 +100,6 @@ export function RuleEditor<T extends RuleMeta>({
     try {
       await onSave({
         ...editing,
-        // A saved edit bumps the version, so a run that used the previous
-        // version can still say which one it consumed.
         version: isNew ? 1 : editing.version + 1,
         updatedBy: user?.name ?? 'unknown',
         updatedAt: new Date().toISOString(),
@@ -148,11 +131,6 @@ export function RuleEditor<T extends RuleMeta>({
     setNotice('Copied. Give it a name and save to create it.');
   };
 
-  /**
-   * Deletion is checked, not confirmed-and-hoped. If anything references the
-   * rule the delete is refused and the blockers are named — decorative
-   * dependency checking is worse than none.
-   */
   const handleDelete = async () => {
     if (!selected) return;
     const deps = await checkDependencies(selected.id);

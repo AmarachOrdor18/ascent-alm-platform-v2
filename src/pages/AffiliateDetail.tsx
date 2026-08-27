@@ -1,11 +1,3 @@
-/**
- * Affiliate Detail — screen 4.
- *
- * Profile, currencies, feeds and per-domain refresh SLAs, plus the status
- * transitions that gate consolidation. Only Live affiliates reach Group
- * figures, so promoting one is a maker-checker action rather than a toggle.
- */
-
 import { Link, useRoute } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -22,14 +14,7 @@ const TODAY = '2026-08-25';
 
 const FRESHNESS_TONE = { Fresh: 'success', Due: 'warning', Stale: 'danger', 'Never loaded': 'neutral' } as const;
 
-/**
- * Onboarding → Testing is a direct admin action (the wizard's "Submit for
- * approval" already does this); Testing → Live is deliberately absent here
- * — it only happens through Approvals now (`Approvals.tsx`'s `decide()`),
- * so the person who submits an affiliate can no longer also promote it
- * themselves just because they hold `group.manage`. Suspended ↔ Live is
- * unrelated to onboarding and stays a direct admin toggle.
- */
+// Testing → Live is deliberately absent — it only happens through Approvals (see Approvals.tsx's decide()).
 const NEXT_STATUS: Record<AffiliateStatus, AffiliateStatus[]> = {
   Onboarding: ['Testing'],
   Testing: [],

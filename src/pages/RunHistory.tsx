@@ -1,14 +1,3 @@
-/**
- * Run History — screen 31.
- *
- * Every run, with what it consumed and what it produced. Two runs can be
- * compared side by side, which is the question an ALCO actually asks: not
- * "what is LCR" but "why did it move".
- *
- * A run also records the data version and rule versions it used, so a
- * figure stays defensible after the underlying data is reloaded.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

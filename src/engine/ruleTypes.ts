@@ -1,17 +1,3 @@
-/**
- * The fourteen configurable rule types.
- *
- * Every one extends `RuleMeta`, so folder, access type, versioning and
- * dependency checking behave identically across all of them. That uniformity
- * is what lets one `<RuleEditor>` shell serve fourteen screens — and it is
- * why Oracle devotes a whole chapter to common rule management (ALM UG
- * Ch. 8) rather than letting each rule invent its own lifecycle.
- *
- * RFP §1.1 names "configurable product engine (not code-dependent)" as an
- * architectural principle. These types are the mechanism: assumptions are
- * rows a bank edits, not regular expressions compiled into a release.
- */
-
 import type { BehaviouralTag, IsoDate, RuleMeta, TimeBucketRule } from './types';
 import type { BehaviourPattern } from './behavioural';
 import type { AdjustmentType, TpMethod } from './ftp';
@@ -22,13 +8,7 @@ export type { TimeBucketRule };
 // Product characteristics (screen 17)
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * Per-product, per-currency assumptions.
- *
- * This replaces the 22 regular expressions the previous platform compiled
- * into TypeScript to decide run-off rates and Basel factors. Adding a
- * product was a code change; here it is a row.
- */
+/** Per-product, per-currency assumptions. */
 export interface ProductAssumption {
   productCode: string;
   currency: string;
@@ -61,7 +41,6 @@ export interface BehaviourPatternRule extends RuleMeta {
 // Payment and repricing patterns (screen 19)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Oracle's three pattern types (ALM UG Ch. 12). */
 export type PatternType = 'Absolute' | 'Relative' | 'Split';
 
 export interface PatternPhase {
@@ -74,7 +53,7 @@ export interface PatternPhase {
 export interface PaymentRepricingRule extends RuleMeta {
   kind: 'PaymentPattern' | 'RepricingPattern';
   patternType: PatternType;
-  /** Oracle reserves 1000–69999 for payment patterns and 70000–99999 for behaviour. */
+  /** 1000–69999 for payment patterns, 70000–99999 for behaviour. */
   amortizationCode: number;
   phases: PatternPhase[];
 }
@@ -136,7 +115,6 @@ export interface ForecastScenarioRule extends RuleMeta {
 // New business (screen 23)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Oracle's eight forecast-balance methods (ALM UG Ch. 27.1). */
 export type ForecastMethod =
   | 'NoNewBusiness'
   | 'TargetEndBalance'
@@ -173,13 +151,7 @@ export interface NewBusinessRule extends RuleMeta {
 
 export type TransactionAction = 'Add' | 'Sell' | 'Hedge';
 
-/**
- * A balance-sheet action inside a scenario.
- *
- * This is what makes a what-if strategic rather than only a rate shock:
- * "issue a $200m Eurobond" or "sell 30% of the bill portfolio" are
- * decisions, and Oracle models them as transactions (ALM UG Ch. 32).
- */
+/** A balance-sheet action inside a scenario. */
 export interface TransactionLine {
   action: TransactionAction;
   productCode: string;
@@ -250,12 +222,7 @@ export interface FilterRule extends RuleMeta {
   referencedFilterIds: string[];
 }
 
-/**
- * A derived measure, computed from run outputs.
- *
- * Oracle's Formula Results (ALM UG Ch. 33) — a bank defines its own metric
- * without waiting for a release.
- */
+/** A derived measure, computed from run outputs. */
 export interface CustomMetricRule extends RuleMeta {
   kind: 'CustomMetric';
   /** Expression over named run outputs, e.g. `hqla / netCashOutflows * 100`. */

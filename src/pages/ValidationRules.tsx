@@ -1,15 +1,3 @@
-/**
- * Validation Rules — screen 8.
- *
- * Modelled on Oracle's Cash Flow Edits (ALM UG Ch. 10): named, saved,
- * re-runnable checks with an owner and a run log, executed as a gate before
- * the engine sees the data.
- *
- * The blocking flag is what gives the Control Tester actual authority — a
- * batch failing a blocking rule cannot be committed, so a balance sheet that
- * does not balance cannot silently reach a regulatory report.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';

@@ -1,14 +1,5 @@
-/**
- * Domain types for the Ascent ALM Platform.
- *
- * These are shared by `engine/` (pure calculation) and `store/` (persistence).
- * The engine takes these as arguments and returns results; it never fetches
- * them. See the ESLint override in .eslintrc.cjs which enforces that.
- *
- * Field naming follows the Ecobank mock dataset workbook where it overlaps,
- * and the OFSAA dimensional model where it does not — see the build plan
- * §7 (dimensional model) and §8 (what an affiliate carries).
- */
+// Shared by `engine/` (pure calculation) and `store/` (persistence). The engine takes these as arguments and
+// returns results; it never fetches them — enforced by an ESLint override in .eslintrc.cjs.
 
 // ─────────────────────────────────────────────────────────────────────────
 // Shared primitives
@@ -20,12 +11,7 @@ export type IsoDate = string;
 /** ISO-4217 currency code: `NGN`, `GHS`, `XOF`, `USD`. */
 export type CurrencyCode = string;
 
-/**
- * A monetary amount is always paired with the currency it is denominated in.
- * v1 summed raw numbers across currencies and rendered every one with a `$`
- * (defects D-02 and P-02); making currency inseparable from amount at the
- * type level is what stops that recurring.
- */
+/** A monetary amount is always paired with the currency it is denominated in. */
 export interface Money {
   amount: number;
   currency: CurrencyCode;
@@ -33,7 +19,6 @@ export interface Money {
 
 export type Severity = 'Low' | 'Medium' | 'High' | 'Critical';
 
-/** Three-tier limit status. v1 had two tiers; RFP §2.1 asks for a series of escalation points. */
 export type LimitStatus = 'Green' | 'Amber' | 'Red';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -43,11 +28,8 @@ export type LimitStatus = 'Green' | 'Amber' | 'Red';
 export type DimensionType =
   'LegalEntity' | 'OrgUnit' | 'Product' | 'GlAccount' | 'CommonCoa' | 'FinancialElement' | 'Counterparty' | 'Country';
 
-/**
- * GL depth. Real charts of accounts are hierarchical numeric codes where the
- * child embeds its parent — category 20, group 2001, account 200101 — and
- * reconciliation is performed *at a level*, not against a flat list.
- */
+// Hierarchical GL codes: the child embeds its parent (category 20, group 2001, account 200101), and
+// reconciliation is performed at a level, not against a flat list.
 export type GlLevel = 'Category' | 'Level1' | 'Level2';
 
 /** A node in a dimension hierarchy. `parentCode: null` marks a root. */
@@ -78,7 +60,7 @@ export interface DomainFeed {
   domain: DataDomain;
   mode: FeedMode;
   connectorId: string | null;
-  /** Expected refresh cadence in days. Staleness beyond this raises a freshness warning (build plan §9.1). */
+  /** Expected refresh cadence in days. Staleness beyond this raises a freshness warning. */
   slaDays: number;
   owner: string | null;
 }
@@ -95,7 +77,7 @@ export interface Affiliate {
   country: string;
   region: string;
   regulator: string;
-  /** Exactly one, immutable once set — see OFSAA "functional currency". */
+  /** Exactly one, immutable once set. */
   functionalCurrency: CurrencyCode;
   /** The currency this affiliate consolidates into on its way to Group. */
   reportingCurrency: CurrencyCode;
@@ -106,11 +88,11 @@ export interface Affiliate {
   holidayCalendarId: string | null;
   legalEntityCode: string;
   feeds: DomainFeed[];
-  /** true = use Group's rule set as-is; false = this affiliate's rules can diverge (onboarding step 5). */
+  /** true = use Group's rule set as-is; false = this affiliate's rules can diverge. */
   inheritGroupRules: boolean;
-  /** Per-metric internal amber/red, on top of the regulatory minimum — Ecobank's own appetite, set per affiliate. Keyed by the same metric names as REGULATORY_MINIMA (e.g. 'lcrPercent'). */
+  /** Per-metric internal amber/red on top of the regulatory minimum, keyed by the same metric names as REGULATORY_MINIMA (e.g. 'lcrPercent'). */
   internalThresholds: Record<string, InternalThreshold>;
-  /** The onboarding governance attestation for step 6 — distinct from the threshold values themselves. */
+  /** Governance attestation, distinct from the threshold values themselves. */
   limitsConfirmed: boolean;
   createdAt: string;
 }
@@ -119,7 +101,6 @@ export interface Affiliate {
 // Positions (build plan §8)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** v1 had only Asset and Liability, so the balance sheet could not balance (defect P-04). */
 export type PositionCategory = 'Asset' | 'Liability' | 'Capital';
 
 export type BehaviouralTag = 'Core' | 'Non-Core' | 'Operational' | 'Non-Operational' | 'N/A';
@@ -127,37 +108,24 @@ export type RateType = 'Fixed' | 'Floating' | 'N/A';
 export type HqlaLevel = 'Level 1' | 'Level 2A' | 'Level 2B' | 'None';
 export type LcrCashflowRole = 'HQLA' | 'Inflow' | 'Outflow' | 'None';
 
-/** CBN classification; Bank of Ghana and BCEAO mirror it closely. Closes defect D-10. */
+/** CBN classification; Bank of Ghana and BCEAO mirror it closely. */
 export type PerformingStatus = 'Performing' | 'Special Mention' | 'Substandard' | 'Doubtful' | 'Loss';
 
 export type AmortizationType = 'Conventional' | 'Level Principal' | 'Non-Amortising' | 'Pattern';
 
-/** Day-count convention. A seeded dimension in OFSAA, used pervasively. */
 export type AccrualBasis = '30/360' | 'Actual/360' | 'Actual/Actual' | '30/365' | 'Actual/365' | '30/Actual';
 
 export type ObsType =
   'Undrawn Commitment' | 'Guarantee' | 'Letter of Credit' | 'IR Swap' | 'FX Forward' | 'Cap' | 'Floor';
 
-/**
- * What kind of account a position sits on.
- *
- * Core banking systems carry this on every account, and it matters here:
- * internal and suspense accounts are not customer money. Without the
- * distinction they are counted as customer deposits, which inflates
- * loan-to-deposit and depositor concentration — the same class of quiet
- * error as counting pledged collateral as HQLA.
- */
+// Internal and suspense accounts are not customer money; excluding them affects loan-to-deposit and
+// depositor-concentration calculations.
 export type AccountClass = 'Customer' | 'Internal' | 'Suspense' | 'Nostro' | 'Vostro';
 
 /** Maker-checker state, carried on reference and account data as well as rules. */
 export type RecordStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'CLOSED' | 'DORMANT';
 
-/**
- * Four-eyes and lifecycle metadata.
- *
- * Every row in a real core-banking extract carries these — the chart of
- * accounts and the accounts alike, not just business rules.
- */
+/** Four-eyes and lifecycle metadata, carried on reference and account data as well as rules. */
 export interface RecordControl {
   maker: string;
   checker: string | null;
@@ -166,13 +134,8 @@ export interface RecordControl {
   updatedAt: string;
 }
 
-/**
- * Account turnover.
- *
- * This is the behavioural signal the platform previously had no access to.
- * A current account with no movement in three months runs off nothing like
- * an actively-used one, however they are classified by product.
- */
+// Drives behavioural run-off assumptions independent of product classification: a dormant account runs off
+// nothing like an actively-used one, however it's classified.
 export interface AccountTurnover {
   dailyCredit: number;
   dailyDebit: number;
@@ -182,13 +145,7 @@ export interface AccountTurnover {
   totalDebit: number;
 }
 
-/**
- * An overdraft facility attached to an account.
- *
- * The undrawn portion is an LCR outflow, and the expiry decides whether it
- * falls inside the 30-day window. Core systems give the facility its own GL
- * account, which is why the code is carried here.
- */
+// The undrawn portion is an LCR outflow; the expiry date decides whether it falls inside the 30-day window.
 export interface OverdraftFacility {
   productCode: string;
   limit: number;
@@ -200,9 +157,9 @@ export interface OverdraftFacility {
 export interface Position {
   id: string;
   affiliateCode: string;
-  /** The reporting date this position is a snapshot of. Load-bearing: v1 had none (defect P-01). */
+  /** The reporting date this position is a snapshot of. */
   asOfDate: IsoDate;
-  /** Which load batch committed this row — the lineage pointer (defect P-19). */
+  /** Which load batch committed this row (lineage pointer). */
   batchId: string;
 
   /** The account this position sits on. Core systems embed the GL code in it. */
@@ -227,8 +184,7 @@ export interface Position {
   commonCoaCode: string;
   counterpartyId: string | null;
 
-  // Dates — buckets are derived from these against the active ladder,
-  // rather than arriving pre-assigned as they did in v1.
+  // Buckets are derived from these dates against the active ladder.
   originationDate: IsoDate | null;
   maturityDate: IsoDate | null;
   nextRepricingDate: IsoDate | null;
@@ -264,13 +220,7 @@ export interface Position {
   daysPastDue: number | null;
   provisionAmount: number | null;
 
-  /**
-   * Amount under lien, in the position's own currency.
-   *
-   * Basel requires HQLA to be unencumbered. This is an amount rather than a
-   * flag because real liens are partial: a bond of 500 with a lien of 200
-   * contributes 300 of HQLA, not nothing and not all of it.
-   */
+  /** Amount under lien, in the position's own currency — an amount rather than a flag, since liens are often partial. */
   lienAmount: number;
   lienReason: string | null;
 
@@ -317,12 +267,8 @@ export type RuleKind =
   | 'CustomMetric'
   | 'ValidationRule';
 
-/**
- * Common envelope for every business rule, mirroring OFSAA's uniform rule
- * management (ALM UG Ch. 8): folder, access type, versioning and
- * dependency checking behave identically for all rule types, which is what
- * makes one `<RuleEditor>` shell serve fourteen screens.
- */
+// Common envelope for every rule type: folder, access type, versioning and dependency checking behave
+// identically, which is what lets one `<RuleEditor>` shell serve fourteen screens.
 export interface RuleMeta {
   id: string;
   kind: RuleKind;
@@ -344,7 +290,6 @@ export interface RuleMeta {
 // Time buckets (build plan §10)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** OFSAA keeps three independent ladders; v1 used one hardcoded five-bucket list for all three. */
 export type LadderKind = 'IncomeSimulation' | 'RepricingGap' | 'LiquidityGap';
 
 export interface TimeBucket {
@@ -443,7 +388,7 @@ export interface ProcessRun {
 
   elements: CalculationElement[];
 
-  /** Pins the exact data version consumed, so a result stays defensible after a reload (build plan §9.3). */
+  /** Pins the exact data version consumed, so a result stays defensible after a reload. */
   positionBatchIds: string[];
 
   status: RunStatus;
@@ -466,7 +411,7 @@ export interface RunResult {
   element: CalculationElement;
   /** Element-specific payload; each engine module declares its own result shape. */
   payload: unknown;
-  /** Every calculation states its simplifications inline — carried over from v1's disclosure discipline. */
+  /** Every calculation states its simplifications inline. */
   methodology: string;
   computedAt: string;
 }
@@ -523,7 +468,6 @@ export interface AuditEvent {
 // Reference data (build plan §11, screens 12–15)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Zero-coupon or yield-to-maturity, per OFSAA's Rate Format attribute. */
 export type RateFormat = 'Zero Coupon' | 'Yield to Maturity';
 
 export type CompoundingBasis = 'Annual' | 'Semiannual' | 'Monthly' | 'Simple';
@@ -535,11 +479,7 @@ export interface CurveTerm {
   ratePercent: number;
 }
 
-/**
- * A yield curve. OFSAA calls this an Interest Rate Code and hangs
- * rate format, compounding and accrual basis off it (ALM UG §5.2.2) —
- * attributes that change what the same quoted rate actually means.
- */
+// Rate format, compounding and accrual basis together determine what a quoted rate actually means.
 export interface StoredYieldCurve {
   id: string;
   code: string;
@@ -555,11 +495,7 @@ export interface StoredYieldCurve {
   updatedAt: string;
 }
 
-/**
- * OFSAA distinguishes three currency roles (ALM UG §7.6): one functional
- * currency per institution, reporting currencies that intermediate
- * consolidation, and other active currencies it transacts in.
- */
+// Functional: one per institution. Reporting: intermediates consolidation. Active: other currencies transacted in.
 export type CurrencyRole = 'Functional' | 'Reporting' | 'Active';
 
 export interface StoredCurrency {

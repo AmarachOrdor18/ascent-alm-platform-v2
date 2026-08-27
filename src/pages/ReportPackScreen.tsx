@@ -1,14 +1,3 @@
-/**
- * Shared engine behind ALCO Reporting and Management Reporting.
- *
- * A pack is a named set of sections, each pointing at a real calculation
- * element on a real run. "Generate" does not invent a document — it checks
- * off whichever elements the chosen run actually computed and reads their
- * headline figure at generation time. Viewing a pack later re-reads the
- * same run, so the figures shown are always what that run produced, not a
- * snapshot that can drift from the source.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

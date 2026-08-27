@@ -1,12 +1,3 @@
-/**
- * Dexie schema.
- *
- * Indexes are declared deliberately — v1 shipped zero indexes across every
- * Postgres schema and filtered `positions` by affiliate, currency and bucket
- * on every call (engineering register §3.3). The compound indexes below are
- * the ones the query patterns in `repository.ts` actually use.
- */
-
 import Dexie, { type EntityTable } from 'dexie';
 import type { Connector, ApprovalRequest, RemediationIssue, NotificationRule, RiskEntry, AlcoMeeting, RegulatoryReturn, ReportPack } from '@/engine/types';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
@@ -81,30 +72,22 @@ export class AscentDb extends Dexie {
       holidayCalendars: 'id, code, countryCode, isActive',
     });
 
-    // v2 adds recurring run definitions. Declaring a new version rather than
-    // editing v1 keeps an existing browser's data intact across the upgrade.
+    // Each new version() call (rather than editing an earlier one) preserves
+    // existing browsers' data across the upgrade.
     this.version(2).stores({
       runSchedules: 'id, affiliateCode, templateRunId, isActive, [affiliateCode+isActive]',
     });
 
-    // v3 adds limit monitoring. The engine modules for this existed from
-    // phase 1; nothing had ever persisted their configuration.
     this.version(3).stores({
       limitConfigs: 'id, metricKey, affiliateCode, isActive, [affiliateCode+isActive]',
       temporaryLimits: 'id, limitId, expiresOn',
       breachNotes: 'id, breachId, recordedAt',
     });
 
-    // v4 makes connectors configurable. They were a hardcoded array in the
-    // screen, so a bank could not add its own source or correct the status
-    // this platform had asserted about theirs.
     this.version(4).stores({
       connectors: 'id, vendor, status, isActive',
     });
 
-    // v5 gives the governance, monitoring and reporting screens somewhere to
-    // live. They previously rendered hardcoded arrays because there was no
-    // entity behind them at all.
     this.version(5).stores({
       approvals: 'id, status, module, affiliateCode, requestedAt',
       remediationIssues: 'id, stage, severity, affiliateCode, raisedAt',
@@ -115,19 +98,10 @@ export class AscentDb extends Dexie {
       reportPacks: 'id, kind, affiliateCode, status',
     });
 
-    // v6 persists staged (uncommitted) uploads. "Save as staged" previously
-    // wrote only the LoadBatch metadata row — the actual parsed positions
-    // lived in React state alone, so navigating away or refreshing silently
-    // discarded them while the batch record it left behind pointed at data
-    // that was never there.
     this.version(6).stores({
       stagedBatches: 'id, affiliateCode, domain, asOfDate, [affiliateCode+domain+asOfDate]',
     });
 
-    // v7 makes role permissions editable. They were a hardcoded object in
-    // AuthContext, so an admin could see what a role could do but never
-    // change it — the "Roles are fixed in this build" line on Users & Roles
-    // was describing a limitation, not a design choice.
     this.version(7).stores({
       roles: 'code',
     });

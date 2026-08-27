@@ -1,14 +1,4 @@
-/**
- * Execution & Scheduling module.
- *
- * What-If Builder is deliberately not here — it lives under Stress Testing
- * & Scenario Analysis, since that's the workflow it actually belongs to.
- *
- * Run History needs only `risk.view`, unlike Process Run/Batch Scheduler's
- * `run.execute` — the module route gates on `risk.view`, the looser of the
- * two, matching today's behavior where a read-only role still sees Run
- * History.
- */
+// What-If Builder lives under Stress Testing & Scenario Analysis, not here.
 import { lazy } from 'react';
 import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 

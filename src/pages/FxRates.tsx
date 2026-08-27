@@ -1,13 +1,3 @@
-/**
- * Currency & FX Rates — screen 13.
- *
- * This screen exists because of defect D-02: the previous platform summed
- * NGN, GHS, XOF and USD as if they were one unit, which made every
- * consolidated Group figure meaningless. Rates loaded here are what the
- * engine converts through, and a missing rate fails a run rather than
- * silently omitting the currency.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -40,8 +30,7 @@ export function FxRates() {
   const asOfDate = rates[0]?.asOfDate ?? null;
   const table = buildFxTable('USD', rates, asOfDate ?? '');
 
-  // Every currency any affiliate actually transacts in must be convertible,
-  // otherwise a Group run will fail — better to surface it here than at run time.
+  // Every currency an affiliate transacts in must be convertible, or a Group run will fail.
   const requiredCurrencies = Array.from(
     new Set(affiliates.flatMap((a) => [a.functionalCurrency, ...a.activeCurrencies])),
   );

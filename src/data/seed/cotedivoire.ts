@@ -1,17 +1,9 @@
-/**
- * Ecobank Côte d'Ivoire — seed balance sheet, as at 2026-07-31.
- *
- * Synthetic data representing Côte d'Ivoire affiliate positions for demo purposes.
- * Figures are in XOF (West African CFA franc) millions.
- *
- * Synthetic data. Not sourced from any real institution.
- */
-
 import type { Position } from '@/engine/types';
 
 export const COTEIVOIRE_AS_OF = '2026-07-31';
 export const COTEIVOIRE_BATCH_ID = 'B-CI-2026-07';
 
+// Amounts are in XOF (West African CFA franc) millions.
 export const COTEIVOIRE_POSITIONS: Position[] = [
   {
     id: 'CI-POS001',

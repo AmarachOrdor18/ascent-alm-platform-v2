@@ -1,15 +1,3 @@
-/**
- * Behavioural Analysis — screen 41.
- *
- * What the core/volatile split actually is, per product and per behavioural
- * tag, and what recalibrating it would do.
- *
- * The recalibration panel writes to the Behaviour Pattern rule and then
- * requires a re-run — it does not silently mutate the figures on screen.
- * That is the discipline the whole platform rests on: a displayed number
- * always belongs to a run that produced it.
- */
-
 import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';

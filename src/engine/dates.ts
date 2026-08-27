@@ -1,11 +1,3 @@
-/**
- * Date and day-count arithmetic.
- *
- * Accrual basis is a seeded dimension in OFSAA and is used pervasively:
- * two positions with identical balance and rate accrue different interest
- * under 30/360 than under Actual/365. v1 had no day-count concept at all.
- */
-
 import type { AccrualBasis, IsoDate } from './types';
 
 const MS_PER_DAY = 86_400_000;

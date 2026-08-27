@@ -1,16 +1,3 @@
-/**
- * Data validation — configurable checks run before any calculation.
- *
- * Modelled on Oracle's Cash Flow Edits (ALM UG Ch. 10), which are *named,
- * saved, re-runnable processes* with an owner and an execution log, run as a
- * gate before the engine sees the data. v1 had five hardcoded check types
- * and no run history.
- *
- * The gate matters: a High-severity exception blocks the commit, so a
- * balance sheet that does not balance cannot silently reach a regulatory
- * report.
- */
-
 import type { IsoDate, Position, Severity } from './types';
 
 export type CheckType =
@@ -126,12 +113,6 @@ export interface ValidationContext {
   balanceTolerancePercent?: number;
 }
 
-/**
- * Run active rules over a staged batch.
- *
- * Rules are data, so a bank can add its own without a code change — the
- * point of RFP §1.1's "configurable, not code-dependent".
- */
 export function validatePositions(
   positions: Position[],
   ctx: ValidationContext,

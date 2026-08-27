@@ -1,12 +1,3 @@
-/**
- * Data Upload & Staging — screen 6.
- *
- * The pipeline itself (upload → stage → edit → validate → commit) lives in
- * `DataLoadPanel` — shared with the onboarding wizard's Step 7 — so this
- * screen is just that panel plus the affiliate/domain/as-of-date pickers an
- * ongoing operations user needs but a fixed-affiliate onboarding step
- * doesn't.
- */
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';

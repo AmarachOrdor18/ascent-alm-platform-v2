@@ -1,14 +1,3 @@
-/**
- * Approvals — screen 48.
- *
- * A real maker-checker queue. This used to render a fixed array of four
- * invented requests with Approve/Reject buttons that had no click handler
- * at all. It now reads and writes `ApprovalRequest` rows through the same
- * governance store the ALCO and Regulatory Reporting screens use, and a
- * decision is blocked, with a stated reason, when the signed-in user is
- * also the requester.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -57,15 +46,7 @@ export function Approvals() {
     ['module', 'entityLabel', 'summary', 'requestedBy'],
   );
 
-  /**
-   * Approving is the checker action; for an affiliate activation request
-   * that means actually applying the Testing → Live transition, not just
-   * recording that someone said yes. Before this, the ApprovalRequest row
-   * and the affiliate it names had no connection at all — an approved
-   * request just sat there while `AffiliateDetail.tsx`'s "Move to Live"
-   * button did the real work unsupervised. Rejecting leaves the affiliate
-   * exactly where it was, in Testing, for the maker to revisit.
-   */
+  // Approving an Activate request on Affiliates also applies the affiliate's Testing → Live transition.
   const decide = (request: ApprovalRequest, status: 'Approved' | 'Rejected') => {
     if (!user || !canDecide) return;
     void save.mutateAsync({

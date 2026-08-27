@@ -1,11 +1,3 @@
-/**
- * Connector configuration.
- *
- * The catalogue used to be a `const` array inside the screen. Making it
- * stored data is what turns "here are the four sources we support" into
- * "configure your estate".
- */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -49,10 +41,6 @@ export function newConnector(): Connector {
     status: 'Planned',
     statusReason: 'Not yet assessed.',
     endpoint: '',
-    // 'None' rather than 'ApiKey' — otherwise a brand-new, not-yet-specified
-    // connector is immediately blocked on a credential reference nobody has
-    // typed yet, for a reason buried at the bottom of a long form. Set the
-    // real auth mode once it's actually known.
     authMode: 'None',
     credentialRef: '',
     cadenceDays: 1,
@@ -67,14 +55,7 @@ export function newConnector(): Connector {
   };
 }
 
-/**
- * What is wrong with a connector's configuration.
- *
- * Returned as a list rather than a boolean so the screen can say which field
- * is at fault. A blocked connector still has to be *described* correctly —
- * the block is a reason to substitute files, not a reason to leave the
- * record half-filled.
- */
+// What is wrong with a connector's configuration.
 export function validateConnector(c: Connector): string[] {
   const problems: string[] = [];
   if (c.name.trim() === '') problems.push('Name is required.');
@@ -88,8 +69,7 @@ export function validateConnector(c: Connector): string[] {
   if (c.authMode !== 'None' && c.credentialRef.trim() === '') {
     problems.push('Give a vault reference for the credential.');
   }
-  // A credential pasted in clear text would sit in IndexedDB on every
-  // machine that opens this page.
+  // A credential pasted in clear text would sit in IndexedDB on every machine that opens this page.
   if (/^[A-Za-z0-9+/=]{24,}$/.test(c.credentialRef.trim()) && !c.credentialRef.includes('://')) {
     problems.push('That looks like a secret rather than a vault reference. Store the pointer, not the credential.');
   }

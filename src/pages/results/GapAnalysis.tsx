@@ -1,16 +1,3 @@
-/**
- * Maturity & Repricing Gap — screen 38.
- *
- * Two ladders that are genuinely different. v1 conflated them (defect D-06):
- * it bucketed everything on maturity and called one of the results a
- * repricing gap. A floating-rate five-year loan repricing quarterly belongs
- * in the 0–3M repricing bucket and the 3–5Y maturity bucket, and the whole
- * point of interest-rate risk is that distinction.
- *
- * The ladder itself comes from the run's Time Bucket rule, so changing the
- * rule genuinely changes the allocation.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';

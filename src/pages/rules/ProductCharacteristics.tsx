@@ -1,16 +1,3 @@
-/**
- * Product Characteristics — screen 17.
- *
- * This screen is the answer to RFP §1.1's "configurable product engine (not
- * code-dependent)". The previous platform decided run-off rates, ASF and RSF
- * factors by matching product names against 22 regular expressions compiled
- * into TypeScript — adding a product meant a code change and a release.
- * Here it is a row.
- *
- * Copy Across Currencies is Oracle's mechanic (ALM UG Ch. 17.4): define once
- * for NGN, copy to GHS and XOF, adjust where local practice differs.
- */
-
 import { useState } from 'react';
 import { RuleEditor, RuleField } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
@@ -244,8 +231,7 @@ export function ProductCharacteristics() {
                     type="button"
                     disabled={!copyTarget}
                     onClick={() => {
-                      // Copy every assumption not already defined for the
-                      // target, so an existing local override is preserved.
+                      // Skip products already defined for the target so local overrides aren't clobbered.
                       const existing = new Set(
                         rule.assumptions.filter((a) => a.currency === copyTarget).map((a) => a.productCode),
                       );

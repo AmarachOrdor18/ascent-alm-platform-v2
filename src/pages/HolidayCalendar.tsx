@@ -1,11 +1,3 @@
-/**
- * Holiday Calendar — screen 15.
- *
- * Business-day conventions per jurisdiction. A cash flow due on a public
- * holiday settles on the next business day, which moves it between buckets
- * at the short end where liquidity analysis is most sensitive.
- */
-
 import { useEffect, useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -17,7 +9,6 @@ import type { HolidayCalendar as Calendar } from '@/engine/types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/** Next business day on or after `date`, skipping weekends and holidays. */
 function nextBusinessDay(calendar: Calendar, date: string): string {
   const holidays = new Set(calendar.holidays.map((h) => h.date));
   let candidate = date;

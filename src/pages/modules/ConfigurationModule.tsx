@@ -1,15 +1,3 @@
-/**
- * Configuration module.
- *
- * "Business Rules" is the existing hub screen (`/rules` today) — its own 13
- * `RuleKind` sub-editors are unlisted, deep-linked screens reached by
- * clicking through the hub, and are untouched by this redesign; only the
- * hub's own address moves.
- *
- * Validation Rules needs `data.configure`; Business Rules needs
- * `rules.edit`. Every role with `data.configure` also has `rules.edit` in
- * the current permission model, so the module route gates on `rules.edit`.
- */
 import { lazy } from 'react';
 import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 

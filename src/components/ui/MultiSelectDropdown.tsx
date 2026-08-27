@@ -1,9 +1,3 @@
-/**
- * A checklist-in-a-dropdown for picking several items from a long list —
- * the Group is 33 affiliates, and a row of toggle buttons for every one of
- * them just pushes the bulk into the page instead of removing it.
- */
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 

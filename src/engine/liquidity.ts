@@ -1,25 +1,3 @@
-/**
- * Liquidity risk — LCR, NSFR, loan-to-deposit, gap and concentration.
- *
- * Two things are structurally different from v1:
- *
- * 1. **Factors come from the data, not from regex.** v1 decided run-off
- *    rates, ASF and RSF by matching product names against 22 regular
- *    expressions compiled into TypeScript, so adding a product meant a code
- *    change (defect D-12, RFP §1.1). Here every factor is a field on the
- *    position, set by the Product Characteristics rule.
- *
- * 2. **Amounts are converted before they are summed.** v1's `num()` helper
- *    was literally `Number(p.amount)` with no currency check anywhere, so
- *    NGN, GHS, XOF and USD were added together (defect D-02). Every
- *    aggregate here goes through `convert`.
- *
- * 3. **Internal accounts are excluded from customer metrics.** Core banking
- *    systems classify every account, and suspense or internal accounts are
- *    not customer money. Counting them inflates loan-to-deposit and
- *    depositor concentration.
- */
-
 import type { CurrencyCode, IsoDate, Position, TimeBucketLadder } from './types';
 import { bucketize, type BucketedTotal } from './buckets';
 import { convert, type FxTable } from './fx';
@@ -66,19 +44,7 @@ export interface LcrStress {
   inflowSuppressionPercent?: number;
 }
 
-/**
- * Basel III LCR.
- *
- * `HQLA / max(net cash outflows, 0)`, where net cash outflows are gross
- * 30-day outflows less inflows capped at 75% of outflows.
- *
- * Only the *unencumbered* portion counts. Liens are amounts rather than
- * flags, because real liens are partial: a bond of 500 carrying a lien of
- * 200 contributes 300 of HQLA — not nothing, and not all of it. v1 tested
- * only whether the product name matched `/government securities/i`, so a
- * pledged bill counted in full (defect D-03). The encumbered amount is
- * reported so the effect is visible rather than silent.
- */
+// Only the unencumbered portion counts; liens are amounts rather than flags, since real liens are often partial.
 export function computeLcr(positions: Position[], ctx: LiquidityContext, stress: LcrStress = {}): LcrResult {
   const extraHaircut = (stress.hqlaHaircutPercent ?? 0) / 100;
   const runoffMultiplier = stress.runoffMultiplier ?? 1;
@@ -160,13 +126,7 @@ export interface NsfrStress {
   depositAttritionPercent?: number;
 }
 
-/**
- * Basel III NSFR — available over required stable funding.
- *
- * ASF is computed over everything that is not an asset, so Capital
- * contributes at its own ASF factor. v1 had no Capital category at all, so
- * equity simply did not appear in the numerator (defect P-04).
- */
+// ASF is computed over everything that is not an asset, so Capital contributes at its own ASF factor.
 export function computeNsfr(positions: Position[], ctx: LiquidityContext, stress: NsfrStress = {}): NsfrResult {
   const attrition = (stress.depositAttritionPercent ?? 0) / 100;
 
@@ -206,11 +166,7 @@ export interface LoanToDepositResult {
   methodology: string;
 }
 
-/**
- * Loans and deposits are identified by their Common Chart of Accounts
- * classification rather than by matching the product name, so a new deposit
- * product is picked up by mapping it in the COA — not by editing a regex.
- */
+// Loans and deposits are identified by Common Chart of Accounts classification, not by matching the product name.
 export function computeLoanToDeposit(positions: Position[], ctx: LiquidityContext): LoanToDepositResult {
   const loans = sumConverted(positions.filter(isLoan, undefined), ctx);
   const deposits = sumConverted(positions.filter(isDeposit, undefined), ctx);
@@ -226,13 +182,7 @@ export function computeLoanToDeposit(positions: Position[], ctx: LiquidityContex
   };
 }
 
-/**
- * Customer loans.
- *
- * `accountClass` does the work an internal-account exclusion needs: a
- * suspense account holding loan-recovery entries is not a customer loan,
- * however its product is described.
- */
+/** Customer loans. `accountClass` excludes internal accounts regardless of how the product is described. */
 export function isLoan(p: Position): boolean {
   return (
     p.category === 'Asset' &&
@@ -263,13 +213,8 @@ export interface LiquidityGapResult {
   methodology: string;
 }
 
-/**
- * Contractual gap buckets every position on its contractual maturity date.
- * The behavioural view is produced by `applyBehaviouralMaturity` in
- * `behavioural.ts`, which re-dates non-maturity deposits by their run-off
- * profile — v1's Behavioural/Contractual toggle rendered identical data in
- * both modes because no separate model existed.
- */
+// The behavioural view is produced by `applyBehaviouralMaturity` in `behavioural.ts`, which re-dates
+// non-maturity deposits by their run-off profile.
 export function computeLiquidityGap(
   positions: Position[],
   ctx: LiquidityContext,
@@ -319,16 +264,7 @@ export interface ConcentrationResult {
   methodology: string;
 }
 
-/**
- * Depositor concentration, grouped by counterparty.
- *
- * RFP §2.1 asks for "Depositor Concentrations". v1 grouped by
- * `p.affiliate`, which answers how deposits are spread across the Group —
- * a different question entirely, and not the one a regulator asks
- * (defect D-04). Deposits with no counterparty are reported as
- * unattributed rather than being dropped or lumped into one bucket, since
- * either would distort the concentration measure.
- */
+/** Depositor concentration, grouped by counterparty. */
 export function computeConcentration(positions: Position[], ctx: LiquidityContext): ConcentrationResult {
   const deposits = positions.filter(isDeposit);
   const totalDeposits = sumConverted(deposits, ctx);
@@ -361,8 +297,9 @@ export function computeConcentration(positions: Position[], ctx: LiquidityContex
     largestSharePercent: byCounterparty[0]?.sharePercent ?? null,
     topFiveSharePercent: topN(5),
     topTenSharePercent: topN(10),
+    // Conventional 0-10,000 scale (sum of squared percentage-point shares) — dividing by 100 before squaring would put this on a 0-1 scale instead.
     herfindahlIndex:
-      byCounterparty.length === 0 ? null : byCounterparty.reduce((s, e) => s + (e.sharePercent / 100) ** 2, 0),
+      byCounterparty.length === 0 ? null : byCounterparty.reduce((s, e) => s + e.sharePercent ** 2, 0),
     unattributedAmount,
     currency: ctx.reportingCurrency,
     methodology:
@@ -378,18 +315,8 @@ export interface AffiliateFundingShare {
   sharePercent: number;
 }
 
-/**
- * Each affiliate's share of Group deposit funding.
- *
- * A deliberately different question from `computeConcentration`, and kept
- * as a separate function rather than an extra field on that result: v1's
- * defect D-04 was grouping *customer* concentration by affiliate, which
- * answers "how diversified is our own funding base across entities" while
- * the regulator asks "could a handful of customers walk away with our
- * funding". Conflating the two here would reintroduce exactly that mistake
- * under a different name. This one is only meaningful at Group scope,
- * comparing affiliates against each other rather than against a limit.
- */
+// A different question from `computeConcentration`: this measures the Group's own funding diversification
+// across affiliates, not customer concentration risk, and is only meaningful at Group scope.
 export function computeDepositsByAffiliate(positions: Position[], ctx: LiquidityContext): AffiliateFundingShare[] {
   const deposits = positions.filter(isDeposit);
   const total = sumConverted(deposits, ctx);

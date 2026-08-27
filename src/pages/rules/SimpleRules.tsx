@@ -1,11 +1,3 @@
-/**
- * The four remaining rule editors — prepayment, discount methods, payment
- * and repricing patterns, and filters.
- *
- * They share the same shell as every other rule, which is the point: a user
- * who has configured one has configured all of them.
- */
-
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { TierAllocationBar, paletteTone, type AllocationSegment } from '@/components/ui/TierAllocationBar';

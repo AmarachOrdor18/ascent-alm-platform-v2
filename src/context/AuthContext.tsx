@@ -1,24 +1,10 @@
-/**
- * Authentication and role-based authorisation.
- *
- * `hasPermission` is checked at both the navigation and the action level.
- * v1 declared six roles but enforced `requirePermission` on only 11 of 68
- * endpoints, so a read-only Executive Viewer could run a stress test
- * (engineering register E-04). Here every mutating control asks first.
- */
-
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import type { Role, RoleCode, User } from '@/engine/types';
 
-/**
- * The permission sets this build ships with. Seeded into the `roles` table
- * on first run and editable afterward from Users & Roles — this constant is
- * the default/fallback, not the live source of truth. `hasPermission` reads
- * the stored roles below, so an edited permission takes effect everywhere
- * that checks it, not just on the screen that changed it.
- */
+// Default/fallback permission sets, seeded into the `roles` table on first run and
+// editable afterward from Users & Roles; `hasPermission` reads the live table, not this constant.
 export const ROLES: Record<RoleCode, Role> = {
   ADMIN: {
     code: 'ADMIN',
@@ -133,14 +119,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  // Deliberately no `initialData` here: combined with the app's global
-  // staleTime, initialData marks the seeded data "fresh" for 30 seconds,
-  // which was skipping the real fetch and made the DB-backed roles table
-  // effectively invisible for the first half-minute of every session -
-  // exactly the window someone testing "log in as different users" would
-  // be in. Fetch for real every time; fall back to the static default only
-  // while genuinely loading or if the table is genuinely empty, the same
-  // fallback shape already used on Users & Roles and System Preferences.
+  // No `initialData`: it would mark seeded data "fresh" under the app's global staleTime
+  // and skip the real fetch, hiding roles-table edits for the first 30s of a session.
   const { data: liveRoles } = useQuery({
     queryKey: ['roles'],
     queryFn: () => repository.listRoles(),

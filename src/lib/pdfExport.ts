@@ -1,14 +1,3 @@
-/**
- * Client-side PDF export for a generated report pack. No server round trip —
- * the figures are already in the browser (read from the run at generation
- * time), so the download just lays them out.
- *
- * Styled to the same brand tokens as the rest of the app (navy-900 / gold-500
- * from index.css), not jsPDF's black-on-white default — this is a document a
- * committee member forwards outside the platform, so it should read as an
- * Ecobank artifact rather than a generic export.
- */
-
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 

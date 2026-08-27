@@ -1,11 +1,3 @@
-/**
- * Data Management module.
- *
- * Nine screens, capped at three top-level tabs (Data Operations / Data
- * Structure / Reference Data) with a second row of tabs for the individual
- * existing screens inside whichever group is active — nested tabs, not one
- * flat bar of nine buttons.
- */
 import { lazy } from 'react';
 import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 

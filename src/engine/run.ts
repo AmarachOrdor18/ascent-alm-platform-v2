@@ -1,19 +1,5 @@
-/**
- * The process-run orchestrator.
- *
- * This is the concept that makes the platform an ALM system rather than a
- * reporting layer (build plan §10). A run is:
- *
- *   as-of date + scope + reporting currency + rule set + scenario
- *     → an immutable, named, timestamped result set
- *
- * Results screens read *from a run*, never from live recomputation. That
- * gives reproducibility, run-to-run comparison, an audit trail, and a real
- * answer to "what assumptions produced this number?".
- *
- * It is also why the v1 affiliate-switcher defect cannot recur: a run is
- * scoped by construction, so there is no unscoped query to write.
- */
+// A run is: as-of date + scope + reporting currency + rule set + scenario → an immutable, named, timestamped
+// result set. Results screens read from a run, never from live recomputation.
 
 import type {
   CalculationElement,
@@ -91,19 +77,13 @@ function resultId(runId: string, element: CalculationElement): string {
   return `${runId}-${element}-${resultCounter}`;
 }
 
-/**
- * Execute a run.
- *
- * Each element is computed independently and a failure in one is recorded
- * against the run rather than aborting the whole thing — Oracle's processing
- * error log works the same way (ALM UG §7.25), and a single unpriced
- * position should not cost you the entire liquidity report.
- */
+// Each element is computed independently; a failure in one is recorded against the run rather than aborting
+// the whole thing.
 export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): RunOutcome {
   const errors: RunError[] = [];
   const results: RunResult[] = [];
 
-  // Scope first. Everything downstream sees only positions in scope.
+  // Everything downstream sees only positions in scope.
   let scoped = inputs.positions.filter(
     (p) => p.asOfDate === run.asOfDate && (run.affiliateCode === 'GROUP' || p.affiliateCode === run.affiliateCode),
   );
@@ -118,8 +98,7 @@ export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): Run
     scoped = scoped.filter((p) => pinned.has(p.batchId));
   }
 
-  // A missing FX rate must stop the run. Producing a figure that silently
-  // omits a currency is the exact failure this platform exists to avoid.
+  // A missing FX rate must stop the run rather than silently omitting a currency from the totals.
   const currencies = Array.from(new Set(scoped.map((p) => p.currency)));
   const missing = missingRates(currencies, run.reportingCurrency, inputs.fx);
   if (missing.length > 0) {
@@ -205,8 +184,7 @@ export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): Run
   });
 
   record('LiquidityGap', () => {
-    // Both bases are computed so the screen can show them side by side
-    // rather than as a toggle — v1's toggle rendered identical data.
+    // Both bases are computed so the screen can show them side by side rather than as a toggle.
     const contractual = computeLiquidityGap(scoped, liquidityCtx, inputs.liquidityLadder, 'Contractual');
     const behavioural = computeLiquidityGap(
       applyBehaviouralMaturity(scoped, run.asOfDate, inputs.behaviourPatterns),

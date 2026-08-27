@@ -1,10 +1,3 @@
-/**
- * A drag-to-set bar chart for signed values around a zero line — a rate
- * shock in basis points per bucket, not an allocation that must sum to
- * anything. Each bar moves independently; dragging up steepens a rise,
- * down steepens a fall, past the centre line into the other sign.
- */
-
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 

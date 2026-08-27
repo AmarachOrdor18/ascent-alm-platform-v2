@@ -1,13 +1,3 @@
-/**
- * Administration & Governance module.
- *
- * Users/Preferences/Audit Log keep their existing `/admin/users`,
- * `/admin/preferences`, `/admin/audit` addresses unchanged — only Approvals,
- * Control Remediation and Notifications move under `/admin`. The module
- * route gates on `dashboard.view`, the loosest permission among its six
- * tabs (Notifications), matching today's behavior where every role sees at
- * least Notifications under Administration.
- */
 import { lazy } from 'react';
 import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 

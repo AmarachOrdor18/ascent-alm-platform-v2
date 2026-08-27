@@ -1,9 +1,3 @@
-/**
- * Connector edit fields — extracted from `Connectors.tsx`'s `ConnectorEditor`
- * so the exact same form (and `validateConnector` problems list) renders
- * both in the standalone drawer there and inline in the onboarding wizard's
- * Connectivity step, instead of two copies that could drift.
- */
 import { type ReactNode } from 'react';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { validateConnector } from '@/lib/connectorHooks';

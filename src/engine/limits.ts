@@ -1,15 +1,3 @@
-/**
- * Limit monitoring, temporary limits and breach detection.
- *
- * RFP §2.1 asks for "a series of escalation points as the metric utilization
- * approaches and breaches a limit", plus "the allowance of temporary limits
- * and timelines of expiry" and "notes on causes of the breach and the
- * resolution actions and timelines".
- *
- * v1 had two tiers, five hardcoded thresholds, and no concept of a temporary
- * limit, an expiry or a breach note (defect D-08). All three are here.
- */
-
 import type { IsoDate, LimitStatus, Severity } from './types';
 
 /** Whether a higher value is better (LCR) or worse (loan-to-deposit). */
@@ -21,7 +9,6 @@ export interface LimitConfig {
   label: string;
   affiliateCode: string | null;
   direction: LimitDirection;
-  /** Three tiers, per RFP §2.1's "series of escalation points". */
   greenThreshold: number;
   amberThreshold: number;
   redThreshold: number;
@@ -32,13 +19,7 @@ export interface LimitConfig {
   updatedAt: string;
 }
 
-/**
- * A time-boxed relaxation of a limit.
- *
- * Temporary limits expire on their own date. Evaluation takes the as-of date
- * so an expired relaxation stops applying without anyone having to remember
- * to remove it.
- */
+// Evaluation takes the as-of date so an expired relaxation stops applying automatically.
 export interface TemporaryLimit {
   id: string;
   limitId: string;
@@ -82,13 +63,7 @@ function isEffective(temp: TemporaryLimit, asOfDate: IsoDate): boolean {
   return temp.effectiveFrom <= asOfDate && asOfDate <= temp.expiresOn;
 }
 
-/**
- * Evaluate one metric against its limit.
- *
- * A `null` value yields `No data` rather than a Green — an unmeasured metric
- * is not a compliant one, and reporting it as green is how a gap becomes
- * invisible.
- */
+// A null value yields 'No data' rather than 'Green' — an unmeasured metric is not a compliant one.
 export function evaluateLimit(
   config: LimitConfig,
   value: number | null,
@@ -138,8 +113,7 @@ export function evaluateLimit(
     config.regulatoryMinimum !== null &&
     (higherIsBetter ? value < config.regulatoryMinimum : value > config.regulatoryMinimum);
 
-  // Utilisation measures how far the metric has travelled from its green
-  // threshold toward its red one — 100% means it is at the red line.
+  // 100% utilisation means the metric is at the red line.
   const span = Math.abs(config.greenThreshold - red);
   const travelled = Math.abs(config.greenThreshold - value);
   const utilisationPercent = span > 0 ? Math.min(999, (travelled / span) * 100) : null;
@@ -169,13 +143,6 @@ export interface BreachTransition {
   isEscalation: boolean;
 }
 
-/**
- * Compare two evaluations and describe the transition.
- *
- * Only transitions raise events. v1 got this right and it is worth keeping:
- * emitting an event on every evaluation floods the queue and trains people
- * to ignore it.
- */
 export function detectTransition(previous: LimitEvaluation | null, current: LimitEvaluation): BreachTransition | null {
   const from = previous?.status ?? 'No data';
   const to = current.status;
@@ -198,13 +165,7 @@ export function expiringSoon(temporaryLimits: TemporaryLimit[], asOfDate: IsoDat
   return temporaryLimits.filter((t) => t.expiresOn >= asOfDate && t.expiresOn <= cutoff);
 }
 
-/**
- * Jurisdiction-specific regulatory minima.
- *
- * CBN, Bank of Ghana and BCEAO do not impose identical requirements, so
- * these are seeded per regulator during onboarding rather than assumed
- * uniform across the Group.
- */
+// Seeded per regulator during onboarding — requirements are not uniform across jurisdictions.
 export const REGULATORY_MINIMA: Record<string, Record<string, number>> = {
   CBN: { lcrPercent: 100, nsfrPercent: 100, loanToDepositPercent: 65 },
   'Bank of Ghana': { lcrPercent: 100, nsfrPercent: 100 },

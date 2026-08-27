@@ -1,13 +1,3 @@
-/**
- * Search, pagination and export for a hand-rolled table.
- *
- * `ResultTable` renders every row it's given — fine for a run's fixed
- * metric list, wrong for a register that grows without bound (approvals,
- * audit events, users). This is the client-side search/page/export layer
- * those screens compose around a plain `<table>`, matched to the pattern
- * already proven in the sibling Ecobank platform build.
- */
-
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
 import { SearchIcon, RefreshIcon, DownloadIcon } from '@/components/icons/Icons';

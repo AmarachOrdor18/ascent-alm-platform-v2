@@ -1,19 +1,3 @@
-/**
- * Sidebar navigation map.
- *
- * The sidebar represents major ALM business capabilities; screens that
- * belong to the same workflow are grouped as tabs inside a module instead of
- * each getting their own sidebar row (see `src/pages/modules/*`). This
- * intentionally shrank NAV_GROUPS from 40+ individual screens down to ~13
- * primary items — `routing.test.ts` reflects that on purpose, it isn't
- * drift.
- *
- * `SEARCH_INDEX` is the pre-redesign flat list, kept so Cmd/Ctrl+K search
- * still finds every individual screen by its familiar name, pointed at its
- * new module/tab URL — collapsing the sidebar shouldn't make a screen
- * harder to find, just less prominent as a standing link.
- */
-
 import type { ComponentType } from 'react';
 import type { IconProps } from '@/components/icons/Icons';
 import {
@@ -56,7 +40,7 @@ export interface NavItem {
   name: string;
   path: string;
   permission: string;
-  /** Build phase this screen landed in — see build plan §14. Kept for the search index's provenance, not used by the router. */
+  /** Not used by the router; kept for the search index's provenance. */
   phase: number;
   icon: ComponentType<IconProps>;
 }
@@ -66,6 +50,8 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+// Screens sharing a workflow are grouped as tabs inside a module rather than each getting a sidebar row;
+// routing.test.ts asserts the resulting ~13-item count on purpose, not by drift.
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'OVERVIEW',
@@ -117,13 +103,9 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Flat list, for the router — the 13 sidebar-visible module entries. */
 export const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
-/**
- * Every individual screen, pointed at its new module/tab URL, for Cmd/Ctrl+K
- * search — not rendered in the sidebar and not a source of routes.
- */
+// Every individual screen for Cmd/Ctrl+K search; not rendered in the sidebar and not a source of routes.
 export const SEARCH_INDEX: NavItem[] = [
   { name: 'Executive Dashboard', path: '/dashboard', permission: 'dashboard.view', phase: 6, icon: DashboardIcon },
 

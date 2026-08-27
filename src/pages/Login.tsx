@@ -1,18 +1,3 @@
-/**
- * Sign-in, adapted from ecobank-alm-platform's design.
- *
- * Reads the same real user register Users & Roles manages, rather than a
- * second, hardcoded copy of the same six identities — a user created there
- * is signed-in-able here without touching this file, and disabling one
- * there removes it from this list. Credential entry (email + password,
- * checked against a hashed value on the User record) replaces a "pick
- * yourself from a list" dropdown so a locked-down demo doesn't hand every
- * visitor the full roster on sight. Real authentication (MFA via otplib,
- * Azure AD SSO via MSAL) is implemented in v1 and is out of scope here —
- * see build plan §15; passwordHash.ts explains exactly how demo-grade this
- * credential check is.
- */
-
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useUsers } from '@/lib/hooks';

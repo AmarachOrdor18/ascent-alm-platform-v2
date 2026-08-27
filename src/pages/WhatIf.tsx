@@ -1,15 +1,3 @@
-/**
- * What-If Builder — screen 33.
- *
- * The previous platform had a genuine parametric what-if engine and told
- * users to reach it with an HTTP request: its Stress Testing screen rendered
- * the literal text "Custom Scenarios: Via API — POST /stress/run". That one
- * string was the clearest symptom of the whole problem.
- *
- * This is that screen. Move a slider, see the answer, save it as a scenario
- * if it is worth keeping.
- */
-
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -99,8 +87,7 @@ export function WhatIf() {
     setSaved(false);
   };
 
-  // The engine throws on a missing rate rather than converting at 1.0, so
-  // the gap is detected here and reported instead of crashing the screen.
+  // The engine throws on a missing rate rather than converting at 1.0; detect the gap here instead of crashing.
   const fx = useMemo(() => buildFxTable(currency, fxRates, asOfDate), [currency, fxRates, asOfDate]);
   const missingFx = useMemo(
     () => missingRates(positions.map((p) => p.currency), currency, fx),
@@ -113,9 +100,7 @@ export function WhatIf() {
   const result = useMemo(() => {
     if (positions.length === 0 || missingFx.length > 0) return null;
 
-    // Loan growth scales asset balances, which is a crude proxy for a
-    // dynamic run — the real thing lives in the New Business rule and the
-    // process run. It is here so a slider can show direction immediately.
+    // Crude proxy for a dynamic run; the real mechanism lives in the New Business rule and the process run.
     const grown =
       levers.loanGrowthPercent === 0
         ? positions

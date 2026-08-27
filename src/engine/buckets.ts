@@ -1,16 +1,3 @@
-/**
- * Time buckets.
- *
- * v1 hardcoded one five-bucket ladder in five separate files and used it for
- * liquidity gap, repricing gap and FTP alike. OFSAA keeps three independent
- * ladders (ALM UG Ch. 15) because they answer different questions: a
- * liquidity ladder wants daily granularity at the short end, a repricing
- * ladder wants monthly out to several years.
- *
- * Buckets are *derived from dates* here rather than arriving pre-assigned,
- * which is what makes a bucket rule mean anything at all.
- */
-
 import type { IsoDate, LadderKind, TimeBucket, TimeBucketLadder } from './types';
 import { daysBetween } from './dates';
 
@@ -20,11 +7,6 @@ export const NON_RATE_SENSITIVE = 'Non-Rate-Sensitive';
 /** Label used when a position carries no date to bucket on. Never silently dropped. */
 export const UNDATED = 'Undated';
 
-/**
- * The ladder the Ecobank mock workbook uses. Reproducing its allocation is
- * part of the phase-1 acceptance test, so this is the default liquidity and
- * repricing ladder rather than an arbitrary choice.
- */
 export const STANDARD_BUCKETS: TimeBucket[] = [
   { label: '0-30D', upperBoundDays: 30 },
   { label: '1-3M', upperBoundDays: 90 },
@@ -56,14 +38,7 @@ export function defaultLadder(kind: LadderKind): TimeBucketLadder {
   };
 }
 
-/**
- * Assign a date to a bucket on the ladder.
- *
- * A date on or before the as-of date falls in the first bucket — an already
- * matured or overdue position is immediately due, not excluded. A `null`
- * date returns `UNDATED` rather than being silently dropped into the
- * terminal bucket, which would overstate long-dated funding.
- */
+// A date on or before the as-of date falls in the first bucket; a null date returns UNDATED rather than the terminal bucket.
 export function bucketForDate(ladder: TimeBucketLadder, asOfDate: IsoDate, date: IsoDate | null): string {
   if (!date) return UNDATED;
   const days = daysBetween(asOfDate, date);
@@ -109,12 +84,7 @@ export interface BucketableItem {
   rateSensitive?: boolean;
 }
 
-/**
- * Bucket a set of items and accumulate the gap.
- *
- * Every ladder label appears in the output even when empty — a gap table
- * with rows missing is misread as a gap of zero rather than no data.
- */
+// Every ladder label appears in the output even when empty.
 export function bucketize(ladder: TimeBucketLadder, asOfDate: IsoDate, items: BucketableItem[]): BucketedTotal[] {
   const labels = ladderLabels(ladder);
   const byLabel = new Map<string, { assets: number; liabilities: number }>(

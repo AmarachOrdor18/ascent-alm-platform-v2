@@ -1,19 +1,3 @@
-/**
- * KRI Dashboard — screen 46.
- *
- * A limit is a point-in-time test. A key risk indicator is a *direction of
- * travel*, so this screen reads the same metric from every completed run at
- * successive as-of dates and fits a trend across them.
- *
- * The distinction matters at ALCO: a bank sitting at 118% LCR is within
- * appetite, but if it was at 168% six months ago the interesting fact is the
- * slope, not the level. `engine/kri.ts` fits a least-squares line rather than
- * differencing the endpoints, so a single odd month does not read as a trend.
- *
- * This screen previously rendered a hardcoded array and had no access to run
- * history at all.
- */
-
 import { useMemo } from 'react';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';

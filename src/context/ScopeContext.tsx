@@ -1,14 +1,3 @@
-/**
- * The reporting scope every results screen reads from.
- *
- * This is the architectural fix for defect D-01. In v1 the affiliate
- * switcher only changed a subtitle string, because the risk engines fetched
- * every position unconditionally and no screen passed a filter. Here the
- * scope — affiliate, as-of date and the selected run — is the thing results
- * are *derived from*, so a screen cannot accidentally show unscoped data:
- * there is no unscoped query to write.
- */
-
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
 import type { Affiliate, CurrencyCode, IsoDate, ProcessRun } from '@/engine/types';
@@ -44,11 +33,7 @@ export function ScopeProvider({ children }: { children: React.ReactNode }) {
   const [run, setRun] = useState<ProcessRun | null>(null);
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
 
-  // A user assigned to one affiliate (not Group) starts scoped to it on
-  // every login, rather than always defaulting to Group and leaving them
-  // to pick — which is what made two different logins show the same data:
-  // nothing was actually reading who was signed in. Re-syncs on every
-  // login/logout so switching accounts genuinely switches what's visible.
+  // Re-sync scope to the signed-in user's affiliate on every login/logout.
   useEffect(() => {
     setAffiliateCode(user?.affiliateCode ?? GROUP_CODE);
     setAsOfDate(null);
@@ -64,10 +49,7 @@ export function ScopeProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<ScopeContextValue>(
     () => ({
       affiliateCode,
-      // Changing scope invalidates the selected run — a run belongs to one
-      // affiliate and one as-of date, so carrying it across would show the
-      // previous affiliate's numbers under the new affiliate's name, which
-      // is precisely the v1 failure this context exists to prevent.
+      // A run is scoped to one affiliate and one as-of date, so changing either invalidates it.
       setAffiliateCode: (code: string) => {
         setAffiliateCode(code);
         setRun(null);
@@ -80,12 +62,7 @@ export function ScopeProvider({ children }: { children: React.ReactNode }) {
       },
       run,
       setRun,
-      // The affiliate's own functional currency, not its reporting currency
-      // (which every affiliate here reports up to Group as, USD) — every
-      // results screen computes and displays in functional currency at
-      // affiliate scope, so the shell's badge showing reporting currency
-      // instead just looked wrong next to the actual figures underneath.
-      // Only Group scope, which genuinely consolidates through USD, shows USD.
+      // Functional currency at affiliate scope; Group consolidates in USD.
       currency: affiliateCode === GROUP_CODE ? 'USD' : (affiliate?.functionalCurrency ?? 'USD'),
       affiliates,
       setAffiliates,

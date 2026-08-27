@@ -1,16 +1,3 @@
-/**
- * Behaviour Patterns — screen 18.
- *
- * RFP §2.1 asks, in these words, for the "Run off profile of customer
- * deposits based on type (Core/Non-Core)". Oracle's mechanic (ALM UG Ch.
- * 11.3) is the one used here: for each non-maturity product, allocate the
- * balance across tenor tiers, each tagged Core or Volatile, totalling 100%.
- *
- * This is also what makes the behavioural liquidity gap genuinely differ
- * from the contractual one. The previous platform's toggle rendered
- * identical data in both modes because no separate model existed.
- */
-
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { TierAllocationBar, type AllocationSegment } from '@/components/ui/TierAllocationBar';

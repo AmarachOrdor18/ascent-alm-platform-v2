@@ -1,12 +1,3 @@
-/**
- * A ratio chart that always draws its thresholds.
- *
- * v1's charts used `ReferenceLine` four times and every one was the zero
- * axis — an LCR chart with no 100% floor and no internal trigger
- * (practitioner register P-05). Bankers read ratios *against* thresholds,
- * so the thresholds are a required prop here, not an option.
- */
-
 import {
   Bar,
   BarChart,
@@ -38,10 +29,7 @@ export interface RatioPoint {
 
 interface RatioChartProps {
   data: RatioPoint[];
-  /**
-   * At minimum the regulatory floor. Convention: `regulatory` renders solid
-   * red, `internal` renders dashed amber.
-   */
+  /** At minimum the regulatory floor. */
   thresholds: RatioThreshold[];
   variant?: 'line' | 'bar';
   /** `higher` means above the threshold is good (LCR); `lower` means below is good (LDR). */
@@ -65,8 +53,7 @@ export function RatioChart({
   const values = data.map((d) => d.value);
   const thresholdValues = thresholds.map((t) => t.value);
   const all = [...values, ...thresholdValues];
-  // Always keep every threshold inside the visible range — a floor drawn
-  // off-canvas is worse than no floor at all.
+  // Keep every threshold inside the visible range.
   const min = Math.min(...all);
   const max = Math.max(...all);
   const pad = Math.max((max - min) * 0.15, 2);

@@ -1,10 +1,4 @@
-/**
- * Seeds the local database on first run.
- *
- * Idempotent: it checks for an existing marker and does nothing if the
- * database already holds data, so a page refresh never discards work the
- * user has done. `reseed` is the explicit reset used by the demo control.
- */
+// Seeds the local database on first run; idempotent, so a page refresh never discards user data.
 
 import type { Repository } from '@/store/repository';
 import type { LoadBatch, Role, User } from '@/engine/types';
@@ -33,12 +27,7 @@ import { SEED_DEFAULT_RULES } from './defaultRules';
 /** The permission sets a fresh database starts with — editable afterward via Users & Roles. */
 const SEED_ROLES: Role[] = Object.values(ROLES);
 
-/**
- * SHA-256 of 'Ecobank@2026' — every seed/demo account shares this one
- * password, so signing in as a different person only means a different
- * email. See src/lib/passwordHash.ts for why this is demo-grade, not
- * production auth.
- */
+// SHA-256 of 'Ecobank@2026' — every seed/demo account shares this password (see src/lib/passwordHash.ts).
 const SEED_PASSWORD_HASH = '9a3931b8a44194a83d4ca4ebb8275eb4f3566694e43f600f2befc3831fc4c05c';
 
 const SEED_USERS: User[] = [
@@ -206,18 +195,8 @@ const COTEIVOIRE_BATCH: LoadBatch = {
   reconciledAt: null,
 };
 
-/**
- * Positions is the only domain that ever gets a LoadBatch from the demo
- * seed data — GeneralLedger, MarketRates, FxRates, Counterparties and
- * EconomicIndicators are genuinely populated (via the reference tables
- * above) but never went through the batch/commit pipeline, so every
- * affiliate's freshness always read "Never loaded" on five of its six
- * domains regardless of how current the underlying data actually was.
- * These are lightweight batch records — zero rows, since the data lives in
- * its own table, not `positions` — that record honestly that the domain
- * was in fact loaded, on the same date the rest of that affiliate's seed
- * data was assembled.
- */
+// Zero-row LoadBatch records for domains (GeneralLedger, MarketRates, etc.) whose data lives in its own
+// table rather than `positions` — without these, every affiliate would show "Never loaded" on those domains.
 function referenceDomainBatch(
   affiliateCode: string,
   domain: LoadBatch['domain'],
@@ -276,7 +255,6 @@ async function writeSeed(repo: Repository): Promise<void> {
   for (const connector of SEED_CONNECTORS) await repo.upsertConnector(connector);
   for (const rule of SEED_DEFAULT_RULES) await repo.upsertRule(rule);
 
-  // Phase 9: Seed all three affiliates (Nigeria, Ghana, Côte d'Ivoire) with committed data
   await repo.upsertBatch(NIGERIA_BATCH);
   await repo.insertPositions(NIGERIA_POSITIONS);
   await repo.upsertBatch(GHANA_BATCH);
@@ -291,24 +269,8 @@ const DIMENSION_TYPES = [
   'LegalEntity', 'OrgUnit', 'Product', 'GlAccount', 'CommonCoa', 'FinancialElement', 'Counterparty', 'Country',
 ] as const;
 
-/**
- * Bring a database that was seeded by an earlier build up to date with
- * anything a later build added — a new affiliate's org units, its currency,
- * its FX rate, a limit the framework has grown since.
- *
- * `ensureSeeded` only runs the full first-time seed once: the very first
- * `existing.length > 0` check short-circuits it forever after, on this
- * browser, for this affiliate register. Thirty affiliates' worth of org
- * units, currencies and FX rates were added in a later change, and without
- * this, nobody who had already opened the app would ever receive them —
- * onboarding a new affiliate would still hit "functional currency not
- * found" or "unmapped org unit" against reference data that exists in the
- * codebase but never reached their database.
- *
- * Every write here is add-only: a record already present — including one a
- * user has since edited on the Limits, Connectors or Currency screens — is
- * left alone. Only what is genuinely missing is inserted.
- */
+// Brings an existing database up to date with reference data a later build added. Add-only: a record
+// already present — including one a user has since edited — is left alone; only what's missing is inserted.
 async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingMemberIds = new Set(
     (await Promise.all(DIMENSION_TYPES.map((d) => repo.listDimensionMembers(d))))
@@ -340,36 +302,23 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
     if (!existingConnectorIds.has(connector.id)) await repo.upsertConnector(connector);
   }
 
-  // Added after Login started reading the real user register instead of its
-  // own hardcoded list — a browser seeded before that change has an empty
-  // Users table, so sign-in fails with "no active user" even though the
-  // rest of the database is fine. Same add-only rule: a user already
-  // created or edited here is left untouched.
   const existingUserIds = new Set((await repo.listUsers()).map((u) => u.id));
   for (const seedUser of SEED_USERS) {
     if (!existingUserIds.has(seedUser.id)) await repo.upsertUser(seedUser);
   }
 
-  // Same reasoning: an existing database was seeded before the reference-
-  // domain batches above existed, so its three demo affiliates would show
-  // "Never loaded" on five of six domains forever without this top-up.
   const existingBatchIds = new Set((await repo.listBatches()).map((b) => b.id));
   for (const batch of REFERENCE_DOMAIN_BATCHES) {
     if (!existingBatchIds.has(batch.id)) await repo.upsertBatch(batch);
   }
 
-  // Roles were a hardcoded object with nowhere to persist an edit until this
-  // table existed — an existing database has zero rows here, not a row per
-  // role, so this is a real top-up, not a defensive no-op.
+  // Existing databases have zero rows in Roles (it used to be a hardcoded object), so this is a
+  // real top-up, not a defensive no-op — it's how a role like Affiliate Administrator reaches them.
   const existingRoleCodes = new Set((await repo.listRoles()).map((r) => r.code));
   for (const seedRole of SEED_ROLES) {
     if (!existingRoleCodes.has(seedRole.code)) await repo.upsertRole(seedRole);
   }
 
-  // Same reasoning: Time Buckets, Behaviour Patterns and Forecast Scenarios
-  // always had a real engine default in use, but nowhere to see or edit it
-  // until these were seeded as ordinary rules - an existing database never
-  // received them without this.
   const existingRuleIds = new Set((await repo.listRules({})).map((r) => r.id));
   for (const seedRule of SEED_DEFAULT_RULES) {
     if (!existingRuleIds.has(seedRule.id)) await repo.upsertRule(seedRule);

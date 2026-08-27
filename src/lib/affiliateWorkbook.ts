@@ -1,19 +1,3 @@
-/**
- * Bulk affiliate onboarding — Excel workbook generation and parsing.
- *
- * A controlled, multi-sheet template rather than a single flat CSV, because
- * onboarding genuinely has distinct shapes of data (one profile row per
- * affiliate, but many-to-one currency/connectivity/COA rows) — forcing all
- * of that into one sheet would mean either repeating the profile columns on
- * every row or losing the one-to-many relationships entirely.
- *
- * Every field this template captures is exactly what the interactive
- * wizard (`OnboardAffiliate.tsx`) captures in steps 1–4 — nothing here is
- * invented separately. Bulk import creates affiliates in `Onboarding`
- * status only; steps 5–7 (assumptions, limits, initial data load,
- * reconciliation, approval) are never bulk-able and still happen per
- * affiliate afterwards, same as the interactive flow.
- */
 import * as XLSX from 'xlsx';
 import type { DataDomain, DomainFeed, FeedMode } from '@/engine/types';
 
@@ -159,8 +143,7 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
     const errors: string[] = [];
 
     if (!code) {
-      // A fully blank trailing row — skip it rather than reporting an error
-      // for nothing, the same way a blank line in a CSV upload is ignored.
+      // Skip a fully blank trailing row rather than reporting an error for nothing.
       if (!str(raw, 'Legal Name*') && !str(raw, 'Country*')) return;
       errors.push('Affiliate Code is required.');
     }

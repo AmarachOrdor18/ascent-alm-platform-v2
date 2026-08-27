@@ -1,11 +1,3 @@
-/**
- * Honest placeholder for a screen that a later phase builds.
- *
- * Navigation lists all 57 screens from day one so the information
- * architecture is visible and reviewable, but an unbuilt screen says so
- * plainly rather than showing an empty shell that implies it works.
- */
-
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import type { NavItem } from '@/components/layout/navigation';
 

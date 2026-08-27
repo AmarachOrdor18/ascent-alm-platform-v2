@@ -1,12 +1,3 @@
-/**
- * Economic Indicators — screen 14.
- *
- * Macro series feeding behavioural modelling and stress scenarios. Oracle
- * treats these as first-class reference data with a publication frequency
- * and a value type (ALM UG §5.6), because a monthly CPI print and a
- * quarterly GDP print cannot be trended the same way.
- */
-
 import { useEffect, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -36,9 +27,7 @@ export function EconomicIndicators() {
     const value = Number(newObs.value);
     if (Number.isNaN(value)) return;
 
-    // Re-observing the same date replaces it rather than duplicating —
-    // statistical agencies revise, and a series with two values for one
-    // month cannot be trended.
+    // Re-observing the same date replaces it rather than duplicating (agencies revise history).
     const observations = [
       ...active.observations.filter((o) => o.asOfDate !== newObs.asOfDate),
       { asOfDate: newObs.asOfDate, value },

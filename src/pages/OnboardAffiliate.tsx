@@ -1,25 +1,3 @@
-/**
- * Affiliate Onboarding — one continuous workspace, screen 2.
- *
- * Seven steps, all inline: connector configuration, initial data load and
- * GL reconciliation happen directly in this screen instead of sending the
- * Administrator to /connectors, /data-upload or /gl-reconciliation — those
- * screens remain for ongoing operations, and share their exact business
- * logic with this wizard via `ConnectorFields` and `DataLoadPanel` rather
- * than a second implementation.
- *
- * The affiliate is persisted at `status: 'Onboarding'` the moment step 1's
- * minimum fields are valid, and every step after that reads/writes the same
- * real record (and the same real Dimension/Connector/LoadBatch data) other
- * screens use — so leaving and returning resumes exactly where it left off,
- * nothing is held only in this component's memory.
- *
- * Chart-of-accounts mapping is against the live Group Common COA
- * (`useDimensionMembers('CommonCoa')`), not a hardcoded list — unmapped
- * nodes still block activation, same control as before, just sourced from
- * the real Dimensions configuration instead of a private copy.
- */
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -114,9 +92,6 @@ export function OnboardAffiliate() {
   const [submitted, setSubmitted] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
 
-  // Rehydrate step 1's local fields once, whenever we learn what the real
-  // record already holds — resuming or freshly created, either way this is
-  // the affiliate's own persisted data, not a shadow copy.
   useEffect(() => {
     if (affiliate) {
       setProfile({
@@ -130,9 +105,7 @@ export function OnboardAffiliate() {
     !code && affiliates.some((a) => a.code.toUpperCase() === profile.code.trim().toUpperCase());
   const profileValid = profile.code.trim().length >= 2 && profile.name.trim().length > 0 && profile.country.trim().length > 0;
 
-  // Step 1 → create the real record the moment it's identifiable. This is
-  // the one moment a new affiliate goes from nothing to a persisted,
-  // resumable "Onboarding" row.
+  // Creates the persisted record the moment step 1's fields are valid, so onboarding is resumable from here on.
   useEffect(() => {
     if (code || !profileValid || duplicateCode || creatingRef.current) return;
     creatingRef.current = true;
@@ -145,9 +118,6 @@ export function OnboardAffiliate() {
       functionalCurrency: '',
       reportingCurrency: 'USD',
       activeCurrencies: [],
-      // Onboarding, not Testing or Live: this is the existing model's own
-      // in-progress status — activation still needs maker-checker approval
-      // later, and only Live affiliates consolidate into Group.
       status: 'Onboarding',
       fiscalYearEnd: '12-31',
       holidayCalendarId: null,
@@ -328,13 +298,8 @@ export function OnboardAffiliate() {
     setLedgerErrors(result.errors.length);
   };
 
-  // `identityFxTable` is single-currency — it has no real cross-currency
-  // conversion, so reconciliation only works when the positions and the
-  // uploaded ledger are already stated in the affiliate's own functional
-  // currency. `convert()` throws rather than silently returning a wrong
-  // number when that's not true, which is correct, but letting that
-  // exception reach the wizard would crash the whole onboarding session
-  // over a currency mismatch — this reports it inline instead.
+  // `identityFxTable` is single-currency, so a mismatch would make `convert()` throw; caught here and
+  // reported inline instead of letting it crash the wizard.
   const reconciliationError = useMemo(() => {
     if (!affiliate || ledgerRows.length === 0) return null;
     const mismatched = new Set(
@@ -633,9 +598,7 @@ export function OnboardAffiliate() {
                                 value={feed.mode}
                                 onChange={(e) => {
                                   const mode = e.target.value as FeedMode;
-                                  // Never auto-pick a connector — a connector already marked "Available" here
-                                  // (e.g. Flexcube) belongs to whichever affiliate actually configured it, not
-                                  // this one by default. This affiliate gets its own via "Configure a connector".
+                                  // Never auto-pick a connector — an existing one belongs to whichever affiliate configured it.
                                   updateFeed(domain, { mode, connectorId: mode === 'Connector' ? null : null });
                                 }}
                                 className="mb-2 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"

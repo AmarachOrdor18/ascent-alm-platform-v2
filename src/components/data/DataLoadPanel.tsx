@@ -1,13 +1,3 @@
-/**
- * Upload → stage → validate → commit — extracted from `DataUpload.tsx` so
- * the exact same pipeline (staging, `validatePositions`, unmapped-code
- * detection, commit/supersede) runs both on the standalone Data Upload &
- * Staging screen and inline in the onboarding wizard's Step 7, instead of a
- * second implementation that could drift from the real validation rules.
- *
- * The caller owns which affiliate/domain/as-of date this instance is for —
- * this component only owns the upload/stage/validate/commit mechanics.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
@@ -31,7 +21,7 @@ import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
 import { useConnectors } from '@/lib/connectorHooks';
 import type { Affiliate, DataDomain, DimensionMember, DimensionType, LoadBatch, Position } from '@/engine/types';
 
-/** Hash of the file content, so a re-upload of the same bytes is detectable. */
+// Hash of the file content, so a re-upload of the same bytes is detectable.
 async function hashFile(text: string): Promise<string> {
   const bytes = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -83,12 +73,7 @@ export function DataLoadPanel({
   const saveCounterparties = useSaveDimensionMembers('Counterparty');
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // A connector is the authoritative feed for its domain once configured —
-  // manual upload here would let someone silently override what the
-  // connector delivers, with no record of which one actually fed the run.
-  // File substitution only becomes a real upload path when the affiliate's
-  // own connectivity configuration (set in onboarding or Connectors.tsx)
-  // explicitly declares it, same control either way reaches this screen.
+  // A connector is the authoritative feed for its domain once configured; manual upload is blocked to avoid silently overriding it.
   const feed = affiliate.feeds.find((f) => f.domain === domain);
   const feedConnector = feed?.mode === 'Connector' ? connectors.find((c) => c.id === feed.connectorId) : undefined;
   const uploadBlockedByConnector = feed?.mode === 'Connector';
@@ -101,9 +86,7 @@ export function DataLoadPanel({
   const [autoMapping, setAutoMapping] = useState(false);
   const [justCommitted, setJustCommitted] = useState<{ fileName: string; rowCount: number } | null>(null);
 
-  // Resume a previously saved staging session for this exact affiliate,
-  // domain and as-of date — same reasoning as DataUpload.tsx: without this,
-  // leaving the wizard mid-upload silently drops staged rows.
+  // Resume a previously saved staging session so leaving mid-upload doesn't silently drop staged rows.
   const { data: resumable } = useStagedBatchFor(affiliate.code, domain, asOfDate);
   useEffect(() => {
     if (staged || !resumable) return;

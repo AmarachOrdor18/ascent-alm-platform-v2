@@ -1,16 +1,3 @@
-/**
- * Data vintages and freshness.
- *
- * Build plan §9: data is a dated time series, results are immutable per run,
- * and corrections happen by reload and reprocess rather than by editing in
- * place. This module decides which batch is current for an as-of date, and
- * whether a domain has gone stale against its SLA.
- *
- * Freshness monitoring is what stops a platform quietly reporting confident
- * numbers off three-month-old data — a stale FX rate does not announce
- * itself, it just silently consolidates the Group at last quarter's rate.
- */
-
 import type { Affiliate, DataDomain, IsoDate, LoadBatch } from './types';
 import { daysBetween } from './dates';
 
@@ -28,13 +15,7 @@ export interface FreshnessCheck {
   warning: string | null;
 }
 
-/**
- * Evaluate one domain against its SLA.
- *
- * `Due` is the grace band at 100–150% of the SLA: the data is past its
- * expected refresh but not yet old enough to distrust. Beyond that it is
- * `Stale` and dependent runs are flagged.
- */
+// 'Due' is the grace band at 100-150% of the SLA; beyond that it is 'Stale'.
 export function checkFreshness(
   affiliate: Affiliate,
   domain: DataDomain,
@@ -84,13 +65,7 @@ export function checkAllDomains(affiliate: Affiliate, batches: LoadBatch[], toda
   return affiliate.feeds.map((f) => checkFreshness(affiliate, f.domain, batches, today));
 }
 
-/**
- * The current committed batch for an as-of date.
- *
- * Reloading an as-of date creates a new version and supersedes the previous
- * one; the highest version wins. Superseded batches are retained, because a
- * run that consumed v1 must still be able to show what it actually computed.
- */
+// Reloading an as-of date creates a new version; the highest version wins. Superseded batches are retained, not deleted.
 export function currentBatch(
   batches: LoadBatch[],
   affiliateCode: string,
@@ -130,13 +105,6 @@ export interface SupersedeOutcome {
   nextVersion: number;
 }
 
-/**
- * Work out what a reload of an existing as-of date should do.
- *
- * A reason is mandatory when superseding: the audit question is never "what
- * changed" but "why was it changed", and a version history without reasons
- * answers neither.
- */
 export function planSupersede(
   batches: LoadBatch[],
   affiliateCode: string,

@@ -1,15 +1,3 @@
-/**
- * A drag-to-resize stacked bar for a set of tiers that must sum to 100%.
- *
- * The table below still exists for precise numeric entry and as the audit
- * trail — the same split this app already draws between a chart and its
- * table everywhere else (a chart is not an audit trail). This is the fast,
- * visual way in: drag the boundary between two tiers and both percentages
- * update together, so the pair can never sum to anything but what they
- * started at. The one thing typing two numbers into two boxes can't
- * guarantee, dragging one handle does by construction.
- */
-
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 

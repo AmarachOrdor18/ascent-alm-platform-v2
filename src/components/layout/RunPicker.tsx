@@ -1,12 +1,3 @@
-/**
- * Attach a real run to a report, a meeting or a return.
- *
- * A pack, an ALCO meeting or a regulatory return that isn't tied to a real
- * run has no figures behind it — this is how every reporting screen points
- * at the same evidence the results screens read from, instead of a number
- * someone typed in.
- */
-
 import type { ProcessRun } from '@/engine/types';
 
 export function RunPicker({

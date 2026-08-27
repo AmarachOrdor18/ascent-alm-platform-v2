@@ -1,15 +1,3 @@
-/**
- * The connector catalogue, as starting data rather than as code.
- *
- * These four were previously a hardcoded array inside the Connectors screen,
- * which had two consequences worth naming: a bank could not add a source the
- * platform had never heard of, and it could not correct a status this
- * platform had asserted about *its* estate. "Calypso is blocked" is a fact
- * about one engagement, not a property of the software.
- *
- * Everything here is editable on screen, including status and the reason.
- */
-
 import type { Connector } from '@/engine/types';
 
 const STAMP = { isActive: true, updatedBy: 'SEED', updatedAt: '2026-01-01T00:00:00.000Z' };

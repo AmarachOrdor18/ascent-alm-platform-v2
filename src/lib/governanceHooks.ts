@@ -1,16 +1,3 @@
-/**
- * CRUD for the governance, monitoring and reporting entities.
- *
- * Seven entities behave identically — list scoped by affiliate, upsert with a
- * stamp, delete — so they are generated from one factory rather than written
- * out seven times. The same bet the Rule Editor made in phase 4 and the
- * Results Frame made in phase 6.
- *
- * These screens previously rendered hardcoded arrays because nothing existed
- * behind them. There was no approval queue, no remediation register, no
- * notification subscription anywhere in the data model.
- */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -106,12 +93,6 @@ export function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
 }
 
-/**
- * Raise an approval request.
- *
- * Anything that changes a governed object should route through here rather
- * than writing its own record, so the queue is complete by construction.
- */
 export function useRequestApproval() {
   const save = approvals.useSave();
   const { user } = useAuth();
@@ -129,13 +110,6 @@ export function useRequestApproval() {
     });
 }
 
-/**
- * Whether the signed-in user may decide a request.
- *
- * The maker may not be their own checker. Returned as a reason string rather
- * than a boolean so the screen can explain the refusal instead of showing a
- * disabled button with no explanation.
- */
 export function approvalBlockedReason(request: ApprovalRequest, userName: string | undefined): string | null {
   if (request.status !== 'Pending') return `Already ${request.status.toLowerCase()}.`;
   if (!userName) return 'Not signed in.';

@@ -1,14 +1,3 @@
-/**
- * The guided tour itself — a floating overlay, not a redesign of any
- * screen it walks through. Mounted once in `AppShell`, so every existing
- * page is untouched; the tour navigates the real router to the real
- * routes and narrates what's already there.
- *
- * Role-aware by construction: `tourStepsFor` returns a different script per
- * `RoleCode`, built from the same permission-gated screens `AppShell`
- * already restricts navigation to — an Executive Viewer's script never
- * names a screen their role couldn't open anyway.
- */
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/cn';
@@ -17,21 +6,15 @@ import { tourStepsFor, type TourTag } from './tourSteps';
 import { TourContext, useTour, type TourContextValue } from './tourContext';
 
 export function TourProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { role } = useAuth();
   const [, navigate] = useLocation();
   const [active, setActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
-  const steps = useMemo(() => tourStepsFor(user?.role), [user?.role]);
+  const steps = useMemo(() => tourStepsFor(role), [role]);
   const step = active ? (steps[stepIndex] ?? null) : null;
 
-  // `navigate()` deliberately never runs inside a setState updater — React
-  // may re-invoke an updater more than once, and a navigation triggered
-  // from inside one fired a "setState while rendering a different
-  // component" warning (CommandPalette, a sibling under the same
-  // provider, was the one caught by it). Reading `stepIndex` from the
-  // closure and calling `navigate()` as a plain statement afterwards
-  // avoids that entirely.
+  // navigate() runs as a plain statement, never inside a setState updater — React can re-invoke an updater and trigger a "setState while rendering a different component" warning.
   const start = useCallback(() => {
     setStepIndex(0);
     setActive(true);
@@ -106,6 +89,13 @@ function TourOverlay() {
         </button>
       </div>
 
+      <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-gray-100">
+        <div
+          className="h-full rounded-full bg-navy-700 transition-all"
+          style={{ width: `${((stepIndex + 1) / stepCount) * 100}%` }}
+        />
+      </div>
+
       <div className="mb-1.5 flex items-center gap-2">
         <h2 className="text-[14px] font-bold text-navy-900">{step.title}</h2>
         {step.tag && (
@@ -117,7 +107,10 @@ function TourOverlay() {
         )}
       </div>
 
-      <p className="mb-4 text-[12px] leading-relaxed text-gray-600">{step.body}</p>
+      {step.why && <p className="mb-2 text-[12px] leading-relaxed text-gray-600">{step.why}</p>}
+      <p className="mb-4 text-[11px] leading-relaxed text-gray-400">
+        <span className="font-bold text-gray-500">Data in:</span> {step.dataIn}
+      </p>
 
       <div className="flex items-center justify-between">
         <button

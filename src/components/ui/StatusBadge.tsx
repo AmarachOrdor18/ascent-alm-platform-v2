@@ -11,7 +11,6 @@ const TONE_CLASS: Record<Tone, string> = {
   neutral: 'bg-gray-100 text-gray-600',
 };
 
-/** Words that recur across the domain, mapped to a consistent tone. */
 const KNOWN_TONES: Record<string, Tone> = {
   Green: 'success',
   Amber: 'warning',

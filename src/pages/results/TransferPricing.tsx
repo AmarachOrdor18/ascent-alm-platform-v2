@@ -1,19 +1,3 @@
-/**
- * Funds Transfer Pricing — screen 40.
- *
- * Margin attributed to the business unit that earned it, with the transfer
- * rate broken into its base curve reading and each named add-on on top.
- *
- * The method family is Oracle's *non-cash-flow* transfer pricing (ALM UG
- * §7.18). That is not a shortcut — Oracle states plainly that ledger-grain
- * data cannot support cash-flow transfer pricing and prescribes this family
- * instead. Saying so makes the approach defensible rather than apologetic.
- *
- * v1 attributed margin to the affiliate, because position data carried no
- * business-unit dimension at all. It does now, so the question "which desk
- * is actually making money" has an answer.
- */
-
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';

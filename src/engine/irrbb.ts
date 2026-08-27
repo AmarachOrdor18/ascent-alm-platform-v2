@@ -1,17 +1,3 @@
-/**
- * Interest rate risk in the banking book.
- *
- * Two substantive changes from v1:
- *
- * 1. **EVE uses a duration gap against real equity**, not
- *    `Σ(bucket duration proxy × net position × shock)` against a capital
- *    figure that was hardcoded to 10% of total assets (defect D-05).
- *
- * 2. **The Basel outlier test is computed and labelled.** ΔEVE against Tier 1
- *    capital is the number a supervisor asks for first, and v1 neither
- *    computed nor named it (defect P-08).
- */
-
 import type { CurrencyCode, IsoDate, Position, TimeBucketLadder } from './types';
 import { bucketize, type BucketedTotal } from './buckets';
 import { convert, type FxTable } from './fx';
@@ -31,14 +17,7 @@ export interface IrrbbContext {
 /** Shock in basis points, per bucket label. A flat shock applies the same value to every bucket. */
 export type ShockByBucket = Record<string, number>;
 
-/**
- * The six BCBS standardised supervisory shocks, as basis-point curves.
- *
- * BCBS parametrises these per currency, with country-specific magnitudes;
- * these are the generic shapes at a 200bp parallel magnitude. The
- * per-currency parametrisation is deliberately not implemented — see the
- * methodology string returned with every result.
- */
+// Generic shock shapes at a 200bp parallel magnitude; per-currency parametrisation is not implemented.
 export function standardShocks(ladder: TimeBucketLadder): Record<string, ShockByBucket> {
   const labels = ladder.buckets.map((b) => b.label);
   const short = labels.slice(0, Math.ceil(labels.length / 2));
@@ -81,11 +60,7 @@ export interface RepricingGapResult {
   methodology: string;
 }
 
-/**
- * Repricing gap buckets each position on its *next repricing* date, falling
- * back to maturity for fixed-rate instruments which reprice only at
- * maturity. v1 conflated repricing with maturity entirely (defect D-06).
- */
+/** Repricing gap buckets each position on its next repricing date, falling back to maturity for fixed-rate instruments which reprice only at maturity. */
 export function computeRepricingGap(
   positions: Position[],
   ctx: IrrbbContext,
@@ -131,16 +106,9 @@ export interface NiiResult {
   methodology: string;
 }
 
-/**
- * ΔNII over a horizon, from the repricing gap.
- *
- * `ΔNII = repricing gap within the horizon × shock`. This is the standard
- * gap approximation: it assumes every repricing instrument reprices fully
- * and immediately at the shocked rate. Rate caps, floors and deposit betas
- * are *not* applied here — `applyDepositBetas` in `behavioural.ts` adjusts
- * the liability side where a beta rule is configured, and the result says
- * whether it was.
- */
+// `ΔNII = repricing gap within the horizon × shock`, the standard gap approximation: it assumes every
+// repricing instrument reprices fully and immediately. Rate caps, floors and deposit betas are not applied
+// here — `applyDepositBetas` in `behavioural.ts` adjusts the liability side where a beta rule is configured.
 export function computeNiiSensitivity(
   positions: Position[],
   ctx: IrrbbContext,
@@ -216,7 +184,7 @@ export interface EveResult {
   methodology: string;
 }
 
-/** Total of the Capital category — real equity, replacing v1's 10%-of-assets proxy. */
+/** Total of the Capital category. */
 export function computeEquity(positions: Position[], ctx: IrrbbContext): number {
   return positions.filter((p) => p.category === 'Capital').reduce((s, p) => s + amountIn(p, ctx), 0);
 }
@@ -233,18 +201,9 @@ function weightedDuration(positions: Position[], ctx: IrrbbContext): number | nu
   return total > 0 ? weighted / total : null;
 }
 
-/**
- * ΔEVE by the duration-gap method.
- *
- * `DGap = D_assets − (L / A) × D_liabilities`, then
- * `ΔEVE = −DGap × A × Δr`.
- *
- * This is the standard simplified measure, and it is a genuine
- * approximation: it assumes a parallel shift and linear price sensitivity,
- * ignoring convexity and any optionality. Full cash-flow discounting under
- * each of the six BCBS curves needs contract-level cash flows, which are
- * out of scope (build plan §15).
- */
+// ΔEVE by the duration-gap method: `DGap = D_assets − (L / A) × D_liabilities`, `ΔEVE = −DGap × A × Δr`.
+// A genuine approximation — assumes a parallel shift and linear price sensitivity, ignoring convexity and
+// optionality.
 export function computeEveSensitivity(positions: Position[], ctx: IrrbbContext, shockBps: number): EveResult {
   const assets = positions.filter((p) => p.category === 'Asset');
   const liabilities = positions.filter((p) => p.category === 'Liability');

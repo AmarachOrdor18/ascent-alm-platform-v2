@@ -1,12 +1,3 @@
-/**
- * Custom Metrics — screen 28.
- *
- * Oracle's Formula Results (ALM UG Ch. 33): a bank defines its own derived
- * measure over run outputs without waiting for a release. RFP §2.6 asks for
- * "customisable reports and dashboards"; this is the layer that makes a
- * custom *measure* possible, not only a custom layout.
- */
-
 import { useMemo } from 'react';
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -30,13 +21,7 @@ const AVAILABLE: Array<{ name: string; description: string; sample: number }> = 
   { name: 'survivalHorizonDays', description: 'Days until the buffer is exhausted', sample: 17 },
 ];
 
-/**
- * Evaluate an expression against sample values.
- *
- * Deliberately restricted to arithmetic over the known names — no general
- * evaluation, so a formula cannot reach anything it should not. An
- * unrecognised token is reported rather than silently treated as zero.
- */
+// Restricted to arithmetic over known names; an unrecognised token errors rather than evaluating as zero.
 function evaluate(expression: string, values: Record<string, number>): { value: number | null; error: string | null } {
   const trimmed = expression.trim();
   if (!trimmed) return { value: null, error: null };
@@ -54,7 +39,6 @@ function evaluate(expression: string, values: Record<string, number>): { value: 
 
   try {
     const substituted = tokens.map((t) => (t in values ? String(values[t]) : t)).join(' ');
-    // Arithmetic only, over already-substituted numbers.
     // eslint-disable-next-line no-new-func
     const result = Function(`"use strict"; return (${substituted});`)() as unknown;
     if (typeof result !== 'number' || !Number.isFinite(result)) {

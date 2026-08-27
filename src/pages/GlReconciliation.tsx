@@ -1,16 +1,3 @@
-/**
- * GL Reconciliation — screen 9.
- *
- * Instrument balances compared against the general ledger at a chosen level.
- * A variance inside tolerance produces a **suggested** plug requiring
- * approval; nothing is adjusted automatically. Anything outside tolerance
- * blocks sign-off and goes back to the affiliate — that is the control.
- *
- * A file-fed affiliate is held to exactly the same standard as an API-fed
- * one, which is what makes file substitution a real path rather than a way
- * around the checks.
- */
-
 import { useMemo, useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';

@@ -1,11 +1,3 @@
-/**
- * ALCO Meetings — screen 51.
- *
- * Real meetings, stored, editable, with a real run attached as the evidence
- * behind the agenda — "Review Group LCR position" now shows the actual LCR
- * from the linked run, not a number typed into a mock array.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';

@@ -1,12 +1,3 @@
-/**
- * Forecast Rate Scenarios — screen 22.
- *
- * RFP §2.1 asks for the six prescribed BCBS shocks *and* "custom scenarios
- * tailored to the bank's specific risk profile". Saved, reusable scenario
- * rules are what make the second half true: a scenario is defined once and
- * used by any run, rather than being retyped into a form each time.
- */
-
 import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { ShockCurveEditor } from '@/components/ui/ShockCurveEditor';
 import { useAuth } from '@/context/AuthContext';
@@ -119,8 +110,7 @@ export function ForecastScenarios() {
                     onChange={(e) =>
                       update({
                         shockByBucket: { ...rule.shockByBucket, [bucket.label]: Number(e.target.value) },
-                        // Editing a bucket means it is no longer purely the
-                        // standardised shape, so the provenance is cleared.
+                        // Manual edit means it's no longer the pure standardised shape.
                         basedOn: null,
                       })
                     }

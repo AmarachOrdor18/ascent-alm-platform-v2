@@ -1,36 +1,9 @@
-/**
- * Ecobank Nigeria — seed balance sheet, as at 2026-07-31.
- *
- * Generated mechanically from `ecobank_ALM/Ecobank_ALM_Mock_Dataset (1).xlsx`
- * rather than retyped, because that workbook is the phase-1 acceptance test:
- * the engine must reproduce its computed figures exactly.
- *
- * The record *shape* follows a real core-banking extract rather than the
- * workbook's flat columns: a three-level numeric chart of accounts on the
- * 10/20/30/40 category scheme, account numbers embedding their GL code, an
- * account class, lien amounts, turnover, maker/checker on every row, and the
- * pre-migration account number for lineage. Nothing from that extract is
- * reproduced — only its structure.
- *
- * Figures are in NGN millions. Maturity dates are representative dates for
- * the workbook's bucket labels, so deriving buckets from dates reproduces
- * the same allocation.
- *
- * KNOWN INHERITED ASSUMPTION: the workbook states "Repricing bucket is
- * assumed equal to contractual maturity bucket", so every floating-rate
- * position here reprices at maturity. That is not how a quarterly-reset loan
- * behaves, and it is why this dataset cannot demonstrate defect D-06 being
- * closed. `src/engine/repricing.test.ts` proves the mechanism with
- * purpose-built fixtures; the Ghana seed carries realistic repricing.
- *
- * Synthetic data. Not sourced from any real institution.
- */
-
 import type { Position } from '@/engine/types';
 
 export const NIGERIA_AS_OF = '2026-07-31';
 export const NIGERIA_BATCH_ID = 'B-NG-2026-07';
 
+// Repricing bucket is assumed equal to contractual maturity bucket (inherited from source data), so floating-rate positions here reprice at maturity, not on a quarterly schedule.
 export const NIGERIA_POSITIONS: Position[] = [
   {
     id: 'POS001',

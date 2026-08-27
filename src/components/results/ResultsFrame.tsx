@@ -1,15 +1,3 @@
-/**
- * The shell every results screen sits in.
- *
- * It answers three questions before any figure is shown: which run produced
- * this, was the element computed, and is the data still current. v1 answered
- * none of them — a chart appeared and you were expected to trust it.
- *
- * The bet here is the same one the Rule Editor made in phase 4: one shell
- * makes ten screens affordable, and makes them consistent by construction
- * rather than by discipline.
- */
-
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -22,10 +10,7 @@ interface ResultsFrameProps {
   onSelect: (runId: string) => void;
   isLoading: boolean;
   isStale: boolean;
-  /**
-   * Elements this screen needs. When the selected run did not compute one,
-   * the frame says so instead of rendering an empty chart.
-   */
+  /** When the selected run did not compute one of these, the frame says so instead of rendering an empty chart. */
   requires: CalculationElement[];
   /** How each required element reads in the message. */
   elementLabels?: Partial<Record<CalculationElement, string>>;

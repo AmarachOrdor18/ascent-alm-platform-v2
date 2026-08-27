@@ -1,21 +1,3 @@
-/**
- * Connectors & Data Sources — screen 5.
- *
- * Two separate things live here and they are worth keeping apart:
- *
- *   * the **catalogue** — what systems exist, how they are reached, what
- *     blocks them. Group-wide, and now editable: it used to be a `const`
- *     array in this file, so a bank could neither add its own source nor
- *     correct a status this platform had asserted about its estate.
- *   * the **feed map** — which source supplies which domain *for this
- *     affiliate*. Where no connector is available, the affiliate is declared
- *     file-fed for that domain with a cadence and a named owner.
- *
- * File substitution is a first-class declared path, not an informal
- * fallback. GL Reconciliation then holds a file-fed affiliate to exactly the
- * same standard as an API-fed one.
- */
-
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
@@ -36,7 +18,6 @@ import {
 } from '@/lib/connectorHooks';
 import type { Affiliate, Connector, DataDomain, DomainFeed, FeedMode } from '@/engine/types';
 
-/** Why each domain matters, so the six are not just a list of nouns. */
 const DOMAIN_PURPOSE: Record<DataDomain, string> = {
   Positions: 'Every ratio. Without it there is nothing to compute.',
   GeneralLedger: 'Reconciles the position book to the books of account before anything is signed off.',
@@ -79,14 +60,7 @@ export function Connectors() {
     saveAffiliate.mutate({ ...affiliate, feeds } satisfies Affiliate);
   };
 
-  /**
-   * Simulated reachability check.
-   *
-   * A connector the bank has marked Blocked fails, because reporting a green
-   * tick for something known not to work is how a demo becomes a
-   * misrepresentation. Nothing here opens a socket — the browser cannot, and
-   * the screen says so rather than implying a live handshake.
-   */
+  // Simulated reachability check — no real socket is opened.
   const testConnection = (c: Connector) => {
     setTesting(c.id);
     window.setTimeout(() => {

@@ -1,15 +1,3 @@
-/**
- * Group reference data — dimensions, counterparties, curves, FX, indicators
- * and calendars for the three demo affiliates.
- *
- * Set up once at Group level, then inherited by every affiliate during
- * onboarding. That inheritance is what makes onboarding affiliates 4
- * through 33 cheap: they map onto this, rather than rebuilding it.
- *
- * Synthetic data. Calibrated to look like a plausible mid-size African
- * banking group; not sourced from any real institution.
- */
-
 import { PRODUCTS } from './products';
 import {
   CORE_DIMENSIONS,
@@ -34,7 +22,7 @@ import type {
 export const REFERENCE_AS_OF = '2026-07-31';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Affiliates — three lifecycle states, so one demo shows all of them
+// Affiliates
 // ─────────────────────────────────────────────────────────────────────────
 
 export const AFFILIATES: Affiliate[] = [
@@ -102,8 +90,7 @@ export const AFFILIATES: Affiliate[] = [
     holidayCalendarId: 'CAL-GH',
     legalEntityCode: 'LE-GH',
     feeds: [
-      // Flexcube is unreachable at this affiliate, so positions are declared
-      // file-fed — a first-class substitution path, not a workaround.
+      // Flexcube is unreachable here, so Positions is file-fed instead.
       { domain: 'Positions', mode: 'File', connectorId: null, slaDays: 30, owner: 'Finance Ops' },
       { domain: 'GeneralLedger', mode: 'File', connectorId: null, slaDays: 30, owner: 'Finance Ops' },
       { domain: 'MarketRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
@@ -112,8 +99,7 @@ export const AFFILIATES: Affiliate[] = [
       { domain: 'EconomicIndicators', mode: 'File', connectorId: null, slaDays: 30, owner: 'Group Research' },
     ],
     inheritGroupRules: true,
-    // Steps 1–6 are done (Bank of Ghana carries no loan-to-deposit minimum — see REGULATORY_MINIMA);
-    // only the initial data load remains, so resuming this affiliate lands directly on step 7.
+    // Bank of Ghana carries no loan-to-deposit minimum (see REGULATORY_MINIMA), hence no loanToDepositPercent below.
     internalThresholds: {
       lcrPercent: { amberPercent: 110, redPercent: 100 },
       nsfrPercent: { amberPercent: 110, redPercent: 100 },
@@ -130,7 +116,6 @@ export const AFFILIATES: Affiliate[] = [
     functionalCurrency: 'XOF',
     reportingCurrency: 'USD',
     activeCurrencies: ['XOF', 'EUR', 'USD'],
-    // Not started: the full seven-step wizard runs from scratch in the demo.
     status: 'Onboarding',
     fiscalYearEnd: '12-31',
     holidayCalendarId: null,
@@ -147,12 +132,9 @@ export const AFFILIATES: Affiliate[] = [
 // Dimensions
 // ─────────────────────────────────────────────────────────────────────────
 
-// Product dimension is generated from the workbook alongside the positions,
-// so a position can never reference a code the dimension lacks.
+// Product is generated from the workbook, so a position can never cite a code the dimension lacks.
 export { PRODUCTS } from './products';
 
-// The six core dimensions come from `dimensions.ts`; Product is generated
-// from the workbook so a position can never cite a code the dimension lacks.
 export { COMMON_COA, COUNTERPARTIES, FINANCIAL_ELEMENTS, GL_ACCOUNTS, LEGAL_ENTITIES, LOCAL_GL, ORG_UNITS };
 
 export const ALL_DIMENSION_MEMBERS: DimensionMember[] = [...CORE_DIMENSIONS, ...PRODUCTS];
@@ -336,8 +318,7 @@ export const ECONOMIC_INDICATORS: EconomicIndicator[] = [
     'Percentage',
     [22.75, 24.75, 26.25, 26.25, 26.75, 27.25],
   ),
-  // Nigeria's fiscal and FX position tracks the oil price closely, which
-  // makes it a genuine driver of deposit behaviour rather than decoration.
+  // Proxy for Nigeria's fiscal/FX position, a real driver of deposit behaviour.
   indicator(
     'NG-BRENT',
     'Brent Crude (Nigeria fiscal driver)',

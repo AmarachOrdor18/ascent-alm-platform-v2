@@ -1,18 +1,3 @@
-/**
- * Limits and KRIs, evaluated against real run output.
- *
- * The engine modules for both have existed since phase 1 and were never
- * called: the monitoring screens rendered hardcoded arrays, which meant the
- * Limits screen could assert an LCR in breach while the Liquidity Risk
- * screen, reading the same run, reported it comfortably above the floor.
- *
- * Two different questions are answered here, and they need different data:
- *
- *   * a **limit** is a point-in-time test against the selected run
- *   * a **KRI** is a trend, so it needs the same metric from several runs at
- *     successive as-of dates — which is exactly what run history holds
- */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -85,13 +70,7 @@ export interface EvaluatedLimit extends LimitEvaluation {
   config: LimitConfig;
 }
 
-/**
- * Evaluate every active limit against one run.
- *
- * Metrics the run did not compute are passed through as `null`, which the
- * engine reports as `No data` rather than Green. An unmeasured limit is not
- * a satisfied one, and showing it green is how a gap becomes invisible.
- */
+/** Evaluate every active limit against one run; metrics the run didn't compute pass through as `null`, which reports as `No data` rather than Green. */
 export function evaluateAll(
   configs: LimitConfig[],
   results: RunResult[],
@@ -107,13 +86,7 @@ export function evaluateAll(
     }));
 }
 
-/**
- * A KRI's observation series, built from every completed run for the scope.
- *
- * One run per as-of date: where a date has been run more than once, the most
- * recent run wins, because that is the figure that stands. Trending over
- * both would show a step change that never happened.
- */
+/** A KRI's observation series, built from every completed run for the scope; when a date has multiple runs, the most recent wins. */
 export function useKriSeries(runs: ProcessRun[], metricKeys: string[]) {
   const completed = runs.filter((r) => r.status === 'Completed');
   const ids = completed.map((r) => r.id).join(',');
@@ -136,8 +109,7 @@ export function useKriSeries(runs: ProcessRun[], metricKeys: string[]) {
         const metrics = extractMetrics(results);
         for (const key of metricKeys) {
           const value = metrics.get(key);
-          // Only observed values enter the series. A gap is a gap; filling it
-          // with a zero would read as a collapse.
+          // Only observed values enter the series; a gap stays a gap rather than becoming a zero.
           if (typeof value === 'number') series.get(key)!.push({ asOfDate: run.asOfDate, value });
         }
       }

@@ -1,17 +1,3 @@
-/**
- * Audit Trail — screen 57.
- *
- * Reads the events the platform actually recorded. Until now it rendered a
- * fabricated list — invented users, invented timestamps, and a line claiming
- * "7,421 position(s) committed" for a load that never happened — while the
- * store held the real events the whole time. Six call sites write them: run
- * execution, rule changes, batch commits, affiliate changes, reference-data
- * edits and reconciliation sign-off.
- *
- * A fabricated audit trail is worse than none. It is the one screen whose
- * entire purpose is to be trustworthy.
- */
-
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';

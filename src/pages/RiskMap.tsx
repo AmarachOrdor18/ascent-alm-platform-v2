@@ -1,15 +1,3 @@
-/**
- * Liquidity Risk Map — screen 49.
- *
- * A table, one row per Live affiliate — a card grid stops being scannable
- * once the Group reaches its full 33 affiliates. Each row's numbers come
- * from that affiliate's own latest completed run — deposit share is that
- * affiliate's deposits as a fraction of every Live affiliate's deposits
- * combined, not a regulatory concentration measure (that question belongs
- * to Concentration & Large Exposures; this one is Group funding
- * diversification, a different question kept deliberately separate).
- */
-
 import { useQueries } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -132,6 +120,7 @@ export function RiskMap() {
 
   const groupDepositTotal = raw.reduce((s, a) => s + a.depositTotal, 0);
 
+  // Deposit share here is Group funding diversification, not the regulatory concentration measure on Concentration & Large Exposures — deliberately separate.
   const points: AffiliatePoint[] = raw.map((a) => {
     const depositSharePercent = a.hasRun && groupDepositTotal > 0 ? (a.depositTotal / groupDepositTotal) * 100 : null;
     const severity = a.hasRun ? classify(a.lcr, depositSharePercent) : 'No run';

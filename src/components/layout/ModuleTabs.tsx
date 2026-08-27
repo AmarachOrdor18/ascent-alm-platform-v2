@@ -1,16 +1,3 @@
-/**
- * Shared tab bar for a sidebar "module" that groups several existing
- * screens. Reused by every module wrapper under `src/pages/modules/` so the
- * tab UI is visually consistent and the permission logic lives in one place
- * instead of being re-implemented per module.
- *
- * Route access (can this role open the module at all) and tab access (can
- * this role see this specific tab) are separate checks, same as the
- * existing route-vs-action split (`RouteGate` vs. in-page `hasPermission`
- * checks) — a tab never becomes visible just because its module is
- * reachable. See `protected-controls.md` §1–2.
- */
-
 import { Suspense, type ComponentType, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/cn';
@@ -19,9 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 export interface ModuleTab {
   key: string;
   label: string;
-  /** Absolute path this tab renders at. */
   path: string;
-  /** Permission required for this tab to appear at all — independent of the module's own route permission. */
+  /** Independent of the module's own route permission. */
   permission: string;
   Component: ComponentType;
 }
@@ -83,15 +69,6 @@ function AccessRestricted() {
   );
 }
 
-/**
- * Renders a horizontal tab bar (hidden when only one tab is visible, so a
- * permission-filtered-down-to-one-tab module never shows a pointless single
- * button) and the active tab's existing page component beneath it.
- *
- * `matchMode: 'prefix'` is for a tab that is itself a nested sub-module (see
- * `DataManagementModule.tsx`) — the tab counts as active for every path
- * beneath it, not just its own exact path.
- */
 export function ModuleTabs({
   tabs,
   variant = 'primary',
@@ -109,6 +86,7 @@ export function ModuleTabs({
 
   if (visible.length === 0) return <AccessRestricted />;
 
+  // 'prefix' matches nested sub-module paths beneath the tab (see DataManagementModule.tsx).
   const active =
     (matchMode === 'exact'
       ? visible.find((t) => t.path === location)
