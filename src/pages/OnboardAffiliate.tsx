@@ -23,7 +23,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { ShieldCheckIcon } from '@/components/icons/Icons';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { ConnectorFields } from '@/components/connectors/ConnectorFields';
 import { DOMAINS, DOMAIN_LABEL } from '@/components/connectors/connectorConstants';
 import { DataLoadPanel } from '@/components/data/DataLoadPanel';
@@ -816,7 +818,12 @@ export function OnboardAffiliate() {
                 <p className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
                   Regulatory minima are seeded from the regulator selected at step 1 and locked —{' '}
                   <span className="font-bold">{affiliate.regulator}</span> is applied here. Internal amber and red are
-                  Ecobank&rsquo;s own appetite for this affiliate, and stay editable.
+                  Ecobank&rsquo;s own appetite for this affiliate, and stay editable.{' '}
+                  <InfoButton label="What do limit, threshold, breach and escalation mean?">
+                    <p className="mb-1.5"><span className="font-bold">Limit</span> — the boundary for one metric (e.g. LCR). <span className="font-bold">Threshold</span> — where along that limit a status changes: amber is an early warning, red is a breach.</p>
+                    <p className="mb-1.5"><span className="font-bold">Breach</span> — the metric has crossed red. It doesn&rsquo;t stop the bank, but it does require a recorded reason and an action plan.</p>
+                    <p><span className="font-bold">Escalation</span> — who gets told and how urgently, once amber or red is hit. That routing lives on Limits &amp; Breaches, reached after onboarding.</p>
+                  </InfoButton>
                 </p>
                 <table className="w-full text-[12px]">
                   <thead>
@@ -834,7 +841,13 @@ export function OnboardAffiliate() {
                         <tr key={metric} className="border-b border-gray-100">
                           <td className="py-2 font-medium text-navy-900">{METRIC_LABEL[metric] ?? metric}</td>
                           <td className="py-2 text-right">
-                            <span className="rounded bg-gray-100 px-2 py-1 font-mono text-gray-500" title="Locked — set by the regulator">{value}% 🔒</span>
+                            <span
+                              className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 font-mono text-gray-500"
+                              title="Locked — set by the regulator"
+                            >
+                              {value}%
+                              <ShieldCheckIcon className="h-3 w-3 shrink-0 text-gray-400" />
+                            </span>
                           </td>
                           <td className="py-2 text-right">
                             <input

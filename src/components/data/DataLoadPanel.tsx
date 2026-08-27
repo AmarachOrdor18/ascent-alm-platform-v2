@@ -28,6 +28,7 @@ import { importPositions, type RowError } from '@/lib/csvImport';
 import { validatePositions, type ValidationResult } from '@/engine/validation';
 import { planSupersede } from '@/engine/vintage';
 import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
+import { useConnectors } from '@/lib/connectorHooks';
 import type { Affiliate, DataDomain, DimensionMember, DimensionType, LoadBatch, Position } from '@/engine/types';
 
 /** Hash of the file content, so a re-upload of the same bytes is detectable. */
@@ -72,6 +73,7 @@ export function DataLoadPanel({
   const { hasPermission } = useAuth();
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
+  const { data: connectors = [] } = useConnectors();
   const saveBatch = useSaveBatch();
   const commit = useCommitBatch();
   const saveStagedBatch = useSaveStagedBatch();
@@ -79,8 +81,18 @@ export function DataLoadPanel({
   const saveGlAccounts = useSaveDimensionMembers('GlAccount');
   const saveOrgUnits = useSaveDimensionMembers('OrgUnit');
   const saveCounterparties = useSaveDimensionMembers('Counterparty');
-  const canUpload = hasPermission('data.configure');
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // A connector is the authoritative feed for its domain once configured —
+  // manual upload here would let someone silently override what the
+  // connector delivers, with no record of which one actually fed the run.
+  // File substitution only becomes a real upload path when the affiliate's
+  // own connectivity configuration (set in onboarding or Connectors.tsx)
+  // explicitly declares it, same control either way reaches this screen.
+  const feed = affiliate.feeds.find((f) => f.domain === domain);
+  const feedConnector = feed?.mode === 'Connector' ? connectors.find((c) => c.id === feed.connectorId) : undefined;
+  const uploadBlockedByConnector = feed?.mode === 'Connector';
+  const canUpload = hasPermission('data.configure') && !uploadBlockedByConnector;
 
   const [staged, setStaged] = useState<Staged | null>(null);
   const [supersedeReason, setSupersedeReason] = useState('');
@@ -325,29 +337,43 @@ export function DataLoadPanel({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-end gap-4 rounded-2xl border border-gray-100 bg-white p-4">
-        <div>
-          <label htmlFor={`up-file-${domain}`} className="mb-1 block text-[11px] text-gray-600">
-            CSV file — {domain}
-          </label>
-          <input
-            id={`up-file-${domain}`}
-            ref={fileInput}
-            type="file"
-            accept=".csv,text/csv"
-            disabled={!canUpload || busy}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleFile(file);
-            }}
-            className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
-          />
+      {uploadBlockedByConnector ? (
+        <div className="mb-4 rounded-2xl border border-navy-100 bg-navy-50 p-4">
+          <p className="text-[12px] font-bold text-navy-900">
+            {domain} is fed by {feedConnector?.name ?? 'a configured connector'}, not manual upload
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-navy-900/80">
+            This affiliate&rsquo;s connectivity configuration declares a connector as the authoritative source for
+            this domain. Data is expected to arrive from it directly — uploading a file here would let it silently
+            override what the connector delivers. To upload manually instead, switch this domain to File
+            substitution in Connectivity (Step 3 of onboarding, or Connectors &amp; Data Sources).
+          </p>
         </div>
-        {busy && <span className="text-[12px] text-gray-400">Parsing…</span>}
-        {!staged && !busy && !justCommitted && (
-          <span className="text-[11px] text-gray-400">As of {asOfDate} · {affiliate.name}</span>
-        )}
-      </div>
+      ) : (
+        <div className="mb-4 flex flex-wrap items-end gap-4 rounded-2xl border border-gray-100 bg-white p-4">
+          <div>
+            <label htmlFor={`up-file-${domain}`} className="mb-1 block text-[11px] text-gray-600">
+              CSV file — {domain}
+            </label>
+            <input
+              id={`up-file-${domain}`}
+              ref={fileInput}
+              type="file"
+              accept=".csv,text/csv"
+              disabled={!canUpload || busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleFile(file);
+              }}
+              className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
+            />
+          </div>
+          {busy && <span className="text-[12px] text-gray-400">Parsing…</span>}
+          {!staged && !busy && !justCommitted && (
+            <span className="text-[11px] text-gray-400">As of {asOfDate} · {affiliate.name}</span>
+          )}
+        </div>
+      )}
 
       {justCommitted && !staged && (
         <div role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success">
@@ -556,7 +582,7 @@ export function DataLoadPanel({
         </>
       )}
 
-      {!staged && !justCommitted && (
+      {!staged && !justCommitted && !uploadBlockedByConnector && (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-[13px] font-bold text-navy-900">No batch staged for {domain}</p>
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">

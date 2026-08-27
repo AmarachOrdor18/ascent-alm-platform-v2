@@ -71,8 +71,8 @@ export const AFFILIATES: Affiliate[] = [
     holidayCalendarId: 'CAL-NG',
     legalEntityCode: 'LE-NG',
     feeds: [
-      { domain: 'Positions', mode: 'Connector', connectorId: 'C-FLEXCUBE-NG', slaDays: 30, owner: 'Finance Ops' },
-      { domain: 'GeneralLedger', mode: 'Connector', connectorId: 'C-FLEXCUBE-NG', slaDays: 30, owner: 'Finance Ops' },
+      { domain: 'Positions', mode: 'Connector', connectorId: 'C-FLEXCUBE', slaDays: 30, owner: 'Finance Ops' },
+      { domain: 'GeneralLedger', mode: 'Connector', connectorId: 'C-FLEXCUBE', slaDays: 30, owner: 'Finance Ops' },
       { domain: 'MarketRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
       { domain: 'FxRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
       { domain: 'Counterparties', mode: 'File', connectorId: null, slaDays: 90, owner: 'Credit Risk' },
