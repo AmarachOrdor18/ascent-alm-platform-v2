@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 interface InfoButtonProps {
@@ -18,7 +18,9 @@ export function InfoButton({
   stopClickPropagation = false,
 }: InfoButtonProps) {
   const [open, setOpen] = useState(false);
+  const [align, setAlign] = useState<'left' | 'right'>('left');
   const ref = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -34,6 +36,20 @@ export function InfoButton({
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onKey);
     };
+  }, [open]);
+
+  // Flips the panel to hang off the right edge of the button instead of the left
+  // when it would otherwise run past the viewport — a fixed left-0 offset overflows
+  // whenever the button sits in the right half of the screen (e.g. a card's top-right corner).
+  useLayoutEffect(() => {
+    if (!open) {
+      setAlign('left');
+      return;
+    }
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    if (rect.right > window.innerWidth) setAlign('right');
   }, [open]);
 
   return (
@@ -58,9 +74,11 @@ export function InfoButton({
       </button>
       {open && (
         <div
+          ref={panelRef}
           role="tooltip"
           className={cn(
-            'absolute left-0 top-full z-30 mt-1.5 w-72 rounded-lg border border-gray-200 bg-white p-3 text-[11px] leading-relaxed text-gray-600 shadow-lg',
+            'absolute top-full z-30 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 text-[11px] font-normal normal-case leading-relaxed tracking-normal text-gray-600 shadow-lg',
+            align === 'left' ? 'left-0' : 'right-0',
             panelClassName,
           )}
         >

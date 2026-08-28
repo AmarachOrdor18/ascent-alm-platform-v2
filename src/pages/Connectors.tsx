@@ -8,6 +8,7 @@ import { DOMAINS, DOMAIN_LABEL, STATUS_LABEL, STATUS_TONE } from '@/components/c
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { resolveSingleAffiliate, useAffiliates, useSaveAffiliate } from '@/lib/hooks';
+import { accessibleAffiliates } from '@/lib/scope';
 import {
   availableFor,
   newConnector,
@@ -32,9 +33,12 @@ const DEFAULT_SLA: Record<DataDomain, number> = {
 };
 
 export function Connectors() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { affiliateCode } = useScope();
-  const { data: affiliates = [] } = useAffiliates();
+  const { data: allAffiliates = [] } = useAffiliates();
+  // A user confined to one affiliate can only ever configure that affiliate's own feeds here —
+  // this picker is otherwise independent of the (also-restricted) global scope switcher.
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
   const { data: connectors = [] } = useConnectors();
   const saveAffiliate = useSaveAffiliate();
   const saveConnector = useSaveConnector();
@@ -46,7 +50,12 @@ export function Connectors() {
   const [results, setResults] = useState<Record<string, 'ok' | 'failed'>>({});
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
-  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
+  // At a specific affiliate's scope, defaulting to it is unambiguous. At Group scope there is no single
+  // affiliate to default to — silently picking one (the fallback resolveSingleAffiliate falls back to)
+  // would mean editing another affiliate's feeds without ever having chosen to.
+  const affiliate =
+    affiliates.find((a) => a.code === pickedCode) ??
+    (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
 
   const [savedDomain, setSavedDomain] = useState<DataDomain | null>(null);
   const [draftOwner, setDraftOwner] = useState<Partial<Record<DataDomain, string>>>({});
@@ -113,6 +122,14 @@ export function Connectors() {
 
       <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
 
+      {!affiliate ? (
+        <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <p className="text-[13px] font-bold text-navy-900">Select an affiliate</p>
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+            Group scope has no single affiliate to default to. Pick one above to see or edit its feed map.
+          </p>
+        </section>
+      ) : (
       <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
           Feed map — {affiliate?.name ?? '—'}
@@ -210,6 +227,7 @@ export function Connectors() {
           })}
         </div>
       </section>
+      )}
 
       <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Data sources</h2>

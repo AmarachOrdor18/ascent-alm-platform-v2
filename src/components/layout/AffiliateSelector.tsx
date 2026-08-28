@@ -38,6 +38,7 @@ export function AffiliateSelector({
         className="rounded border border-gray-200 px-2 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
       >
         {options.length === 0 && <option value="">No affiliates onboarded yet</option>}
+        {options.length > 0 && !current && <option value="">Select an affiliate…</option>}
         {options.map((a) => (
           <option key={a.code} value={a.code}>
             {a.name}

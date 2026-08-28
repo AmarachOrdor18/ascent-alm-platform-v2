@@ -303,7 +303,14 @@ export function Dashboard() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rate shock sensitivity — ΔEVE by scenario</h2>
+            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Rate shock sensitivity — ΔEVE by scenario
+              <InfoButton label="What this chart shows">
+                All six BCBS-standard shocks (parallel up/down, steepener, flattener, short rate up/down) applied to
+                this scope's own book, showing the economic-value impact of each. Bars beyond the dashed ±15% lines
+                are highlighted — that's the Basel supervisory outlier threshold.
+              </InfoButton>
+            </h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">Capital impact under all six BCBS supervisory shocks, this scope's own book — dashed lines mark the ±15% outlier test</p>
             <div className="min-h-[260px] flex-1">
               {shockRows.length === 0 ? (
@@ -331,7 +338,14 @@ export function Dashboard() {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Market &amp; Rate Monitor</h2>
+            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Market &amp; Rate Monitor
+              <InfoButton label="What this shows">
+                Live reference points for this scope's own currency — the local policy rate, an overnight interbank
+                rate, a sovereign yield benchmark, SOFR, and FX rates against USD. These aren't computed by a run;
+                they're the market context the run's figures sit against.
+              </InfoButton>
+            </h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">{marketCurrency} benchmarks, SOFR, and FX against USD</p>
             {marketRows.length === 0 && rateRows.length === 0 ? (
               <p className="text-[12px] text-gray-400">No market data loaded.</p>
@@ -385,7 +399,13 @@ export function Dashboard() {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Active Breaches</h2>
+            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Active Breaches
+              <InfoButton label="What counts as a breach here">
+                Any headline or snapshot metric on this page currently graded Red against its configured limit. Click
+                through to Limits &amp; Breaches for the full threshold detail and to record a breach note.
+              </InfoButton>
+            </h2>
             {breaches.length === 0 ? (
               <p className="text-[12px] text-gray-400">No active breaches for this scope.</p>
             ) : (
@@ -410,7 +430,13 @@ export function Dashboard() {
 
         {prof && (
           <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Balance sheet shape</h2>
+            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Balance sheet shape
+              <InfoButton label="What this shows">
+                The size and earnings profile the run's other figures sit on top of — total assets, interest income
+                and expense, and the net of the two. Read from the same run and positions as every ratio above.
+              </InfoButton>
+            </h2>
             <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
               <Stat label="Total assets" value={<Amount value={prof.totalAssets} currency={currency} />} />
               <Stat label="Interest income" value={<Amount value={prof.interestIncome} currency={currency} />} />

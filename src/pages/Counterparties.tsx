@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useDimensionMembers, useSaveDimensionMembers } from '@/lib/hooks';
 import { useScope } from '@/context/ScopeContext';
@@ -164,7 +165,14 @@ export function Counterparties() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <section className="table-datagrid-container lg:col-span-3">
           <div className="border-b border-gray-100 bg-white/50 p-5">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Register</h2>
+            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Register
+              <InfoButton label="How exposure is computed">
+                Deposit balance and share are computed live from currently loaded positions mapped to each
+                counterparty — this is the register itself, not a run's frozen results, so it reflects data as it
+                stands right now.
+              </InfoButton>
+            </h2>
             <TableToolbar
               searchValue={search}
               onSearchChange={setSearch}

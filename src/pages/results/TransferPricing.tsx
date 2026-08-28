@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { InfoButton } from '@/components/ui/InfoButton';
@@ -32,10 +33,12 @@ export function TransferPricing() {
 
   const lines = useMemo(() => {
     if (!ftp) return [];
-    return showUnpriced ? ftp.lines.filter((l) => l.marginContribution === null) : ftp.lines.slice(0, 60);
+    return showUnpriced ? ftp.lines.filter((l) => l.marginContribution === null) : ftp.lines;
   }, [ftp, showUnpriced]);
 
   const unpricedCount = ftp?.lines.filter((l) => l.marginContribution === null).length ?? 0;
+
+  const lineControls = useTableControls(lines, 25, ['positionId', 'productClass', 'orgUnitCode', 'commonCoaCode', 'currency']);
 
   const unitColumns: ResultColumn<FtpResult['byOrgUnit'][number]>[] = [
     { key: 'unit', header: 'Business unit', render: (r) => <span className="font-medium">{nameOf(r.orgUnitCode)}</span> },
@@ -201,41 +204,52 @@ export function TransferPricing() {
               </section>
             )}
 
-            <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                  Transfer rate detail
-                  <InfoButton label="How to read this table">
-                    The base rate is read off the yield curve at the position's tenor; add-ons stack on top by named
-                    type (liquidity premium, basis risk, and so on); the all-in rate is what the position is actually
-                    charged or credited. Expand a row to see the full breakdown.
-                  </InfoButton>
-                </h2>
-                {unpricedCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowUnpriced((v) => !v)}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
-                  >
-                    {showUnpriced ? 'Show all positions' : `Show the ${unpricedCount} unpriced`}
-                  </button>
-                )}
+            <section className="table-datagrid-container">
+              <div className="border-b border-gray-100 bg-white/50 p-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    Transfer rate detail
+                    <InfoButton label="How to read this table">
+                      The base rate is read off the yield curve at the position's tenor; add-ons stack on top by named
+                      type (liquidity premium, basis risk, and so on); the all-in rate is what the position is
+                      actually charged or credited. Expand a row to see the full breakdown. Attribution and totals
+                      above are computed over every position, not just the page shown here.
+                    </InfoButton>
+                  </h2>
+                  {unpricedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowUnpriced((v) => !v)}
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+                    >
+                      {showUnpriced ? 'Show all positions' : `Show the ${unpricedCount} unpriced`}
+                    </button>
+                  )}
+                </div>
+                <TableToolbar
+                  searchValue={lineControls.search}
+                  onSearchChange={lineControls.setSearch}
+                  exportData={() => lines}
+                  exportFilename="transfer-rate-detail"
+                  density={lineControls.density}
+                  onDensityChange={lineControls.setDensity}
+                />
               </div>
 
               <ResultTable
-                rows={lines}
+                rows={lineControls.paged}
                 columns={lineColumns}
                 rowKey={(l) => l.positionId}
                 emptyMessage="Nothing to show."
                 renderDetail={(l) => <AdjustmentDetail line={l} />}
               />
 
-              {!showUnpriced && ftp.lines.length > 60 && (
-                <p className="mt-3 text-[11px] text-gray-500">
-                  Showing the first 60 of {ftp.lines.length} positions. Attribution above is computed over all of them,
-                  not this sample.
-                </p>
-              )}
+              <TablePagination
+                currentPage={lineControls.page}
+                totalItems={lineControls.totalItems}
+                pageSize={lineControls.pageSize}
+                onPageChange={lineControls.setPage}
+              />
             </section>
           </>
         )}

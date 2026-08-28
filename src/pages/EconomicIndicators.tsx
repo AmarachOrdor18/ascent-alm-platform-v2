@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useEconomicIndicators, useSaveEconomicIndicator } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
@@ -65,7 +66,13 @@ export function EconomicIndicators() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="lg:col-span-1">
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Series</h2>
+          <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            Series
+            <InfoButton label="What these drive">
+              These macro series feed forecast scenarios and behavioural assumptions — an economic-indicator-conditioned
+              scenario only applies when the indicator crosses the threshold set on it.
+            </InfoButton>
+          </h2>
           <ul className="space-y-2">
             {indicators.map((i) => (
               <li key={i.id}>
@@ -136,7 +143,14 @@ export function EconomicIndicators() {
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Observations</h2>
+              <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Observations
+                <InfoButton label="How revisions are handled">
+                  Recording a new value for a date that's already on file replaces that observation rather than
+                  duplicating it — statistical agencies revise history, and a series can't hold two values for one
+                  period.
+                </InfoButton>
+              </h2>
 
               {canEdit && (
                 <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">

@@ -7,6 +7,7 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
+import { accessibleAffiliates } from '@/lib/scope';
 import { importLedger } from '@/lib/csvImport';
 import { identityFxTable } from '@/engine/fx';
 import {
@@ -18,9 +19,11 @@ import {
 import { formatPct } from '@/lib/format';
 
 export function GlReconciliation() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { affiliateCode } = useScope();
-  const { data: affiliates = [] } = useAffiliates();
+  const { data: allAffiliates = [] } = useAffiliates();
+  // Confined to one affiliate can only reconcile that affiliate's own book here.
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
   const canSignOff = hasPermission('data.configure');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -34,7 +37,13 @@ export function GlReconciliation() {
   const [signedOff, setSignedOff] = useState(false);
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
-  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
+  // At Group scope there is no single affiliate to default to — silently picking one would mean
+  // reconciling (and potentially signing off) an affiliate's book nobody actually chose. Leaving
+  // affiliate undefined here also matters for usePositions below: an undefined code, unlike 'GROUP',
+  // is read as "no filter" and would otherwise pull every affiliate's positions into the count.
+  const affiliate =
+    affiliates.find((a) => a.code === pickedCode) ??
+    (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
   const currency = affiliate?.functionalCurrency ?? 'USD';
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
 
@@ -236,7 +245,14 @@ export function GlReconciliation() {
         </p>
       </section>
 
-      {!ledger ? (
+      {!affiliate ? (
+        <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <p className="text-[13px] font-bold text-navy-900">Select an affiliate</p>
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+            Group scope has no single affiliate to default to. Pick one above to reconcile its book.
+          </p>
+        </section>
+      ) : !ledger ? (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-[13px] font-bold text-navy-900">No trial balance loaded</p>
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">

@@ -7,6 +7,7 @@ import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
+import { accessibleAffiliates } from '@/lib/scope';
 import { DEFAULT_VALIDATION_RULES, validatePositions, type ValidationRule } from '@/engine/validation';
 import type { Severity } from '@/engine/types';
 
@@ -25,9 +26,11 @@ const CHECK_EXPLANATION: Record<string, string> = {
 };
 
 export function ValidationRules() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { affiliateCode } = useScope();
-  const { data: affiliates = [] } = useAffiliates();
+  const { data: allAffiliates = [] } = useAffiliates();
+  // Confined to one affiliate can only run checks against that affiliate's own data here.
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
   const canEdit = hasPermission('data.configure');
 
   const [rules, setRules] = useState<ValidationRule[]>(DEFAULT_VALIDATION_RULES);
@@ -35,15 +38,20 @@ export function ValidationRules() {
   const [lastRun, setLastRun] = useState<{ at: string; by: string } | null>(null);
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
-  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
+  // At Group scope there is no single affiliate to default to — an undefined code here (unlike 'GROUP')
+  // is read by usePositions as "no filter", which would otherwise silently validate every affiliate's
+  // positions together as if they were one book.
+  const affiliate =
+    affiliates.find((a) => a.code === pickedCode) ??
+    (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
 
   const result = useMemo(
     () =>
-      positions.length > 0
+      affiliate && positions.length > 0
         ? validatePositions(positions, { asOfDate, knownAffiliateCodes: affiliates.map((a) => a.code) }, rules)
         : null,
-    [positions, asOfDate, affiliates, rules],
+    [affiliate, positions, asOfDate, affiliates, rules],
   );
 
   const update = (id: string, patch: Partial<ValidationRule>) => {
@@ -174,6 +182,12 @@ export function ValidationRules() {
       />
 
       <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
+
+      {!affiliate && (
+        <div className="mb-6 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-[12px] text-gray-500">
+          Group scope has no single affiliate to default to. Pick one above to check its own data.
+        </div>
+      )}
 
       {result && (
         <div

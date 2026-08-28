@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useYieldCurves, useSaveYieldCurve } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
@@ -117,7 +118,13 @@ export function YieldCurves() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">{editing.name}</h2>
+              <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                {editing.name}
+                <InfoButton label="What this curve drives">
+                  This curve is what FTP base rates and interest-rate shock scenarios are read from for {editing.currency}.
+                  An inverted curve — the long end below the short end — is a genuine market signal, not a data error.
+                </InfoButton>
+              </h2>
               {inverted && <StatusBadge status="Inverted curve" tone="warning" />}
             </div>
 
@@ -206,7 +213,14 @@ export function YieldCurves() {
 
           <section className="space-y-6">
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Conventions</h2>
+              <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Conventions
+                <InfoButton label="Why these matter">
+                  Rate format, compounding and accrual basis together determine what a quoted rate actually means in
+                  cash-flow terms — the same number produces different results under different conventions, which is
+                  why they're attributes of the curve rather than an assumption buried in the engine.
+                </InfoButton>
+              </h2>
               <div className="space-y-3">
                 <Field label="Currency" value={editing.currency} />
                 <Select
@@ -241,8 +255,13 @@ export function YieldCurves() {
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Interpolation probe
+                <InfoButton label="How this is calculated">
+                  Linearly interpolates between the two term points bracketing the tenor you enter, and holds flat
+                  beyond either end of the curve — the same method FTP uses to price a position repricing at an
+                  in-between tenor.
+                </InfoButton>
               </h2>
               <label htmlFor="probe" className="mb-1 block text-[11px] text-gray-600">
                 Tenor in days

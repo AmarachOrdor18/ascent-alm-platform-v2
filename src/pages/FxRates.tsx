@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
@@ -158,7 +159,14 @@ export function FxRates() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Exchange rates</h2>
+          <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            Exchange rates
+            <InfoButton label="How conversion works">
+              Every rate converts through USD as the pivot currency — an NGN/GHS conversion, for example, goes via
+              each currency's own USD rate rather than a direct quote. A currency missing a rate here fails any run
+              that touches it, rather than silently being converted at 1.0.
+            </InfoButton>
+          </h2>
 
           {canEdit && (
             <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
@@ -235,7 +243,14 @@ export function FxRates() {
         </section>
 
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Currency roles</h2>
+          <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            Currency roles
+            <InfoButton label="What a role controls">
+              Functional is the Group's own primary currency, fixed once and never changed. Reporting currencies
+              consolidate other currencies on their way to it. Active currencies are transacted in but never
+              consolidated through. See the definitions below for the full detail.
+            </InfoButton>
+          </h2>
           <TableToolbar
             searchValue={rolesControls.search}
             onSearchChange={rolesControls.setSearch}

@@ -98,6 +98,7 @@ export const ROLES: Record<RoleCode, Role> = {
       'treasury.view',
       'reporting.view',
       'data.view',
+      'data.configure',
       'users.manage',
       'run.execute',
       'limits.manage',

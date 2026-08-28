@@ -3,6 +3,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { Amount } from '@/components/ui/Amount';
+import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useRunResults, useRuns, useExecuteRun, payloadOf } from '@/lib/runHooks';
 import { useBatches } from '@/lib/hooks';
@@ -41,6 +42,10 @@ function headlines(results: RunResult[], currency: string): Headline[] {
 }
 
 export function RunHistory() {
+  const { hasPermission } = useAuth();
+  // Viewing history only needs risk.view (several roles, e.g. Reporting User, hold it) — re-running one is a
+  // real execution and needs run.execute specifically, which Reporting User does not have.
+  const canRun = hasPermission('run.execute');
   const { affiliateCode, setRun } = useScope();
   const { data: runs = [], isLoading } = useRuns(affiliateCode);
   const { data: batches = [] } = useBatches();
@@ -185,7 +190,8 @@ export function RunHistory() {
                       errorLog: [],
                     })
                   }
-                  disabled={execute.isPending}
+                  disabled={!canRun || execute.isPending}
+                  title={canRun ? undefined : 'Your role does not have permission to execute a run'}
                   className="rounded bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                 >
                   Re-run against current data

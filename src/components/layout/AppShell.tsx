@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
 import { GROUP_CODE, useScope } from '@/context/ScopeContext';
 import { useBatches } from '@/lib/hooks';
+import { accessibleAffiliates, isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { NAV_GROUPS, SEARCH_INDEX } from './navigation';
 import { CommandPalette } from './CommandPalette';
 import { TourLauncher, TourProvider } from '@/components/tour/Tour';
@@ -40,10 +41,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     [hasPermission],
   );
 
-  // A user assigned to one affiliate sees only that affiliate here, unless group.manage says otherwise.
-  const restrictedToOwn = user !== null && user.affiliateCode !== GROUP_CODE && !hasPermission('group.manage');
+  // A user assigned to one affiliate sees only that affiliate here, unless group.manage says otherwise —
+  // the same rule every other affiliate picker in the app applies via accessibleAffiliates(). A restricted
+  // user keeps their own affiliate regardless of its status; an unrestricted user only sees Group or Live ones.
+  const restrictedToOwn = isRestrictedToOwnAffiliate(user, hasPermission);
   const selectable = restrictedToOwn
-    ? affiliates.filter((a) => a.code === user!.affiliateCode)
+    ? accessibleAffiliates(affiliates, user, hasPermission)
     : affiliates.filter((a) => a.code === GROUP_CODE || a.status === 'Live');
 
   const toggleGroup = (groupLabel: string) => {

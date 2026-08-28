@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useHolidayCalendars, useSaveHolidayCalendar } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
@@ -103,7 +104,13 @@ export function HolidayCalendar() {
       {active && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Public holidays</h2>
+            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Public holidays
+              <InfoButton label="Recurring vs exception">
+                Recurring holidays fall on the same pattern every year. Exceptions are dates added directly — a
+                declared holiday like Eid that moves each year rather than following a fixed rule.
+              </InfoButton>
+            </h2>
 
             {canEdit && (
               <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
@@ -206,7 +213,13 @@ export function HolidayCalendar() {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Settlement probe</h2>
+            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Settlement probe
+              <InfoButton label="Why this matters for buckets">
+                A flow due on a non-business day rolls forward to the next one. At the short end of a liquidity
+                ladder, that roll can shift a flow across a bucket boundary and change the reported gap.
+              </InfoButton>
+            </h2>
             <label htmlFor="probe-date" className="mb-1 block text-[11px] text-gray-600">
               A flow falls due on
             </label>

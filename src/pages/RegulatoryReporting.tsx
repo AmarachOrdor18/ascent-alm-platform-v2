@@ -5,6 +5,7 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { RunPicker } from '@/components/layout/RunPicker';
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates } from '@/lib/hooks';
+import { accessibleAffiliates, scopedListCode } from '@/lib/scope';
 import { regulatoryReturns, newId } from '@/lib/governanceHooks';
 import { useRuns, useRunResults } from '@/lib/runHooks';
 import { metricValue, formatMetric } from '@/lib/metrics';
@@ -20,8 +21,11 @@ const STATUS_TONE: Record<ReturnStatus, 'success' | 'warning' | 'danger' | 'neut
 export function RegulatoryReporting() {
   const { hasPermission, user } = useAuth();
   const canEdit = hasPermission('reporting.generate') || hasPermission('reporting.manage') || hasPermission('run.execute');
-  const { data: rows = [], isLoading } = regulatoryReturns.useList();
-  const { data: affiliates = [] } = useAffiliates();
+  // A user confined to one affiliate only sees that affiliate's own returns, plus any Group-wide ones —
+  // reporting.view is broad, so without this every affiliate's returns leaked to everyone who holds it.
+  const { data: rows = [], isLoading } = regulatoryReturns.useList(scopedListCode(user, hasPermission));
+  const { data: allAffiliates = [] } = useAffiliates();
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
   const { data: runs = [] } = useRuns();
   const save = regulatoryReturns.useSave();
 

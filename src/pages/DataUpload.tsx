@@ -2,13 +2,18 @@ import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { DataLoadPanel, type DataLoadPanelState } from '@/components/data/DataLoadPanel';
+import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { resolveSingleAffiliate, useAffiliates } from '@/lib/hooks';
+import { accessibleAffiliates } from '@/lib/scope';
 import type { DataDomain } from '@/engine/types';
 
 export function DataUpload() {
+  const { user, hasPermission } = useAuth();
   const { affiliateCode } = useScope();
-  const { data: affiliates = [] } = useAffiliates();
+  const { data: allAffiliates = [] } = useAffiliates();
+  // Confined to one affiliate can only stage and commit data for that affiliate here.
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
 
   const [asOfDate, setAsOfDate] = useState('2026-07-31');
   const [domain, setDomain] = useState<DataDomain>('Positions');
@@ -17,7 +22,11 @@ export function DataUpload() {
   });
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
-  const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
+  // At Group scope there is no single affiliate to default to — silently picking one would mean staging
+  // or committing data for an affiliate nobody actually chose.
+  const affiliate =
+    affiliates.find((a) => a.code === pickedCode) ??
+    (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
 
   return (
     <>

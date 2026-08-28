@@ -27,7 +27,11 @@ const STAGE_TONE: Record<RemediationStage, 'success' | 'warning' | 'danger' | 'n
 };
 
 export function Remediation() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  // Nobody at all was gated on a role before — any signed-in user, including a read-only viewer, could
+  // raise, advance and even close a control issue. Control Tester and Risk Analyst are the roles actually
+  // meant to run this workflow, so gate writes on the permissions those two (and Administrator) hold.
+  const canEdit = hasPermission('data.configure') || hasPermission('risk.configure');
   const { data: affiliates = [] } = useAffiliates();
   const { data: issues = [], isLoading } = remediation.useList();
   const save = remediation.useSave();
@@ -71,7 +75,7 @@ export function Remediation() {
   };
 
   const advance = async (issue: RemediationIssue, stage: RemediationStage) => {
-    if (!user) return;
+    if (!user || !canEdit) return;
     if (stage === 'Closed') {
       const blocked = closeBlockedReason(issue);
       if (blocked) return;
@@ -86,7 +90,7 @@ export function Remediation() {
   };
 
   const handleCreate = async () => {
-    if (!user || !draft.title || !draft.owner) return;
+    if (!user || !canEdit || !draft.title || !draft.owner) return;
     await save.mutateAsync({
       id: newId('CR'),
       title: draft.title,
@@ -153,7 +157,9 @@ export function Remediation() {
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+            disabled={!canEdit}
+            title={canEdit ? undefined : 'Only Risk Analyst, Control Tester or Administrator can raise an issue'}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             New issue
           </button>
@@ -181,8 +187,14 @@ export function Remediation() {
               {nextStage && (
                 <button
                   type="button"
-                  disabled={nextStage === 'Closed' && !!closeBlockedReason(selected)}
-                  title={nextStage === 'Closed' ? (closeBlockedReason(selected) ?? undefined) : undefined}
+                  disabled={!canEdit || (nextStage === 'Closed' && !!closeBlockedReason(selected))}
+                  title={
+                    !canEdit
+                      ? 'Only Risk Analyst, Control Tester or Administrator can advance an issue'
+                      : nextStage === 'Closed'
+                        ? (closeBlockedReason(selected) ?? undefined)
+                        : undefined
+                  }
                   onClick={() => void advance(selected, nextStage)}
                   className="shrink-0 rounded-lg bg-navy-900 px-3.5 py-2 text-[12px] font-bold text-white shadow-sm transition-colors hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -379,7 +391,7 @@ export function Remediation() {
               <button
                 type="button"
                 onClick={() => void handleCreate()}
-                disabled={!draft.title || !draft.owner}
+                disabled={!canEdit || !draft.title || !draft.owner}
                 className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Raise issue

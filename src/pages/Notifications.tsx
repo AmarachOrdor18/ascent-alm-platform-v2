@@ -25,7 +25,11 @@ const emptyDraft = {
 };
 
 export function Notifications() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  // Alert routing and escalation apply platform-wide, so — unlike most screens — this isn't gated per
+  // affiliate; it's gated to Administrators only. Without this, `dashboard.view` (every role, including a
+  // read-only Executive Viewer) was enough to reach this tab and freely create, edit or disable any rule.
+  const canEdit = hasPermission('admin.manage');
   const { data: affiliates = [] } = useAffiliates();
   const { data: rules = [], isLoading } = notifications.useList();
   const save = notifications.useSave();
@@ -64,12 +68,12 @@ export function Notifications() {
   };
 
   const toggleActive = async (rule: NotificationRule) => {
-    if (!user) return;
+    if (!user || !canEdit) return;
     await save.mutateAsync({ ...rule, isActive: !rule.isActive, updatedBy: user.name, updatedAt: new Date().toISOString() });
   };
 
   const handleSave = async () => {
-    if (!user || !draft.name || !draft.event) return;
+    if (!user || !canEdit || !draft.name || !draft.event) return;
     await save.mutateAsync({
       id: draft.id ?? newId('NOT'),
       name: draft.name,
@@ -104,7 +108,9 @@ export function Notifications() {
           <button
             type="button"
             onClick={openNew}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+            disabled={!canEdit}
+            title={canEdit ? undefined : 'Only an Administrator can configure notification rules'}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             New rule
           </button>
@@ -184,12 +190,24 @@ export function Notifications() {
                       )}
                     </td>
                     <td>
-                      <button type="button" onClick={() => void toggleActive(r)}>
+                      <button
+                        type="button"
+                        onClick={() => void toggleActive(r)}
+                        disabled={!canEdit}
+                        title={canEdit ? undefined : 'Only an Administrator can change this'}
+                        className="disabled:cursor-not-allowed disabled:opacity-60"
+                      >
                         <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} tone={r.isActive ? 'success' : 'neutral'} />
                       </button>
                     </td>
                     <td>
-                      <button type="button" onClick={() => openEdit(r)} className="text-[11px] font-bold text-navy-700 hover:underline">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(r)}
+                        disabled={!canEdit}
+                        title={canEdit ? undefined : 'Only an Administrator can edit notification rules'}
+                        className="text-[11px] font-bold text-navy-700 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+                      >
                         Edit
                       </button>
                     </td>
@@ -347,7 +365,7 @@ export function Notifications() {
               <button
                 type="button"
                 onClick={() => void handleSave()}
-                disabled={!draft.name || !draft.event}
+                disabled={!canEdit || !draft.name || !draft.event}
                 className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Save rule

@@ -149,7 +149,13 @@ export function Dimensions() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="lg:col-span-1">
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Hierarchy</h2>
+          <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            Hierarchy
+            <InfoButton label="How to use this tree">
+              Select one or more nodes to filter the table on the right to just those members. Selecting a rollup
+              node brings its whole subtree with it — everything nested beneath it is included automatically.
+            </InfoButton>
+          </h2>
           <HierarchyBrowser
             members={members}
             selectedCodes={selected}
@@ -218,8 +224,13 @@ export function Dimensions() {
         </section>
 
         <section className="lg:col-span-2">
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+          <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
             {selected.length > 0 ? `Selected (${selected.length})` : `All ${definition.label} members`}
+            <InfoButton label="Leaf vs rollup">
+              A Leaf member is what a position can actually be tagged with. A Rollup exists purely to organise leaves
+              beneath it and never carries a balance of its own — that's why its "booked here" figure elsewhere is
+              always zero.
+            </InfoButton>
           </h2>
           <div className="table-datagrid-container">
             <div className="border-b border-gray-100 bg-white/50 p-5">

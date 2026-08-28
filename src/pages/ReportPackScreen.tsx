@@ -6,6 +6,7 @@ import { RunPicker } from '@/components/layout/RunPicker';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { reportPacks, newId } from '@/lib/governanceHooks';
+import { scopedListCode } from '@/lib/scope';
 import { useRuns, useRunResults } from '@/lib/runHooks';
 import { METRIC_SPECS, formatMetric } from '@/lib/metrics';
 import { exportPackPdf } from '@/lib/pdfExport';
@@ -26,7 +27,8 @@ export function ReportPackScreen({
   const { hasPermission, user } = useAuth();
   const { affiliateCode } = useScope();
   const canEdit = hasPermission('reporting.generate') || hasPermission('reporting.manage') || hasPermission('run.execute');
-  const { data: packs = [], isLoading } = reportPacks.useList();
+  // A user confined to one affiliate only sees that affiliate's own packs, plus any Group-wide ones.
+  const { data: packs = [], isLoading } = reportPacks.useList(scopedListCode(user, hasPermission));
   const { data: runs = [] } = useRuns();
   const save = reportPacks.useSave();
   const remove = reportPacks.useRemove();
