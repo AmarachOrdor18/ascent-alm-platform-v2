@@ -264,7 +264,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
                   {selectable.map((a) => (
                     <option key={a.code} value={a.code}>
-                      {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : `${a.name} — ${a.country}`}
+                      {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : a.name}
                     </option>
                   ))}
                 </select>

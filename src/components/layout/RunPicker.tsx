@@ -26,7 +26,7 @@ export function RunPicker({
         <option value="">No run attached</option>
         {completed.map((r) => (
           <option key={r.id} value={r.id}>
-            {r.name} — {r.asOfDate}
+            {r.name}
           </option>
         ))}
       </select>

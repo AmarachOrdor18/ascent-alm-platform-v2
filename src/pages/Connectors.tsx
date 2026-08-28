@@ -48,6 +48,10 @@ export function Connectors() {
   const [pickedCode, setPickedCode] = useState<string | null>(null);
   const affiliate = affiliates.find((a) => a.code === pickedCode) ?? resolveSingleAffiliate(affiliates, affiliateCode);
 
+  const [savedDomain, setSavedDomain] = useState<DataDomain | null>(null);
+  const [draftOwner, setDraftOwner] = useState<Partial<Record<DataDomain, string>>>({});
+  const [draftSla, setDraftSla] = useState<Partial<Record<DataDomain, number>>>({});
+
   const feedFor = (domain: DataDomain): DomainFeed =>
     affiliate?.feeds.find((f) => f.domain === domain) ?? {
       domain, mode: 'NotConfigured', connectorId: null, slaDays: DEFAULT_SLA[domain], owner: null,
@@ -57,7 +61,12 @@ export function Connectors() {
     if (!affiliate) return;
     const feed: DomainFeed = { ...feedFor(domain), ...patch };
     const feeds = [...affiliate.feeds.filter((f) => f.domain !== domain), feed];
-    saveAffiliate.mutate({ ...affiliate, feeds } satisfies Affiliate);
+    saveAffiliate.mutate({ ...affiliate, feeds } satisfies Affiliate, {
+      onSuccess: () => {
+        setSavedDomain(domain);
+        window.setTimeout(() => setSavedDomain((d) => (d === domain ? null : d)), 1500);
+      },
+    });
   };
 
   // Simulated reachability check — no real socket is opened.
@@ -159,9 +168,13 @@ export function Connectors() {
                         type="number"
                         min={1}
                         aria-label={`SLA days for ${DOMAIN_LABEL[domain]}`}
-                        value={feed.slaDays}
+                        value={draftSla[domain] ?? feed.slaDays}
                         disabled={!canEdit}
-                        onChange={(e) => updateFeed(domain, { slaDays: Number(e.target.value) })}
+                        onChange={(e) => setDraftSla({ ...draftSla, [domain]: Number(e.target.value) })}
+                        onBlur={() => {
+                          const value = draftSla[domain];
+                          if (value !== undefined && value !== feed.slaDays) updateFeed(domain, { slaDays: value });
+                        }}
                         className="w-16 rounded border border-gray-200 px-2 py-1.5 text-[11px] focus:border-navy-700 focus:outline-none disabled:bg-gray-50"
                       />
                       <span>days</span>
@@ -171,9 +184,13 @@ export function Connectors() {
                       type="text"
                       placeholder="Owner"
                       aria-label={`Owner for ${DOMAIN_LABEL[domain]}`}
-                      value={feed.owner ?? ''}
+                      value={draftOwner[domain] ?? feed.owner ?? ''}
                       disabled={!canEdit}
-                      onChange={(e) => updateFeed(domain, { owner: e.target.value || null })}
+                      onChange={(e) => setDraftOwner({ ...draftOwner, [domain]: e.target.value })}
+                      onBlur={() => {
+                        const value = draftOwner[domain];
+                        if (value !== undefined && value !== (feed.owner ?? '')) updateFeed(domain, { owner: value || null });
+                      }}
                       className="w-40 rounded border border-gray-200 px-2 py-1.5 text-[11px] focus:border-navy-700 focus:outline-none disabled:bg-gray-50"
                     />
 
@@ -181,6 +198,8 @@ export function Connectors() {
                       status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? 'Connected' : 'Not configured'}
                       tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? 'success' : 'neutral'}
                     />
+
+                    {savedDomain === domain && <StatusBadge status="Saved" tone="success" />}
                   </div>
                 </div>
               </div>

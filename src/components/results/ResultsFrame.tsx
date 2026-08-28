@@ -87,7 +87,7 @@ export function ResultsFrame({
             >
               {available.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name} — {r.asOfDate}
+                  {r.name}
                 </option>
               ))}
             </select>

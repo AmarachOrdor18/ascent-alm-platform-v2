@@ -40,16 +40,13 @@ export function AffiliateSelector({
         {options.length === 0 && <option value="">No affiliates onboarded yet</option>}
         {options.map((a) => (
           <option key={a.code} value={a.code}>
-            {a.name} — {a.status}
+            {a.name}
           </option>
         ))}
       </select>
       {current && (
         <span className={`text-[11px] font-bold ${STATUS_TONE[current.status]}`}>{current.status}</span>
       )}
-      <span className="text-[11px] text-gray-500">
-        Independent of the Scope switcher above — every affiliate appears here, including one still onboarding.
-      </span>
     </div>
   );
 }

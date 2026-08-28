@@ -231,8 +231,7 @@ export function BehaviouralAnalysis() {
                 </div>
               ) : (
                 <p className="text-[11px] leading-relaxed text-gray-600">
-                  No Behaviour Pattern rule was attached to this run, so the engine defaults applied. Attaching one on
-                  the Process Run screen makes the assumption governed and versioned like any other.
+                  No Behaviour Pattern rule was attached to this run — engine defaults applied.
                 </p>
               )}
             </section>

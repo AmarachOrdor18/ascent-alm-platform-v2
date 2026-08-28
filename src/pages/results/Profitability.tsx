@@ -159,24 +159,6 @@ export function Profitability() {
                 seriesName="Ratio"
               />
             </section>
-
-            {p.notes.length > 0 && (
-              <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                  What these figures assume
-                </h2>
-                <ul className="space-y-2 text-[11px] leading-relaxed text-gray-600">
-                  {p.notes.map((note, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span aria-hidden="true" className="text-gray-300">
-                        ·
-                      </span>
-                      <span>{note}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
           </>
         )}
       </ResultsFrame>

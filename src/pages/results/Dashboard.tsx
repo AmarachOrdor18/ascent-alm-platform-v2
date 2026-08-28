@@ -370,8 +370,8 @@ export function Dashboard() {
                     className="flex items-center justify-between rounded-lg px-1 py-2 hover:bg-gray-50"
                   >
                     <div>
-                      <p className="text-[12px] font-bold text-navy-900">{b.label}</p>
-                      <p className="text-[10px] text-gray-400">Current: {b.value}</p>
+                      <p className="font-mono text-[16px] font-bold text-danger">{b.value}</p>
+                      <p className="text-[11px] text-gray-500">{b.label}</p>
                     </div>
                     <StatusBadge status="Breach" tone="danger" />
                   </Link>

@@ -212,28 +212,6 @@ export function StressTesting() {
                 caption="BCBS 368 standardised interest rate shocks. The 15% test compares ΔEVE against the capital basis named above."
               />
 
-              <div
-                className={
-                  outliers.length > 0
-                    ? 'mt-4 rounded-lg border border-warning/30 bg-warning/5 p-4 text-[11px] leading-relaxed text-navy-900'
-                    : 'mt-4 rounded-lg bg-gray-50 p-4 text-[11px] leading-relaxed text-gray-600'
-                }
-              >
-                {outliers.length > 0 ? (
-                  <>
-                    <span className="font-bold">
-                      {outliers.length === 1 ? 'One shock' : `${outliers.length} shocks`} breach the 15% outlier
-                      threshold
-                    </span>{' '}
-                    — {outliers.map((o) => o.label).join(', ')}.
-                  </>
-                ) : (
-                  <>
-                    No shock moves economic value by more than 15% of capital. The book passes the outlier test on
-                    every prescribed scenario.
-                  </>
-                )}
-              </div>
             </section>
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">

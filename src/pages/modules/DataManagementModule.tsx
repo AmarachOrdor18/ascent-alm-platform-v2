@@ -45,10 +45,10 @@ function ReferenceData() {
 }
 
 const GROUP_TABS: ModuleTab[] = [
+  { key: 'connectors', label: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', Component: Connectors },
   { key: 'operations', label: 'Data Operations', path: '/data/operations', permission: 'data.view', Component: DataOperations },
   { key: 'structure', label: 'Data Structure', path: '/data/structure', permission: 'data.view', Component: DataStructure },
   { key: 'reference-data', label: 'Reference Data', path: '/data/reference-data', permission: 'data.view', Component: ReferenceData },
-  { key: 'connectors', label: 'Connectors & Data Sources', path: '/connectors', permission: 'data.view', Component: Connectors },
 ];
 
 export function DataManagementModule() {
