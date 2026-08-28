@@ -1,14 +1,34 @@
+import { useState } from 'react';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { ROLES } from '@/context/AuthContext';
+import { ROLES, useAuth } from '@/context/AuthContext';
 import { useRoles } from '@/lib/hooks';
+import { reseed } from '@/data/seed/bootstrap';
+import { repository } from '@/store/localRepository';
 
 const DEFAULT_ROLE_LIST = Object.values(ROLES);
 
 // No system-wide settings entity exists in this data model; this page is read-only and links out to where each setting is actually configured.
 export function AdminPreferences() {
+  const { hasPermission } = useAuth();
+  const canReset = hasPermission('admin.manage');
   const { data: roles } = useRoles();
   const roleList = roles && roles.length > 0 ? roles : DEFAULT_ROLE_LIST;
+
+  const [armed, setArmed] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleReset = async () => {
+    if (!armed) {
+      setArmed(true);
+      return;
+    }
+    setResetting(true);
+    await reseed(repository);
+    // A full reload is deliberate: every screen's React Query cache, the auth session and scope
+    // context all need to forget what they knew and re-read the freshly seeded database from zero.
+    window.location.reload();
+  };
 
   return (
     <>
@@ -81,6 +101,44 @@ export function AdminPreferences() {
           <Link href="/notifications" className="mt-4 inline-block text-[11px] font-bold text-navy-700 hover:underline">
             Manage notification rules →
           </Link>
+        </section>
+
+        <section className="rounded-2xl border border-danger/30 bg-danger/5 p-6 lg:col-span-2">
+          <h3 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-danger">Reset demo data</h3>
+          <p className="mb-4 text-[11px] leading-relaxed text-navy-900">
+            Wipes every affiliate, position, rule, run, user and log entry in this browser&rsquo;s local database and
+            restores the platform to its original shipped state (Nigeria Live, Ghana and Côte d&rsquo;Ivoire
+            onboarding). This cannot be undone, and it signs everyone in this browser out — the page reloads to the
+            sign-in screen once it&rsquo;s done.
+          </p>
+          {canReset ? (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleReset()}
+                onBlur={() => setArmed(false)}
+                disabled={resetting}
+                className={
+                  armed
+                    ? 'rounded-lg bg-danger px-4 py-2 text-[12px] font-bold text-white hover:opacity-90 disabled:opacity-40'
+                    : 'rounded-lg border border-danger px-4 py-2 text-[12px] font-bold text-danger hover:bg-danger hover:text-white disabled:opacity-40'
+                }
+              >
+                {resetting ? 'Resetting…' : armed ? 'Click again to confirm — this erases everything' : 'Reset demo data'}
+              </button>
+              {armed && !resetting && (
+                <button
+                  type="button"
+                  onClick={() => setArmed(false)}
+                  className="text-[11px] font-bold text-gray-500 hover:text-navy-900"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] font-bold text-gray-500">Only an Administrator can reset demo data.</p>
+          )}
         </section>
       </div>
     </>

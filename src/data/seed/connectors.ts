@@ -9,8 +9,11 @@ export const SEED_CONNECTORS: Connector[] = [
     vendor: 'Oracle',
     protocol: 'REST',
     domains: ['Positions', 'GeneralLedger', 'Counterparties'],
-    status: 'Available',
-    statusReason: null,
+    status: 'Blocked',
+    statusReason:
+      'No production API credentials have been issued for this environment yet. The endpoint, cadence and window ' +
+      'below are the target configuration each affiliate will point to once Core Banking provisions access — not a ' +
+      'live connection today. Positions and the general ledger come in by file upload in the meantime.',
     endpoint: 'https://{affiliate}.flexcube.ecobank.internal/api/v2/extract',
     authMode: 'OAuth2',
     credentialRef: 'vault://alm/flexcube/{affiliate}',
@@ -20,8 +23,9 @@ export const SEED_CONNECTORS: Connector[] = [
     maxRetries: 3,
     owner: 'Ecobank Business Services — Core Banking',
     notes:
-      'One instance per affiliate, so the endpoint is templated on the affiliate code. The extract runs after ' +
-      'end-of-day, which is why the window sits overnight in local time rather than at a single Group hour.',
+      'One instance per affiliate, so the endpoint is templated on the affiliate code. Once connected, the extract ' +
+      'would run after end-of-day, which is why the window sits overnight in local time rather than at a single ' +
+      'Group hour.',
     ...STAMP,
   },
   {
@@ -30,8 +34,10 @@ export const SEED_CONNECTORS: Connector[] = [
     vendor: 'LSEG',
     protocol: 'REST',
     domains: ['MarketRates', 'FxRates'],
-    status: 'Available',
-    statusReason: null,
+    status: 'Blocked',
+    statusReason:
+      'No API key or entitlement has been provisioned for this environment yet. The endpoint and cadence below are ' +
+      'the target configuration, not a live feed today. Curves and FX rates come in by manual entry in the meantime.',
     endpoint: 'https://api.refinitiv.com/data/pricing/v1/views',
     authMode: 'ApiKey',
     credentialRef: 'vault://alm/refinitiv/group',
@@ -40,7 +46,7 @@ export const SEED_CONNECTORS: Connector[] = [
     timeoutSeconds: 60,
     maxRetries: 5,
     owner: 'Group Treasury — Market Data',
-    notes: 'Group-wide entitlement, so one credential covers every affiliate. Curves and FX in the same call.',
+    notes: 'Once entitled, one Group-wide credential would cover every affiliate, with curves and FX in the same call.',
     ...STAMP,
   },
   {
