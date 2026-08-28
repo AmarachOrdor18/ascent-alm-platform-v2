@@ -126,6 +126,26 @@ export const AFFILIATES: Affiliate[] = [
     limitsConfirmed: false,
     createdAt: '2026-07-31T00:00:00Z',
   },
+  {
+    code: 'KE',
+    name: 'Ecobank Kenya',
+    country: 'Kenya',
+    region: 'East Africa',
+    regulator: 'Central Bank of Kenya',
+    functionalCurrency: 'KES',
+    reportingCurrency: 'USD',
+    activeCurrencies: ['KES', 'USD'],
+    // Just onboarded, nothing configured yet — every domain still starts from a manual upload or entry.
+    status: 'Onboarding',
+    fiscalYearEnd: '12-31',
+    holidayCalendarId: null,
+    legalEntityCode: 'LE-KE',
+    feeds: [],
+    inheritGroupRules: true,
+    internalThresholds: {},
+    limitsConfirmed: false,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -150,6 +170,9 @@ export const CURRENCIES: StoredCurrency[] = [
   { code: 'XOF', name: 'West African CFA Franc', symbol: 'CFA', role: 'Reporting', isActive: true },
   { code: 'EUR', name: 'Euro', symbol: '€', role: 'Active', isActive: true },
   { code: 'ZMW', name: 'Zambian Kwacha', symbol: 'ZK', role: 'Active', isActive: true },
+  // No rate seeded on purpose — Ecobank Kenya is a freshly onboarded affiliate, and adding its first
+  // FX rate is one of the manual-entry steps the demo walks through.
+  { code: 'KES', name: 'Kenyan Shilling', symbol: 'KSh', role: 'Active', isActive: true },
 ];
 
 /** Rates are units of the base per one USD, the Group functional currency. */
@@ -190,6 +213,16 @@ export const FX_RATES: StoredFxRate[] = [
     base: 'EUR',
     quote: 'USD',
     rate: 1.083,
+    asOfDate: REFERENCE_AS_OF,
+    source: 'Reuters',
+    updatedBy: 'system-seed',
+    updatedAt: `${REFERENCE_AS_OF}T06:00:00Z`,
+  },
+  {
+    id: 'FX-KES-USD',
+    base: 'KES',
+    quote: 'USD',
+    rate: 1 / 129,
     asOfDate: REFERENCE_AS_OF,
     source: 'Reuters',
     updatedBy: 'system-seed',
@@ -264,6 +297,15 @@ export const YIELD_CURVES: StoredYieldCurve[] = [
     [1825, '5Y', 4.0],
     [3650, '10Y', 4.15],
   ]),
+  curve('KES-TBILL', 'KES Treasury Bill / Interbank Curve', 'KES', [
+    [1, 'O/N', 11.0],
+    [30, '1M', 11.3],
+    [90, '3M', 11.8],
+    [180, '6M', 12.4],
+    [365, '1Y', 13.0],
+    [1095, '3Y', 13.8],
+    [1825, '5Y', 14.2],
+  ]),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -337,6 +379,7 @@ export const ECONOMIC_INDICATORS: EconomicIndicator[] = [
     'Percentage',
     [4.2, 4.0, 3.8, 3.6, 3.5, 3.4],
   ),
+  indicator('KE-CPI', 'Kenya — Headline Inflation', 'KE', '% y/y', 'Percentage', [6.8, 6.3, 5.8, 5.1, 4.6, 4.1]),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

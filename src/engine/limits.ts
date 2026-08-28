@@ -170,4 +170,5 @@ export const REGULATORY_MINIMA: Record<string, Record<string, number>> = {
   CBN: { lcrPercent: 100, nsfrPercent: 100, loanToDepositPercent: 65 },
   'Bank of Ghana': { lcrPercent: 100, nsfrPercent: 100 },
   BCEAO: { lcrPercent: 100, nsfrPercent: 100 },
+  'Central Bank of Kenya': { lcrPercent: 100, nsfrPercent: 100 },
 };

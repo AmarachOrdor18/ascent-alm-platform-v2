@@ -6,7 +6,19 @@ import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useEconomicIndicators, useSaveEconomicIndicator } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
-import type { EconomicIndicator } from '@/engine/types';
+import type { EconomicIndicator, IndicatorFrequency, IndicatorValueType } from '@/engine/types';
+
+const FREQUENCIES: IndicatorFrequency[] = ['Weekly', 'Monthly', 'Quarterly', 'Semi-Annually', 'Annually'];
+const VALUE_TYPES: IndicatorValueType[] = ['Numeric', 'Percentage', 'Amount'];
+
+const emptySeriesDraft = () => ({
+  code: '',
+  name: '',
+  countryCode: '',
+  frequency: 'Monthly' as IndicatorFrequency,
+  valueType: 'Percentage' as IndicatorValueType,
+  unit: '',
+});
 
 export function EconomicIndicators() {
   const { hasPermission } = useAuth();
@@ -16,6 +28,37 @@ export function EconomicIndicators() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newObs, setNewObs] = useState({ asOfDate: '', value: '' });
+  const [creatingSeries, setCreatingSeries] = useState(false);
+  const [seriesDraft, setSeriesDraft] = useState(emptySeriesDraft());
+
+  const handleCreateSeries = () => {
+    const code = seriesDraft.code.trim().toUpperCase();
+    const name = seriesDraft.name.trim();
+    const countryCode = seriesDraft.countryCode.trim().toUpperCase();
+    const unit = seriesDraft.unit.trim();
+    if (!code || !name || !countryCode || !unit) return;
+    if (indicators.some((i) => i.code === code)) return;
+    const created: EconomicIndicator = {
+      id: `EI-${code}`,
+      code,
+      name,
+      countryCode,
+      frequency: seriesDraft.frequency,
+      valueType: seriesDraft.valueType,
+      unit,
+      observations: [],
+      isActive: true,
+      updatedBy: 'current-user',
+      updatedAt: new Date().toISOString(),
+    };
+    save.mutate(created, {
+      onSuccess: () => {
+        setActiveId(created.id);
+        setCreatingSeries(false);
+        setSeriesDraft(emptySeriesDraft());
+      },
+    });
+  };
 
   useEffect(() => {
     if (!activeId && indicators.length > 0) setActiveId(indicators[0]!.id);
@@ -99,6 +142,64 @@ export function EconomicIndicators() {
             ))}
             {isLoading && <li className="text-[12px] text-gray-400">Loading…</li>}
           </ul>
+
+          {canEdit && (
+            <div className="mt-4">
+              {creatingSeries ? (
+                <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div>
+                    <label htmlFor="series-code" className="mb-1 block text-[11px] text-gray-600">Code</label>
+                    <input id="series-code" value={seriesDraft.code} onChange={(e) => setSeriesDraft({ ...seriesDraft, code: e.target.value })} placeholder="KE-CPI" className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+                  </div>
+                  <div>
+                    <label htmlFor="series-name" className="mb-1 block text-[11px] text-gray-600">Name</label>
+                    <input id="series-name" value={seriesDraft.name} onChange={(e) => setSeriesDraft({ ...seriesDraft, name: e.target.value })} placeholder="Kenya — Headline Inflation" className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+                  </div>
+                  <div>
+                    <label htmlFor="series-country" className="mb-1 block text-[11px] text-gray-600">Country code</label>
+                    <input id="series-country" value={seriesDraft.countryCode} onChange={(e) => setSeriesDraft({ ...seriesDraft, countryCode: e.target.value })} placeholder="KE" className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+                  </div>
+                  <div>
+                    <label htmlFor="series-unit" className="mb-1 block text-[11px] text-gray-600">Unit</label>
+                    <input id="series-unit" value={seriesDraft.unit} onChange={(e) => setSeriesDraft({ ...seriesDraft, unit: e.target.value })} placeholder="% y/y" className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+                  </div>
+                  <div>
+                    <label htmlFor="series-freq" className="mb-1 block text-[11px] text-gray-600">Frequency</label>
+                    <select id="series-freq" value={seriesDraft.frequency} onChange={(e) => setSeriesDraft({ ...seriesDraft, frequency: e.target.value as IndicatorFrequency })} className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
+                      {FREQUENCIES.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="series-valuetype" className="mb-1 block text-[11px] text-gray-600">Value type</label>
+                    <select id="series-valuetype" value={seriesDraft.valueType} onChange={(e) => setSeriesDraft({ ...seriesDraft, valueType: e.target.value as IndicatorValueType })} className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700">
+                      {VALUE_TYPES.map((v) => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button type="button" onClick={() => { setCreatingSeries(false); setSeriesDraft(emptySeriesDraft()); }} className="flex-1 rounded-lg px-3 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateSeries}
+                      disabled={save.isPending || !seriesDraft.code.trim() || !seriesDraft.name.trim() || !seriesDraft.countryCode.trim() || !seriesDraft.unit.trim()}
+                      className="flex-1 rounded-lg bg-navy-900 px-3 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                    >
+                      {save.isPending ? 'Creating…' : 'Create series'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreatingSeries(true)}
+                  className="w-full rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[12px] font-bold text-gray-500 hover:border-navy-700 hover:text-navy-900"
+                >
+                  + New series
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         {active && (

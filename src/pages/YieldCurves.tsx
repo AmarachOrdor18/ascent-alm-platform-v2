@@ -4,7 +4,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
-import { useYieldCurves, useSaveYieldCurve } from '@/lib/hooks';
+import { useCurrencies, useYieldCurves, useSaveYieldCurve } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
 import { interpolateCurve } from '@/engine/ftp';
 import type { AccrualBasis, CompoundingBasis, RateFormat, StoredYieldCurve } from '@/engine/types';
@@ -13,15 +13,45 @@ const RATE_FORMATS: RateFormat[] = ['Zero Coupon', 'Yield to Maturity'];
 const COMPOUNDING: CompoundingBasis[] = ['Annual', 'Semiannual', 'Monthly', 'Simple'];
 const ACCRUAL: AccrualBasis[] = ['30/360', 'Actual/360', 'Actual/Actual', '30/365', 'Actual/365', '30/Actual'];
 
+// Same tenor ladder the seed data uses, so a brand-new curve starts in a familiar shape rather than empty.
+const DEFAULT_TENORS: Array<[number, string]> = [
+  [1, 'O/N'],
+  [30, '1M'],
+  [90, '3M'],
+  [180, '6M'],
+  [365, '1Y'],
+  [1095, '3Y'],
+  [1825, '5Y'],
+];
+
+function blankCurve(currency: string, asOfDate: string): StoredYieldCurve {
+  return {
+    id: `IRC-${currency}-${Math.random().toString(36).slice(2, 8)}`,
+    code: `${currency}-BASE`,
+    name: `${currency} base curve`,
+    currency,
+    rateFormat: 'Zero Coupon',
+    compoundingBasis: 'Annual',
+    accrualBasis: 'Actual/365',
+    terms: DEFAULT_TENORS.map(([tenorDays, label]) => ({ tenorDays, label, ratePercent: 0 })),
+    asOfDate,
+    isActive: true,
+    updatedBy: 'current-user',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function YieldCurves() {
   const { hasPermission } = useAuth();
   const { data: curves = [], isLoading } = useYieldCurves();
+  const { data: currencies = [] } = useCurrencies();
   const save = useSaveYieldCurve();
   const canEdit = hasPermission('data.configure') || hasPermission('rules.edit');
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StoredYieldCurve | null>(null);
   const [probeTenor, setProbeTenor] = useState(197);
+  const [creatingCurrency, setCreatingCurrency] = useState('');
 
   useEffect(() => {
     if (!activeId && curves.length > 0) setActiveId(curves[0]!.id);
@@ -29,6 +59,17 @@ export function YieldCurves() {
 
   const active = curves.find((c) => c.id === activeId) ?? null;
   const editing = draft ?? active;
+  const isNewCurve = draft !== null && !curves.some((c) => c.id === draft.id);
+
+  // Currencies that don't already have a curve — creating a second curve for one that has one happens
+  // by editing that curve directly, not through "new curve".
+  const curveless = currencies.filter((c) => !curves.some((curve) => curve.currency === c.code));
+
+  const handleCreate = () => {
+    if (!creatingCurrency) return;
+    setDraft(blankCurve(creatingCurrency, curves[0]?.asOfDate ?? '2026-07-31'));
+    setCreatingCurrency('');
+  };
 
   const updateTerm = (index: number, ratePercent: number) => {
     if (!editing) return;
@@ -38,10 +79,13 @@ export function YieldCurves() {
 
   const handleSave = () => {
     if (!draft) return;
-    save.mutate(
-      { ...draft, updatedBy: 'current-user', updatedAt: new Date().toISOString() },
-      { onSuccess: () => setDraft(null) },
-    );
+    const saved = { ...draft, updatedBy: 'current-user', updatedAt: new Date().toISOString() };
+    save.mutate(saved, {
+      onSuccess: () => {
+        setDraft(null);
+        setActiveId(saved.id);
+      },
+    });
   };
 
   const probeRate = editing
@@ -81,12 +125,48 @@ export function YieldCurves() {
                 disabled={save.isPending}
                 className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
-                {save.isPending ? 'Saving…' : 'Save curve'}
+                {save.isPending ? 'Saving…' : isNewCurve ? 'Create curve' : 'Save curve'}
               </button>
             </>
           ) : null
         }
       />
+
+      {canEdit && !draft && (
+        <div className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+          <div>
+            <label htmlFor="new-curve-currency" className="mb-1 block text-[11px] text-gray-600">
+              New curve for currency
+            </label>
+            <select
+              id="new-curve-currency"
+              value={creatingCurrency}
+              onChange={(e) => setCreatingCurrency(e.target.value)}
+              disabled={curveless.length === 0}
+              className="w-48 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+            >
+              <option value="">{curveless.length === 0 ? 'Every currency has a curve' : 'Select…'}</option>
+              {curveless.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} — {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={!creatingCurrency}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+          >
+            New curve
+          </button>
+          <p className="w-full text-[11px] text-gray-500">
+            Starts from a standard O/N–5Y ladder at 0% — fill in real rates before saving. A currency with no rate
+            registered yet on Currency &amp; FX Rates can still get a curve here; register its rate separately.
+          </p>
+        </div>
+      )}
 
       <div className="mb-6 flex items-center gap-3">
         <label htmlFor="curve-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -94,13 +174,18 @@ export function YieldCurves() {
         </label>
         <select
           id="curve-picker"
-          value={activeId ?? ''}
+          value={isNewCurve ? draft!.id : (activeId ?? '')}
           onChange={(e) => {
             setActiveId(e.target.value);
             setDraft(null);
           }}
           className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
         >
+          {isNewCurve && (
+            <option value={draft!.id}>
+              {draft!.code} — {draft!.name} (new, unsaved)
+            </option>
+          )}
           {curves.map((c) => (
             <option key={c.id} value={c.id}>
               {c.code} — {c.name}

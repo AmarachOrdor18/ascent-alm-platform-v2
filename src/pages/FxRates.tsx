@@ -29,6 +29,17 @@ export function FxRates() {
 
   const [edits, setEdits] = useState<Record<string, number>>({});
   const [newRate, setNewRate] = useState({ code: '', rate: '' });
+  const [newCurrency, setNewCurrency] = useState({ code: '', name: '', symbol: '' });
+
+  const handleAddCurrency = () => {
+    const code = newCurrency.code.trim().toUpperCase();
+    const name = newCurrency.name.trim();
+    if (!code || !name || currencies.some((c) => c.code === code)) return;
+    saveCurrency.mutate(
+      { code, name, symbol: newCurrency.symbol.trim() || code, role: 'Active', isActive: true },
+      { onSuccess: () => setNewCurrency({ code: '', name: '', symbol: '' }) },
+    );
+  };
 
   const asOfDate = rates[0]?.asOfDate ?? null;
   const table = buildFxTable('USD', rates, asOfDate ?? '');
@@ -251,6 +262,35 @@ export function FxRates() {
               consolidated through. See the definitions below for the full detail.
             </InfoButton>
           </h2>
+
+          {canEdit && (
+            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg bg-gray-50 p-3">
+              <div>
+                <label htmlFor="new-ccy-code" className="mb-1 block text-[11px] text-gray-600">Code</label>
+                <input id="new-ccy-code" value={newCurrency.code} onChange={(e) => setNewCurrency({ ...newCurrency, code: e.target.value })} placeholder="KES" maxLength={3} className="w-20 rounded border border-gray-200 px-2 py-1 font-mono text-[12px] uppercase focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+              </div>
+              <div>
+                <label htmlFor="new-ccy-name" className="mb-1 block text-[11px] text-gray-600">Name</label>
+                <input id="new-ccy-name" value={newCurrency.name} onChange={(e) => setNewCurrency({ ...newCurrency, name: e.target.value })} placeholder="Kenyan Shilling" className="w-40 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+              </div>
+              <div>
+                <label htmlFor="new-ccy-symbol" className="mb-1 block text-[11px] text-gray-600">Symbol</label>
+                <input id="new-ccy-symbol" value={newCurrency.symbol} onChange={(e) => setNewCurrency({ ...newCurrency, symbol: e.target.value })} placeholder="KSh" className="w-20 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddCurrency}
+                disabled={saveCurrency.isPending || !newCurrency.code.trim() || !newCurrency.name.trim()}
+                className="rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              >
+                {saveCurrency.isPending ? 'Adding…' : 'New currency'}
+              </button>
+              <p className="w-full text-[11px] text-gray-500">
+                Registers with an Active role and no rate yet — add its rate above once it exists here.
+              </p>
+            </div>
+          )}
+
           <TableToolbar
             searchValue={rolesControls.search}
             onSearchChange={rolesControls.setSearch}

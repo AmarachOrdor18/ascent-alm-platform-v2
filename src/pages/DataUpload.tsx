@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { DataLoadPanel, type DataLoadPanelState } from '@/components/data/DataLoadPanel';
@@ -72,7 +73,7 @@ export function DataUpload() {
             onChange={(e) => setDomain(e.target.value as DataDomain)}
             className="rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
           >
-            {(['Positions', 'GeneralLedger', 'Counterparties'] as DataDomain[]).map((d) => (
+            {(['Positions', 'Counterparties'] as DataDomain[]).map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>
@@ -91,6 +92,9 @@ export function DataUpload() {
             className="rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
           />
         </div>
+        <p className="text-[11px] text-gray-400">
+          General ledger trial balances upload on <Link href="/gl-reconciliation" className="font-bold text-navy-700 hover:underline">GL Reconciliation</Link>, not here — that screen compares the ledger against committed positions rather than staging it on its own.
+        </p>
       </div>
 
       {affiliate ? (

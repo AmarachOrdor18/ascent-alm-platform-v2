@@ -3,6 +3,7 @@ import type {
   AccrualBasis,
   AmortizationType,
   BehaviouralTag,
+  DimensionMember,
   HqlaLevel,
   IsoDate,
   LcrCashflowRole,
@@ -401,4 +402,60 @@ export function importLedger(text: string, asOfDate: IsoDate, defaultCurrency = 
   }
 
   return { rows, errors, ignoredColumns: [], headerColumns: header };
+}
+
+const COUNTERPARTY_SECTORS = ['Corporate', 'Retail', 'Sovereign', 'Public Sector', 'Financial Institution'];
+const COUNTERPARTY_COLUMNS = ['code', 'name', 'sector', 'parentcode'];
+
+/** Parse a counterparty register file. */
+export function importCounterparties(text: string): ImportResult<DimensionMember> {
+  const table = parseCsv(text);
+  if (table.length === 0) {
+    return {
+      rows: [],
+      errors: [{ line: 1, column: '', message: 'File is empty' }],
+      ignoredColumns: [],
+      headerColumns: [],
+    };
+  }
+
+  const header = table[0]!.map((h) => h.trim());
+  const index = new Map(header.map((h, i) => [h.trim().toLowerCase(), i]));
+  const ignoredColumns = header.filter((h) => !COUNTERPARTY_COLUMNS.includes(h.trim().toLowerCase()));
+  const errors: RowError[] = [];
+  const rows: DimensionMember[] = [];
+
+  const missing = ['code', 'name'].filter((c) => !index.has(c));
+  if (missing.length > 0) {
+    errors.push({ line: 1, column: missing.join(', '), message: `Required column(s) missing: ${missing.join(', ')}` });
+    return { rows, errors, ignoredColumns, headerColumns: header };
+  }
+
+  for (let r = 1; r < table.length; r += 1) {
+    const line = r + 1;
+    const cells = table[r]!;
+    const get = (name: string): string | undefined => {
+      const i = index.get(name);
+      return i === undefined ? undefined : cells[i];
+    };
+
+    const code = optionalText(get('code'));
+    const name = optionalText(get('name'));
+    if (!code || !name) {
+      errors.push({ line, column: 'code, name', message: 'code and name are both required' });
+      continue;
+    }
+
+    rows.push({
+      id: `Counterparty:${code}`,
+      dimension: 'Counterparty',
+      code,
+      name,
+      parentCode: optionalText(get('parentcode')) ?? 'CP-ROOT',
+      isLeaf: true,
+      attributes: { sector: oneOf(get('sector'), COUNTERPARTY_SECTORS, 'Corporate', 'sector', line, errors) },
+    });
+  }
+
+  return { rows, errors, ignoredColumns, headerColumns: header };
 }

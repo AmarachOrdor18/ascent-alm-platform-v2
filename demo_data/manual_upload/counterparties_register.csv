@@ -1,0 +1,52 @@
+code,name,sector
+CP-BONDHOLDERS,Bondholders (Aggregated),Corporate
+CP-CIB-001,Corporate & Investment Banking Client 001,Corporate
+CP-CIB-002,Corporate & Investment Banking Client 002,Corporate
+CP-CIB-003,Corporate & Investment Banking Client 003,Corporate
+CP-CIB-004,Corporate & Investment Banking Client 004,Corporate
+CP-CIB-005,Corporate & Investment Banking Client 005,Corporate
+CP-CIB-006,Corporate & Investment Banking Client 006,Corporate
+CP-CIB-007,Corporate & Investment Banking Client 007,Corporate
+CP-CIB-010,Corporate & Investment Banking Client 010,Corporate
+CP-CIB-011,Corporate & Investment Banking Client 011,Corporate
+CP-CIB-013,Corporate & Investment Banking Client 013,Corporate
+CP-CIB-019,Corporate & Investment Banking Client 019,Corporate
+CP-CIB-026,Corporate & Investment Banking Client 026,Corporate
+CP-CIB-027,Corporate & Investment Banking Client 027,Corporate
+CP-CIB-032,Corporate & Investment Banking Client 032,Corporate
+CP-CIB-034,Corporate & Investment Banking Client 034,Corporate
+CP-CIB-035,Corporate & Investment Banking Client 035,Corporate
+CP-CIB-036,Corporate & Investment Banking Client 036,Corporate
+CP-CIB-038,Corporate & Investment Banking Client 038,Corporate
+CP-CIB-040,Corporate & Investment Banking Client 040,Corporate
+CP-CIB-042,Corporate & Investment Banking Client 042,Corporate
+CP-CIB-045,Corporate & Investment Banking Client 045,Corporate
+CP-CIB-046,Corporate & Investment Banking Client 046,Corporate
+CP-CIB-048,Corporate & Investment Banking Client 048,Corporate
+CP-CIB-050,Corporate & Investment Banking Client 050,Corporate
+CP-CIB-052,Corporate & Investment Banking Client 052,Corporate
+CP-CIB-054,Corporate & Investment Banking Client 054,Corporate
+CP-CIB-055,Corporate & Investment Banking Client 055,Corporate
+CP-CIB-056,Corporate & Investment Banking Client 056,Corporate
+CP-CIB-058,Corporate & Investment Banking Client 058,Corporate
+CP-CIB-059,Corporate & Investment Banking Client 059,Corporate
+CP-CIB-063,Corporate & Investment Banking Client 063,Corporate
+CP-CIB-064,Corporate & Investment Banking Client 064,Corporate
+CP-CIB-068,Corporate & Investment Banking Client 068,Corporate
+CP-CIB-069,Corporate & Investment Banking Client 069,Corporate
+CP-CORP-ISSUER-01,Corporate Bond Issuer,Corporate
+CP-CORRESPONDENT-01,Correspondent Bank - Nostro Relationship,Financial Institution
+CP-DFI-01,Development Finance Institution,Financial Institution
+CP-INTERBANK-01,Interbank Counterparty - Money Market,Financial Institution
+CP-RTL-002,Retail Banking Client Pool 002,Retail
+CP-RTL-004,Retail Banking Client Pool 004,Retail
+CP-RTL-005,Retail Banking Client Pool 005,Retail
+CP-RTL-008,Retail Banking Client Pool 008,Retail
+CP-RTL-016,Retail Banking Client Pool 016,Retail
+CP-RTL-018,Retail Banking Client Pool 018,Retail
+CP-RTL-022,Retail Banking Client Pool 022,Retail
+CP-RTL-037,Retail Banking Client Pool 037,Retail
+CP-RTL-045,Retail Banking Client Pool 045,Retail
+CP-RTL-053,Retail Banking Client Pool 053,Retail
+CP-RTL-061,Retail Banking Client Pool 061,Retail
+CP-SOVEREIGN,Sovereign / Government Securities,Sovereign

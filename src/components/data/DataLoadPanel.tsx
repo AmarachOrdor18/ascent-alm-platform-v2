@@ -14,7 +14,7 @@ import {
   useStagedBatchFor,
   useSaveStagedBatch,
 } from '@/lib/hooks';
-import { importPositions, type RowError } from '@/lib/csvImport';
+import { importCounterparties, importPositions, type RowError } from '@/lib/csvImport';
 import { validatePositions, type ValidationResult } from '@/engine/validation';
 import { planSupersede } from '@/engine/vintage';
 import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
@@ -34,6 +34,13 @@ async function hashFile(text: string): Promise<string> {
 interface Staged {
   batch: LoadBatch;
   positions: Position[];
+  parseErrors: RowError[];
+  ignoredColumns: string[];
+}
+
+interface StagedMembers {
+  fileName: string;
+  members: DimensionMember[];
   parseErrors: RowError[];
   ignoredColumns: string[];
 }
@@ -86,6 +93,12 @@ export function DataLoadPanel({
   const [autoMapping, setAutoMapping] = useState(false);
   const [justCommitted, setJustCommitted] = useState<{ fileName: string; rowCount: number } | null>(null);
 
+  // Counterparties is a flat dimension-member list, not a versioned/validated position batch — it gets its
+  // own lightweight staging state rather than being forced through the position-shaped flow above.
+  const [stagedMembers, setStagedMembers] = useState<StagedMembers | null>(null);
+  const [savingMembers, setSavingMembers] = useState(false);
+  const [membersSaved, setMembersSaved] = useState<{ fileName: string; count: number } | null>(null);
+
   // Resume a previously saved staging session so leaving mid-upload doesn't silently drop staged rows.
   const { data: resumable } = useStagedBatchFor(affiliate.code, domain, asOfDate);
   useEffect(() => {
@@ -123,7 +136,41 @@ export function DataLoadPanel({
 
   const supersede = planSupersede(batches, affiliate.code, domain, asOfDate);
 
+  const handleCounterpartyFile = async (file: File) => {
+    setBusy(true);
+    setMembersSaved(null);
+    try {
+      const text = await file.text();
+      const result = importCounterparties(text);
+      setStagedMembers({
+        fileName: file.name,
+        members: result.rows,
+        parseErrors: result.errors,
+        ignoredColumns: result.ignoredColumns,
+      });
+    } finally {
+      setBusy(false);
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
+
+  const handleSaveMembers = async () => {
+    if (!stagedMembers || stagedMembers.members.length === 0) return;
+    setSavingMembers(true);
+    try {
+      await saveCounterparties.mutateAsync(stagedMembers.members);
+      setMembersSaved({ fileName: stagedMembers.fileName, count: stagedMembers.members.length });
+      setStagedMembers(null);
+    } finally {
+      setSavingMembers(false);
+    }
+  };
+
   const handleFile = async (file: File) => {
+    if (domain === 'Counterparties') {
+      await handleCounterpartyFile(file);
+      return;
+    }
     setBusy(true);
     setJustCommitted(null);
     try {
@@ -257,6 +304,15 @@ export function DataLoadPanel({
   }, [staged]);
 
   useEffect(() => {
+    if (domain === 'Counterparties') {
+      onStateChange?.({
+        rowsStaged: stagedMembers ? stagedMembers.members.length : null,
+        parseErrors: stagedMembers ? stagedMembers.parseErrors.length : null,
+        validation: null,
+        balanceCheck: null,
+      });
+      return;
+    }
     onStateChange?.({
       rowsStaged: staged ? staged.positions.length : null,
       parseErrors: staged ? staged.parseErrors.length : null,
@@ -264,7 +320,7 @@ export function DataLoadPanel({
       balanceCheck: totals ? (Math.abs(totals.difference) < 0.01 ? 'Balances' : `Out by ${totals.difference.toFixed(0)}`) : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onStateChange is expected to be stable per caller; including it would re-fire on every parent render
-  }, [staged, validation, totals]);
+  }, [domain, staged, validation, totals, stagedMembers]);
 
   const columns: ResultColumn<Position>[] = [
     { key: 'id', header: 'ID', render: (p) => <span className="font-mono text-[11px]">{p.id}</span> },
@@ -358,6 +414,107 @@ export function DataLoadPanel({
         </div>
       )}
 
+      {domain === 'Counterparties' ? (
+        <>
+          {membersSaved && !stagedMembers && (
+            <div role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success">
+              <span className="font-bold">✓ Saved.</span> {membersSaved.fileName} — {membersSaved.count} counterpart
+              {membersSaved.count === 1 ? 'y' : 'ies'} registered.
+            </div>
+          )}
+
+          {stagedMembers && (
+            <>
+              {stagedMembers.ignoredColumns.length > 0 && (
+                <div role="status" className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[12px] text-navy-900">
+                  <span className="font-bold">Columns not used:</span> {stagedMembers.ignoredColumns.join(', ')}.
+                </div>
+              )}
+
+              {stagedMembers.parseErrors.length > 0 && (
+                <section className="mb-4 rounded-2xl border border-danger/20 bg-danger-bg p-6">
+                  <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-danger">
+                    Parse errors ({stagedMembers.parseErrors.length})
+                  </h2>
+                  <ul className="space-y-1 text-[12px] text-gray-700">
+                    {stagedMembers.parseErrors.slice(0, 20).map((e, i) => (
+                      <li key={`${e.line}-${e.column}-${i}`}>
+                        <span className="font-mono">line {e.line}</span> · <span className="font-bold">{e.column}</span> —{' '}
+                        {e.message}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                      Parsed counterparties — {stagedMembers.fileName}
+                    </h2>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      {stagedMembers.members.length} row{stagedMembers.members.length === 1 ? '' : 's'} ready to register —
+                      re-uploading a code already on file updates it rather than duplicating it.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStagedMembers(null)}
+                      className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveMembers()}
+                      disabled={!canUpload || savingMembers || stagedMembers.members.length === 0}
+                      className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                    >
+                      {savingMembers ? 'Saving…' : `Register ${stagedMembers.members.length} counterpart${stagedMembers.members.length === 1 ? 'y' : 'ies'}`}
+                    </button>
+                  </div>
+                </div>
+
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
+                      <th className="py-2 px-3 font-bold">Code</th>
+                      <th className="py-2 px-3 font-bold">Name</th>
+                      <th className="py-2 px-3 font-bold">Sector</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stagedMembers.members.slice(0, 200).map((m) => (
+                      <tr key={m.id} className="border-b border-gray-100">
+                        <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{m.code}</td>
+                        <td className="py-2 px-3 text-navy-900">{m.name}</td>
+                        <td className="py-2 px-3 text-gray-600">{String(m.attributes?.sector ?? '—')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {stagedMembers.members.length > 200 && (
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    Showing the first 200 of {stagedMembers.members.length} rows.
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+
+          {!stagedMembers && !membersSaved && !uploadBlockedByConnector && (
+            <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+              <p className="text-[13px] font-bold text-navy-900">No file staged for Counterparties</p>
+              <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+                Upload a CSV above, or register one at a time from the Counterparty Register screen.
+              </p>
+            </section>
+          )}
+        </>
+      ) : (
+        <>
       {justCommitted && !staged && (
         <div role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success">
           <span className="font-bold">✓ Committed.</span> {justCommitted.fileName} — {justCommitted.rowCount} row{justCommitted.rowCount === 1 ? '' : 's'} for {domain}.
@@ -572,6 +729,8 @@ export function DataLoadPanel({
             Upload a file above to get started.
           </p>
         </section>
+      )}
+        </>
       )}
     </div>
   );

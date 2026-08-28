@@ -68,6 +68,12 @@ export const LEGAL_ENTITIES: DimensionMember[] = [
     licence: 'Société de Gestion et d’Intermédiation',
     consolidationBasis: 'Full',
   }),
+
+  node('LegalEntity', 'LE-KE', 'Ecobank Kenya Limited', 'LE-GROUP', true, {
+    regulator: 'Central Bank of Kenya',
+    licence: 'Commercial Banking',
+    consolidationBasis: 'Full',
+  }),
 ];
 
 // Organisational Unit — Retail / Corporate / Treasury / Wealth, with branch/region beneath
