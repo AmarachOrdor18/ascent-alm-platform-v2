@@ -133,6 +133,7 @@ BUILT['/treasury/ftp'] = FtpProfitabilityModule;
 BUILT['/treasury/balance-sheet'] = BalanceSheetTreasuryModule;
 BUILT['/reporting'] = ReportingModule;
 BUILT['/data/operations'] = DataManagementModule;
+BUILT['/connectors'] = DataManagementModule;
 BUILT['/execution'] = ExecutionModule;
 BUILT['/configuration'] = ConfigurationModule;
 BUILT['/admin'] = AdministrationModule;
@@ -175,7 +176,6 @@ const MODULE_TAB_ROUTES: RouteEntry[] = [
   { path: '/admin/users', screenName: 'Users, Roles & Permissions', Component: AdministrationModule, permission: 'dashboard.view' },
   { path: '/admin/preferences', screenName: 'System Preferences', Component: AdministrationModule, permission: 'dashboard.view' },
   { path: '/admin/audit', screenName: 'Audit Log', Component: AdministrationModule, permission: 'dashboard.view' },
-  { path: '/connectors', screenName: 'Connectors & Data Sources', Component: DataManagementModule, permission: 'data.view' },
 ];
 
 /**
@@ -203,7 +203,7 @@ const LEGACY_REDIRECTS: Array<{ from: string; to: string }> = [
   { from: '/management-reporting', to: '/reporting' },
   { from: '/regulatory-reporting', to: '/reporting/regulatory' },
   { from: '/ad-hoc', to: '/reporting/ad-hoc' },
-  { from: '/data', to: '/data/operations' },
+  { from: '/data', to: '/connectors' },
   { from: '/data-upload', to: '/data/operations' },
   { from: '/gl-reconciliation', to: '/data/operations/gl-reconciliation' },
   { from: '/data-vintages', to: '/data/operations/vintages' },
@@ -255,6 +255,7 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
   { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
   { path: '/affiliates/bulk-onboard', screenName: 'Bulk Onboard Affiliates' },
+  { path: '/data/operations', screenName: 'Data Operations' },
 ];
 
 /**
@@ -265,6 +266,7 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
 const UNLISTED_PERMISSION: Record<string, string> = {
   '/affiliates/onboard': 'group.manage',
   '/affiliates/bulk-onboard': 'group.manage',
+  '/data/operations': 'data.view',
 };
 
 function permissionForUnlisted(path: string): string {

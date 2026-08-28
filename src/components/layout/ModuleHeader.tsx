@@ -3,12 +3,15 @@ import { cn } from '@/lib/cn';
 import { formatAsAt } from '@/lib/format';
 import type { CurrencyCode, IsoDate } from '@/engine/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 
 export interface HeaderMetric {
   label: string;
   value: string;
   delta?: string;
   tone?: 'success' | 'warning' | 'danger' | 'neutral';
+  /** Brief, plain-English explanation shown behind an info button next to the label. */
+  about?: string;
 }
 
 interface ModuleHeaderProps {
@@ -81,7 +84,10 @@ export function ModuleHeader({
         <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {metrics.map((m) => (
             <div key={m.label} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-              <dt className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</dt>
+              <dt className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                {m.label}
+                {m.about && <InfoButton label={`About ${m.label}`}>{m.about}</InfoButton>}
+              </dt>
               <dd className="text-lg font-bold text-navy-900">{m.value}</dd>
               {m.delta && <p className={cn('mt-0.5 text-[11px]', TONE[m.tone ?? 'neutral'])}>{m.delta}</p>}
             </div>

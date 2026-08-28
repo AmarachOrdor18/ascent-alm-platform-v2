@@ -132,13 +132,14 @@ export function Limits() {
         asOfDate={run?.asOfDate ?? null}
         scope={affiliateCode}
         metrics={[
-          { label: 'Limits monitored', value: String(evaluations.length) },
-          { label: 'In breach', value: String(red.length), tone: red.length > 0 ? 'danger' : 'success' },
-          { label: 'On watch', value: String(amber.length), tone: amber.length > 0 ? 'warning' : 'success' },
+          { label: 'Limits monitored', value: String(evaluations.length), about: 'Limit configurations active for this scope, evaluated automatically against the selected run.' },
+          { label: 'In breach', value: String(red.length), tone: red.length > 0 ? 'danger' : 'success', about: 'Limits currently graded Red — inside or beyond the most severe internal threshold.' },
+          { label: 'On watch', value: String(amber.length), tone: amber.length > 0 ? 'warning' : 'success', about: 'Limits currently graded Amber — inside appetite but past the early-warning threshold.' },
           {
             label: 'Below regulatory minimum',
             value: String(regBreaches.length),
             tone: regBreaches.length > 0 ? 'danger' : 'success',
+            about: "Limits breaching the regulator's own floor, not just an internal one — the most serious category, distinct from a Red internal grading.",
           },
         ]}
         actions={

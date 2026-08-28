@@ -6,9 +6,17 @@ interface InfoButtonProps {
   label?: string;
   className?: string;
   panelClassName?: string;
+  /** Stops the click from bubbling to an ancestor link/row — for an info button nested inside a clickable card. */
+  stopClickPropagation?: boolean;
 }
 
-export function InfoButton({ children, label = 'More information', className, panelClassName }: InfoButtonProps) {
+export function InfoButton({
+  children,
+  label = 'More information',
+  className,
+  panelClassName,
+  stopClickPropagation = false,
+}: InfoButtonProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -32,7 +40,13 @@ export function InfoButton({ children, label = 'More information', className, pa
     <span ref={ref} className={cn('relative inline-flex', className)}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          if (stopClickPropagation) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          setOpen((v) => !v);
+        }}
         aria-label={label}
         aria-expanded={open}
         className={cn(

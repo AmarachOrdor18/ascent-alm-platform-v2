@@ -75,13 +75,14 @@ export function AdminAudit() {
         description="Every recorded action, as it happened. Nothing on this screen is generated for display."
         asOfDate={null}
         metrics={[
-          { label: 'Events recorded', value: String(events.length) },
-          { label: 'Showing', value: String(totalItems) },
-          { label: 'Distinct actors', value: String(actors) },
+          { label: 'Events recorded', value: String(events.length), about: 'Every logged action across the platform — rule changes, run executions, data loads, sign-ins and more.' },
+          { label: 'Showing', value: String(totalItems), about: 'Events matching the current module, outcome and search filters below.' },
+          { label: 'Distinct actors', value: String(actors), about: 'Unique users who have taken a logged action.' },
           {
             label: 'Failures',
             value: String(failures.length),
             tone: failures.length > 0 ? 'warning' : 'success',
+            about: 'Actions that were attempted but did not succeed — a failed run, a rejected save, and similar.',
           },
         ]}
       />

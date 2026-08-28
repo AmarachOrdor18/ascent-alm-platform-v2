@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer,
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { Amount } from '@/components/ui/Amount';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
@@ -45,7 +46,22 @@ interface Metric {
   href: string;
   icon?: ComponentType<IconProps>;
   trend?: Trend;
+  /** Plain-English explanation shown behind an info button next to the label. */
+  about: string;
 }
+
+const METRIC_ABOUT: Record<string, string> = {
+  lcr: 'Liquidity Coverage Ratio: high-quality liquid assets divided by expected net cash outflows over a 30-day stress scenario. Basel III sets a 100% regulatory floor.',
+  nsfr: 'Net Stable Funding Ratio: available stable funding divided by required stable funding over a one-year horizon. Basel III sets a 100% regulatory floor.',
+  survival: 'Survival Horizon: how many days the counterbalancing capacity (liquid assets, committed lines) would last under a severe stressed outflow before running out.',
+  ldr: 'Loan-to-Deposit: customer loans as a share of customer deposits. A classic funding-structure indicator — a high ratio signals reliance on deposits to fund lending.',
+  nii: 'Net Interest Income sensitivity: how much a standard interest-rate shock (+200bp) would change this year’s net interest income, driven by the repricing gap.',
+  eve: 'Economic Value of Equity sensitivity: how much an interest-rate shock would change the present value of the whole balance sheet, as a share of capital. Basel’s supervisory outlier test is ±15%.',
+  concentration: 'Largest single depositor’s share of total deposits — the single biggest funding-concentration vulnerability.',
+  npl: 'Non-Performing Loan ratio: share of the loan book classified Substandard, Doubtful or Loss.',
+  nim: 'Net Interest Margin: interest income less interest expense, expressed as a share of total assets — a core profitability measure.',
+  inbreach: 'Count of the metrics on this page currently outside their configured internal limit.',
+};
 
 const TONE_TEXT: Record<Tone, string> = {
   success: 'text-success',
@@ -185,6 +201,7 @@ export function Dashboard() {
       href: '/liquidity-risk',
       icon: ShieldCheckIcon,
       trend: trendFrom(trendSeries?.get('lcrPercent'), true),
+      about: METRIC_ABOUT.lcr!,
     },
     {
       id: 'nsfr',
@@ -194,6 +211,7 @@ export function Dashboard() {
       href: '/liquidity-risk',
       icon: BarChartIcon,
       trend: trendFrom(trendSeries?.get('nsfrPercent'), true),
+      about: METRIC_ABOUT.nsfr!,
     },
     {
       id: 'survival',
@@ -203,6 +221,7 @@ export function Dashboard() {
       href: '/stress-testing',
       icon: ClockIcon,
       trend: trendFrom(trendSeries?.get('survivalHorizonDays'), true, 0),
+      about: METRIC_ABOUT.survival!,
     },
     {
       id: 'ldr',
@@ -212,16 +231,17 @@ export function Dashboard() {
       href: '/liquidity-risk',
       icon: PieChartIcon,
       trend: trendFrom(trendSeries?.get('loanToDepositPercent'), false),
+      about: METRIC_ABOUT.ldr!,
     },
   ];
 
   // Everything else, read as a label next to a number, not a card.
   const baseSnapshot: Metric[] = [
-    { id: 'nii', label: 'NII sensitivity', value: formatPct(nii?.niiSensitivityPercent ?? null, 2), tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success', href: '/interest-rate-risk' },
-    { id: 'eve', label: 'EVE sensitivity', value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2), tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success', href: '/interest-rate-risk' },
-    { id: 'concentration', label: 'Largest depositor', value: formatPct(conc?.largestSharePercent ?? null), tone: conc?.largestSharePercent == null ? 'neutral' : conc.largestSharePercent > 10 ? 'danger' : conc.largestSharePercent > 5 ? 'warning' : 'success', href: '/concentration' },
-    { id: 'npl', label: 'NPL ratio', value: formatPct(prof?.nplRatioPercent ?? null, 2), tone: prof?.nplRatioPercent == null ? 'neutral' : prof.nplRatioPercent > 5 ? 'danger' : prof.nplRatioPercent > 3 ? 'warning' : 'success', href: '/profitability' },
-    { id: 'nim', label: 'Net interest margin', value: formatPct(prof?.netInterestMarginPercent ?? null, 2), tone: 'neutral', href: '/profitability' },
+    { id: 'nii', label: 'NII sensitivity', value: formatPct(nii?.niiSensitivityPercent ?? null, 2), tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success', href: '/interest-rate-risk', about: METRIC_ABOUT.nii! },
+    { id: 'eve', label: 'EVE sensitivity', value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2), tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success', href: '/interest-rate-risk', about: METRIC_ABOUT.eve! },
+    { id: 'concentration', label: 'Largest depositor', value: formatPct(conc?.largestSharePercent ?? null), tone: conc?.largestSharePercent == null ? 'neutral' : conc.largestSharePercent > 10 ? 'danger' : conc.largestSharePercent > 5 ? 'warning' : 'success', href: '/concentration', about: METRIC_ABOUT.concentration! },
+    { id: 'npl', label: 'NPL ratio', value: formatPct(prof?.nplRatioPercent ?? null, 2), tone: prof?.nplRatioPercent == null ? 'neutral' : prof.nplRatioPercent > 5 ? 'danger' : prof.nplRatioPercent > 3 ? 'warning' : 'success', href: '/profitability', about: METRIC_ABOUT.npl! },
+    { id: 'nim', label: 'Net interest margin', value: formatPct(prof?.netInterestMarginPercent ?? null, 2), tone: 'neutral', href: '/profitability', about: METRIC_ABOUT.nim! },
   ];
 
   const breaches = [...headline, ...baseSnapshot].filter((m) => m.tone === 'danger');
@@ -234,6 +254,7 @@ export function Dashboard() {
       value: String(breaches.length),
       tone: breaches.length > 0 ? 'danger' : 'success',
       href: '/limits',
+      about: METRIC_ABOUT.inbreach!,
     },
   ];
 
@@ -258,7 +279,10 @@ export function Dashboard() {
                 className="block rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
-                  <p className="text-[13px] font-medium text-gray-500">{m.label}</p>
+                  <span className="flex items-center gap-1">
+                    <p className="text-[13px] font-medium text-gray-500">{m.label}</p>
+                    <InfoButton label={`About ${m.label}`} stopClickPropagation>{m.about}</InfoButton>
+                  </span>
                   {Icon && (
                     <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TONE_ICON_BG[m.tone]}`}>
                       <Icon className="h-4 w-4" />
@@ -350,7 +374,10 @@ export function Dashboard() {
             <div className="grid grid-cols-3 gap-3">
               {snapshot.map((m) => (
                 <Link key={m.id} href={m.href} className="block rounded-lg bg-gray-50 p-3 hover:bg-gray-100">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
+                  <span className="flex items-center gap-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
+                    <InfoButton label={`About ${m.label}`} stopClickPropagation>{m.about}</InfoButton>
+                  </span>
                   <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
                 </Link>
               ))}

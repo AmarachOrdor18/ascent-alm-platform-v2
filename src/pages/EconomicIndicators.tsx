@@ -51,13 +51,14 @@ export function EconomicIndicators() {
         asOfDate={latest?.asOfDate ?? null}
         scope="Group"
         metrics={[
-          { label: 'Series', value: String(indicators.length) },
-          { label: 'Countries', value: String(new Set(indicators.map((i) => i.countryCode)).size) },
-          { label: 'Latest value', value: latest ? `${latest.value} ${active?.unit ?? ''}` : '—' },
+          { label: 'Series', value: String(indicators.length), about: 'Macro series on file — inflation, policy rates and similar drivers of behavioural and scenario assumptions.' },
+          { label: 'Countries', value: String(new Set(indicators.map((i) => i.countryCode)).size), about: 'Distinct countries with at least one series tracked.' },
+          { label: 'Latest value', value: latest ? `${latest.value} ${active?.unit ?? ''}` : '—', about: 'The most recent observation on the selected series.' },
           {
             label: 'Period change',
             value: change === null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}`,
             tone: change === null ? 'neutral' : change > 0 ? 'warning' : 'success',
+            about: 'Move from the prior observation to the latest one on the selected series.',
           },
         ]}
       />

@@ -180,22 +180,26 @@ export function WhatIf() {
                 : (result?.stressedLcr.lcrPercent ?? 100) < 130
                   ? 'warning'
                   : 'success',
+            about: 'The Liquidity Coverage Ratio recomputed live under the levers set on this screen — the delta shows the move from the unstressed base case.',
           },
           {
             label: 'NSFR',
             value: formatPct(result?.stressedNsfr.nsfrPercent ?? null),
             tone: (result?.stressedNsfr.nsfrPercent ?? 100) < 100 ? 'danger' : 'success',
+            about: 'The Net Stable Funding Ratio recomputed under the deposit-attrition lever set on this screen.',
           },
           {
             label: 'Survival horizon',
             value: result ? `${result.survival.survivalHorizonDays} days` : '—',
             delta: result ? `${result.survival.survivalHorizonDays - result.baseSurvival.survivalHorizonDays} days` : undefined,
             tone: (result?.survival.survivalHorizonDays ?? 30) < 20 ? 'danger' : 'success',
+            about: "Days the counterbalancing capacity lasts under this scenario's outflow assumption — the delta shows the move from the base-case survival horizon.",
           },
           {
             label: 'ΔNII',
             value: result ? formatPct(result.baseNii.niiSensitivityPercent) : '—',
             tone: (result?.baseNii.deltaNii ?? 0) < 0 ? 'warning' : 'neutral',
+            about: 'How much the rate-shock lever changes net interest income, before any deposit-beta adjustment.',
           },
         ]}
         actions={

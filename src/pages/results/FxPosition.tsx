@@ -101,6 +101,7 @@ export function FxPosition() {
           {
             label: 'Aggregate NOP',
             value: fx ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(fx.aggregateNetOpenPosition) : '—',
+            about: 'Aggregate Net Open Position: the sum of absolute net positions across every non-reporting currency — the conservative measure, not long netted against short.',
           },
           {
             label: 'Aggregate % of capital',
@@ -111,15 +112,18 @@ export function FxPosition() {
                 : Math.abs(fx.aggregatePercentOfCapital) > AGGREGATE_LIMIT_PCT
                   ? 'danger'
                   : 'success',
+            about: 'The aggregate net open position expressed as a share of capital — the standard way FX exposure is sized against the balance sheet that has to absorb it.',
           },
           {
             label: 'Currencies held',
             value: fx ? String(fx.lines.length) : '—',
+            about: "How many distinct currencies this run's positions are denominated in.",
           },
           {
             label: `Above ${SINGLE_CURRENCY_LIMIT_PCT}% singly`,
             value: String(breaches.length),
             tone: breaches.length > 0 ? 'danger' : 'success',
+            about: `Currencies whose individual net open position exceeds ${SINGLE_CURRENCY_LIMIT_PCT}% of capital on its own, regardless of the aggregate figure.`,
           },
         ]}
       />

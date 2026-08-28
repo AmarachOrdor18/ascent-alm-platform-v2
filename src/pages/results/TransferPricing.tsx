@@ -5,6 +5,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf, methodologyOf } from '@/lib/resultHooks';
 import { useDimensionMembers } from '@/lib/hooks';
@@ -117,17 +118,20 @@ export function TransferPricing() {
             label: 'Total FTP margin',
             value: ftp ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(ftp.totalMarginContribution) : '—',
             tone: (ftp?.totalMarginContribution ?? 0) < 0 ? 'danger' : 'success',
+            about: 'Net margin earned across the whole book once every priced position has been charged or credited its internal transfer rate.',
           },
-          { label: 'Priced positions', value: ftp ? String(ftp.lines.length - unpricedCount) : '—' },
+          { label: 'Priced positions', value: ftp ? String(ftp.lines.length - unpricedCount) : '—', about: 'Positions that matched a yield-curve point and could be charged a transfer rate.' },
           {
             label: 'Unpriced',
             value: String(unpricedCount),
             tone: unpricedCount > 0 ? 'warning' : 'success',
+            about: 'Positions with no matching curve point or external rate — reported here rather than silently priced at zero.',
           },
           {
             label: 'Balance unpriced',
             value: ftp ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(ftp.unpriced) : '—',
             tone: (ftp?.unpriced ?? 0) > 0 ? 'warning' : 'success',
+            about: 'Total balance sitting in unpriced positions — a data or configuration gap worth closing, not a number quietly left out of the total.',
           },
         ]}
         actions={
@@ -148,8 +152,12 @@ export function TransferPricing() {
         {ftp && (
           <>
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Margin by business unit
+                <InfoButton label="How margin is attributed">
+                  Each position's margin is attributed to its own organisational unit — a negative Treasury figure is
+                  expected, since Treasury funds the balance sheet at cost rather than earning a lending spread.
+                </InfoButton>
               </h2>
               <p className="mb-4 text-[11px] text-gray-500">
                 Assets are charged the transfer rate and keep the excess of their external rate; liabilities are
@@ -195,7 +203,14 @@ export function TransferPricing() {
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Transfer rate detail</h2>
+                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Transfer rate detail
+                  <InfoButton label="How to read this table">
+                    The base rate is read off the yield curve at the position's tenor; add-ons stack on top by named
+                    type (liquidity premium, basis risk, and so on); the all-in rate is what the position is actually
+                    charged or credited. Expand a row to see the full breakdown.
+                  </InfoButton>
+                </h2>
                 {unpricedCount > 0 && (
                   <button
                     type="button"

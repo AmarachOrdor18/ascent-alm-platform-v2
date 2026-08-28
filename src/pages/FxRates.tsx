@@ -144,13 +144,14 @@ export function FxRates() {
             : null
         }
         metrics={[
-          { label: 'Active currencies', value: String(currencies.filter((c) => c.isActive).length) },
-          { label: 'Rates loaded', value: String(rates.length) },
-          { label: 'Pivot currency', value: 'USD' },
+          { label: 'Active currencies', value: String(currencies.filter((c) => c.isActive).length), about: 'Currencies available for positions and rules to reference.' },
+          { label: 'Rates loaded', value: String(rates.length), about: 'Exchange rate pairs currently on file.' },
+          { label: 'Pivot currency', value: 'USD', about: 'Every rate converts through this currency — a NGN/GHS conversion, for example, goes via their respective USD rates.' },
           {
             label: 'Coverage',
             value: missing.length === 0 ? 'Complete' : `${missing.length} missing`,
             tone: missing.length === 0 ? 'success' : 'danger',
+            about: 'Whether every currency an affiliate actually transacts in has a loaded rate. A gap here fails any run touching that currency rather than silently omitting it.',
           },
         ]}
       />

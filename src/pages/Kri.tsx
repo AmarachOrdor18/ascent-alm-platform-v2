@@ -97,14 +97,15 @@ export function Kri() {
         asOfDate={null}
         scope={affiliateCode}
         metrics={[
-          { label: 'Indicators', value: String(evaluations.length) },
+          { label: 'Indicators', value: String(evaluations.length), about: "Key Risk Indicators currently active — each one tracks a metric's trend across successive runs, not just its latest level." },
           {
             label: 'Deteriorating',
             value: String(deteriorating.length),
             tone: deteriorating.length > 0 ? 'danger' : 'success',
+            about: 'Indicators whose least-squares slope over the observation window is moving the wrong way for that metric.',
           },
-          { label: 'Runs in history', value: String(completed) },
-          { label: 'Longest series', value: `${observationCount} obs` },
+          { label: 'Runs in history', value: String(completed), about: 'Completed runs in this scope, which is how many data points the trend lines below can draw from.' },
+          { label: 'Longest series', value: `${observationCount} obs`, about: 'The longest run of observations behind any single indicator. At least 3 are needed before a trend can be called.' },
         ]}
         actions={
           <Link

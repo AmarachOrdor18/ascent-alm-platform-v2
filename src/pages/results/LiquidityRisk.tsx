@@ -66,20 +66,24 @@ export function LiquidityRisk() {
             label: 'LCR',
             value: formatPct(lcr?.lcrPercent ?? null),
             tone: (lcr?.lcrPercent ?? 200) < 100 ? 'danger' : (lcr?.lcrPercent ?? 200) < 130 ? 'warning' : 'success',
+            about: 'Liquidity Coverage Ratio: high-quality liquid assets over 30-day net cash outflows under stress. Basel III floor is 100%.',
           },
           {
             label: 'NSFR',
             value: formatPct(nsfr?.nsfrPercent ?? null),
             tone: (nsfr?.nsfrPercent ?? 200) < 100 ? 'danger' : 'success',
+            about: 'Net Stable Funding Ratio: available stable funding over required stable funding across a one-year horizon. Basel III floor is 100%.',
           },
           {
             label: 'Loan-to-deposit',
             value: formatPct(ldr?.ratioPercent ?? null),
             tone: (ldr?.ratioPercent ?? 0) > 90 ? 'warning' : 'success',
+            about: 'Customer loans as a share of customer deposits — a classic funding-structure indicator. A high ratio signals reliance on deposits to fund lending.',
           },
           {
             label: 'Largest affiliate deposit share',
             value: depositsByAffiliate[0] ? formatPct(depositsByAffiliate[0].sharePercent) : '—',
+            about: 'The single affiliate holding the largest share of Group deposit funding — a Group-diversification question, distinct from depositor-level concentration.',
           },
         ]}
         actions={
@@ -98,7 +102,14 @@ export function LiquidityRisk() {
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Maturity gap analysis</h2>
+                  <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    Maturity gap analysis
+                    <InfoButton label="What this chart shows">
+                      Assets minus liabilities and capital by maturity bucket, bucketed on contractual maturity date (or
+                      behavioural re-dating in the Behavioural view). A negative gap means more matures on the
+                      liability side than the asset side in that window — net cash out, not in.
+                    </InfoButton>
+                  </h2>
                   <p className="mt-1 text-[11px] font-medium text-gray-400">Assets vs. liabilities by maturity bucket</p>
                 </div>
                 <div className="flex rounded-lg border border-gray-200 p-0.5">
@@ -140,7 +151,13 @@ export function LiquidityRisk() {
           )}
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Deposit concentration by affiliate</h2>
+            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Deposit concentration by affiliate
+              <InfoButton label="What this shows">
+                Each affiliate's share of total Group deposit funding — a diversification question at the affiliate
+                level, distinct from the depositor-level concentration on the Concentration screen.
+              </InfoButton>
+            </h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">Share of Group deposit funding</p>
             {depositsByAffiliate.length === 0 ? (
               <p className="text-[12px] text-gray-400">Only meaningful at Group scope with more than one affiliate's deposits in the run.</p>
@@ -167,7 +184,14 @@ export function LiquidityRisk() {
 
         {fxPosition && fxPosition.lines.length > 0 && (
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Cross-currency funding position</h2>
+            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Cross-currency funding position
+              <InfoButton label="What this shows">
+                Assets and liabilities converted to the reporting currency, broken out by the currency they are
+                actually settled in — this is where a currency mismatch shows up even when the overall book looks
+                balanced.
+              </InfoButton>
+            </h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">Assets and liabilities by settlement currency</p>
             <FxPositionTable lines={fxPosition.lines} currency={currency} />
           </section>
@@ -177,8 +201,12 @@ export function LiquidityRisk() {
           {lcr && (
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                   Liquidity Coverage Ratio
+                  <InfoButton label="Methodology">
+                    High-quality liquid assets net of each position's own haircut, unencumbered only, divided by
+                    30-day net cash outflows (gross outflows less inflows, inflows capped at 75% of outflows).
+                  </InfoButton>
                 </h2>
                 <StatusBadge
                   status={lcr.lcrPercent === null ? 'Not computable' : lcr.lcrPercent >= 100 ? 'Above 100%' : 'Below 100%'}
@@ -221,8 +249,12 @@ export function LiquidityRisk() {
           {nsfr && (
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                   Net Stable Funding Ratio
+                  <InfoButton label="Methodology">
+                    Available stable funding (liabilities and capital, weighted by each position's ASF factor) over
+                    required stable funding (assets, weighted by RSF factor), over a one-year horizon.
+                  </InfoButton>
                 </h2>
                 <StatusBadge
                   status={nsfr.nsfrPercent === null ? 'Not computable' : nsfr.nsfrPercent >= 100 ? 'Above 100%' : 'Below 100%'}

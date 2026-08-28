@@ -4,6 +4,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { useDimensionMembers } from '@/lib/hooks';
@@ -106,13 +107,15 @@ export function Concentration() {
                   : conc.largestSharePercent > 5
                     ? 'warning'
                     : 'success',
+            about: 'Share of total deposits held by the single largest mapped counterparty — the biggest single funding-concentration vulnerability.',
           },
-          { label: 'Top five', value: formatPct(conc?.topFiveSharePercent ?? null, 2) },
-          { label: 'Top ten', value: formatPct(conc?.topTenSharePercent ?? null, 2) },
+          { label: 'Top five', value: formatPct(conc?.topFiveSharePercent ?? null, 2), about: 'Combined share of total deposits held by the five largest counterparties.' },
+          { label: 'Top ten', value: formatPct(conc?.topTenSharePercent ?? null, 2), about: 'Combined share of total deposits held by the ten largest counterparties.' },
           {
             label: 'Herfindahl index',
             value: conc?.herfindahlIndex === null || conc == null ? '—' : Math.round(conc.herfindahlIndex).toString(),
             tone: band.tone,
+            about: 'Sum of every counterparty’s squared percentage share. Below 1,500 reads as diversified, 1,500–2,500 as moderately concentrated, above 2,500 as highly concentrated.',
           },
         ]}
       />
@@ -149,8 +152,13 @@ export function Concentration() {
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                   Largest depositors
+                  <InfoButton label="How exposures are flagged">
+                    Deposits with no counterparty mapping are excluded here and reported separately, rather than
+                    dropped or lumped into an average — either would distort the shares. A depositor above 10% is
+                    flagged as a large exposure; above 5% as worth monitoring.
+                  </InfoButton>
                 </h2>
                 {conc.byCounterparty.length > limit && (
                   <button

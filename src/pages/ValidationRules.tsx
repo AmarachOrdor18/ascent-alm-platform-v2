@@ -139,13 +139,14 @@ export function ValidationRules() {
         asOfDate={asOfDate}
         scope={affiliate?.name ?? 'No affiliate selected'}
         metrics={[
-          { label: 'Rules', value: String(rules.length) },
-          { label: 'Active', value: String(rules.filter((r) => r.isActive).length) },
-          { label: 'Blocking', value: String(blocking), tone: 'warning' },
+          { label: 'Rules', value: String(rules.length), about: 'Data-quality checks configured for this scope, covering completeness, referential integrity, ranges and more.' },
+          { label: 'Active', value: String(rules.filter((r) => r.isActive).length), about: 'Rules currently enforced — a disabled rule is kept on file but not evaluated.' },
+          { label: 'Blocking', value: String(blocking), tone: 'warning', about: 'Active rules that prevent a batch being committed if it fails them, rather than just flagging the finding.' },
           {
             label: 'Last run',
             value: result ? (result.blocked ? 'Blocked' : 'Passed') : 'Not run',
             tone: result ? (result.blocked ? 'danger' : 'success') : 'neutral',
+            about: 'The outcome of the most recent check against this affiliate’s staged positions.',
           },
         ]}
         actions={

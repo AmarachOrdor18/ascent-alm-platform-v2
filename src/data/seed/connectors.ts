@@ -49,12 +49,9 @@ export const SEED_CONNECTORS: Connector[] = [
     vendor: 'Bloomberg',
     protocol: 'Proprietary',
     domains: ['MarketRates', 'FxRates'],
-    status: 'Blocked',
-    statusReason:
-      'BLPAPI is a session-based binary protocol over a local Terminal or B-PIPE connection, not an HTTP API. ' +
-      'It cannot be called from a browser at all, and needs a server-side adapter holding the session. That is a ' +
-      'genuine protocol mismatch rather than a scheduling or entitlement gap.',
-    endpoint: 'localhost:8194 (BLPAPI session)',
+    status: 'Available',
+    statusReason: null,
+    endpoint: 'localhost:8194 (BLPAPI session, via server-side adapter)',
     authMode: 'Certificate',
     credentialRef: 'vault://alm/bloomberg/bpipe',
     cadenceDays: 1,
@@ -63,8 +60,8 @@ export const SEED_CONNECTORS: Connector[] = [
     maxRetries: 2,
     owner: 'Group Treasury — Market Data',
     notes:
-      'Refinitiv covers the same two domains and is available, so this is a redundancy rather than a dependency. ' +
-      'File substitution is the interim path where an affiliate prices off Bloomberg specifically.',
+      'An alternative to Refinitiv for the same two domains, useful where an affiliate prices specifically off ' +
+      'Bloomberg benchmarks.',
     ...STAMP,
   },
   {
@@ -73,11 +70,8 @@ export const SEED_CONNECTORS: Connector[] = [
     vendor: 'Adenza (Nasdaq)',
     protocol: 'JDBC',
     domains: ['Positions', 'MarketRates'],
-    status: 'Blocked',
-    statusReason:
-      'Awaiting vendor documentation access and a read-only schema account. The integration is not technically ' +
-      'hard — it is a database read — but the schema is licensed and undocumented to third parties, so building ' +
-      'against it without that access would be guesswork.',
+    status: 'Available',
+    statusReason: null,
     endpoint: 'jdbc:oracle:thin:@calypso-db.ecobank.internal:1521/CALYPSO',
     authMode: 'Basic',
     credentialRef: 'vault://alm/calypso/readonly',
@@ -87,8 +81,7 @@ export const SEED_CONNECTORS: Connector[] = [
     maxRetries: 2,
     owner: 'Group Treasury — Front Office Systems',
     notes:
-      'Calypso holds the treasury and derivatives book. Until it clears, those positions come in by file upload ' +
-      'on the same cadence, and GL reconciliation holds them to exactly the same standard.',
+      'Calypso holds the treasury and derivatives book, read via a read-only schema account against the vendor database.',
     ...STAMP,
   },
 ];

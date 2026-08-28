@@ -82,12 +82,13 @@ export function BatchScheduler() {
         asOfDate={null}
         scope={affiliates.find((a) => a.code === affiliateCode)?.name ?? 'All affiliates'}
         metrics={[
-          { label: 'Schedules', value: String(schedules.length) },
-          { label: 'Active', value: String(schedules.filter((s) => s.isActive).length) },
+          { label: 'Schedules', value: String(schedules.length), about: 'Recurring run definitions configured for this scope.' },
+          { label: 'Active', value: String(schedules.filter((s) => s.isActive).length), about: 'Schedules currently live — a paused schedule stops producing new occurrences without being deleted.' },
           {
             label: 'Occurrences overdue',
             value: String(totalOverdue),
             tone: totalOverdue > 0 ? 'warning' : 'success',
+            about: 'Reporting dates a schedule should have produced by now but has not — each is a separate date, not collapsed into the next run.',
           },
         ]}
         actions={

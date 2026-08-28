@@ -60,9 +60,9 @@ export function YieldCurves() {
         asOfDate={editing?.asOfDate ?? null}
         scope="Group"
         metrics={[
-          { label: 'Curves defined', value: String(curves.length) },
-          { label: 'Currencies covered', value: String(new Set(curves.map((c) => c.currency)).size) },
-          { label: 'Term points', value: editing ? String(editing.terms.length) : '—' },
+          { label: 'Curves defined', value: String(curves.length), about: 'Yield curves on file across every currency — these are what FTP base rates and shock scenarios are read from.' },
+          { label: 'Currencies covered', value: String(new Set(curves.map((c) => c.currency)).size), about: 'Distinct currencies with at least one curve defined.' },
+          { label: 'Term points', value: editing ? String(editing.terms.length) : '—', about: 'Tenor points on the selected curve — rates between them are linearly interpolated.' },
         ]}
         actions={
           draft && canEdit ? (

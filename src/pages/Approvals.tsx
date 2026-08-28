@@ -95,10 +95,10 @@ export function Approvals() {
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'Pending', value: String(pending.length), tone: pending.length > 0 ? 'warning' : 'success' },
-          { label: 'Approved', value: String(requests.filter((r) => r.status === 'Approved').length), tone: 'success' },
-          { label: 'Rejected', value: String(requests.filter((r) => r.status === 'Rejected').length) },
-          { label: 'Total', value: String(requests.length) },
+          { label: 'Pending', value: String(pending.length), tone: pending.length > 0 ? 'warning' : 'success', about: 'Requests awaiting a decision from someone other than the person who raised them.' },
+          { label: 'Approved', value: String(requests.filter((r) => r.status === 'Approved').length), tone: 'success', about: 'Requests a different user has approved.' },
+          { label: 'Rejected', value: String(requests.filter((r) => r.status === 'Rejected').length), about: 'Requests a different user has declined.' },
+          { label: 'Total', value: String(requests.length), about: 'Every approval request ever raised, regardless of outcome.' },
         ]}
         actions={
           <button

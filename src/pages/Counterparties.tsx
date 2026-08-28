@@ -141,14 +141,15 @@ export function Counterparties() {
         asOfDate={positions[0]?.asOfDate ?? null}
         scope={affiliateCode === 'GROUP' ? 'Ecobank Group' : affiliateCode}
         metrics={[
-          { label: 'Registered', value: String(rows.length) },
-          { label: 'With exposure', value: String(withExposure.length) },
+          { label: 'Registered', value: String(rows.length), about: 'Counterparty codes on file, whether or not they currently carry a deposit balance.' },
+          { label: 'With exposure', value: String(withExposure.length), about: 'Registered counterparties that actually hold a deposit balance in the current scope.' },
           {
             label: 'Largest single',
             value: largest ? formatPct(largest.sharePercent) : '—',
             tone: largest && largest.sharePercent > 25 ? 'danger' : 'neutral',
+            about: 'The single largest counterparty’s share of total mapped deposits in this scope.',
           },
-          { label: 'Top-5 share', value: withExposure.length > 0 ? formatPct(topFive) : '—' },
+          { label: 'Top-5 share', value: withExposure.length > 0 ? formatPct(topFive) : '—', about: 'Combined share of total deposits held by the five largest counterparties.' },
         ]}
       />
 

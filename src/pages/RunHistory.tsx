@@ -97,13 +97,14 @@ export function RunHistory() {
         asOfDate={null}
         scope={affiliateCode === 'GROUP' ? 'All scopes' : affiliateCode}
         metrics={[
-          { label: 'Runs', value: String(runs.length) },
-          { label: 'Completed', value: String(completed.length), tone: 'success' },
-          { label: 'Failed', value: String(failed.length), tone: failed.length > 0 ? 'danger' : 'neutral' },
+          { label: 'Runs', value: String(runs.length), about: 'Every run ever executed in this scope, regardless of outcome.' },
+          { label: 'Completed', value: String(completed.length), tone: 'success', about: 'Runs that finished and produced results, available to results screens.' },
+          { label: 'Failed', value: String(failed.length), tone: failed.length > 0 ? 'danger' : 'neutral', about: 'Runs that stopped rather than silently producing a partial answer — check the error log in each row.' },
           {
             label: 'On superseded data',
             value: String(runs.filter(isStale).length),
             tone: runs.some(isStale) ? 'warning' : 'neutral',
+            about: 'Completed runs whose pinned data version has since been replaced by a newer batch — the figures are still exactly what was computed at the time, just no longer current.',
           },
         ]}
       />

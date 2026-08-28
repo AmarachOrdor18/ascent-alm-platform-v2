@@ -95,10 +95,10 @@ export function Notifications() {
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'Rules', value: String(rules.length) },
-          { label: 'Active', value: String(active.length), tone: 'success' },
-          { label: 'With escalation', value: String(withEscalation.length) },
-          { label: 'Channels used', value: String(new Set(rules.map((r) => r.channel)).size) },
+          { label: 'Rules', value: String(rules.length), about: 'Configured event-to-alert rules across every channel and affiliate.' },
+          { label: 'Active', value: String(active.length), tone: 'success', about: 'Rules currently live — a disabled rule stops firing without being deleted.' },
+          { label: 'With escalation', value: String(withEscalation.length), about: 'Rules that forward to a second recipient if nobody acts within the configured hours.' },
+          { label: 'Channels used', value: String(new Set(rules.map((r) => r.channel)).size), about: 'Distinct delivery channels (Email, SMS, In-App, Webhook) in use across all rules.' },
         ]}
         actions={
           <button

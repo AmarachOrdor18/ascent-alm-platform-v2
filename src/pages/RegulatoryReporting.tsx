@@ -84,10 +84,10 @@ export function RegulatoryReporting() {
         description="Returns by jurisdiction, each attachable to the run supplying its figures. Submission is maker-checker."
         asOfDate={null}
         metrics={[
-          { label: 'Overdue', value: String(overdue.length), tone: overdue.length > 0 ? 'danger' : 'success' },
-          { label: 'In flight', value: String(inFlight.length), tone: inFlight.length > 0 ? 'warning' : 'neutral' },
-          { label: 'Accepted', value: String(accepted.length), tone: 'success' },
-          { label: 'Total', value: String(rows.length) },
+          { label: 'Overdue', value: String(overdue.length), tone: overdue.length > 0 ? 'danger' : 'success', about: 'Returns past their due date that have not yet been Submitted or Accepted.' },
+          { label: 'In flight', value: String(inFlight.length), tone: inFlight.length > 0 ? 'warning' : 'neutral', about: 'Returns currently In preparation or Under review.' },
+          { label: 'Accepted', value: String(accepted.length), tone: 'success', about: 'Returns the regulator has formally accepted.' },
+          { label: 'Total', value: String(rows.length), about: 'All regulatory returns tracked across every regulator and affiliate.' },
         ]}
         actions={
           <button type="button" onClick={() => setEditing(blank())} disabled={!canEdit} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">

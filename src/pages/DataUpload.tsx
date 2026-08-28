@@ -28,21 +28,24 @@ export function DataUpload() {
         scope={affiliate?.name ?? 'No affiliate selected'}
         currency={affiliate?.functionalCurrency}
         metrics={[
-          { label: 'Rows staged', value: panelState.rowsStaged !== null ? String(panelState.rowsStaged) : '—' },
+          { label: 'Rows staged', value: panelState.rowsStaged !== null ? String(panelState.rowsStaged) : '—', about: 'Rows parsed from the uploaded file and sitting in staging — editable, not yet committed.' },
           {
             label: 'Parse errors',
             value: panelState.parseErrors !== null ? String(panelState.parseErrors) : '—',
             tone: panelState.parseErrors && panelState.parseErrors > 0 ? 'danger' : 'neutral',
+            about: 'Rows that failed to parse into the expected schema at all.',
           },
           {
             label: 'Validation',
             value: panelState.validation ?? '—',
             tone: panelState.validation === 'Blocked' ? 'danger' : panelState.validation === 'Passed' ? 'success' : 'neutral',
+            about: 'Whether the staged rows pass the configured Validation Rules — a blocking finding prevents commit.',
           },
           {
             label: 'Balance check',
             value: panelState.balanceCheck ?? '—',
             tone: panelState.balanceCheck === 'Balances' ? 'success' : panelState.balanceCheck ? 'danger' : 'neutral',
+            about: 'Whether staged assets equal liabilities plus capital — catches an obviously broken file before it reaches a calculation.',
           },
         ]}
       />

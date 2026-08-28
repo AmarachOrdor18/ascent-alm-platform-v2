@@ -70,13 +70,14 @@ export function HolidayCalendar() {
         asOfDate={null}
         scope={active?.name ?? 'Group'}
         metrics={[
-          { label: 'Calendars', value: String(calendars.length) },
-          { label: 'Holidays defined', value: active ? String(active.holidays.length) : '—' },
+          { label: 'Calendars', value: String(calendars.length), about: 'Business-day calendars defined, typically one per jurisdiction.' },
+          { label: 'Holidays defined', value: active ? String(active.holidays.length) : '—', about: 'Dates on the selected calendar that are not business days.' },
           {
             label: 'Weekend',
             value: active ? active.weekendDays.map((d) => DAY_NAMES[d]!.slice(0, 3)).join(' & ') : '—',
+            about: 'Which weekdays this jurisdiction treats as non-business days — not every calendar uses Saturday/Sunday.',
           },
-          { label: 'Exceptions', value: active ? String(active.holidays.filter((h) => h.isException).length) : '—' },
+          { label: 'Exceptions', value: active ? String(active.holidays.filter((h) => h.isException).length) : '—', about: 'Holidays that move each year (like Eid) rather than falling on a fixed recurring date.' },
         ]}
       />
 

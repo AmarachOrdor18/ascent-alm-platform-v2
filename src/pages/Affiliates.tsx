@@ -109,17 +109,19 @@ export function Affiliates() {
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'Affiliates', value: String(rows.length) },
-          { label: 'Live', value: String(live.length), tone: 'success' },
+          { label: 'Affiliates', value: String(rows.length), about: 'Every affiliate registered in the platform, at any stage of onboarding.' },
+          { label: 'Live', value: String(live.length), tone: 'success', about: 'Affiliates whose data is trusted enough to roll up into Group figures.' },
           {
             label: 'Onboarding',
             value: String(onboarding.length),
             tone: onboarding.length > 0 ? 'warning' : 'neutral',
+            about: 'Affiliates still being configured — not yet contributing to Group-consolidated results.',
           },
           {
             label: 'Stale data',
             value: String(rows.filter((a) => worstFreshness(a) === 'Stale').length),
             tone: 'danger',
+            about: 'Affiliates where at least one data domain has aged past its refresh SLA.',
           },
         ]}
         actions={

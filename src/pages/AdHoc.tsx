@@ -42,10 +42,10 @@ export function AdHoc() {
         description="Pick metrics and affiliates from the platform's own catalogue and register — each read from its latest completed run."
         asOfDate={null}
         metrics={[
-          { label: 'Metrics available', value: String(METRIC_SPECS.length) },
-          { label: 'Affiliates onboarded', value: String(liveAffiliates.length) },
-          { label: 'Runs with results', value: String(latestRunByAffiliate.size) },
-          { label: 'Selected', value: `${metricKeys.length} × ${affiliateCodes.length}` },
+          { label: 'Metrics available', value: String(METRIC_SPECS.length), about: 'The full metric catalogue this screen can pull from — the same one Limits and KRI use.' },
+          { label: 'Affiliates onboarded', value: String(liveAffiliates.length), about: 'Non-Group affiliates registered in the platform, regardless of onboarding status.' },
+          { label: 'Runs with results', value: String(latestRunByAffiliate.size), about: 'Affiliates that have at least one completed run to read a metric from.' },
+          { label: 'Selected', value: `${metricKeys.length} × ${affiliateCodes.length}`, about: 'How many metrics and affiliates are currently chosen — the analysis below is this grid, one cell per pair.' },
         ]}
       />
 

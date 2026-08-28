@@ -149,14 +149,15 @@ export function ModelsAssumptions() {
         asOfDate={null}
         scope="All folders"
         metrics={[
-          { label: 'Rule types', value: `${configured}/${REGISTRY.length}` },
-          { label: 'Rules defined', value: String(allRules.length) },
+          { label: 'Rule types', value: `${configured}/${REGISTRY.length}`, about: 'How many of the 13 rule categories have at least one rule defined, versus still running on engine defaults.' },
+          { label: 'Rules defined', value: String(allRules.length), about: 'Total rule instances across every category, Group-wide and affiliate-specific combined.' },
           {
             label: 'Affiliate overrides',
             value: String(affiliateSpecific.length),
             tone: affiliateSpecific.length > 0 ? 'warning' : 'neutral',
+            about: 'Rules scoped to a single affiliate rather than the Group standard — a deliberate fork, not an oversight, but worth knowing about.',
           },
-          { label: 'Inactive', value: String(inactive.length), tone: inactive.length > 0 ? 'warning' : 'neutral' },
+          { label: 'Inactive', value: String(inactive.length), tone: inactive.length > 0 ? 'warning' : 'neutral', about: 'Rules kept on file but not currently applied to any run.' },
         ]}
       />
 

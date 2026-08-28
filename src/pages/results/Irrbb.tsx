@@ -68,14 +68,16 @@ export function Irrbb() {
             label: `NII sensitivity (${nii ? `${nii.shockBps > 0 ? '+' : ''}${nii.shockBps}bp` : 'run shock'})`,
             value: formatPct(nii?.niiSensitivityPercent ?? null, 2),
             tone: (nii?.deltaNii ?? 0) < 0 ? 'warning' : 'neutral',
+            about: 'How much this shock would change net interest income over the horizon, driven by the repricing gap between rate-sensitive assets and liabilities.',
           },
           {
             label: 'EVE sensitivity (% of capital)',
             value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2),
             tone: eve?.isBaselOutlier === true ? 'danger' : 'success',
+            about: 'How much this shock would change the present value of the whole book, via the duration gap, as a share of capital. Basel’s supervisory outlier test is ±15%.',
           },
-          { label: 'Prescribed shock scenarios', value: String(shockRows.length) },
-          { label: 'Repricing buckets', value: String(repricingGap?.buckets.length ?? ladder.buckets.length) },
+          { label: 'Prescribed shock scenarios', value: String(shockRows.length), about: 'The six BCBS-standard interest-rate shocks: parallel up/down, steepener, flattener, and short rate up/down.' },
+          { label: 'Repricing buckets', value: String(repricingGap?.buckets.length ?? ladder.buckets.length), about: 'The number of time buckets on the active repricing ladder, into which positions are sorted by their next repricing date.' },
         ]}
         actions={
           <div className="flex gap-2">
@@ -103,7 +105,13 @@ export function Irrbb() {
         {shockRows.length > 0 && (
           <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Basel prescribed shock scenarios</h2>
+              <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Basel prescribed shock scenarios
+                <InfoButton label="What this chart shows">
+                  All six BCBS-standard shocks (parallel up/down, steepener, flattener, short rate up/down) applied to
+                  this run's own book, showing both the earnings (NII) and economic-value (EVE) impact side by side.
+                </InfoButton>
+              </h2>
               <p className="mb-4 text-[11px] font-medium text-gray-400">NII and EVE impact, all six standard shocks against this run's book</p>
               <div style={{ width: '100%', height: 320 }}>
                 <ResponsiveContainer>
@@ -122,7 +130,13 @@ export function Irrbb() {
             </section>
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Yield curve</h2>
+              <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                Yield curve
+                <InfoButton label="What this chart shows">
+                  The market curve used to derive the shock scenarios above — the same curve, shocked, drives both the
+                  NII and EVE calculations.
+                </InfoButton>
+              </h2>
               <p className="mb-4 text-[11px] font-medium text-gray-400">{currency}, most recent curve as at or before the run date</p>
               <div style={{ width: '100%', height: 320 }}>
                 {curvePoints.length === 0 ? (
@@ -147,7 +161,14 @@ export function Irrbb() {
 
         {repricingGap && (
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-navy-900">Repricing gap analysis</h2>
+            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              Repricing gap analysis
+              <InfoButton label="What this chart shows">
+                Positions bucketed by next repricing date (falling back to maturity for fixed-rate instruments) —
+                different from the maturity gap, since a floating-rate loan can reprice long before it matures. This
+                gap is what drives the NII sensitivity above.
+              </InfoButton>
+            </h2>
             <p className="mb-4 text-[11px] font-medium text-gray-400">Rate-sensitive assets vs. liabilities by repricing bucket</p>
             <div style={{ width: '100%', height: 280 }}>
               <ResponsiveContainer>

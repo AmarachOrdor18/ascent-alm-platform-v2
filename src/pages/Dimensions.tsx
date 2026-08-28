@@ -114,10 +114,10 @@ export function Dimensions() {
           </InfoButton>
         }
         metrics={[
-          { label: 'Dimensions', value: String(DIMENSIONS.length) },
-          { label: `${definition.label} members`, value: String(members.length) },
-          { label: 'Root nodes', value: String(roots.length) },
-          { label: 'Leaves', value: String(members.filter((m) => m.isLeaf).length) },
+          { label: 'Dimensions', value: String(DIMENSIONS.length), about: 'The seven classification axes every position is tagged with — organisational unit, product, GL account and so on.' },
+          { label: `${definition.label} members`, value: String(members.length), about: `Every code defined on the ${definition.label} dimension, at any level of its hierarchy.` },
+          { label: 'Root nodes', value: String(roots.length), about: 'Top-level entries in this dimension’s hierarchy — everything else nests beneath one of these.' },
+          { label: 'Leaves', value: String(members.filter((m) => m.isLeaf).length), about: 'Members with no children — these are what a position can actually be tagged with; a rollup node cannot carry a balance directly.' },
         ]}
       />
 

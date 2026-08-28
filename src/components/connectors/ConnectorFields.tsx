@@ -16,8 +16,6 @@ export function ConnectorFields({
   onChange: (next: Connector) => void;
 }) {
   const set = (patch: Partial<Connector>) => onChange({ ...connector, ...patch });
-  const toggleDomain = (d: DataDomain) =>
-    set({ domains: connector.domains.includes(d) ? connector.domains.filter((x) => x !== d) : [...connector.domains, d] });
   const problems = validateConnector(connector);
 
   return (
@@ -56,26 +54,32 @@ export function ConnectorFields({
         </F>
       </div>
 
-      <fieldset className="mt-4">
-        <legend className="mb-2 text-[11px] font-medium text-gray-600">Data domains it can supply</legend>
-        <div className="flex flex-wrap gap-2">
+      <F
+        id="cn-domains"
+        label={
+          <span className="inline-flex items-center gap-1.5">
+            Data domains it can supply
+            <InfoButton label="How to select more than one domain">
+              Hold Ctrl (Windows) or Cmd (Mac) and click to select or deselect individual domains — a connector
+              can supply more than one.
+            </InfoButton>
+          </span>
+        }
+        className="mt-4"
+      >
+        <select
+          id="cn-domains"
+          multiple
+          value={connector.domains}
+          onChange={(e) => set({ domains: Array.from(e.target.selectedOptions, (o) => o.value as DataDomain) })}
+          className={`${INPUT} h-auto`}
+          size={DOMAINS.length}
+        >
           {DOMAINS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => toggleDomain(d)}
-              aria-pressed={connector.domains.includes(d)}
-              className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold ${
-                connector.domains.includes(d)
-                  ? 'border-navy-700 bg-navy-50 text-navy-900'
-                  : 'border-gray-200 text-gray-500 hover:border-navy-700'
-              }`}
-            >
-              {DOMAIN_LABEL[d]}
-            </button>
+            <option key={d} value={d}>{DOMAIN_LABEL[d]}</option>
           ))}
-        </div>
-      </fieldset>
+        </select>
+      </F>
 
       {connector.status !== 'Available' && (
         <F id="cn-reason" label={`Why it is ${connector.status.toLowerCase()}`} className="mt-4">

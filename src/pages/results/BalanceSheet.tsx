@@ -4,6 +4,7 @@ import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps } from '@/lib/resultHooks';
 import { useDimensionMembers, usePositions } from '@/lib/hooks';
@@ -111,13 +112,14 @@ export function BalanceSheet() {
         scope={affiliate?.name ?? affiliateCode}
         currency={currency}
         metrics={[
-          { label: 'Total assets', value: fmt(totals.assets, currency) },
-          { label: 'Total liabilities', value: fmt(totals.liabilities, currency) },
-          { label: 'Capital', value: fmt(totals.capital, currency) },
+          { label: 'Total assets', value: fmt(totals.assets, currency), about: "Sum of every on-balance-sheet position flagged Asset, converted to the reporting currency at this run's own FX rates." },
+          { label: 'Total liabilities', value: fmt(totals.liabilities, currency), about: 'Sum of every on-balance-sheet position flagged Liability, converted to the reporting currency.' },
+          { label: 'Capital', value: fmt(totals.capital, currency), about: 'Sum of every position flagged Capital — the balance-sheet equity used as the capital basis elsewhere when no Tier 1 figure is loaded.' },
           {
             label: 'Balance check',
             value: fmt(totals.plug, currency),
             tone: Math.abs(totals.plug) < Math.max(1, totals.assets * 0.0001) ? 'success' : 'warning',
+            about: 'Assets minus liabilities minus capital. Should be zero (or a rounding fraction) — a non-zero figure means the loaded book itself does not balance.',
           },
         ]}
         actions={
@@ -155,8 +157,12 @@ export function BalanceSheet() {
         )}
 
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+          <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
             Roll-up by {DIMENSIONS.find((d) => d.value === dimension)?.label.toLowerCase()}
+            <InfoButton label="How to read this table">
+              "Booked here" is the balance posted directly to that line; "Including children" rolls up every line
+              beneath it in the hierarchy. Expand a leaf row to see the individual accounts behind it.
+            </InfoButton>
           </h2>
           <ResultTable
             rows={rows}

@@ -30,13 +30,35 @@ function TabBar({
   variant: 'primary' | 'secondary';
 }) {
   if (tabs.length <= 1) return null;
+
+  // Secondary tabs render as an underline strip on a shaded strip, visually
+  // subordinate to the primary pill tabs above them — otherwise both variants
+  // read as the same kind of button and the nesting is invisible to a user.
+  if (variant === 'secondary') {
+    return (
+      <div className="mb-5 -mt-1 flex flex-wrap gap-1 rounded-lg bg-gray-50 p-1">
+        {tabs.map((t) => {
+          const active = t.key === activeKey;
+          return (
+            <Link
+              key={t.key}
+              href={t.path}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors',
+                active ? 'bg-white text-navy-900 shadow-sm' : 'text-gray-500 hover:text-navy-900',
+              )}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        'mb-5 flex flex-wrap gap-2',
-        variant === 'primary' ? 'border-b border-gray-100 pb-3' : 'border-b border-gray-100 pb-2.5',
-      )}
-    >
+    <div className="mb-5 flex flex-wrap gap-2 border-b border-gray-100 pb-3">
       {tabs.map((t) => {
         const active = t.key === activeKey;
         return (
@@ -45,8 +67,7 @@ function TabBar({
             href={t.path}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'rounded-lg font-bold transition-colors',
-              variant === 'primary' ? 'px-3 py-1.5 text-[12px]' : 'px-2.5 py-1 text-[11px]',
+              'rounded-lg px-3 py-1.5 text-[12px] font-bold transition-colors',
               active
                 ? 'bg-navy-900 text-white'
                 : 'border border-gray-200 text-gray-600 hover:border-navy-700 hover:text-navy-900',

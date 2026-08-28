@@ -144,10 +144,10 @@ export function Remediation() {
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'Open', value: String(openCount), tone: openCount > 0 ? 'warning' : 'success' },
-          { label: 'Overdue', value: String(overdueCount), tone: overdueCount > 0 ? 'danger' : 'neutral' },
-          { label: 'Closed', value: String(closedCount), tone: 'success' },
-          { label: 'Total tracked', value: String(issues.length) },
+          { label: 'Open', value: String(openCount), tone: openCount > 0 ? 'warning' : 'success', about: 'Issues anywhere in the lifecycle short of Closed.' },
+          { label: 'Overdue', value: String(overdueCount), tone: overdueCount > 0 ? 'danger' : 'neutral', about: 'Open issues past their due date.' },
+          { label: 'Closed', value: String(closedCount), tone: 'success', about: 'Issues verified and closed — closure requires someone other than the owner to approve it.' },
+          { label: 'Total tracked', value: String(issues.length), about: 'Every control issue ever raised, at any stage.' },
         ]}
         actions={
           <button

@@ -402,10 +402,10 @@ export function OnboardAffiliate() {
         asOfDate={null}
         scope={affiliate?.name ?? 'New affiliate'}
         metrics={[
-          { label: 'Step', value: `${step} of ${STEPS.length}` },
-          { label: 'Complete', value: `${STEPS.filter((s) => complete[s.n]).length}/${STEPS.length}` },
-          { label: 'Unmapped COA', value: String(unmappedCoa.length), tone: unmappedCoa.length > 0 ? 'danger' : 'success' },
-          { label: 'Status', value: affiliate?.status ?? 'Not started', tone: affiliate?.status === 'Onboarding' ? 'warning' : affiliate ? 'success' : 'neutral' },
+          { label: 'Step', value: `${step} of ${STEPS.length}`, about: 'Where this affiliate sits in the seven-step onboarding wizard.' },
+          { label: 'Complete', value: `${STEPS.filter((s) => complete[s.n]).length}/${STEPS.length}`, about: 'Steps marked complete so far — progress is saved, so onboarding can be resumed later from here.' },
+          { label: 'Unmapped COA', value: String(unmappedCoa.length), tone: unmappedCoa.length > 0 ? 'danger' : 'success', about: 'Local general-ledger accounts not yet mapped to the Group standard chart of accounts.' },
+          { label: 'Status', value: affiliate?.status ?? 'Not started', tone: affiliate?.status === 'Onboarding' ? 'warning' : affiliate ? 'success' : 'neutral', about: 'The affiliate’s current lifecycle status — only Live affiliates roll up into Group figures.' },
         ]}
         actions={
           affiliate && affiliate.status === 'Onboarding' && !submitted ? (

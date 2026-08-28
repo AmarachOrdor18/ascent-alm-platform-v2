@@ -140,17 +140,19 @@ export function GlReconciliation() {
         scope={affiliate?.name ?? 'No affiliate selected'}
         currency={currency}
         metrics={[
-          { label: 'Positions', value: String(positions.length) },
-          { label: 'Ledger accounts', value: ledger ? String(ledger.length) : '—' },
+          { label: 'Positions', value: String(positions.length), about: 'Instrument-level positions loaded for this affiliate and as-of date — one side of the reconciliation.' },
+          { label: 'Ledger accounts', value: ledger ? String(ledger.length) : '—', about: 'Accounts in the uploaded trial balance — the other side of the reconciliation.' },
           {
             label: 'Out of tolerance',
             value: result ? String(result.linesOutOfTolerance) : '—',
             tone: result ? (result.linesOutOfTolerance > 0 ? 'danger' : 'success') : 'neutral',
+            about: 'Accounts whose variance exceeds both the absolute and percentage tolerance — these block sign-off rather than being plugged.',
           },
           {
             label: 'Sign-off',
             value: signedOff ? 'Complete' : result ? (result.canSignOff ? 'Available' : 'Blocked') : '—',
             tone: signedOff ? 'success' : result?.canSignOff ? 'warning' : 'danger',
+            about: 'Whether the period can be signed off — requires every line within tolerance and every suggested plug approved.',
           },
         ]}
       />

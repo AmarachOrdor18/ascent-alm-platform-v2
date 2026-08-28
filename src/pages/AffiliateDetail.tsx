@@ -63,13 +63,14 @@ export function AffiliateDetail() {
         scope={affiliate.code}
         currency={affiliate.functionalCurrency}
         metrics={[
-          { label: 'Status', value: affiliate.status },
-          { label: 'Positions loaded', value: String(positions.length) },
-          { label: 'Load batches', value: String(batches.filter((b) => b.affiliateCode === affiliate.code).length) },
+          { label: 'Status', value: affiliate.status, about: 'Onboarding, Testing, Live or Suspended — only Live affiliates roll up into Group figures.' },
+          { label: 'Positions loaded', value: String(positions.length), about: 'Position rows currently on file for this affiliate, across every as-of date.' },
+          { label: 'Load batches', value: String(batches.filter((b) => b.affiliateCode === affiliate.code).length), about: 'Distinct file or connector loads recorded for this affiliate.' },
           {
             label: 'Stale domains',
             value: String(freshness.filter((f) => f.status === 'Stale' || f.status === 'Never loaded').length),
             tone: freshness.some((f) => f.status === 'Stale') ? 'danger' : 'success',
+            about: 'Data domains whose most recent load has aged past its SLA, or that have never been loaded at all.',
           },
         ]}
         actions={

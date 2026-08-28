@@ -83,7 +83,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'DATA MANAGEMENT',
-    items: [{ name: 'Data Management', path: '/data/operations', permission: 'data.view', phase: 2, icon: DownloadIcon }],
+    items: [{ name: 'Data Management', path: '/connectors', permission: 'data.view', phase: 2, icon: DownloadIcon }],
   },
   {
     label: 'EXECUTION',

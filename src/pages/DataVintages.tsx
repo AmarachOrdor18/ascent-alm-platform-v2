@@ -86,13 +86,14 @@ export function DataVintages() {
         asOfDate={null}
         scope={filter === 'ALL' ? 'All affiliates' : filter}
         metrics={[
-          { label: 'Load batches', value: String(filtered.length) },
-          { label: 'Committed', value: String(committed.length), tone: 'success' },
-          { label: 'Superseded', value: String(superseded.length) },
+          { label: 'Load batches', value: String(filtered.length), about: 'Every file or connector load recorded, across every version.' },
+          { label: 'Committed', value: String(committed.length), tone: 'success', about: 'Batches that passed validation and are available for a run to consume.' },
+          { label: 'Superseded', value: String(superseded.length), about: 'Earlier versions replaced by a newer load for the same domain and as-of date — retained, never deleted, so a past run’s figures stay reproducible.' },
           {
             label: 'Stale domains',
             value: String(stale.length),
             tone: stale.length > 0 ? 'danger' : 'success',
+            about: 'Affiliate/domain pairs whose most recent load has aged past its refresh SLA, or that have never been loaded.',
           },
         ]}
       />

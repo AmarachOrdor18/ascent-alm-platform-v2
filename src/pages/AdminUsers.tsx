@@ -133,14 +133,15 @@ export function AdminUsers() {
         description="The register the application gates on — what a role can do here is what it can do everywhere."
         asOfDate={null}
         metrics={[
-          { label: 'Users', value: String(users.length) },
-          { label: 'Active', value: String(active.length) },
+          { label: 'Users', value: String(users.length), about: 'Every account in the register, regardless of status.' },
+          { label: 'Active', value: String(active.length), about: 'Accounts that can currently sign in — a disabled account is kept, not deleted.' },
           {
             label: 'Without MFA',
             value: String(withoutMfa.length),
             tone: withoutMfa.length > 0 ? 'warning' : 'success',
+            about: 'Active accounts not enrolled in multi-factor authentication.',
           },
-          { label: 'Roles in use', value: `${byRole.size} of ${roleList.length}` },
+          { label: 'Roles in use', value: `${byRole.size} of ${roleList.length}`, about: 'How many of the defined roles actually have a user assigned to them.' },
         ]}
         actions={
           <button
@@ -240,8 +241,8 @@ export function AdminUsers() {
           ))}
         </div>
         <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
-          Users move between these six roles; permissions within each are editable here. Sign in as any of them to see
-          the effect — navigation, action buttons and run controls all read this same set, live.
+          Users move between these {roleList.length} roles; permissions within each are editable here. Sign in as any
+          of them to see the effect — navigation, action buttons and run controls all read this same set, live.
         </p>
       </section>
 

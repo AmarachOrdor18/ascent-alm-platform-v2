@@ -112,10 +112,10 @@ export function ReportPackScreen({
         description={description}
         asOfDate={null}
         metrics={[
-          { label: 'Packs generated', value: String(generated) },
-          { label: 'Distributed', value: String(distributed) },
-          { label: 'Sections tracked', value: String(candidates.length) },
-          { label: 'Total', value: String(rows.length) },
+          { label: 'Packs generated', value: String(generated), about: 'Packs built from a source run, whether or not they have gone out yet.' },
+          { label: 'Distributed', value: String(distributed), about: 'Packs marked as actually sent to their recipients — a tracked step, not an assumption.' },
+          { label: 'Sections tracked', value: String(candidates.length), about: 'The fixed set of sections this pack type can include — each one only fills in if the source run actually computed it.' },
+          { label: 'Total', value: String(rows.length), about: 'Every pack of this type ever built, including drafts.' },
         ]}
         actions={
           <button type="button" onClick={() => setBuilding(true)} disabled={!canEdit} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">

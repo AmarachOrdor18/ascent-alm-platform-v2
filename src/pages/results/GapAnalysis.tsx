@@ -55,19 +55,23 @@ export function GapAnalysis() {
             label: 'Cumulative gap',
             value: last ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(last.cumulativeGap) : '—',
             tone: (last?.cumulativeGap ?? 0) < 0 ? 'warning' : 'neutral',
+            about: 'The running total of every bucket’s gap in order — negative means more has matured on the liability side than the asset side up to that point.',
           },
           {
             label: 'Widest negative bucket',
             value: worstBucket ? worstBucket.bucket : '—',
             tone: (worstBucket?.gap ?? 0) < 0 ? 'warning' : 'neutral',
+            about: 'The single time bucket carrying the largest net cash outflow — the point of maximum funding pressure on this ladder.',
           },
           {
             label: 'Buckets',
             value: String(buckets.length),
+            about: 'The number of time buckets on the active ladder for this basis (maturity or repricing).',
           },
           {
             label: 'Bucket rule',
             value: bucketRule ? `v${bucketRule.version}` : 'engine default',
+            about: 'The Time Bucket rule version this run consumed. Editing the rule later never changes what a completed run reports.',
           },
         ]}
         actions={

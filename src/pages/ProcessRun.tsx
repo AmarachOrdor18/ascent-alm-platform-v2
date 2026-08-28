@@ -140,13 +140,14 @@ export function ProcessRun() {
         scope={affiliate?.name ?? 'No affiliate'}
         currency={reportingCurrency}
         metrics={[
-          { label: 'Process type', value: processType },
-          { label: 'Elements', value: `${elements.length}/${ALL_ELEMENTS.length}` },
-          { label: 'Data version', value: batch ? `v${batch.version}` : '—' },
+          { label: 'Process type', value: processType, about: 'Static models the existing book running off; Dynamic layers a New Business rule’s growth assumptions on top.' },
+          { label: 'Elements', value: `${elements.length}/${ALL_ELEMENTS.length}`, about: 'How many of the available calculation elements this run will compute — fewer elements means a lighter, faster run.' },
+          { label: 'Data version', value: batch ? `v${batch.version}` : '—', about: 'The committed position batch version this run will pin to — reloading data later never changes what this run reports.' },
           {
             label: 'Ready',
             value: blockers.length === 0 ? 'Yes' : `${blockers.length} blocker(s)`,
             tone: blockers.length === 0 ? 'success' : 'danger',
+            about: 'Whether every precondition is met — a missing FX rate, an unselected element or an incomplete scope all block execution rather than letting the run fail silently.',
           },
         ]}
         actions={

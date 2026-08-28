@@ -1,6 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAffiliates, useFxRates } from '@/lib/hooks';
 import { useRuns, runKeys } from '@/lib/runHooks';
@@ -193,10 +194,20 @@ export function RiskMap() {
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'High risk', value: String(highCount), tone: highCount > 0 ? 'danger' : 'neutral' },
-          { label: 'Medium risk', value: String(mediumCount), tone: mediumCount > 0 ? 'warning' : 'neutral' },
-          { label: 'Low risk', value: String(lowCount), tone: 'success' },
-          { label: 'Affiliates monitored', value: String(liveAffiliates.length) },
+          {
+            label: 'High risk',
+            value: String(highCount),
+            tone: highCount > 0 ? 'danger' : 'neutral',
+            about: 'Affiliates whose LCR is below 100% or whose share of Group deposit funding exceeds 35%.',
+          },
+          {
+            label: 'Medium risk',
+            value: String(mediumCount),
+            tone: mediumCount > 0 ? 'warning' : 'neutral',
+            about: 'Affiliates whose LCR is between 100% and 130%, or whose Group deposit share is between 20% and 35%.',
+          },
+          { label: 'Low risk', value: String(lowCount), tone: 'success', about: 'Affiliates within both the LCR internal buffer and the funding-diversification threshold.' },
+          { label: 'Affiliates monitored', value: String(liveAffiliates.length), about: 'How many Live affiliates have a completed run to draw a severity rating from.' },
         ]}
       />
 
@@ -208,8 +219,13 @@ export function RiskMap() {
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Group liquidity risk concentration
+                <InfoButton label="How severity is classified">
+                  Each affiliate is read from its own latest completed run — a High rating means its LCR is below
+                  100% or it holds over 35% of Group deposit funding; Medium means it's inside those floors but
+                  outside the internal buffer (130% LCR, 20% deposit share).
+                </InfoButton>
               </h2>
               <p className="mt-1 text-[11px] font-medium text-gray-400">
                 Severity from LCR standing and each affiliate's share of Group deposit funding

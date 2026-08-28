@@ -27,7 +27,11 @@ export function Profitability() {
         scope={affiliate?.name ?? affiliateCode}
         currency={currency}
         metrics={[
-          { label: 'Net interest margin', value: formatPct(p?.netInterestMarginPercent ?? null, 2) },
+          {
+            label: 'Net interest margin',
+            value: formatPct(p?.netInterestMarginPercent ?? null, 2),
+            about: 'Interest income less interest expense, as a share of total assets — a core profitability measure.',
+          },
           {
             label: 'NPL ratio',
             value: formatPct(p?.nplRatioPercent ?? null, 2),
@@ -39,17 +43,20 @@ export function Profitability() {
                   : p.nplRatioPercent > 3
                     ? 'warning'
                     : 'success',
+            about: 'Non-Performing Loan ratio: share of the loan book classified Substandard, Doubtful or Loss.',
           },
           {
             label: 'NPL coverage',
             value: formatPct(p?.nplCoverageRatioPercent ?? null),
             tone:
               p?.nplCoverageRatioPercent == null ? 'neutral' : p.nplCoverageRatioPercent < 100 ? 'warning' : 'success',
+            about: 'Provisions held against the non-performing book, as a share of that balance. Below 100% means provisioning does not yet fully cover it.',
           },
           {
             label: 'Non-earning assets',
             value: formatPct(p?.nonEarningAssetRatioPercent ?? null, 2),
             tone: (p?.nonEarningAssetRatioPercent ?? 0) > 15 ? 'warning' : 'neutral',
+            about: 'Share of total assets carrying a zero interest rate — cash, fixed assets and similar — that generate no interest income.',
           },
         ]}
       />
@@ -63,7 +70,13 @@ export function Profitability() {
           <>
             <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
               <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Earnings</h2>
+                <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Earnings
+                  <InfoButton label="Where these come from">
+                    Computed directly from each position's balance and its own interest rate — the same positions
+                    that drive the liquidity and rate-risk metrics elsewhere in the platform.
+                  </InfoButton>
+                </h2>
                 <dl className="space-y-2 text-[12px]">
                   <Row label="Total assets" value={<Amount value={p.totalAssets} currency={currency} />} />
                   <Row label="Interest income" value={<Amount value={p.interestIncome} currency={currency} />} />

@@ -91,10 +91,13 @@ export function Connectors() {
         scope={affiliate?.name ?? 'No affiliate'}
         metrics={[
           { label: 'Domains configured', value: `${configured} of ${DOMAINS.length}`,
-            tone: configured === DOMAINS.length ? 'success' : 'warning' },
-          { label: 'File-substituted', value: String(fileFed), tone: fileFed > 0 ? 'warning' : 'neutral' },
-          { label: 'Connectors', value: String(connectors.length) },
-          { label: 'Not configured', value: String(blocked.length), tone: blocked.length > 0 ? 'danger' : 'success' },
+            tone: configured === DOMAINS.length ? 'success' : 'warning',
+            about: 'How many of the six data domains have a connector or a declared file feed, for the affiliate selected below.' },
+          { label: 'File-substituted', value: String(fileFed), tone: fileFed > 0 ? 'warning' : 'neutral',
+            about: 'Domains fed by manual file upload rather than a live connector — a valid interim path, not an error.' },
+          { label: 'Connectors', value: String(connectors.length), about: 'Data sources registered platform-wide, regardless of status.' },
+          { label: 'Not configured', value: String(blocked.length), tone: blocked.length > 0 ? 'danger' : 'success',
+            about: 'Connectors currently Blocked — not reachable or not yet cleared for use — see each one’s reason.' },
         ]}
         actions={
           <button

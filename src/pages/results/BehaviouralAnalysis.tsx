@@ -88,19 +88,23 @@ export function BehaviouralAnalysis() {
             label: 'Core share',
             value: formatPct(runoff?.corePercent ?? null),
             tone: (runoff?.corePercent ?? 100) < 50 ? 'warning' : 'success',
+            about: 'The share of modelled non-maturity deposits treated as stable (core) rather than likely to withdraw under stress (volatile).',
           },
           {
             label: 'Total deposits modelled',
             value: runoff ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(runoff.totalDeposits) : '—',
+            about: 'How much of the deposit base this behavioural analysis actually covers — positions with a matching behavioural pattern.',
           },
           {
             label: 'Unmodelled',
             value: runoff ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(runoff.unmodelled) : '—',
             tone: (runoff?.unmodelled ?? 0) > 0 ? 'warning' : 'success',
+            about: 'Deposits carrying a behavioural tag with no matching pattern — reported here rather than silently defaulted into core or volatile.',
           },
           {
             label: 'Pattern rule',
             value: patternRule ? `v${patternRule.version}` : 'engine default',
+            about: 'The Behaviour Pattern rule version this run consumed. Editing the rule later never changes what a completed run reports.',
           },
         ]}
         actions={
@@ -171,8 +175,12 @@ export function BehaviouralAnalysis() {
             </section>
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Split by {groupBy === 'tag' ? 'behavioural tag' : groupBy}
+                <InfoButton label="What this table shows">
+                  The same core/volatile split as the chart above, as exact numbers per group, with the account count
+                  and blended core percentage behind each row.
+                </InfoButton>
               </h2>
               <ResultTable rows={grouped} columns={columns} rowKey={(g) => g.group} />
             </section>
@@ -203,8 +211,13 @@ export function BehaviouralAnalysis() {
             </section>
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Patterns this run applied
+                <InfoButton label="What a pattern is">
+                  Each pattern specifies the core/volatile split by tenor tier for a set of behavioural tags — for
+                  example, more core at 30 days than at a year, since deposits get less sticky the further out you
+                  look.
+                </InfoButton>
               </h2>
               {patternRule ? (
                 <div className="space-y-3">

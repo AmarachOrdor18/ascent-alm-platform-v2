@@ -136,21 +136,25 @@ export function StressTesting() {
             label: 'Worst shock (EVE)',
             value: worstRow?.label ?? '—',
             tone: outliers.length > 0 ? 'danger' : 'neutral',
+            about: 'Which of the six BCBS-prescribed shocks produces the largest economic-value impact — this is the scenario the supervisory outlier test is judged on.',
           },
           {
             label: 'Worst ΔEVE % of capital',
             value: formatPct(worstRow?.evePercent ?? null, 2),
             tone: worstRow?.isOutlier ? 'danger' : 'success',
+            about: 'The economic-value impact of the worst shock, as a share of capital. Beyond ±15% triggers the Basel supervisory outlier test.',
           },
           {
             label: 'Shocks failing 15% test',
             value: analysis ? `${outliers.length} of ${analysis.rows.length}` : '—',
             tone: outliers.length > 0 ? 'danger' : 'success',
+            about: 'How many of the six shocks individually breach the ±15% supervisory outlier threshold.',
           },
           {
             label: 'Survival horizon',
             value: analysis ? `${analysis.survival.survivalHorizonDays} days` : '—',
             tone: (analysis?.survival.survivalHorizonDays ?? 30) < 20 ? 'danger' : 'success',
+            about: 'Days the counterbalancing capacity lasts under a doubled 30-day outflow with an additional HQLA haircut, before the buffer runs out.',
           },
         ]}
         actions={
