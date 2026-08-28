@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { useUsers } from '@/lib/hooks';
 import { hashPassword } from '@/lib/passwordHash';
@@ -13,6 +14,7 @@ const FEATURES = [
 export function Login() {
   const { login } = useAuth();
   const { data: users = [] } = useUsers();
+  const [, navigate] = useLocation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,6 +35,7 @@ export function Login() {
         return;
       }
       login({ ...account, lastLoginAt: new Date().toISOString() });
+      navigate('/dashboard');
     } finally {
       setIsSubmitting(false);
     }
