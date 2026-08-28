@@ -52,12 +52,11 @@ export function Login() {
               <p className="text-[12px] text-white/60">ALM Platform</p>
             </div>
           </div>
+          <p className="text-gold-400 text-sm tracking-wide uppercase mt-6">Group Asset & Liability Management</p>
+          <div className="h-1 w-10 bg-gold-500 mt-3 rounded-full"></div>
         </div>
 
         <div className="flex flex-1 flex-col justify-center">
-          <p className="text-gold-400 text-sm tracking-wide uppercase">Group Asset & Liability Management</p>
-          <div className="h-1 w-10 bg-gold-500 mt-6 mb-6 rounded-full"></div>
-
           <h2 className="text-[32px] font-bold leading-tight text-white">
             Asset & Liability Management
             <br />
@@ -146,6 +145,12 @@ export function Login() {
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <p className="text-xs text-warning-700 font-medium">Multi-factor authentication required on first sign-in.</p>
+          </div>
+
+          <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Demo access — Group Administrator</p>
+            <p className="mt-1 font-mono text-xs text-navy-900">adaeze.okonkwo@ecobank.com</p>
+            <p className="font-mono text-xs text-navy-900">Ecobank@2026</p>
           </div>
         </div>
 
