@@ -398,6 +398,7 @@ describe('vintage', () => {
     id: 'B-1',
     affiliateCode: 'NG',
     domain: 'Positions',
+    contributor: null,
     asOfDate: NIGERIA_AS_OF,
     version: 1,
     fileName: 'positions.csv',

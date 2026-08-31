@@ -134,6 +134,7 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Data Upload & Staging', path: '/data/operations', permission: 'data.view', phase: 3, icon: DownloadIcon },
   { name: 'GL Reconciliation', path: '/data/operations/gl-reconciliation', permission: 'data.view', phase: 3, icon: ReconciliationIcon },
   { name: 'Data Vintages & Load History', path: '/data/operations/vintages', permission: 'data.view', phase: 3, icon: HistoryIcon },
+  { name: 'Position Book', path: '/data/operations/position-book', permission: 'data.view', phase: 3, icon: PortfolioIcon },
   { name: 'Dimensions & Hierarchies', path: '/data/structure', permission: 'data.view', phase: 2, icon: CorporateActionsIcon },
   { name: 'Counterparty Register', path: '/data/structure/counterparties', permission: 'data.view', phase: 2, icon: ClientManagementIcon },
   { name: 'Interest Rates & Curves', path: '/data/reference-data', permission: 'data.view', phase: 2, icon: TrendingUpIcon },

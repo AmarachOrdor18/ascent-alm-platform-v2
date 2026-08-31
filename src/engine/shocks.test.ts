@@ -117,9 +117,9 @@ describe('bucket midpoints', () => {
 
 describe('dimension helpers', () => {
   const members: DimensionMember[] = [
-    { id: '1', dimension: 'OrgUnit', code: 'OU-NG', name: 'Nigeria', parentCode: null, isLeaf: false },
-    { id: '2', dimension: 'OrgUnit', code: 'OU-NG-RET', name: 'Retail', parentCode: 'OU-NG', isLeaf: false },
-    { id: '3', dimension: 'OrgUnit', code: 'OU-NG-RET-LAG', name: 'Lagos', parentCode: 'OU-NG-RET', isLeaf: true },
+    { id: '1', dimension: 'OrgUnit', affiliateCode: 'NG', code: 'OU-NG', name: 'Nigeria', parentCode: null, isLeaf: false },
+    { id: '2', dimension: 'OrgUnit', affiliateCode: 'NG', code: 'OU-NG-RET', name: 'Retail', parentCode: 'OU-NG', isLeaf: false },
+    { id: '3', dimension: 'OrgUnit', affiliateCode: 'NG', code: 'OU-NG-RET-LAG', name: 'Lagos', parentCode: 'OU-NG-RET', isLeaf: true },
   ];
 
   it('walks the path from root to leaf', () => {
@@ -132,8 +132,8 @@ describe('dimension helpers', () => {
 
   it('survives a malformed hierarchy containing a cycle', () => {
     const cyclic: DimensionMember[] = [
-      { id: '1', dimension: 'OrgUnit', code: 'A', name: 'A', parentCode: 'B', isLeaf: false },
-      { id: '2', dimension: 'OrgUnit', code: 'B', name: 'B', parentCode: 'A', isLeaf: false },
+      { id: '1', dimension: 'OrgUnit', affiliateCode: 'NG', code: 'A', name: 'A', parentCode: 'B', isLeaf: false },
+      { id: '2', dimension: 'OrgUnit', affiliateCode: 'NG', code: 'B', name: 'B', parentCode: 'A', isLeaf: false },
     ];
     expect(ancestorPath(cyclic, 'A').length).toBeLessThanOrEqual(2);
   });
@@ -208,6 +208,7 @@ describe('vintage helpers', () => {
     id: 'B-1',
     affiliateCode: 'NG',
     domain: 'Positions',
+    contributor: null,
     asOfDate: NIGERIA_AS_OF,
     version: 1,
     fileName: 'p.csv',

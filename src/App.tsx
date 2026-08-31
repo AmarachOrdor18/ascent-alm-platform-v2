@@ -28,6 +28,9 @@ const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) =>
 const OnboardAffiliateResume = lazy(() =>
   import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate })),
 );
+const SnapshotWorkbench = lazy(() =>
+  import('@/pages/SnapshotWorkbench').then((m) => ({ default: m.SnapshotWorkbench })),
+);
 
 /**
  * Screens built so far. Anything absent renders the placeholder.
@@ -162,6 +165,7 @@ const MODULE_TAB_ROUTES: RouteEntry[] = [
   { path: '/reporting/ad-hoc', screenName: 'Ad-Hoc Analysis', Component: ReportingModule, permission: 'reporting.view' },
   { path: '/data/operations/gl-reconciliation', screenName: 'GL Reconciliation', Component: DataManagementModule, permission: 'data.view' },
   { path: '/data/operations/vintages', screenName: 'Data Vintages & Load History', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/operations/position-book', screenName: 'Position Book', Component: DataManagementModule, permission: 'data.view' },
   { path: '/data/structure', screenName: 'Data Structure', Component: DataManagementModule, permission: 'data.view' },
   { path: '/data/structure/counterparties', screenName: 'Counterparty Register', Component: DataManagementModule, permission: 'data.view' },
   { path: '/data/reference-data', screenName: 'Reference Data', Component: DataManagementModule, permission: 'data.view' },
@@ -320,6 +324,7 @@ export const buildRouteOrder = (): RouteEntry[] => {
   const parameterised: RouteEntry[] = [
     { path: '/affiliates/onboard/:code', screenName: 'Resume Onboarding', Component: OnboardAffiliateResume, permission: 'group.manage' },
     { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail, permission: 'dashboard.view' },
+    { path: '/position-book/snapshot/:id', screenName: 'Editable Snapshot', Component: SnapshotWorkbench, permission: 'data.view' },
   ];
 
   return [...navLiteral, ...unlisted, ...MODULE_TAB_ROUTES, ...parameterised];

@@ -14,7 +14,9 @@ import type {
 } from './types';
 import { missingRates, type FxTable } from './fx';
 import { filterByDimension } from './dimensions';
+import { applyProductCharacteristics } from './classification';
 import { applyBehaviouralMaturity, computeDepositRunoff, type BehaviourPattern } from './behavioural';
+import type { ProductAssumption } from './ruleTypes';
 import {
   computeConcentration,
   computeLcr,
@@ -55,6 +57,8 @@ export interface RunInputs {
   productMembers: DimensionMember[];
   /** Regulatory Tier 1 where known; null falls back to balance-sheet equity, and the result says so. */
   tier1Capital: number | null;
+  /** Per-product/currency HQLA, ASF/RSF and rate-sensitivity assumptions — see engine/classification.ts. Absent means every position's classification is taken as loaded, unchanged. */
+  productAssumptions?: ProductAssumption[];
   /** Total stressed outflow for the survival-horizon scenario. */
   stressedOutflow?: number;
   shockBps?: number;
@@ -96,6 +100,12 @@ export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): Run
   if (run.positionBatchIds.length > 0) {
     const pinned = new Set(run.positionBatchIds);
     scoped = scoped.filter((p) => pinned.has(p.batchId));
+  }
+
+  // Regulatory/behavioural classification is applied once, here, before any calculation reads a position —
+  // every element downstream (LCR, NSFR, IRRBB...) sees the ruled classification, never the raw uploaded one.
+  if (inputs.productAssumptions?.length) {
+    scoped = applyProductCharacteristics(scoped, inputs.productAssumptions);
   }
 
   // A missing FX rate must stop the run rather than silently omitting a currency from the totals.

@@ -407,8 +407,8 @@ export function importLedger(text: string, asOfDate: IsoDate, defaultCurrency = 
 const COUNTERPARTY_SECTORS = ['Corporate', 'Retail', 'Sovereign', 'Public Sector', 'Financial Institution'];
 const COUNTERPARTY_COLUMNS = ['code', 'name', 'sector', 'parentcode'];
 
-/** Parse a counterparty register file. */
-export function importCounterparties(text: string): ImportResult<DimensionMember> {
+/** Parse a counterparty register file. Every entry is owned by the uploading affiliate — no Group-wide list. */
+export function importCounterparties(text: string, affiliateCode: string): ImportResult<DimensionMember> {
   const table = parseCsv(text);
   if (table.length === 0) {
     return {
@@ -447,8 +447,9 @@ export function importCounterparties(text: string): ImportResult<DimensionMember
     }
 
     rows.push({
-      id: `Counterparty:${code}`,
+      id: `Counterparty:${affiliateCode}:${code}`,
       dimension: 'Counterparty',
+      affiliateCode,
       code,
       name,
       parentCode: optionalText(get('parentcode')) ?? 'CP-ROOT',

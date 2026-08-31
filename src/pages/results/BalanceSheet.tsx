@@ -29,7 +29,9 @@ export function BalanceSheet() {
   const { run } = selected;
 
   const [dimension, setDimension] = useState<DimensionType>('CommonCoa');
-  const { data: members = [] } = useDimensionMembers(dimension);
+  // Dimension members are affiliate-owned; label lookups use the run's own affiliate (a Group run consolidates
+  // several, so there's no single affiliate's list to resolve labels from — codes show unlabelled there).
+  const { data: members = [] } = useDimensionMembers(dimension, run?.affiliateCode && run.affiliateCode !== 'GROUP' ? run.affiliateCode : '');
   const { data: fxRates = [] } = useFxRates();
   const { data: allPositions = [] } = usePositions(
     run?.affiliateCode === 'GROUP' ? undefined : run?.affiliateCode,

@@ -70,9 +70,16 @@ export function OnboardAffiliate() {
   const { data: currencies = [] } = useCurrencies();
   const { data: calendars = [] } = useHolidayCalendars();
   const { data: connectors = [] } = useConnectors();
-  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa');
-  const { data: glAccounts = [] } = useDimensionMembers('GlAccount');
-  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit');
+
+  const [code, setCode] = useState<string | null>(resumeCode);
+  const affiliate = code ? (affiliates.find((a) => a.code === code) ?? null) : null;
+
+  // Common COA is affiliate-owned — NG's copy (identical to GH's/CI's today) is the reference this affiliate's
+  // GL mappings are built against, and gets copied into its own list on the first mapping (see addCoaMapping).
+  const { data: commonCoaReference = [] } = useDimensionMembers('CommonCoa', 'NG');
+  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa', code ?? '');
+  const { data: glAccounts = [] } = useDimensionMembers('GlAccount', code ?? '');
+  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit', code ?? '');
   const { data: batches = [] } = useBatches();
 
   const save = useSaveAffiliate();
@@ -80,11 +87,9 @@ export function OnboardAffiliate() {
   const saveConnector = useSaveConnector();
   const saveGlAccounts = useSaveDimensionMembers('GlAccount');
   const saveOrgUnits = useSaveDimensionMembers('OrgUnit');
+  const saveCommonCoa = useSaveDimensionMembers('CommonCoa');
   const saveBatch = useSaveBatch();
   const raiseApproval = approvals.useSave();
-
-  const [code, setCode] = useState<string | null>(resumeCode);
-  const affiliate = code ? (affiliates.find((a) => a.code === code) ?? null) : null;
   const creatingRef = useRef(false);
 
   const [step, setStep] = useState(1);
@@ -182,14 +187,10 @@ export function OnboardAffiliate() {
   const complete3 = !!affiliate && affiliate.feeds.every((f) => f.mode === 'File' || (f.mode === 'Connector' && !!f.connectorId));
 
   // ── Step 4 — COA & organisation ──────────────────────────────────────
-  const commonCoaLeaves = useMemo(() => commonCoa.filter((m) => m.isLeaf), [commonCoa]);
-  const affiliateGlAccounts = useMemo(
-    () => (affiliate ? glAccounts.filter((m) => m.attributes?.affiliate === affiliate.code) : []),
-    [glAccounts, affiliate],
-  );
+  const commonCoaLeaves = useMemo(() => commonCoaReference.filter((m) => m.isLeaf), [commonCoaReference]);
   const unmappedCoa = useMemo(
-    () => commonCoaLeaves.filter((leaf) => !affiliateGlAccounts.some((m) => m.attributes?.commonCoa === leaf.code)),
-    [commonCoaLeaves, affiliateGlAccounts],
+    () => commonCoaLeaves.filter((leaf) => !glAccounts.some((m) => m.attributes?.commonCoa === leaf.code)),
+    [commonCoaLeaves, glAccounts],
   );
   const [newLocalCode, setNewLocalCode] = useState<Record<string, string>>({});
 
@@ -197,18 +198,28 @@ export function OnboardAffiliate() {
     if (!affiliate) return;
     const localCode = (newLocalCode[leafCode] ?? '').trim();
     if (!localCode) return;
+
+    // This affiliate's own Common COA copy — created on the first mapping, since there's no Group-wide list to
+    // point its GL accounts at instead.
+    if (commonCoa.length === 0 && commonCoaReference.length > 0) {
+      await saveCommonCoa.mutateAsync(
+        commonCoaReference.map((m) => ({ ...m, id: `CommonCoa:${affiliate.code}:${m.code}`, affiliateCode: affiliate.code })),
+      );
+    }
+
     const rootCode = `GL-${affiliate.code}`;
     const rootExists = glAccounts.some((m) => m.code === rootCode);
     await saveGlAccounts.mutateAsync([
-      ...(rootExists ? [] : [{ id: `GlAccount:${rootCode}`, dimension: 'GlAccount' as const, code: rootCode, name: `${affiliate.name} — Local Chart`, parentCode: null, isLeaf: false }]),
+      ...(rootExists ? [] : [{ id: `GlAccount:${affiliate.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: affiliate.code, code: rootCode, name: `${affiliate.name} — Local Chart`, parentCode: null, isLeaf: false }]),
       {
-        id: `GlAccount:${localCode}`,
+        id: `GlAccount:${affiliate.code}:${localCode}`,
         dimension: 'GlAccount' as const,
+        affiliateCode: affiliate.code,
         code: localCode,
         name: localCode,
         parentCode: rootCode,
         isLeaf: true,
-        attributes: { commonCoa: leafCode, affiliate: affiliate.code },
+        attributes: { commonCoa: leafCode },
       },
     ]);
     setNewLocalCode((prev) => ({ ...prev, [leafCode]: '' }));
@@ -226,10 +237,11 @@ export function OnboardAffiliate() {
   const createOrgTemplate = () => {
     if (!affiliate || !orgRootCode) return;
     saveOrgUnits.mutate([
-      { id: `OrgUnit:${orgRootCode}`, dimension: 'OrgUnit', code: orgRootCode, name: affiliate.name, parentCode: 'OU-GROUP', isLeaf: false },
+      { id: `OrgUnit:${affiliate.code}:${orgRootCode}`, dimension: 'OrgUnit', affiliateCode: affiliate.code, code: orgRootCode, name: affiliate.name, parentCode: 'OU-GROUP', isLeaf: false },
       ...SEGMENTS.map((s) => ({
-        id: `OrgUnit:${orgRootCode}-${s.suffix}`,
+        id: `OrgUnit:${affiliate.code}:${orgRootCode}-${s.suffix}`,
         dimension: 'OrgUnit' as const,
+        affiliateCode: affiliate.code,
         code: `${orgRootCode}-${s.suffix}`,
         name: `${affiliate.name} — ${s.name}`,
         parentCode: orgRootCode,
@@ -699,7 +711,7 @@ export function OnboardAffiliate() {
                   </thead>
                   <tbody>
                     {commonCoaLeaves.map((leaf) => {
-                      const mapped = affiliateGlAccounts.filter((m) => m.attributes?.commonCoa === leaf.code);
+                      const mapped = glAccounts.filter((m) => m.attributes?.commonCoa === leaf.code);
                       return (
                         <tr key={leaf.code} className="border-b border-gray-100">
                           <td className="py-2 px-3">

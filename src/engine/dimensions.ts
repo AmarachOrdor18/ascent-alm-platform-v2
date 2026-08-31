@@ -190,8 +190,9 @@ export function deriveMembersFromFile(
 
   if (dimension === 'GlAccount') {
     members.push({
-      id: `GlAccount:${rootCode}`,
+      id: `GlAccount:${affiliateCode}:${rootCode}`,
       dimension: 'GlAccount',
+      affiliateCode,
       code: rootCode,
       name: `${affiliateName} — Local Chart`,
       parentCode: null,
@@ -202,8 +203,9 @@ export function deriveMembersFromFile(
   for (const code of codes) {
     const sample = positions.find((p) => p[key] === code);
     members.push({
-      id: `${dimension}:${code}`,
+      id: `${dimension}:${affiliateCode}:${code}`,
       dimension,
+      affiliateCode,
       code,
       name: dimension === 'GlAccount' ? (sample?.productClass ?? code) : code,
       parentCode: dimension === 'GlAccount' ? rootCode : null,

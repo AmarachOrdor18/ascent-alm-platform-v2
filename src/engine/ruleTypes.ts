@@ -1,4 +1,4 @@
-import type { BehaviouralTag, IsoDate, RuleMeta, TimeBucketRule } from './types';
+import type { BehaviouralTag, IsoDate, LcrCashflowRole, RuleMeta, TimeBucketRule } from './types';
 import type { BehaviourPattern } from './behavioural';
 import type { AdjustmentType, TpMethod } from './ftp';
 
@@ -12,6 +12,8 @@ export type { TimeBucketRule };
 export interface ProductAssumption {
   productCode: string;
   currency: string;
+  /** Which side of the 30-day LCR window this product sits on — computeLcr() keys off this, not hqlaLevel, to decide what counts as HQLA. */
+  lcrCashflowRole: LcrCashflowRole;
   lcrRatePct: number | null;
   asfFactorPct: number | null;
   rsfFactorPct: number | null;

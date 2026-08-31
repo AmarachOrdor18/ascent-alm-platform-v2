@@ -25,7 +25,7 @@ export function TransferPricing() {
 
   const ftp = payloadOf<FtpResult>(results, 'TransferPricing');
   const adjustments = payloadOf<AdjustmentSummary>(results, 'TpAdjustments');
-  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit');
+  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit', run?.affiliateCode && run.affiliateCode !== 'GROUP' ? run.affiliateCode : '');
 
   const [showUnpriced, setShowUnpriced] = useState(false);
 

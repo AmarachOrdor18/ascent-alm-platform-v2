@@ -36,6 +36,13 @@ export type GlLevel = 'Category' | 'Level1' | 'Level2';
 export interface DimensionMember {
   id: string;
   dimension: DimensionType;
+  /**
+   * Which affiliate owns this entry — every dimension is affiliate-managed, including Common COA: there is no
+   * Group-wide list. Use the literal code `'GROUP'` for a genuinely cross-affiliate construct (e.g. a
+   * connected-exposure counterparty group spanning two countries, or a consolidation-tree root) — `'GROUP'` is
+   * an ordinary affiliate row like any other, not a bypass, so it's still a real, filterable scope.
+   */
+  affiliateCode: string;
   code: string;
   name: string;
   parentCode: string | null;
@@ -94,6 +101,13 @@ export interface Affiliate {
   internalThresholds: Record<string, InternalThreshold>;
   /** Governance attestation, distinct from the threshold values themselves. */
   limitsConfirmed: boolean;
+  /**
+   * Which departments must submit a Positions slice before this affiliate's
+   * book is considered complete for a date — see `contributionReadiness` in
+   * engine/vintage.ts. Absent (older/seed affiliates) falls back to every
+   * `PositionContributor`, so this is additive and never a breaking field.
+   */
+  requiredContributors?: PositionContributor[];
   createdAt: string;
 }
 
@@ -316,10 +330,23 @@ export interface TimeBucketRule extends RuleMeta {
 
 export type BatchStatus = 'Staged' | 'Validated' | 'Committed' | 'Superseded' | 'Rejected';
 
+/**
+ * A bank doesn't hand over one ready-made position file — the book has to
+ * be assembled from what each department holds. Loans, Deposits and
+ * Treasury each contribute their own slice of the Positions domain for the
+ * same affiliate/date; General Ledger is not a contributor, it's the
+ * independent ground truth the combined book reconciles against (see
+ * GlReconciliation.tsx). `null` on non-Positions domains, where there is
+ * exactly one submitter per domain/date.
+ */
+export type PositionContributor = 'Loans' | 'Deposits' | 'Treasury';
+
 export interface LoadBatch {
   id: string;
   affiliateCode: string;
   domain: DataDomain;
+  /** Which department's slice of the Positions domain this is. Always null outside the Positions domain. */
+  contributor: PositionContributor | null;
   asOfDate: IsoDate;
   version: number;
   fileName: string;
@@ -414,6 +441,69 @@ export interface RunResult {
   /** Every calculation states its simplifications inline. */
   methodology: string;
   computedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Editable snapshots (build plan §10a) — investigate, correct or run
+// what-if analysis on a committed position batch without touching it.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type SnapshotStatus = 'Draft' | 'Recalculated' | 'PendingApproval' | 'Committed' | 'Rejected' | 'Discarded';
+
+/** Fields a snapshot is allowed to change — the same governed subset the skill spec calls out. */
+export type SnapshotEditableField =
+  | 'amount'
+  | 'maturityDate'
+  | 'nextRepricingDate'
+  | 'behaviouralTag'
+  | 'hqlaLevel'
+  | 'hqlaHaircutPct'
+  | 'lcrCashflowRole'
+  | 'lcrRatePct'
+  | 'asfFactorPct'
+  | 'rsfFactorPct'
+  | 'interestRatePct'
+  | 'irrbbRateSensitive'
+  | 'performingStatus'
+  | 'notes';
+
+export interface SnapshotChange {
+  positionId: string;
+  field: SnapshotEditableField;
+  oldValue: string | number | boolean | null;
+  newValue: string | number | boolean | null;
+  changedBy: string;
+  changedAt: string;
+}
+
+/**
+ * An editable copy of a committed batch's positions.
+ *
+ * The parent batch is never touched — `positions` here starts as a clone
+ * and `changes` is the audit trail of every edit made to it. Recalculating
+ * runs the same engine over this set and over the parent batch's positions
+ * so the two can be compared; committing turns the edited set into a new,
+ * superseding batch version via the ordinary commit path (§18).
+ */
+export interface PositionSnapshot {
+  id: string;
+  name: string;
+  parentBatchId: string;
+  /** The run being investigated, where the snapshot was opened from a run rather than a batch directly. */
+  parentRunId: string | null;
+  affiliateCode: string;
+  asOfDate: IsoDate;
+  status: SnapshotStatus;
+  reason: string;
+  positions: Position[];
+  changes: SnapshotChange[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Set once Recalculate has produced a comparison, so the workbench can show it without re-running. */
+  lastRecalculatedAt: string | null;
+  /** Set once approved and committed as a new Position Book version. */
+  committedBatchId: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

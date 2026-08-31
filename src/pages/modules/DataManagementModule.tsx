@@ -4,6 +4,7 @@ import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 const DataUpload = lazy(() => import('@/pages/DataUpload').then((m) => ({ default: m.DataUpload })));
 const GlReconciliation = lazy(() => import('@/pages/GlReconciliation').then((m) => ({ default: m.GlReconciliation })));
 const DataVintages = lazy(() => import('@/pages/DataVintages').then((m) => ({ default: m.DataVintages })));
+const PositionBook = lazy(() => import('@/pages/PositionBook').then((m) => ({ default: m.PositionBook })));
 const Dimensions = lazy(() => import('@/pages/Dimensions').then((m) => ({ default: m.Dimensions })));
 const Counterparties = lazy(() => import('@/pages/Counterparties').then((m) => ({ default: m.Counterparties })));
 const YieldCurves = lazy(() => import('@/pages/YieldCurves').then((m) => ({ default: m.YieldCurves })));
@@ -18,6 +19,7 @@ const OPERATIONS_TABS: ModuleTab[] = [
   { key: 'upload', label: 'Data Upload & Staging', path: '/data/operations', permission: 'data.view', Component: DataUpload },
   { key: 'gl-reconciliation', label: 'GL Reconciliation', path: '/data/operations/gl-reconciliation', permission: 'data.view', Component: GlReconciliation },
   { key: 'vintages', label: 'Data Vintages & Load History', path: '/data/operations/vintages', permission: 'data.view', Component: DataVintages },
+  { key: 'position-book', label: 'Position Book', path: '/data/operations/position-book', permission: 'data.view', Component: PositionBook },
 ];
 
 const STRUCTURE_TABS: ModuleTab[] = [

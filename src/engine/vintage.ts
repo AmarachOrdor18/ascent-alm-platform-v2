@@ -1,5 +1,8 @@
-import type { Affiliate, DataDomain, IsoDate, LoadBatch } from './types';
+import type { Affiliate, DataDomain, IsoDate, LoadBatch, PositionContributor } from './types';
 import { daysBetween } from './dates';
+
+/** Every department the platform currently recognises as a Positions contributor. */
+export const ALL_CONTRIBUTORS: PositionContributor[] = ['Loans', 'Deposits', 'Treasury'];
 
 export type FreshnessStatus = 'Fresh' | 'Due' | 'Stale' | 'Never loaded';
 
@@ -66,18 +69,86 @@ export function checkAllDomains(affiliate: Affiliate, batches: LoadBatch[], toda
 }
 
 // Reloading an as-of date creates a new version; the highest version wins. Superseded batches are retained, not deleted.
+//
+// For the Positions domain, "current" is scoped per contributor as well as
+// per affiliate/domain/date: Loans re-uploading their slice supersedes only
+// Loans' prior version, never Treasury's or Deposits' — each department's
+// submission history is independent. `contributor` is required for the
+// Positions domain (undefined would otherwise conflate every department's
+// batches into one "latest version wins" pool) and ignored elsewhere, where
+// there is exactly one submitter per domain/date.
+// `contributor` and a batch's `b.contributor` are both normalised to `null` before comparing, so calling this
+// with no `contributor` argument matches a `null`-contributor batch specifically — that's how pre-contribution-model
+// batches (seeded before this field existed, or any future domain where one submitter is still all there is) are
+// addressed as their own, distinct bucket rather than silently matching (or silently excluding) every department.
 export function currentBatch(
   batches: LoadBatch[],
   affiliateCode: string,
   domain: DataDomain,
   asOfDate: IsoDate,
+  contributor?: PositionContributor,
 ): LoadBatch | null {
   const candidates = batches.filter(
     (b) =>
-      b.affiliateCode === affiliateCode && b.domain === domain && b.asOfDate === asOfDate && b.status === 'Committed',
+      b.affiliateCode === affiliateCode &&
+      b.domain === domain &&
+      b.asOfDate === asOfDate &&
+      b.status === 'Committed' &&
+      (domain !== 'Positions' || (b.contributor ?? null) === (contributor ?? null)),
   );
   if (candidates.length === 0) return null;
   return candidates.reduce((best, b) => (b.version > best.version ? b : best));
+}
+
+/**
+ * Every department's current (latest-version, Committed) Positions batch
+ * for an affiliate/date — the actual combined book, assembled from however
+ * many contributors have submitted so far. A run must pin every one of
+ * these, not a single batch, or a real contribution silently drops out of
+ * every calculation that consumes it. Includes any legacy, pre-contributor
+ * batch (`contributor: null`) alongside named departments', so data seeded
+ * or loaded before this model existed keeps working.
+ */
+export function currentPositionBatches(batches: LoadBatch[], affiliateCode: string, asOfDate: IsoDate): LoadBatch[] {
+  const legacy = currentBatch(batches, affiliateCode, 'Positions', asOfDate);
+  const perContributor = ALL_CONTRIBUTORS.map((c) => currentBatch(batches, affiliateCode, 'Positions', asOfDate, c));
+  return [legacy, ...perContributor].filter((b): b is LoadBatch => b !== null);
+}
+
+export interface ContributionStatus {
+  contributor: PositionContributor;
+  submitted: boolean;
+  batch: LoadBatch | null;
+}
+
+/** Per-department submission status for an affiliate/date, against whichever contributors that affiliate requires. */
+export function contributionReadiness(
+  affiliate: Affiliate,
+  batches: LoadBatch[],
+  asOfDate: IsoDate,
+): ContributionStatus[] {
+  const required = affiliate.requiredContributors ?? ALL_CONTRIBUTORS;
+  return required.map((contributor) => {
+    const batch = currentBatch(batches, affiliate.code, 'Positions', asOfDate, contributor);
+    return { contributor, submitted: batch !== null, batch };
+  });
+}
+
+export interface PositionBookReadiness {
+  contributors: ContributionStatus[];
+  /** A pre-contributor-model batch for this affiliate/date, if one exists — still counted into the book, but not toward any named department's completeness. */
+  legacyBatch: LoadBatch | null;
+  /** Every required contributor has submitted. Ignores `legacyBatch` deliberately — a legacy load isn't attributable to a specific department. */
+  isComplete: boolean;
+}
+
+export function positionBookReadiness(affiliate: Affiliate, batches: LoadBatch[], asOfDate: IsoDate): PositionBookReadiness {
+  const contributors = contributionReadiness(affiliate, batches, asOfDate);
+  return {
+    contributors,
+    legacyBatch: currentBatch(batches, affiliate.code, 'Positions', asOfDate),
+    isComplete: contributors.every((c) => c.submitted),
+  };
 }
 
 /** Every as-of date with committed data, newest first. */
@@ -110,8 +181,9 @@ export function planSupersede(
   affiliateCode: string,
   domain: DataDomain,
   asOfDate: IsoDate,
+  contributor?: PositionContributor,
 ): SupersedeOutcome {
-  const existing = currentBatch(batches, affiliateCode, domain, asOfDate);
+  const existing = currentBatch(batches, affiliateCode, domain, asOfDate, contributor);
   return { superseded: existing, nextVersion: existing ? existing.version + 1 : 1 };
 }
 

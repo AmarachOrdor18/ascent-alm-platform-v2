@@ -1,45 +1,17 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useRunResults, useRuns, useExecuteRun, payloadOf } from '@/lib/runHooks';
+import { useRunResults, useRuns, useExecuteRun, runHeadlines } from '@/lib/runHooks';
 import { useBatches } from '@/lib/hooks';
 import { formatDate, formatPct } from '@/lib/format';
-import type { ProcessRun, RunResult } from '@/engine/types';
+import type { ProcessRun } from '@/engine/types';
 
 const STATUS_TONE = { Completed: 'success', Running: 'info', Queued: 'warning', Draft: 'neutral', Failed: 'danger' } as const;
-
-/** Headline figures pulled from a result set, for the comparison view. */
-interface Headline {
-  label: string;
-  value: number | null;
-  unit: 'percent' | 'amount' | 'days';
-  higherIsBetter: boolean;
-}
-
-function headlines(results: RunResult[], currency: string): Headline[] {
-  const lcr = payloadOf<{ lcrPercent: number | null }>(results, 'Lcr');
-  const nsfr = payloadOf<{ nsfrPercent: number | null }>(results, 'Nsfr');
-  const ldr = payloadOf<{ ratioPercent: number | null }>(results, 'LoanToDeposit');
-  const nii = payloadOf<{ niiSensitivityPercent: number | null }>(results, 'NiiSensitivity');
-  const eve = payloadOf<{ eveSensitivityPercentOfEquity: number | null }>(results, 'EveSensitivity');
-  const survival = payloadOf<{ survivalHorizonDays: number }>(results, 'SurvivalHorizon');
-  const conc = payloadOf<{ largestSharePercent: number | null }>(results, 'Concentration');
-
-  void currency;
-  return [
-    { label: 'LCR', value: lcr?.lcrPercent ?? null, unit: 'percent', higherIsBetter: true },
-    { label: 'NSFR', value: nsfr?.nsfrPercent ?? null, unit: 'percent', higherIsBetter: true },
-    { label: 'Loan-to-deposit', value: ldr?.ratioPercent ?? null, unit: 'percent', higherIsBetter: false },
-    { label: 'NII sensitivity', value: nii?.niiSensitivityPercent ?? null, unit: 'percent', higherIsBetter: true },
-    { label: 'EVE sensitivity', value: eve?.eveSensitivityPercentOfEquity ?? null, unit: 'percent', higherIsBetter: true },
-    { label: 'Survival horizon', value: survival?.survivalHorizonDays ?? null, unit: 'days', higherIsBetter: true },
-    { label: 'Largest depositor', value: conc?.largestSharePercent ?? null, unit: 'percent', higherIsBetter: false },
-  ];
-}
 
 export function RunHistory() {
   const { hasPermission } = useAuth();
@@ -62,8 +34,8 @@ export function RunHistory() {
 
   const comparison = useMemo(() => {
     if (!left) return null;
-    const a = headlines(leftResults, left.reportingCurrency);
-    const b = right ? headlines(rightResults, right.reportingCurrency) : null;
+    const a = runHeadlines(leftResults);
+    const b = right ? runHeadlines(rightResults) : null;
     return a.map((metric, i) => ({
       ...metric,
       other: b?.[i]?.value ?? null,
@@ -177,6 +149,12 @@ export function RunHistory() {
                 >
                   Use for results screens
                 </button>
+                <Link
+                  href={`/data/operations/position-book?runId=${run.id}`}
+                  className="rounded border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+                >
+                  View positions consumed
+                </Link>
                 <button
                   type="button"
                   onClick={() =>

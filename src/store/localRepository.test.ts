@@ -280,6 +280,7 @@ describe('staged batches', () => {
       id,
       affiliateCode: 'RW',
       domain: 'Positions' as const,
+      contributor: null,
       asOfDate: '2026-07-31',
       version: 1,
       fileName: 'rw_position_book_2026-07.csv',
@@ -355,6 +356,34 @@ describe('staged batches', () => {
   });
 });
 
+describe('dimension members are affiliate-owned', () => {
+  it('two affiliates can use the same bare code without colliding, and neither list leaks into the other', async () => {
+    await repo.upsertDimensionMembers([
+      { id: 'GlAccount:NG:2001', dimension: 'GlAccount', affiliateCode: 'NG', code: '2001', name: 'Cash and Balances (Nigeria)', parentCode: null, isLeaf: true },
+      { id: 'GlAccount:GH:2001', dimension: 'GlAccount', affiliateCode: 'GH', code: '2001', name: 'Something entirely different (Ghana)', parentCode: null, isLeaf: true },
+    ]);
+
+    const ng = await repo.listDimensionMembers('GlAccount', 'NG');
+    const gh = await repo.listDimensionMembers('GlAccount', 'GH');
+
+    expect(ng).toHaveLength(1);
+    expect(ng[0]?.name).toBe('Cash and Balances (Nigeria)');
+    expect(gh).toHaveLength(1);
+    expect(gh[0]?.name).toBe('Something entirely different (Ghana)');
+
+    // Unscoped (no affiliateCode) is the maintenance-utility escape hatch — it sees both.
+    expect(await repo.listDimensionMembers('GlAccount')).toHaveLength(2);
+  });
+
+  it('an affiliate with no entries of a dimension gets an empty list, not another affiliate\'s', async () => {
+    await repo.upsertDimensionMembers([
+      { id: 'Product:NG:P-LOANS', dimension: 'Product', affiliateCode: 'NG', code: 'P-LOANS', name: 'Loans', parentCode: null, isLeaf: true },
+    ]);
+
+    expect(await repo.listDimensionMembers('Product', 'CI')).toEqual([]);
+  });
+});
+
 describe('reset', () => {
   it('clears every table atomically', async () => {
     await repo.upsertAffiliate(affiliate('NG'));
@@ -366,7 +395,7 @@ describe('reset', () => {
       domain: 'Positions',
       asOfDate: '2026-07-31',
       batch: {
-        id: 'B-1', affiliateCode: 'NG', domain: 'Positions', asOfDate: '2026-07-31', version: 1,
+        id: 'B-1', affiliateCode: 'NG', domain: 'Positions', contributor: null, asOfDate: '2026-07-31', version: 1,
         fileName: 'f.csv', fileHash: 'h', rowCount: 1, rowsAccepted: 1, rowsRejected: 0, status: 'Staged',
         supersedesBatchId: null, supersededReason: null, uploadedBy: 't', uploadedAt: '2026-08-01T00:00:00Z',
         committedBy: null, committedAt: null, reconciledBy: null, reconciledAt: null,

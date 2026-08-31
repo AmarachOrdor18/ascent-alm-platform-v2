@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'wouter';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
@@ -16,10 +17,11 @@ import {
 } from '@/lib/hooks';
 import { importCounterparties, importPositions, type RowError } from '@/lib/csvImport';
 import { validatePositions, type ValidationResult } from '@/engine/validation';
-import { planSupersede } from '@/engine/vintage';
+import { planSupersede, ALL_CONTRIBUTORS } from '@/engine/vintage';
+import { downloadPositionTemplate } from '@/lib/positionTemplates';
 import { deriveMembersFromFile, unmappedCodes } from '@/engine/dimensions';
 import { useConnectors } from '@/lib/connectorHooks';
-import type { Affiliate, DataDomain, DimensionMember, DimensionType, LoadBatch, Position } from '@/engine/types';
+import type { Affiliate, DataDomain, DimensionMember, DimensionType, LoadBatch, Position, PositionContributor } from '@/engine/types';
 
 // Hash of the file content, so a re-upload of the same bytes is detectable.
 async function hashFile(text: string): Promise<string> {
@@ -86,6 +88,10 @@ export function DataLoadPanel({
   const uploadBlockedByConnector = feed?.mode === 'Connector';
   const canUpload = hasPermission('data.configure') && !uploadBlockedByConnector;
 
+  // Which department this Positions upload represents — Loans, Deposits and Treasury each contribute an
+  // independent slice of the same affiliate/date; the book is assembled from however many have submitted,
+  // not received as one file. Irrelevant (and left unset) outside the Positions domain.
+  const [contributor, setContributor] = useState<PositionContributor | ''>('');
   const [staged, setStaged] = useState<Staged | null>(null);
   const [supersedeReason, setSupersedeReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -100,10 +106,11 @@ export function DataLoadPanel({
   const [membersSaved, setMembersSaved] = useState<{ fileName: string; count: number } | null>(null);
 
   // Resume a previously saved staging session so leaving mid-upload doesn't silently drop staged rows.
-  const { data: resumable } = useStagedBatchFor(affiliate.code, domain, asOfDate);
+  const { data: resumable } = useStagedBatchFor(affiliate.code, domain, asOfDate, contributor || undefined);
   useEffect(() => {
     if (staged || !resumable) return;
     setStaged({ batch: resumable.batch, positions: resumable.positions, parseErrors: [], ignoredColumns: [] });
+    if (resumable.batch.contributor) setContributor(resumable.batch.contributor);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resuming is a one-shot hydration, not a sync effect
   }, [resumable]);
 
@@ -118,10 +125,10 @@ export function DataLoadPanel({
     [staged, asOfDate, affiliates],
   );
 
-  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit');
-  const { data: glAccounts = [] } = useDimensionMembers('GlAccount');
-  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa');
-  const { data: counterparties = [] } = useDimensionMembers('Counterparty');
+  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit', affiliate.code);
+  const { data: glAccounts = [] } = useDimensionMembers('GlAccount', affiliate.code);
+  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa', affiliate.code);
+  const { data: counterparties = [] } = useDimensionMembers('Counterparty', affiliate.code);
   const knownMembers = useMemo(
     () => [...orgUnits, ...glAccounts, ...commonCoa, ...counterparties],
     [orgUnits, glAccounts, commonCoa, counterparties],
@@ -134,14 +141,14 @@ export function DataLoadPanel({
       .filter((x) => x.codes.length > 0);
   }, [staged, knownMembers]);
 
-  const supersede = planSupersede(batches, affiliate.code, domain, asOfDate);
+  const supersede = planSupersede(batches, affiliate.code, domain, asOfDate, contributor || undefined);
 
   const handleCounterpartyFile = async (file: File) => {
     setBusy(true);
     setMembersSaved(null);
     try {
       const text = await file.text();
-      const result = importCounterparties(text);
+      const result = importCounterparties(text, affiliate.code);
       setStagedMembers({
         fileName: file.name,
         members: result.rows,
@@ -171,26 +178,32 @@ export function DataLoadPanel({
       await handleCounterpartyFile(file);
       return;
     }
+    if (domain === 'Positions' && !contributor) return; // guarded by the disabled file input below too
     setBusy(true);
     setJustCommitted(null);
     try {
       const text = await file.text();
       const hash = await hashFile(text);
-      const duplicate = batches.find((b) => b.fileHash === hash && b.status === 'Committed');
+      const duplicate = batches.find(
+        (b) => b.fileHash === hash && b.status === 'Committed' && b.contributor === (contributor || null),
+      );
       const version = supersede?.nextVersion ?? 1;
+      const idSuffix = domain === 'Positions' ? `${contributor}-${asOfDate}` : asOfDate;
+      const batchId = `B-${affiliate.code}-${idSuffix}-v${version}`;
       const result = importPositions(text, {
         affiliateCode: affiliate.code,
         asOfDate,
-        batchId: `B-${affiliate.code}-${asOfDate}-v${version}`,
+        batchId,
         defaultCurrency: affiliate.functionalCurrency,
         defaultLegalEntityCode: affiliate.legalEntityCode,
       });
 
       setStaged({
         batch: {
-          id: `B-${affiliate.code}-${asOfDate}-v${version}`,
+          id: batchId,
           affiliateCode: affiliate.code,
           domain,
+          contributor: domain === 'Positions' ? (contributor as PositionContributor) : null,
           asOfDate,
           version,
           fileName: file.name,
@@ -242,6 +255,7 @@ export function DataLoadPanel({
           const committed = { ...staged.batch, status: 'Committed' as const };
           setJustCommitted({ fileName: staged.batch.fileName, rowCount: staged.positions.length });
           setStaged(null);
+          setContributor('');
           onCommitted?.(committed);
         },
       },
@@ -267,6 +281,7 @@ export function DataLoadPanel({
   const handleDiscard = () => {
     if (staged) void deleteStagedBatch.mutateAsync(staged.batch.id);
     setStaged(null);
+    setContributor('');
   };
 
   const autoMappable = unmapped.filter((u) => u.dimension !== 'CommonCoa');
@@ -390,6 +405,34 @@ export function DataLoadPanel({
         </div>
       ) : (
         <div className="mb-4 flex flex-wrap items-end gap-4 rounded-2xl border border-gray-100 bg-white p-4">
+          {domain === 'Positions' && (
+            <div>
+              <label htmlFor="up-contributor" className="mb-1 block text-[11px] text-gray-600">
+                Contributing department
+              </label>
+              <select
+                id="up-contributor"
+                value={contributor}
+                onChange={(e) => setContributor(e.target.value as PositionContributor | '')}
+                disabled={!!staged}
+                className="rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+              >
+                <option value="">— select department —</option>
+                {ALL_CONTRIBUTORS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {contributor && (
+                <button
+                  type="button"
+                  onClick={() => downloadPositionTemplate(contributor)}
+                  className="mt-1 block text-[10px] font-bold text-navy-700 hover:underline"
+                >
+                  Download {contributor} CSV template
+                </button>
+              )}
+            </div>
+          )}
           <div>
             <label htmlFor={`up-file-${domain}`} className="mb-1 block text-[11px] text-gray-600">
               CSV file — {domain}
@@ -399,12 +442,13 @@ export function DataLoadPanel({
               ref={fileInput}
               type="file"
               accept=".csv,text/csv"
-              disabled={!canUpload || busy}
+              disabled={!canUpload || busy || (domain === 'Positions' && !contributor)}
+              title={domain === 'Positions' && !contributor ? 'Select the contributing department first' : undefined}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void handleFile(file);
               }}
-              className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
+              className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700 disabled:opacity-50"
             />
           </div>
           {busy && <span className="text-[12px] text-gray-400">Parsing…</span>}
@@ -524,8 +568,11 @@ export function DataLoadPanel({
       {supersede?.superseded && !staged && (
         <div className="mb-4 rounded-lg bg-warning-bg px-4 py-3">
           <p className="text-[12px] text-warning">
-            <span className="font-bold">This as-of date already has committed data.</span> Uploading creates version{' '}
-            {supersede.nextVersion} and supersedes {supersede.superseded.id}.
+            <span className="font-bold">
+              {contributor ? `${contributor} already has committed data for this date.` : 'This as-of date already has committed data.'}
+            </span>{' '}
+            Uploading creates version {supersede.nextVersion} and supersedes {supersede.superseded.id}
+            {contributor ? ` — only ${contributor}'s prior submission, not other departments'.` : '.'}
           </p>
         </div>
       )}
@@ -642,6 +689,7 @@ export function DataLoadPanel({
               <div>
                 <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
                   Staged rows — {staged.batch.fileName}
+                  {staged.batch.contributor && <span className="ml-2 font-normal text-gray-400">({staged.batch.contributor})</span>}
                 </h2>
                 <p className="mt-1 text-[11px] text-gray-500">
                   Version {staged.batch.version} · hash <span className="font-mono">{staged.batch.fileHash}</span> ·
@@ -684,32 +732,45 @@ export function DataLoadPanel({
             </div>
 
             {totals && (
-              <dl className="mb-4 grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4 md:grid-cols-4">
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Assets</dt>
-                  <dd>
-                    <Amount value={totals.assets} currency={affiliate.functionalCurrency} />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Liabilities</dt>
-                  <dd>
-                    <Amount value={totals.liabilities} currency={affiliate.functionalCurrency} />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Capital</dt>
-                  <dd>
-                    <Amount value={totals.capital} currency={affiliate.functionalCurrency} />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">A − (L + C)</dt>
-                  <dd className={Math.abs(totals.difference) < 0.01 ? 'text-success' : 'text-danger'}>
-                    <Amount value={totals.difference} currency={affiliate.functionalCurrency} />
-                  </dd>
-                </div>
-              </dl>
+              <div className="mb-4">
+                <dl className="grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4 md:grid-cols-4">
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Assets</dt>
+                    <dd>
+                      <Amount value={totals.assets} currency={affiliate.functionalCurrency} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Liabilities</dt>
+                    <dd>
+                      <Amount value={totals.liabilities} currency={affiliate.functionalCurrency} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Capital</dt>
+                    <dd>
+                      <Amount value={totals.capital} currency={affiliate.functionalCurrency} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">A − (L + C)</dt>
+                    <dd className={domain === 'Positions' ? 'text-gray-500' : Math.abs(totals.difference) < 0.01 ? 'text-success' : 'text-danger'}>
+                      <Amount value={totals.difference} currency={affiliate.functionalCurrency} />
+                    </dd>
+                  </div>
+                </dl>
+                {domain === 'Positions' && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                    This is {contributor || 'this department'}&rsquo;s contribution only — a single department&rsquo;s
+                    slice is not expected to balance on its own. The combined book, once every department has
+                    submitted, is checked against the general ledger in{' '}
+                    <Link href="/data/operations/gl-reconciliation" className="font-bold text-navy-700 hover:underline">
+                      GL Reconciliation
+                    </Link>
+                    , not here.
+                  </p>
+                )}
+              </div>
             )}
 
             <ResultTable

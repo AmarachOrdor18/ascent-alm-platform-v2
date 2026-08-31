@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { RuleEditor, RuleField } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { useCurrencies, useDimensionMembers } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import type { ProductAssumption, ProductCharacteristicRule } from '@/engine/ruleTypes';
 
 const HQLA_LEVELS = ['Level 1', 'Level 2A', 'Level 2B', 'None'] as const;
+const LCR_ROLES = ['HQLA', 'Inflow', 'Outflow', 'None'] as const;
 
 export function ProductCharacteristics() {
   const { user } = useAuth();
-  const { data: products = [] } = useDimensionMembers('Product');
+  const { affiliateCode } = useScope();
+  // Product is affiliate-owned; a specific affiliate scope is needed to see its catalog — Group scope shows none.
+  const { data: products = [] } = useDimensionMembers('Product', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: currencies = [] } = useCurrencies();
   const { data: rules = [], isLoading } = useRules<ProductCharacteristicRule>('ProductCharacteristic');
   const { save, remove, checkDependencies } = useRuleMutations<ProductCharacteristicRule>('ProductCharacteristic');
@@ -53,6 +57,21 @@ export function ProductCharacteristics() {
           options={currencies.map((c) => c.code)}
           disabled={readOnly}
           onChange={(v) => update({ currency: v })}
+        />
+      ),
+    },
+    {
+      key: 'lcrRole',
+      header: 'LCR role',
+      width: '10%',
+      render: (row, update, readOnly) => (
+        <RowSelect
+          id={`lcrrole-${row.productCode}-${row.currency}`}
+          label="LCR role"
+          value={row.lcrCashflowRole}
+          options={LCR_ROLES}
+          disabled={readOnly}
+          onChange={(v) => update({ lcrCashflowRole: v })}
         />
       ),
     },
@@ -190,6 +209,7 @@ export function ProductCharacteristics() {
             createRow={() => ({
               productCode: leaves[0]?.code ?? '',
               currency: currencies[0]?.code ?? 'USD',
+              lcrCashflowRole: 'None',
               lcrRatePct: null,
               asfFactorPct: null,
               rsfFactorPct: null,

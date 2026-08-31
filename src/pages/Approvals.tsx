@@ -5,6 +5,8 @@ import { TableToolbar, TablePagination, useTableControls } from '@/components/ui
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates, useSaveAffiliate } from '@/lib/hooks';
 import { approvals, approvalBlockedReason, newId } from '@/lib/governanceHooks';
+import { repository } from '@/store/localRepository';
+import { useCommitSnapshot } from '@/lib/snapshotHooks';
 import type { ApprovalRequest } from '@/engine/types';
 
 const ACTIONS = ['Create', 'Update', 'Delete', 'Activate', 'Override'] as const;
@@ -23,6 +25,7 @@ export function Approvals() {
   const { data: requests = [], isLoading } = approvals.useList();
   const save = approvals.useSave();
   const saveAffiliate = useSaveAffiliate();
+  const commitSnapshot = useCommitSnapshot();
 
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
   const [newOpen, setNewOpen] = useState(false);
@@ -62,6 +65,16 @@ export function Approvals() {
       if (affiliate && affiliate.status === 'Testing') {
         saveAffiliate.mutate({ ...affiliate, status: 'Live' });
       }
+    }
+
+    // Approving an edited position snapshot commits it as a new, superseding
+    // Position Book version — the parent batch is never touched (see
+    // useCommitSnapshot). A rejection leaves the snapshot exactly as it was,
+    // still editable from Position Book.
+    if (status === 'Approved' && request.module === 'Position Snapshot') {
+      void repository.getSnapshot(request.entityId).then((snapshot) => {
+        if (snapshot && snapshot.status === 'PendingApproval') void commitSnapshot.mutateAsync(snapshot);
+      });
     }
   };
 

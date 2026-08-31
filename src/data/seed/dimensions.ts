@@ -1,7 +1,12 @@
 import type { DimensionMember, DimensionType, GlLevel } from '@/engine/types';
 
+/** The literal affiliate code for a genuinely cross-affiliate construct — a consolidation-tree root, a
+ * connected-exposure group spanning countries. An ordinary, filterable affiliate value, not a bypass. */
+const GROUP = 'GROUP';
+
 function node(
   dimension: DimensionType,
+  affiliateCode: string,
   code: string,
   name: string,
   parentCode: string | null,
@@ -9,8 +14,9 @@ function node(
   attributes?: DimensionMember['attributes'],
 ): DimensionMember {
   return {
-    id: `${dimension}:${code}`,
+    id: `${dimension}:${affiliateCode}:${code}`,
     dimension,
+    affiliateCode,
     code,
     name,
     parentCode,
@@ -19,57 +25,59 @@ function node(
   };
 }
 
-// Legal Entity — affiliates plus their subsidiaries
+// Legal Entity — each affiliate owns its own entity, plus subsidiaries. LE-GROUP is the consolidation root,
+// owned by the literal 'GROUP' affiliate; a country's entities reference it as `parentCode` without needing
+// it in their own affiliate-scoped list — buildHierarchy() treats an out-of-scope parent as a root.
 
 export const LEGAL_ENTITIES: DimensionMember[] = [
-  node('LegalEntity', 'LE-GROUP', 'Ecobank Transnational Incorporated', null, false, {
+  node('LegalEntity', GROUP, 'LE-GROUP', 'Ecobank Transnational Incorporated', null, false, {
     incorporation: 'Togo',
     consolidationBasis: 'Full',
   }),
 
-  node('LegalEntity', 'LE-NG', 'Ecobank Nigeria Limited', 'LE-GROUP', false, {
+  node('LegalEntity', 'NG', 'LE-NG', 'Ecobank Nigeria Limited', 'LE-GROUP', false, {
     regulator: 'CBN',
     licence: 'Commercial Banking — International',
     consolidationBasis: 'Full',
   }),
-  node('LegalEntity', 'LE-NG-AM', 'EDC Asset Management Limited', 'LE-NG', true, {
+  node('LegalEntity', 'NG', 'LE-NG-AM', 'EDC Asset Management Limited', 'LE-NG', true, {
     regulator: 'SEC Nigeria',
     licence: 'Fund Management',
     consolidationBasis: 'Full',
     note: 'Not a deposit-taker — outside the LCR perimeter',
   }),
-  node('LegalEntity', 'LE-NG-SEC', 'EDC Securities Limited', 'LE-NG', true, {
+  node('LegalEntity', 'NG', 'LE-NG-SEC', 'EDC Securities Limited', 'LE-NG', true, {
     regulator: 'SEC Nigeria',
     licence: 'Broker-Dealer',
     consolidationBasis: 'Full',
     note: 'Not a deposit-taker — outside the LCR perimeter',
   }),
 
-  node('LegalEntity', 'LE-GH', 'Ecobank Ghana PLC', 'LE-GROUP', false, {
+  node('LegalEntity', 'GH', 'LE-GH', 'Ecobank Ghana PLC', 'LE-GROUP', false, {
     regulator: 'Bank of Ghana',
     licence: 'Universal Banking',
     consolidationBasis: 'Full',
     listing: 'Ghana Stock Exchange',
   }),
-  node('LegalEntity', 'LE-GH-IB', 'EDC Investment Banking (Ghana) Limited', 'LE-GH', true, {
+  node('LegalEntity', 'GH', 'LE-GH-IB', 'EDC Investment Banking (Ghana) Limited', 'LE-GH', true, {
     regulator: 'SEC Ghana',
     licence: 'Investment Banking',
     consolidationBasis: 'Full',
   }),
 
-  node('LegalEntity', 'LE-CI', "Ecobank Côte d'Ivoire SA", 'LE-GROUP', false, {
+  node('LegalEntity', 'CI', 'LE-CI', "Ecobank Côte d'Ivoire SA", 'LE-GROUP', false, {
     regulator: 'BCEAO',
     licence: 'Banque Universelle (UEMOA)',
     consolidationBasis: 'Full',
     listing: 'BRVM',
   }),
-  node('LegalEntity', 'LE-CI-SGI', 'EDC Investment Corporation SGI', 'LE-CI', true, {
+  node('LegalEntity', 'CI', 'LE-CI-SGI', 'EDC Investment Corporation SGI', 'LE-CI', true, {
     regulator: 'CREPMF',
     licence: 'Société de Gestion et d’Intermédiation',
     consolidationBasis: 'Full',
   }),
 
-  node('LegalEntity', 'LE-KE', 'Ecobank Kenya Limited', 'LE-GROUP', true, {
+  node('LegalEntity', 'KE', 'LE-KE', 'Ecobank Kenya Limited', 'LE-GROUP', true, {
     regulator: 'Central Bank of Kenya',
     licence: 'Commercial Banking',
     consolidationBasis: 'Full',
@@ -96,20 +104,20 @@ const CORPORATE_DESKS = ['Large Corporates', 'Mid-Market', 'Public Sector'];
 const AFFILIATE_LABEL: Record<string, string> = { NG: 'Nigeria', GH: 'Ghana', CI: "Côte d'Ivoire" };
 
 export const ORG_UNITS: DimensionMember[] = [
-  node('OrgUnit', 'OU-GROUP', 'Ecobank Group', null, false),
+  node('OrgUnit', GROUP, 'OU-GROUP', 'Ecobank Group', null, false),
   ...Object.keys(AFFILIATE_LABEL).flatMap((code) => {
     const label = AFFILIATE_LABEL[code]!;
-    const units: DimensionMember[] = [node('OrgUnit', `OU-${code}`, label, 'OU-GROUP', false)];
+    const units: DimensionMember[] = [node('OrgUnit', code, `OU-${code}`, label, 'OU-GROUP', false)];
 
     for (const segment of SEGMENTS) {
       const segmentCode = `OU-${code}-${segment.suffix}`;
       const hasChildren = segment.suffix === 'RET' || segment.suffix === 'COR';
-      units.push(node('OrgUnit', segmentCode, `${label} — ${segment.name}`, `OU-${code}`, !hasChildren));
+      units.push(node('OrgUnit', code, segmentCode, `${label} — ${segment.name}`, `OU-${code}`, !hasChildren));
 
       if (segment.suffix === 'RET') {
         for (const region of REGIONS[code] ?? []) {
           units.push(
-            node('OrgUnit', `${segmentCode}-${slug(region)}`, `${region} Region`, segmentCode, true, {
+            node('OrgUnit', code, `${segmentCode}-${slug(region)}`, `${region} Region`, segmentCode, true, {
               segment: 'Retail Banking',
             }),
           );
@@ -118,7 +126,7 @@ export const ORG_UNITS: DimensionMember[] = [
       if (segment.suffix === 'COR') {
         for (const desk of CORPORATE_DESKS) {
           units.push(
-            node('OrgUnit', `${segmentCode}-${slug(desk)}`, desk, segmentCode, true, {
+            node('OrgUnit', code, `${segmentCode}-${slug(desk)}`, desk, segmentCode, true, {
               segment: 'Corporate & Investment Banking',
             }),
           );
@@ -138,28 +146,36 @@ function slug(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
-// Common Chart of Accounts — the Group standard every local GL maps onto
+// Common Chart of Accounts — every affiliate that reconciles to it owns its own copy of the same standard
+// (no Group-wide list). The three affiliates below share identical content today because it genuinely is one
+// standard; a country that needs to diverge just edits its own copy without touching anyone else's.
 
-export const COMMON_COA: DimensionMember[] = [
-  node('CommonCoa', 'COA-ROOT', 'Ecobank Group Chart of Accounts', null, false),
+function commonCoaFor(affiliateCode: string): DimensionMember[] {
+  const c = (code: string, name: string, parentCode: string | null, isLeaf: boolean) =>
+    node('CommonCoa', affiliateCode, code, name, parentCode, isLeaf);
+  return [
+    c('COA-ROOT', 'Ecobank Group Chart of Accounts', null, false),
 
-  node('CommonCoa', 'COA-1', 'Assets', 'COA-ROOT', false),
-  node('CommonCoa', 'COA-11', 'Cash & Balances with Central Banks', 'COA-1', true),
-  node('CommonCoa', 'COA-12', 'Due from Banks', 'COA-1', true),
-  node('CommonCoa', 'COA-13', 'Investment Securities', 'COA-1', true),
-  node('CommonCoa', 'COA-14', 'Loans & Advances to Customers', 'COA-1', true),
-  node('CommonCoa', 'COA-15', 'Property, Equipment & Other Assets', 'COA-1', true),
+    c('COA-1', 'Assets', 'COA-ROOT', false),
+    c('COA-11', 'Cash & Balances with Central Banks', 'COA-1', true),
+    c('COA-12', 'Due from Banks', 'COA-1', true),
+    c('COA-13', 'Investment Securities', 'COA-1', true),
+    c('COA-14', 'Loans & Advances to Customers', 'COA-1', true),
+    c('COA-15', 'Property, Equipment & Other Assets', 'COA-1', true),
 
-  node('CommonCoa', 'COA-2', 'Liabilities', 'COA-ROOT', false),
-  node('CommonCoa', 'COA-21', 'Due to Banks', 'COA-2', true),
-  node('CommonCoa', 'COA-22', 'Customer Deposits', 'COA-2', true),
-  node('CommonCoa', 'COA-23', 'Debt Securities Issued', 'COA-2', true),
-  node('CommonCoa', 'COA-24', 'Other Liabilities & Provisions', 'COA-2', true),
+    c('COA-2', 'Liabilities', 'COA-ROOT', false),
+    c('COA-21', 'Due to Banks', 'COA-2', true),
+    c('COA-22', 'Customer Deposits', 'COA-2', true),
+    c('COA-23', 'Debt Securities Issued', 'COA-2', true),
+    c('COA-24', 'Other Liabilities & Provisions', 'COA-2', true),
 
-  node('CommonCoa', 'COA-3', 'Capital & Reserves', 'COA-ROOT', false),
-  node('CommonCoa', 'COA-31', 'Share Capital', 'COA-3', true),
-  node('CommonCoa', 'COA-32', 'Reserves & Retained Earnings', 'COA-3', true),
-];
+    c('COA-3', 'Capital & Reserves', 'COA-ROOT', false),
+    c('COA-31', 'Share Capital', 'COA-3', true),
+    c('COA-32', 'Reserves & Retained Earnings', 'COA-3', true),
+  ];
+}
+
+export const COMMON_COA: DimensionMember[] = ['NG', 'GH', 'CI'].flatMap(commonCoaFor);
 
 // General Ledger Account — the affiliate's local chart (two-digit category /
 // four-digit group / six-digit account). Category codes: 10 Fixed assets,
@@ -258,39 +274,39 @@ const GL_SCHEME: Record<string, string> = {
   CI: 'SYSCOHADA (UEMOA regional standard)',
 };
 
-export const GL_ACCOUNTS: DimensionMember[] = [
-  node('GlAccount', 'GL-ROOT', 'General Ledger', null, false),
-  ...Object.entries(LOCAL_GL).flatMap(([affiliate, accounts]) => [
-    node('GlAccount', `GL-${affiliate}`, `${AFFILIATE_LABEL[affiliate]} — Local Chart`, 'GL-ROOT', false, {
-      scheme: GL_SCHEME[affiliate] ?? 'Local',
+// GL Account was already, in effect, affiliate-owned data pretending to be Group-wide — the codes above show
+// Nigeria (numeric), Ghana (letter-prefixed) and Côte d'Ivoire (SYSCOHADA) are three unrelated schemes that
+// happened to share one bare-code namespace. Every affiliate now owns its chart for real.
+export const GL_ACCOUNTS: DimensionMember[] = Object.entries(LOCAL_GL).flatMap(([affiliate, accounts]) => [
+  node('GlAccount', affiliate, `GL-${affiliate}`, `${AFFILIATE_LABEL[affiliate]} — Local Chart`, null, false, {
+    scheme: GL_SCHEME[affiliate] ?? 'Local',
+  }),
+  ...accounts.map((a) =>
+    node('GlAccount', affiliate, a.code, a.name, a.parent, a.level === 'Level2', {
+      commonCoa: a.commonCoa,
+      glLevel: a.level,
     }),
-    ...accounts.map((a) =>
-      node('GlAccount', a.code, a.name, a.parent, a.level === 'Level2', {
-        commonCoa: a.commonCoa,
-        affiliate,
-        glLevel: a.level,
-      }),
-    ),
-  ]),
-];
+  ),
+]);
 
-// Financial Element — what is being measured
+// Financial Element — what is being measured. Not tied to any one country's data, so it's owned by the
+// literal 'GROUP' affiliate rather than duplicated identically per country.
 
 export const FINANCIAL_ELEMENTS: DimensionMember[] = [
-  node('FinancialElement', 'FE-ROOT', 'Financial Elements', null, false),
+  node('FinancialElement', GROUP, 'FE-ROOT', 'Financial Elements', null, false),
 
-  node('FinancialElement', 'FE-BAL', 'Balances', 'FE-ROOT', false),
-  node('FinancialElement', 'FE-100', 'Ending Balance', 'FE-BAL', true),
-  node('FinancialElement', 'FE-140', 'Average Balance', 'FE-BAL', true),
+  node('FinancialElement', GROUP, 'FE-BAL', 'Balances', 'FE-ROOT', false),
+  node('FinancialElement', GROUP, 'FE-100', 'Ending Balance', 'FE-BAL', true),
+  node('FinancialElement', GROUP, 'FE-140', 'Average Balance', 'FE-BAL', true),
 
-  node('FinancialElement', 'FE-INC', 'Income & Expense', 'FE-ROOT', false),
-  node('FinancialElement', 'FE-430', 'Interest Accrued', 'FE-INC', true),
-  node('FinancialElement', 'FE-450', 'Transfer Rate Charge/Credit', 'FE-INC', true),
+  node('FinancialElement', GROUP, 'FE-INC', 'Income & Expense', 'FE-ROOT', false),
+  node('FinancialElement', GROUP, 'FE-430', 'Interest Accrued', 'FE-INC', true),
+  node('FinancialElement', GROUP, 'FE-450', 'Transfer Rate Charge/Credit', 'FE-INC', true),
 
-  node('FinancialElement', 'FE-GAP', 'Gap Measures', 'FE-ROOT', false),
-  node('FinancialElement', 'FE-660', 'Repricing Gap', 'FE-GAP', true),
-  node('FinancialElement', 'FE-1660', 'Liquidity Runoff', 'FE-GAP', true),
-  node('FinancialElement', 'FE-1680', 'Cumulative Liquidity Gap', 'FE-GAP', true),
+  node('FinancialElement', GROUP, 'FE-GAP', 'Gap Measures', 'FE-ROOT', false),
+  node('FinancialElement', GROUP, 'FE-660', 'Repricing Gap', 'FE-GAP', true),
+  node('FinancialElement', GROUP, 'FE-1660', 'Liquidity Runoff', 'FE-GAP', true),
+  node('FinancialElement', GROUP, 'FE-1680', 'Cumulative Liquidity Gap', 'FE-GAP', true),
 ];
 
 // Counterparty — obligor or depositor, with a group-exposure link for
@@ -412,20 +428,22 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
 ];
 
+// CPG-* connected-exposure groups aggregate obligors across countries (e.g. a sovereign group spanning NG
+// and GH), so they're owned by the literal 'GROUP' affiliate; each leaf obligor/depositor is owned by the
+// country it actually belongs to.
 export const COUNTERPARTIES: DimensionMember[] = [
-  node('Counterparty', 'CP-ROOT', 'All Counterparties', null, false),
+  node('Counterparty', GROUP, 'CP-ROOT', 'All Counterparties', null, false),
   ...COUNTERPARTY_GROUPS.map((g) =>
-    node('Counterparty', g.code, g.name, 'CP-ROOT', false, {
+    node('Counterparty', GROUP, g.code, g.name, 'CP-ROOT', false, {
       sector: g.sector,
       isExposureGroup: true,
     }),
   ),
   ...COUNTERPARTY_LEAVES.map((c) =>
-    node('Counterparty', c.code, c.name, c.group ?? 'CP-ROOT', true, {
+    node('Counterparty', c.affiliate ?? GROUP, c.code, c.name, c.group ?? 'CP-ROOT', true, {
       sector: c.sector,
       ...(c.group ? { groupExposureCode: c.group } : {}),
       ...(c.rating ? { rating: c.rating } : {}),
-      ...(c.affiliate ? { affiliate: c.affiliate } : {}),
       ...(c.note ? { note: c.note } : {}),
     }),
   ),

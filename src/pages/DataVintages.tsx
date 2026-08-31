@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAffiliates, useBatches } from '@/lib/hooks';
-import { availableAsOfDates, checkAllDomains, expiredBatches } from '@/engine/vintage';
+import { availableAsOfDates, checkAllDomains, expiredBatches, positionBookReadiness } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
 import type { LoadBatch } from '@/engine/types';
 
@@ -34,6 +35,18 @@ export function DataVintages() {
     .flatMap((a) => checkAllDomains(a, batches, TODAY).map((c) => ({ affiliate: a.name, ...c })));
   const stale = freshness.filter((f) => f.status === 'Stale' || f.status === 'Never loaded');
 
+  // Position Book readiness: for each affiliate's most recent as-of date, which departments have submitted
+  // their slice of the book and which haven't — the book is assembled from however many have contributed,
+  // never received as one file, so "committed" and "complete" are different questions.
+  const readinessRows = affiliates
+    .filter((a) => a.code !== 'GROUP')
+    .map((a) => {
+      const [latestDate] = availableAsOfDates(batches, a.code, 'Positions');
+      if (!latestDate) return null;
+      return { affiliate: a, asOfDate: latestDate, readiness: positionBookReadiness(a, batches, latestDate) };
+    })
+    .filter((r): r is { affiliate: (typeof affiliates)[number]; asOfDate: string; readiness: ReturnType<typeof positionBookReadiness> } => r !== null);
+
   const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
     filtered,
     10,
@@ -47,6 +60,11 @@ export function DataVintages() {
       render: (b) => <span className="font-mono text-[11px]">{b.affiliateCode}</span>,
     },
     { key: 'domain', header: 'Domain', render: (b) => <span className="text-navy-900">{b.domain}</span> },
+    {
+      key: 'contributor',
+      header: 'Department',
+      render: (b) => (b.contributor ? <span className="text-navy-900">{b.contributor}</span> : <span className="text-gray-300">—</span>),
+    },
     {
       key: 'asOf',
       header: 'As at',
@@ -97,6 +115,45 @@ export function DataVintages() {
           },
         ]}
       />
+
+      {readinessRows.length > 0 && (
+        <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-1.5">
+            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Position Book readiness</h2>
+            <InfoButton label="What 'readiness' means">
+              A bank doesn't hand over one ready-made position file — Loans, Deposits and Treasury each submit their
+              own slice for the same date, and the book is whatever combination of those has been committed so far.
+              This shows, for each affiliate's most recent date, which departments have submitted and which haven't.
+            </InfoButton>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {readinessRows.map(({ affiliate, asOfDate, readiness }) => (
+              <div key={affiliate.code} className="rounded-lg border border-gray-100 p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[12px] font-bold text-navy-900">{affiliate.name}</p>
+                  <StatusBadge status={readiness.isComplete ? 'Complete' : 'Incomplete'} tone={readiness.isComplete ? 'success' : 'warning'} />
+                </div>
+                <p className="mb-2 text-[10px] text-gray-400">As of {formatDate(asOfDate)}</p>
+                <ul className="space-y-1">
+                  {readiness.contributors.map((c) => (
+                    <li key={c.contributor} className="flex items-center justify-between text-[11px]">
+                      <span className="text-gray-600">{c.contributor}</span>
+                      <span className={c.submitted ? 'font-bold text-success' : 'font-bold text-warning'}>
+                        {c.submitted ? 'Submitted' : 'Missing'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {readiness.legacyBatch && (
+                  <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+                    Also carries a pre-department combined load ({readiness.legacyBatch.id}).
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="table-datagrid-container">
         <div className="border-b border-gray-100 bg-white/50 p-5">
@@ -180,6 +237,15 @@ export function DataVintages() {
                   produced, and says which version it used.
                 </p>
               )}
+
+              <div className="border-t border-gray-100 pt-3">
+                <Link
+                  href={`/data/operations/position-book?batchId=${b.id}`}
+                  className="rounded border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+                >
+                  View the {b.rowsAccepted} position(s) this batch admitted
+                </Link>
+              </div>
             </div>
           )}
         />

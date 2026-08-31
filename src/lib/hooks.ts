@@ -8,6 +8,7 @@ import type {
   DataDomain,
   LoadBatch,
   Position,
+  PositionContributor,
   DimensionType,
   EconomicIndicator,
   HolidayCalendar,
@@ -106,10 +107,13 @@ export function resolveSingleAffiliate<T extends { code: string; createdAt: stri
 }
 
 // ── Dimensions ───────────────────────────────────────────────────────────
-export function useDimensionMembers(dimension: DimensionType) {
+// affiliateCode is required — every dimension is affiliate-owned (no Group-wide list), so a caller must always
+// say which affiliate's entries it means. Pass 'GROUP' explicitly for the few genuinely cross-affiliate
+// constructs seeded under that code (a consolidation-tree root, a connected-exposure counterparty group).
+export function useDimensionMembers(dimension: DimensionType, affiliateCode: string) {
   return useQuery({
-    queryKey: keys.dimension(dimension),
-    queryFn: () => repository.listDimensionMembers(dimension),
+    queryKey: [...keys.dimension(dimension), affiliateCode],
+    queryFn: () => repository.listDimensionMembers(dimension, affiliateCode),
   });
 }
 
@@ -349,12 +353,20 @@ export function useCommitBatch() {
   });
 }
 
-// A previously staged (uncommitted) upload for this exact affiliate, domain and as-of date, if one was saved.
-export function useStagedBatchFor(affiliateCode: string | undefined, domain: DataDomain, asOfDate: string) {
+// A previously staged (uncommitted) upload for this exact affiliate, domain, as-of date and (for Positions)
+// contributor department, if one was saved.
+export function useStagedBatchFor(
+  affiliateCode: string | undefined,
+  domain: DataDomain,
+  asOfDate: string,
+  contributor?: PositionContributor,
+) {
   return useQuery({
-    queryKey: ['stagedBatches', affiliateCode ?? 'NONE', domain, asOfDate],
+    queryKey: ['stagedBatches', affiliateCode ?? 'NONE', domain, asOfDate, contributor ?? 'NONE'],
     queryFn: () =>
-      affiliateCode ? repository.getStagedBatchFor(affiliateCode, domain, asOfDate) : Promise.resolve(null),
+      affiliateCode
+        ? repository.getStagedBatchFor(affiliateCode, domain, asOfDate, contributor)
+        : Promise.resolve(null),
     enabled: affiliateCode !== undefined,
   });
 }

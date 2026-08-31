@@ -35,12 +35,14 @@ export function BulkOnboardAffiliates() {
   const { data: currencies = [] } = useCurrencies();
   const { data: calendars = [] } = useHolidayCalendars();
   const { data: connectors = [] } = useConnectors();
-  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa');
-  const { data: glAccounts = [] } = useDimensionMembers('GlAccount');
+  // Common COA is affiliate-owned, not Group-wide — NG's copy (identical to GH's and CI's today) is used as
+  // the reference/template shown to a bulk-onboarded affiliate, and copied into each new affiliate's own list.
+  const { data: commonCoa = [] } = useDimensionMembers('CommonCoa', 'NG');
 
   const save = useSaveAffiliate();
   const saveGlAccounts = useSaveDimensionMembers('GlAccount');
   const saveOrgUnits = useSaveDimensionMembers('OrgUnit');
+  const saveCommonCoa = useSaveDimensionMembers('CommonCoa');
 
   const [showTemplate, setShowTemplate] = useState(false);
   const [rows, setRows] = useState<BulkAffiliateRow[] | null>(null);
@@ -122,19 +124,27 @@ export function BulkOnboardAffiliates() {
         };
         await save.mutateAsync(affiliate);
 
+        // Every new affiliate gets its own copy of the Common COA reference (there's no Group-wide list to
+        // point at instead) before its GL mappings, which reference these codes, are created.
+        if (commonCoa.length > 0) {
+          await saveCommonCoa.mutateAsync(
+            commonCoa.map((m) => ({ ...m, id: `CommonCoa:${row.code}:${m.code}`, affiliateCode: row.code })),
+          );
+        }
+
         if (row.coaMappings.length > 0) {
           const rootCode = `GL-${row.code}`;
-          const rootExists = glAccounts.some((m) => m.code === rootCode);
           const members: DimensionMember[] = [
-            ...(rootExists ? [] : [{ id: `GlAccount:${rootCode}`, dimension: 'GlAccount' as const, code: rootCode, name: `${row.name} — Local Chart`, parentCode: null, isLeaf: false }]),
+            { id: `GlAccount:${row.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: row.code, code: rootCode, name: `${row.name} — Local Chart`, parentCode: null, isLeaf: false },
             ...row.coaMappings.map((m) => ({
-              id: `GlAccount:${m.localCode}`,
+              id: `GlAccount:${row.code}:${m.localCode}`,
               dimension: 'GlAccount' as const,
+              affiliateCode: row.code,
               code: m.localCode,
               name: m.localName,
               parentCode: rootCode,
               isLeaf: true,
-              attributes: { commonCoa: m.commonCoaCode, affiliate: row.code },
+              attributes: { commonCoa: m.commonCoaCode },
             })),
           ];
           await saveGlAccounts.mutateAsync(members);
@@ -143,10 +153,11 @@ export function BulkOnboardAffiliates() {
         if (row.createOrgTemplate) {
           const orgRootCode = `OU-${row.code}`;
           await saveOrgUnits.mutateAsync([
-            { id: `OrgUnit:${orgRootCode}`, dimension: 'OrgUnit', code: orgRootCode, name: row.name, parentCode: 'OU-GROUP', isLeaf: false },
+            { id: `OrgUnit:${row.code}:${orgRootCode}`, dimension: 'OrgUnit', affiliateCode: row.code, code: orgRootCode, name: row.name, parentCode: 'OU-GROUP', isLeaf: false },
             ...SEGMENTS.map((s) => ({
-              id: `OrgUnit:${orgRootCode}-${s.suffix}`,
+              id: `OrgUnit:${row.code}:${orgRootCode}-${s.suffix}`,
               dimension: 'OrgUnit' as const,
+              affiliateCode: row.code,
               code: `${orgRootCode}-${s.suffix}`,
               name: `${row.name} — ${s.name}`,
               parentCode: orgRootCode,

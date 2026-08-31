@@ -10,6 +10,7 @@ import type {
   HolidayCalendar,
   LoadBatch,
   Position,
+  PositionSnapshot,
   ProcessRun,
   Role,
   RuleMeta,
@@ -50,6 +51,7 @@ export class AscentDb extends Dexie {
   economicIndicators!: EntityTable<EconomicIndicator, 'id'>;
   holidayCalendars!: EntityTable<HolidayCalendar, 'id'>;
   roles!: EntityTable<Role, 'code'>;
+  snapshots!: EntityTable<PositionSnapshot, 'id'>;
 
   constructor(name = 'ascent-alm') {
     super(name);
@@ -104,6 +106,19 @@ export class AscentDb extends Dexie {
 
     this.version(7).stores({
       roles: 'code',
+    });
+
+    this.version(8).stores({
+      snapshots: 'id, parentBatchId, parentRunId, affiliateCode, status, [affiliateCode+status]',
+    });
+
+    // Dimension members became affiliate-owned (no Group-wide list — see engine/types.ts DimensionMember).
+    // Re-declaring the whole store (Dexie requires the full index list on every version, not a delta) adds
+    // affiliateCode and the compound indexes the per-affiliate queries need.
+    this.version(9).stores({
+      dimensionMembers:
+        'id, dimension, code, parentCode, affiliateCode, [dimension+code], [dimension+parentCode], ' +
+        '[dimension+affiliateCode], [dimension+affiliateCode+code]',
     });
   }
 }

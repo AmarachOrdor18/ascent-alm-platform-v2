@@ -10,6 +10,8 @@ import type {
   IsoDate,
   LoadBatch,
   Position,
+  PositionContributor,
+  PositionSnapshot,
   ProcessRun,
   Role,
   RuleKind,
@@ -74,8 +76,9 @@ export interface Repository {
   upsertAffiliate(affiliate: Affiliate): Promise<void>;
   deleteAffiliate(code: string): Promise<void>;
 
-  // Dimensions
-  listDimensionMembers(dimension: DimensionType): Promise<DimensionMember[]>;
+  // Dimensions — affiliate-owned; omitting affiliateCode returns every affiliate's members, for maintenance
+  // utilities (e.g. the reference-data refresh in data/seed/bootstrap.ts) rather than ordinary screens.
+  listDimensionMembers(dimension: DimensionType, affiliateCode?: string): Promise<DimensionMember[]>;
   upsertDimensionMembers(members: DimensionMember[]): Promise<void>;
 
   // Positions
@@ -89,7 +92,13 @@ export interface Repository {
 
   // Staged (uncommitted) uploads
   listStagedBatches(affiliateCode?: string): Promise<StagedBatch[]>;
-  getStagedBatchFor(affiliateCode: string, domain: DataDomain, asOfDate: IsoDate): Promise<StagedBatch | null>;
+  /** `contributor` disambiguates concurrent departmental drafts for the Positions domain — omit outside it. */
+  getStagedBatchFor(
+    affiliateCode: string,
+    domain: DataDomain,
+    asOfDate: IsoDate,
+    contributor?: PositionContributor,
+  ): Promise<StagedBatch | null>;
   upsertStagedBatch(staged: StagedBatch): Promise<void>;
   deleteStagedBatch(id: string): Promise<void>;
 
@@ -107,6 +116,12 @@ export interface Repository {
   upsertRun(run: ProcessRun): Promise<void>;
   listRunResults(runId: string): Promise<RunResult[]>;
   insertRunResults(results: RunResult[]): Promise<void>;
+
+  // Editable snapshots
+  listSnapshots(affiliateCode?: string): Promise<PositionSnapshot[]>;
+  getSnapshot(id: string): Promise<PositionSnapshot | null>;
+  upsertSnapshot(snapshot: PositionSnapshot): Promise<void>;
+  deleteSnapshot(id: string): Promise<void>;
 
   // Governance, monitoring and reporting
   listApprovalRequests(affiliateCode?: string): Promise<ApprovalRequest[]>;

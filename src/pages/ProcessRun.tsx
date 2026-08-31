@@ -6,15 +6,16 @@ import { InfoButton } from '@/components/ui/InfoButton';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useBatches, useDimensionMembers, useFxRates } from '@/lib/hooks';
+import { useAffiliates, useBatches, useDimensionMembers, useFxRates, usePositions } from '@/lib/hooks';
 import { useRules } from '@/lib/ruleHooks';
 import { useExecuteRun } from '@/lib/runHooks';
 import { ALL_ELEMENTS, draftRun } from '@/engine/run';
-import { availableAsOfDates, currentBatch } from '@/engine/vintage';
+import { availableAsOfDates, currentPositionBatches, positionBookReadiness } from '@/engine/vintage';
+import { unclassifiedProducts } from '@/engine/classification';
 import { buildFxTable, missingRates } from '@/engine/fx';
 import { formatDate } from '@/lib/format';
 import type { CalculationElement, ProcessRun as Run, ProcessType } from '@/engine/types';
-import type { ForecastScenarioRule, NewBusinessRule, TransactionStrategyRule } from '@/engine/ruleTypes';
+import type { ForecastScenarioRule, NewBusinessRule, ProductCharacteristicRule, TransactionStrategyRule } from '@/engine/ruleTypes';
 
 const ELEMENT_LABELS: Record<CalculationElement, string> = {
   Lcr: 'Liquidity Coverage Ratio',
@@ -39,11 +40,11 @@ export function ProcessRun() {
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
   const { data: fxRates = [] } = useFxRates();
-  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit');
-  const { data: products = [] } = useDimensionMembers('Product');
+  const { data: orgUnits = [] } = useDimensionMembers('OrgUnit', affiliateCode === 'GROUP' ? '' : affiliateCode);
+  const { data: products = [] } = useDimensionMembers('Product', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: bucketRules = [] } = useRules('TimeBucket');
   const { data: behaviourRules = [] } = useRules('BehaviourPattern');
-  const { data: productRules = [] } = useRules('ProductCharacteristic');
+  const { data: productRules = [] } = useRules<ProductCharacteristicRule>('ProductCharacteristic');
   const { data: scenarios = [] } = useRules<ForecastScenarioRule>('ForecastScenario');
   const { data: newBusiness = [] } = useRules<NewBusinessRule>('NewBusiness');
   const { data: strategies = [] } = useRules<TransactionStrategyRule>('TransactionStrategy');
@@ -78,7 +79,14 @@ export function ProcessRun() {
   const [outcome, setOutcome] = useState<{ run: Run; count: number } | null>(null);
 
   const effectiveDate = asOfDate || dates[0] || '';
-  const batch = affiliate && effectiveDate ? currentBatch(batches, affiliate.code, 'Positions', effectiveDate) : null;
+  // Every department's current Positions batch for this affiliate/date — the book is whatever combination of
+  // Loans/Deposits/Treasury (plus any legacy pre-contributor load) has been committed, not a single file.
+  const positionBatches = affiliate && effectiveDate ? currentPositionBatches(batches, affiliate.code, effectiveDate) : [];
+  const readiness = affiliate && effectiveDate ? positionBookReadiness(affiliate, batches, effectiveDate) : null;
+
+  const { data: scopedPositions = [] } = usePositions(affiliate?.code, effectiveDate || undefined);
+  const selectedProductRule = productRules.find((r) => r.id === productRuleId);
+  const unclassified = selectedProductRule ? unclassifiedProducts(scopedPositions, selectedProductRule.assumptions) : [];
 
   // A Group run must be able to convert every currency it will encounter.
   const required = useMemo(
@@ -96,7 +104,9 @@ export function ProcessRun() {
   const blockers: string[] = [];
   if (!affiliate) blockers.push('No affiliate selected.');
   if (!effectiveDate) blockers.push('No as-of date with committed data.');
-  if (!batch && affiliateCode !== 'GROUP') blockers.push('No committed position batch for this date.');
+  if (positionBatches.length === 0 && affiliateCode !== 'GROUP') {
+    blockers.push('No department has committed position data for this date yet.');
+  }
   if (missingFx.length > 0) blockers.push(`No FX rate for ${missingFx.join(', ')} — the run would fail.`);
   if (elements.length === 0) blockers.push('Select at least one calculation element.');
   if (processType === 'Dynamic' && !newBusinessId) blockers.push('A dynamic run needs a new-business rule.');
@@ -111,7 +121,7 @@ export function ProcessRun() {
         affiliateCode: affiliate.code,
         reportingCurrency,
         timeBucketRuleId: bucketRuleId,
-        batchIds: batch ? [batch.id] : [],
+        batchIds: positionBatches.map((b) => b.id),
         createdBy: user?.name ?? 'unknown',
         createdAt: new Date().toISOString(),
         elements,
@@ -142,7 +152,11 @@ export function ProcessRun() {
         metrics={[
           { label: 'Process type', value: processType, about: 'Static models the existing book running off; Dynamic layers a New Business rule’s growth assumptions on top.' },
           { label: 'Elements', value: `${elements.length}/${ALL_ELEMENTS.length}`, about: 'How many of the available calculation elements this run will compute — fewer elements means a lighter, faster run.' },
-          { label: 'Data version', value: batch ? `v${batch.version}` : '—', about: 'The committed position batch version this run will pin to — reloading data later never changes what this run reports.' },
+          {
+            label: 'Contributors',
+            value: positionBatches.length > 0 ? `${positionBatches.length} batch(es)` : '—',
+            about: 'Every department’s current Positions batch this run will pin to, combined — reloading data later never changes what this run reports.',
+          },
           {
             label: 'Ready',
             value: blockers.length === 0 ? 'Yes' : `${blockers.length} blocker(s)`,
@@ -339,13 +353,23 @@ export function ProcessRun() {
                   ))}
                 </select>
               </Field>
-              <Field label="Product characteristics">
+              <Field
+                label="Product characteristics"
+                hint="Overrides HQLA level, haircuts and ASF/RSF factors by product/currency at run time — a department uploading data never has to know these."
+              >
                 <select value={productRuleId} onChange={(e) => setProductRuleId(e.target.value)} className={input} aria-label="Product characteristics rule">
-                  <option value="">— position data as loaded —</option>
+                  <option value="">— position data as loaded, unclassified —</option>
                   {productRules.map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
+                {selectedProductRule && unclassified.length > 0 && (
+                  <p className="mt-1 text-[10px] leading-relaxed text-warning">
+                    {unclassified.reduce((s, u) => s + u.count, 0)} position(s) across {unclassified.length} product/currency
+                    combination(s) aren&rsquo;t covered by this rule and will keep whatever classification was loaded —
+                    e.g. {unclassified[0]!.productCode} ({unclassified[0]!.currency}).
+                  </p>
+                )}
               </Field>
               <Field label="Behaviour patterns">
                 <select value={behaviourRuleId} onChange={(e) => setBehaviourRuleId(e.target.value)} className={input} aria-label="Behaviour pattern rule">
@@ -409,25 +433,49 @@ export function ProcessRun() {
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-3 flex items-center gap-1.5">
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Data version</h2>
-              <InfoButton label="Why the run pins a data version">
-                The run pins this version. Reloading the data later creates a new version — this run keeps reporting
-                what it computed, and says which version that was.
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Position Book — contributors</h2>
+              <InfoButton label="Why the run pins every contributor's version">
+                The book is assembled from however many departments have submitted for this date — the run pins
+                every one of their current versions, combined. Reloading a department's data later creates a new
+                version for that department only; this run keeps reporting what it actually computed.
               </InfoButton>
             </div>
-            {batch ? (
-              <dl className="space-y-2 text-[11px]">
-                <Row label="Batch" value={batch.id} mono />
-                <Row label="Version" value={`v${batch.version}`} mono />
-                <Row label="Rows" value={String(batch.rowsAccepted)} mono />
-                <Row label="Committed" value={batch.committedAt ? formatDate(batch.committedAt.slice(0, 10)) : '—'} />
+            {positionBatches.length > 0 ? (
+              <dl className="space-y-3 text-[11px]">
+                {positionBatches.map((b) => (
+                  <div key={b.id} className="border-b border-gray-50 pb-2 last:border-0">
+                    <Row label={b.contributor ?? 'Legacy (pre-department) load'} value={`${b.id} · v${b.version}`} mono />
+                    <Row label="Rows" value={String(b.rowsAccepted)} mono />
+                  </div>
+                ))}
               </dl>
             ) : (
               <p className="text-[11px] text-gray-500">
                 {affiliateCode === 'GROUP'
                   ? 'A Group run reads every Live affiliate’s committed data.'
-                  : 'No committed batch for this date.'}
+                  : 'No department has committed data for this date yet.'}
               </p>
+            )}
+            {readiness && readiness.contributors.length > 0 && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Department completeness</p>
+                <ul className="space-y-1">
+                  {readiness.contributors.map((c) => (
+                    <li key={c.contributor} className="flex items-center justify-between text-[11px]">
+                      <span className="text-gray-600">{c.contributor}</span>
+                      <span className={c.submitted ? 'font-bold text-success' : 'font-bold text-warning'}>
+                        {c.submitted ? 'Submitted' : 'Missing'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {!readiness.isComplete && (
+                  <p className="mt-2 text-[10px] leading-relaxed text-warning">
+                    This run will proceed with whatever has been submitted — a missing department is not a blocker,
+                    but the result reflects an incomplete book.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </section>

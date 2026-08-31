@@ -2,6 +2,7 @@ import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { TierAllocationBar, paletteTone, type AllocationSegment } from '@/components/ui/TierAllocationBar';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { useDimensionMembers, useYieldCurves } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { allocationError } from '@/engine/ruleTypes';
@@ -32,7 +33,8 @@ const PREPAYMENT_METHODS: Array<{ value: PrepaymentMethod; label: string }> = [
 
 export function PrepaymentRules() {
   const { user } = useAuth();
-  const { data: coa = [] } = useDimensionMembers('CommonCoa');
+  const { affiliateCode } = useScope();
+  const { data: coa = [] } = useDimensionMembers('CommonCoa', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: rules = [], isLoading } = useRules<PrepaymentRule>('Prepayment');
   const { save, remove, checkDependencies } = useRuleMutations<PrepaymentRule>('Prepayment');
   const leaves = coa.filter((c) => c.isLeaf);
@@ -160,7 +162,8 @@ export function PrepaymentRules() {
 
 export function DiscountMethods() {
   const { user } = useAuth();
-  const { data: coa = [] } = useDimensionMembers('CommonCoa');
+  const { affiliateCode } = useScope();
+  const { data: coa = [] } = useDimensionMembers('CommonCoa', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: curves = [] } = useYieldCurves();
   const { data: rules = [], isLoading } = useRules<DiscountMethodRule>('DiscountMethod');
   const { save, remove, checkDependencies } = useRuleMutations<DiscountMethodRule>('DiscountMethod');

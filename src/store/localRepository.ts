@@ -12,6 +12,8 @@ import type {
   IsoDate,
   LoadBatch,
   Position,
+  PositionContributor,
+  PositionSnapshot,
   ProcessRun,
   Role,
   RuleMeta,
@@ -52,7 +54,10 @@ export class LocalRepository implements Repository {
   }
 
   // ── Dimensions ────────────────────────────────────────────────────────
-  listDimensionMembers(dimension: DimensionType): Promise<DimensionMember[]> {
+  listDimensionMembers(dimension: DimensionType, affiliateCode?: string): Promise<DimensionMember[]> {
+    if (affiliateCode) {
+      return this.database.dimensionMembers.where('[dimension+affiliateCode]').equals([dimension, affiliateCode]).toArray();
+    }
     return this.database.dimensionMembers.where('dimension').equals(dimension).toArray();
   }
 
@@ -128,13 +133,19 @@ export class LocalRepository implements Repository {
     return rows.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   }
 
-  async getStagedBatchFor(affiliateCode: string, domain: DataDomain, asOfDate: IsoDate): Promise<StagedBatch | null> {
-    return (
-      (await this.database.stagedBatches
-        .where('[affiliateCode+domain+asOfDate]')
-        .equals([affiliateCode, domain, asOfDate])
-        .first()) ?? null
-    );
+  async getStagedBatchFor(
+    affiliateCode: string,
+    domain: DataDomain,
+    asOfDate: IsoDate,
+    contributor?: PositionContributor,
+  ): Promise<StagedBatch | null> {
+    const candidates = await this.database.stagedBatches
+      .where('[affiliateCode+domain+asOfDate]')
+      .equals([affiliateCode, domain, asOfDate])
+      .toArray();
+    // Outside the Positions domain there is exactly one submitter, so any match is unambiguous; inside it,
+    // matching on contributor keeps one department's in-progress draft from resuming into another's session.
+    return candidates.find((c) => domain !== 'Positions' || c.batch.contributor === (contributor ?? null)) ?? null;
   }
 
   async upsertStagedBatch(staged: StagedBatch): Promise<void> {
@@ -238,6 +249,26 @@ export class LocalRepository implements Repository {
 
   async insertRunResults(results: RunResult[]): Promise<void> {
     await this.database.runResults.bulkPut(results);
+  }
+
+  // ── Editable snapshots ────────────────────────────────────────────────
+  async listSnapshots(affiliateCode?: string): Promise<PositionSnapshot[]> {
+    const rows = affiliateCode
+      ? await this.database.snapshots.where('affiliateCode').equals(affiliateCode).toArray()
+      : await this.database.snapshots.toArray();
+    return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async getSnapshot(id: string): Promise<PositionSnapshot | null> {
+    return (await this.database.snapshots.get(id)) ?? null;
+  }
+
+  async upsertSnapshot(snapshot: PositionSnapshot): Promise<void> {
+    await this.database.snapshots.put(snapshot);
+  }
+
+  async deleteSnapshot(id: string): Promise<void> {
+    await this.database.snapshots.delete(id);
   }
 
   // ── Governance, monitoring and reporting ──────────────────────────────
@@ -556,6 +587,7 @@ export class LocalRepository implements Repository {
         this.database.fxRates,
         this.database.economicIndicators,
         this.database.holidayCalendars,
+        this.database.snapshots,
       ],
       async () => {
         await Promise.all([
@@ -586,6 +618,7 @@ export class LocalRepository implements Repository {
           this.database.fxRates.clear(),
           this.database.economicIndicators.clear(),
           this.database.holidayCalendars.clear(),
+          this.database.snapshots.clear(),
         ]);
       },
     );

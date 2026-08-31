@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { Amount } from '@/components/ui/Amount';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
-import { useDimensionMembers, useSaveDimensionMembers } from '@/lib/hooks';
+import { useAffiliates, useDimensionMembers, useSaveDimensionMembers, resolveSingleAffiliate } from '@/lib/hooks';
 import { useScope } from '@/context/ScopeContext';
+import { accessibleAffiliates } from '@/lib/scope';
 import { repository } from '@/store/localRepository';
 import { useQuery } from '@tanstack/react-query';
 import { formatPct } from '@/lib/format';
@@ -23,9 +25,20 @@ interface Row {
 }
 
 export function Counterparties() {
-  const { hasPermission } = useAuth();
-  const { affiliateCode } = useScope();
-  const { data: members = [], isLoading } = useDimensionMembers('Counterparty');
+  const { user, hasPermission } = useAuth();
+  const { affiliateCode: scopeAffiliateCode } = useScope();
+  const { data: allAffiliates = [] } = useAffiliates();
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
+
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  // Counterparty is affiliate-owned, like every other dimension now — Group scope has no single register to
+  // show, so (as elsewhere in the app) the user picks one affiliate explicitly.
+  const affiliate =
+    affiliates.find((a) => a.code === pickedCode) ??
+    (scopeAffiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, scopeAffiliateCode));
+  const affiliateCode = affiliate?.code ?? '';
+
+  const { data: members = [], isLoading } = useDimensionMembers('Counterparty', affiliateCode);
   const save = useSaveDimensionMembers('Counterparty');
   const canEdit = hasPermission('data.configure');
 
@@ -33,7 +46,8 @@ export function Counterparties() {
 
   const { data: positions = [] } = useQuery({
     queryKey: ['positions', affiliateCode],
-    queryFn: () => repository.queryPositions(affiliateCode === 'GROUP' ? {} : { affiliateCode }),
+    queryFn: () => (affiliateCode ? repository.queryPositions({ affiliateCode }) : Promise.resolve([])),
+    enabled: !!affiliateCode,
   });
 
   const rows = useMemo<Row[]>(() => {
@@ -74,12 +88,13 @@ export function Counterparties() {
   );
 
   const handleAdd = () => {
-    if (!draft.code.trim() || !draft.name.trim()) return;
+    if (!draft.code.trim() || !draft.name.trim() || !affiliateCode) return;
     save.mutate(
       [
         {
-          id: `Counterparty:${draft.code.trim()}`,
+          id: `Counterparty:${affiliateCode}:${draft.code.trim()}`,
           dimension: 'Counterparty',
+          affiliateCode,
           code: draft.code.trim(),
           name: draft.name.trim(),
           parentCode: 'CP-ROOT',
@@ -140,7 +155,7 @@ export function Counterparties() {
         title="Counterparty Register"
         description="Obligors and depositors, with the exposure each carries. This is the dimension that makes depositor concentration computable."
         asOfDate={positions[0]?.asOfDate ?? null}
-        scope={affiliateCode === 'GROUP' ? 'Ecobank Group' : affiliateCode}
+        scope={affiliate?.name ?? 'No affiliate selected'}
         metrics={[
           { label: 'Registered', value: String(rows.length), about: 'Counterparty codes on file, whether or not they currently carry a deposit balance.' },
           { label: 'With exposure', value: String(withExposure.length), about: 'Registered counterparties that actually hold a deposit balance in the current scope.' },
@@ -154,6 +169,18 @@ export function Counterparties() {
         ]}
       />
 
+      <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
+
+      {!affiliate ? (
+        <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <p className="text-[13px] font-bold text-navy-900">Select an affiliate</p>
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+            The counterparty register is owned by each affiliate individually — pick one above to see or edit its
+            register.
+          </p>
+        </section>
+      ) : (
+        <>
       {largest && largest.sharePercent > 25 && (
         <div role="status" className="mb-6 rounded-lg bg-danger-bg px-4 py-3 text-[12px] leading-relaxed text-danger">
           <span className="font-bold">Concentration watch.</span> {largest.member.name} holds{' '}
@@ -286,6 +313,8 @@ export function Counterparties() {
           </div>
         </section>
       </div>
+      </>
+      )}
     </>
   );
 }

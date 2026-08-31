@@ -1,6 +1,7 @@
 import { RuleEditor, RuleField } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { useDimensionMembers, useYieldCurves } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { resolveAdjustmentBps } from '@/engine/ftp';
@@ -21,7 +22,8 @@ const ADJUSTMENT_TYPES = ['LiquidityPremium', 'BasisRiskCost', 'PricingIncentive
 
 export function FtpRules() {
   const { user } = useAuth();
-  const { data: coa = [] } = useDimensionMembers('CommonCoa');
+  const { affiliateCode } = useScope();
+  const { data: coa = [] } = useDimensionMembers('CommonCoa', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: curves = [] } = useYieldCurves();
   const { data: rules = [], isLoading } = useRules<FtpRule>('FtpRule');
   const { save, remove, checkDependencies } = useRuleMutations<FtpRule>('FtpRule');
@@ -133,7 +135,8 @@ export function FtpRules() {
 
 export function AdjustmentRules() {
   const { user } = useAuth();
-  const { data: coa = [] } = useDimensionMembers('CommonCoa');
+  const { affiliateCode } = useScope();
+  const { data: coa = [] } = useDimensionMembers('CommonCoa', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: rules = [], isLoading } = useRules<AdjustmentRuleDef>('AdjustmentRule');
   const { save, remove, checkDependencies } = useRuleMutations<AdjustmentRuleDef>('AdjustmentRule');
 

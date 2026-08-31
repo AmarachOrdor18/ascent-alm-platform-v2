@@ -2,6 +2,7 @@ import { RuleEditor, RuleField, ruleInput } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { TierAllocationBar, paletteTone, type AllocationSegment } from '@/components/ui/TierAllocationBar';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { useCurrencies, useDimensionMembers } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { defaultLadder } from '@/engine/buckets';
@@ -38,7 +39,8 @@ const BUCKETS = defaultLadder('IncomeSimulation').buckets.map((b) => b.label);
 
 export function NewBusiness() {
   const { user } = useAuth();
-  const { data: products = [] } = useDimensionMembers('Product');
+  const { affiliateCode } = useScope();
+  const { data: products = [] } = useDimensionMembers('Product', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: currencies = [] } = useCurrencies();
   const { data: rules = [], isLoading } = useRules<NewBusinessRule>('NewBusiness');
   const { save, remove, checkDependencies } = useRuleMutations<NewBusinessRule>('NewBusiness');

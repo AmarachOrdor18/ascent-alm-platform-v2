@@ -7,7 +7,14 @@ import { defaultLadder } from '@/engine/buckets';
 import { DEFAULT_PATTERNS } from '@/engine/behavioural';
 import type { ProcessRun, RunResult } from '@/engine/types';
 import type { YieldCurve } from '@/engine/ftp';
-import type { AdjustmentRuleDef, BehaviourPatternRule, FtpRule, ForecastScenarioRule, TimeBucketRule } from '@/engine/ruleTypes';
+import type {
+  AdjustmentRuleDef,
+  BehaviourPatternRule,
+  FtpRule,
+  ForecastScenarioRule,
+  ProductCharacteristicRule,
+  TimeBucketRule,
+} from '@/engine/ruleTypes';
 
 export const runKeys = {
   all: ['runs'] as const,
@@ -31,7 +38,10 @@ export function useRunResults(runId: string | null) {
 
 // Rules are read at execution time so the run records the versions it
 // actually used, not whatever is current when the result is later opened.
-async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
+// Exported so callers that need to run the engine outside the ordinary
+// Process Run screen — the snapshot workbench's Original vs Snapshot
+// comparison — assemble inputs identically rather than duplicating this.
+export async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   const [positions, fxRates, orgUnitMembers, productMembers, storedCurves] = await Promise.all([
     repository.queryPositions({}),
     repository.listFxRates(),
@@ -50,6 +60,9 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
     : null;
   const scenarioRule = run.forecastScenarioIds[0]
     ? await repository.getRule<ForecastScenarioRule>(run.forecastScenarioIds[0])
+    : null;
+  const productRule = run.productCharacteristicRuleId
+    ? await repository.getRule<ProductCharacteristicRule>(run.productCharacteristicRuleId)
     : null;
 
   // The engine's NII/EVE sensitivity takes one shock magnitude, not a full
@@ -88,6 +101,7 @@ async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
     adjustmentRules: adjustmentRule?.adjustments ?? [],
     ftpAssignments: ftpRule?.assignments ?? [],
     shockBps: scenarioShockBps,
+    productAssumptions: productRule?.assumptions ?? [],
   };
 }
 
@@ -151,4 +165,32 @@ export function payloadOf<T>(results: RunResult[], element: string): T | null {
 
 export function methodologyOf(results: RunResult[], element: string): string | null {
   return results.find((r) => r.element === element)?.methodology ?? null;
+}
+
+/** Headline figures pulled from a result set — shared by Run History's A/B compare and the snapshot workbench's Original vs Snapshot compare. */
+export interface RunHeadline {
+  label: string;
+  value: number | null;
+  unit: 'percent' | 'amount' | 'days';
+  higherIsBetter: boolean;
+}
+
+export function runHeadlines(results: RunResult[]): RunHeadline[] {
+  const lcr = payloadOf<{ lcrPercent: number | null }>(results, 'Lcr');
+  const nsfr = payloadOf<{ nsfrPercent: number | null }>(results, 'Nsfr');
+  const ldr = payloadOf<{ ratioPercent: number | null }>(results, 'LoanToDeposit');
+  const nii = payloadOf<{ niiSensitivityPercent: number | null }>(results, 'NiiSensitivity');
+  const eve = payloadOf<{ eveSensitivityPercentOfEquity: number | null }>(results, 'EveSensitivity');
+  const survival = payloadOf<{ survivalHorizonDays: number }>(results, 'SurvivalHorizon');
+  const conc = payloadOf<{ largestSharePercent: number | null }>(results, 'Concentration');
+
+  return [
+    { label: 'LCR', value: lcr?.lcrPercent ?? null, unit: 'percent', higherIsBetter: true },
+    { label: 'NSFR', value: nsfr?.nsfrPercent ?? null, unit: 'percent', higherIsBetter: true },
+    { label: 'Loan-to-deposit', value: ldr?.ratioPercent ?? null, unit: 'percent', higherIsBetter: false },
+    { label: 'NII sensitivity', value: nii?.niiSensitivityPercent ?? null, unit: 'percent', higherIsBetter: true },
+    { label: 'EVE sensitivity', value: eve?.eveSensitivityPercentOfEquity ?? null, unit: 'percent', higherIsBetter: true },
+    { label: 'Survival horizon', value: survival?.survivalHorizonDays ?? null, unit: 'days', higherIsBetter: true },
+    { label: 'Largest depositor', value: conc?.largestSharePercent ?? null, unit: 'percent', higherIsBetter: false },
+  ];
 }

@@ -32,7 +32,7 @@ export function Concentration() {
   const currency = run?.reportingCurrency ?? 'USD';
 
   const conc = payloadOf<ConcentrationResult>(results, 'Concentration');
-  const { data: counterparties = [] } = useDimensionMembers('Counterparty');
+  const { data: counterparties = [] } = useDimensionMembers('Counterparty', run?.affiliateCode && run.affiliateCode !== 'GROUP' ? run.affiliateCode : '');
   const [limit, setLimit] = useState(20);
 
   const nameOf = (id: string) => counterparties.find((c) => c.code === id)?.name ?? id;

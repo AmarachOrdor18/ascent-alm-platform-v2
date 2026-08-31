@@ -2,6 +2,7 @@ import { RuleEditor } from '@/components/ui/RuleEditor';
 import { RuleRows, RowInput, RowSelect, type RowColumn } from '@/components/ui/RuleRows';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { useCurrencies, useDimensionMembers } from '@/lib/hooks';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import type { TransactionAction, TransactionLine, TransactionStrategyRule } from '@/engine/ruleTypes';
@@ -14,7 +15,8 @@ const ACTIONS: Array<{ value: TransactionAction; label: string }> = [
 
 export function TransactionStrategies() {
   const { user } = useAuth();
-  const { data: products = [] } = useDimensionMembers('Product');
+  const { affiliateCode } = useScope();
+  const { data: products = [] } = useDimensionMembers('Product', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: currencies = [] } = useCurrencies();
   const { data: rules = [], isLoading } = useRules<TransactionStrategyRule>('TransactionStrategy');
   const { save, remove, checkDependencies } = useRuleMutations<TransactionStrategyRule>('TransactionStrategy');
