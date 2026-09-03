@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -6,10 +7,15 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
+import { resolveSingleAffiliate, useAffiliates, useAuditEvents, usePositions } from '@/lib/hooks';
 import { accessibleAffiliates } from '@/lib/scope';
+import { repository } from '@/store/localRepository';
+import { useRules, useRuleMutations, newRuleMeta } from '@/lib/ruleHooks';
 import { DEFAULT_VALIDATION_RULES, validatePositions, type ValidationRule } from '@/engine/validation';
+import type { ValidationRuleSet } from '@/engine/ruleTypes';
 import type { Severity } from '@/engine/types';
+
+let validationAuditCounter = 0;
 
 const SEVERITIES: Severity[] = ['Low', 'Medium', 'High', 'Critical'];
 
@@ -17,7 +23,7 @@ const SEVERITY_TONE = { Low: 'neutral', Medium: 'warning', High: 'danger', Criti
 
 const CHECK_EXPLANATION: Record<string, string> = {
   Completeness: 'Required fields are present on every row.',
-  ReferentialIntegrity: 'Referenced entities exist — an unknown affiliate cannot be loaded against.',
+  ReferentialIntegrity: 'Referenced entities exist - an unknown affiliate cannot be loaded against.',
   Range: 'Amounts sit inside a plausible range, catching unit and decimal errors.',
   CrossField: 'Fields agree with each other, such as a maturity date after the as-of date.',
   Duplicate: 'Position identifiers are unique within the batch.',
@@ -25,7 +31,10 @@ const CHECK_EXPLANATION: Record<string, string> = {
   FactorCoverage: 'Basel factors are present where the classification requires them.',
 };
 
-export function ValidationRules() {
+export function ValidationRules({
+  embedded = false,
+  forcedAffiliateCode,
+}: { embedded?: boolean; forcedAffiliateCode?: string } = {}) {
   const { user, hasPermission } = useAuth();
   const { affiliateCode } = useScope();
   const { data: allAffiliates = [] } = useAffiliates();
@@ -33,18 +42,38 @@ export function ValidationRules() {
   const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
   const canEdit = hasPermission('data.configure');
 
-  const [rules, setRules] = useState<ValidationRule[]>(DEFAULT_VALIDATION_RULES);
   const [asOfDate, setAsOfDate] = useState('2026-07-31');
-  const [lastRun, setLastRun] = useState<{ at: string; by: string } | null>(null);
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
-  // At Group scope there is no single affiliate to default to — an undefined code here (unlike 'GROUP')
+  // At Group scope there is no single affiliate to default to - an undefined code here (unlike 'GROUP')
   // is read by usePositions as "no filter", which would otherwise silently validate every affiliate's
-  // positions together as if they were one book.
+  // positions together as if they were one book. Embedded inside a specific affiliate's Settings page,
+  // that affiliate is already fixed - no picker, no Group-scope ambiguity.
   const affiliate =
-    affiliates.find((a) => a.code === pickedCode) ??
-    (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
+    embedded && forcedAffiliateCode
+      ? affiliates.find((a) => a.code === forcedAffiliateCode)
+      : affiliates.find((a) => a.code === pickedCode) ??
+        (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
+  const { data: auditEvents = [] } = useAuditEvents();
+
+  // Persisted, versioned, affiliate-scoped like every other rule kind: an affiliate-specific set
+  // overrides the Group default of the same kind (`affiliateCode: null`).
+  const { data: ruleSets = [] } = useRules<ValidationRuleSet>('ValidationRule');
+  const { save } = useRuleMutations<ValidationRuleSet>('ValidationRule');
+  const activeSet =
+    ruleSets.find((s) => s.affiliateCode === (affiliate?.code ?? null)) ??
+    ruleSets.find((s) => s.affiliateCode === null) ??
+    null;
+  const rules = activeSet?.rules ?? DEFAULT_VALIDATION_RULES;
+
+  const lastRun = useMemo(() => {
+    if (!affiliate) return null;
+    const events = auditEvents.filter(
+      (e) => e.module === 'Data Quality' && e.action === 'Run checks' && e.entityId === affiliate.code,
+    );
+    return events[0] ? { at: events[0].recordedAt, by: events[0].userName } : null;
+  }, [auditEvents, affiliate]);
 
   const result = useMemo(
     () =>
@@ -55,7 +84,50 @@ export function ValidationRules() {
   );
 
   const update = (id: string, patch: Partial<ValidationRule>) => {
-    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    if (!canEdit) return;
+    const nextRules = rules.map((r) => (r.id === id ? { ...r, ...patch } : r));
+    const base =
+      activeSet ??
+      ({
+        ...newRuleMeta('ValidationRule', `Validation rules - ${affiliate?.name ?? 'Group default'}`, user?.name ?? 'unknown'),
+        kind: 'ValidationRule' as const,
+        affiliateCode: affiliate?.code ?? null,
+        rules: DEFAULT_VALIDATION_RULES,
+      } satisfies ValidationRuleSet);
+    void save({
+      ...base,
+      rules: nextRules,
+      version: base.version + (activeSet ? 1 : 0),
+      updatedBy: user?.name ?? 'unknown',
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const queryClient = useQueryClient();
+  const [runningChecks, setRunningChecks] = useState(false);
+
+  const runChecks = async () => {
+    if (!affiliate || !user || !result) return;
+    setRunningChecks(true);
+    try {
+      validationAuditCounter += 1;
+      await repository.recordAuditEvent({
+        id: `AE-${Date.now()}-${validationAuditCounter}`,
+        module: 'Data Quality',
+        action: 'Run checks',
+        entity: 'ValidationRules',
+        entityId: affiliate.code,
+        userId: user.id,
+        userName: user.name,
+        role: user.role,
+        outcome: result.blocked ? 'Failure' : 'Success',
+        detail: `${result.rowsChecked} row(s) checked, ${result.exceptions.length} exception(s) - ${result.blocked ? 'commit would be blocked' : 'all blocking checks passed'}`,
+        recordedAt: new Date().toISOString(),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['auditEvents'] });
+    } finally {
+      setRunningChecks(false);
+    }
   };
 
   const columns: ResultColumn<ValidationRule>[] = [
@@ -131,7 +203,7 @@ export function ValidationRules() {
         ) : result ? (
           <span className="font-mono text-success">0</span>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         );
       },
     },
@@ -141,6 +213,7 @@ export function ValidationRules() {
 
   return (
     <>
+      {!embedded && (
       <ModuleHeader
         title="Validation Rules"
         description="Data-quality checks run as a gate before any calculation. Rules are configuration, so a bank adds its own without a release."
@@ -148,7 +221,7 @@ export function ValidationRules() {
         scope={affiliate?.name ?? 'No affiliate selected'}
         metrics={[
           { label: 'Rules', value: String(rules.length), about: 'Data-quality checks configured for this scope, covering completeness, referential integrity, ranges and more.' },
-          { label: 'Active', value: String(rules.filter((r) => r.isActive).length), about: 'Rules currently enforced — a disabled rule is kept on file but not evaluated.' },
+          { label: 'Active', value: String(rules.filter((r) => r.isActive).length), about: 'Rules currently enforced - a disabled rule is kept on file but not evaluated.' },
           { label: 'Blocking', value: String(blocking), tone: 'warning', about: 'Active rules that prevent a batch being committed if it fails them, rather than just flagging the finding.' },
           {
             label: 'Last run',
@@ -171,19 +244,20 @@ export function ValidationRules() {
             />
             <button
               type="button"
-              onClick={() => setLastRun({ at: new Date().toISOString(), by: 'current-user' })}
-              disabled={positions.length === 0}
+              onClick={() => void runChecks()}
+              disabled={positions.length === 0 || runningChecks || !result}
               className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
-              Run checks
+              {runningChecks ? 'Recording…' : 'Run checks'}
             </button>
           </>
         }
       />
+      )}
 
-      <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />
+      {!embedded && <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />}
 
-      {!affiliate && (
+      {!embedded && !affiliate && (
         <div className="mb-6 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-[12px] text-gray-500">
           Group scope has no single affiliate to default to. Pick one above to check its own data.
         </div>
@@ -232,9 +306,9 @@ export function ValidationRules() {
                   {result.exceptions
                     .filter((e) => e.ruleId === r.id)
                     .slice(0, 8)
-                    .map((e, i) => (
-                      <li key={`${e.positionId}-${i}`} className="text-gray-700">
-                        <span className="font-mono">{e.positionId ?? 'batch'}</span> — {e.description}
+                    .map((e) => (
+                      <li key={e.id} className="text-gray-700">
+                        <span className="font-mono">{e.positionId ?? 'batch'}</span> - {e.description}
                       </li>
                     ))}
                 </ul>

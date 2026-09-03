@@ -15,7 +15,7 @@ export interface HeaderMetric {
 }
 
 interface ModuleHeaderProps {
-  title: string;
+  title: React.ReactNode;
   description: string;
   /** `null` is legitimate only on configuration screens, which are not as-of dated. */
   asOfDate: IsoDate | null;

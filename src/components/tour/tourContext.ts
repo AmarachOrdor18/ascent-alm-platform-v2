@@ -1,4 +1,4 @@
-// Split out of Tour.tsx so this file only exports components — fast-refresh needs that to hot-reload without losing state.
+// Split out of Tour.tsx so this file only exports components - fast-refresh needs that to hot-reload without losing state.
 import { createContext, useContext } from 'react';
 import type { TourStep } from './tourSteps';
 

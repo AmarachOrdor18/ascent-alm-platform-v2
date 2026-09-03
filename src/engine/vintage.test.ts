@@ -13,12 +13,12 @@ import { defaultLadder } from './buckets';
 import { DEFAULT_PATTERNS } from './behavioural';
 import type { Affiliate, LoadBatch, Position, PositionContributor } from './types';
 
-// A bank doesn't hand over one ready-made position file — Loans, Deposits
+// A bank doesn't hand over one ready-made position file - Loans, Deposits
 // and Treasury each submit their own slice for the same affiliate/date, and
 // the Position Book is whatever combination of those has been committed.
 // This file proves two things: (1) the contribution model actually keeps
 // departments' submissions independent (one department reloading doesn't
-// touch another's), and (2) the specific bug this model was built to fix —
+// touch another's), and (2) the specific bug this model was built to fix -
 // a run used to pin exactly one batch per affiliate/date, so if two
 // departments uploaded separately, only the second uploader's positions
 // would silently feed every LCR/NSFR/IRRBB calculation. `currentPositionBatches`
@@ -69,6 +69,9 @@ function batch(overrides: Partial<LoadBatch> = {}): LoadBatch {
     committedAt: '2026-07-31T09:05:00Z',
     reconciledBy: null,
     reconciledAt: null,
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectedReason: null,
     ...overrides,
   };
 }
@@ -140,7 +143,7 @@ describe('multi-department Position Book contribution', () => {
     const deposits = batch({ id: 'B-DEPOSITS-1', contributor: 'Deposits' });
     const batches = [loans, deposits];
 
-    // Loans re-uploads (a new version) — planning the supersede for Loans must not touch Deposits.
+    // Loans re-uploads (a new version) - planning the supersede for Loans must not touch Deposits.
     const plan = planSupersede(batches, 'NG', 'Positions', '2026-07-31', 'Loans');
     expect(plan.superseded?.id).toBe('B-LOANS-1');
     expect(plan.nextVersion).toBe(2);
@@ -157,7 +160,7 @@ describe('multi-department Position Book contribution', () => {
 
   it('the bug this model fixes: a run must pin every current contributor batch, not the single latest one', () => {
     const loans = batch({ id: 'B-LOANS-1', contributor: 'Loans', uploadedAt: '2026-07-31T08:00:00Z' });
-    // Treasury uploads after Loans — under the old "one batch per affiliate/domain/date" model, this would
+    // Treasury uploads after Loans - under the old "one batch per affiliate/domain/date" model, this would
     // have been treated as the sole "current" batch, silently excluding Loans from every calculation.
     const treasury = batch({ id: 'B-TREASURY-1', contributor: 'Treasury', uploadedAt: '2026-07-31T10:00:00Z' });
     const batches = [loans, treasury];
@@ -166,7 +169,7 @@ describe('multi-department Position Book contribution', () => {
     const ids = combined.map((b) => b.id).sort();
     expect(ids).toEqual(['B-LOANS-1', 'B-TREASURY-1']);
 
-    // Deposits never submitted — the combined set is exactly what was actually committed, no more.
+    // Deposits never submitted - the combined set is exactly what was actually committed, no more.
     expect(combined.find((b) => b.contributor === 'Deposits')).toBeUndefined();
   });
 
@@ -233,7 +236,7 @@ describe('multi-department Position Book contribution', () => {
     const batches = [loansBatch, treasuryBatch];
 
     // Loans contributes a large HQLA asset; Treasury contributes the funding liability that gives it a real
-    // net cash outflow to be measured against. Neither department's file balances alone — only together do
+    // net cash outflow to be measured against. Neither department's file balances alone - only together do
     // they represent the bank's book, which is exactly the point of this model.
     const loansPosition = position({ id: 'P-LOANS-1', batchId: 'B-LOANS-1', amount: 1_000_000_000 });
     const treasuryPosition = position({
@@ -286,7 +289,7 @@ describe('multi-department Position Book contribution', () => {
       hqla: number;
       grossOutflows: number;
     };
-    // Both sides of the ratio are non-zero only because both departments' positions were actually consumed —
+    // Both sides of the ratio are non-zero only because both departments' positions were actually consumed -
     // under the old single-batch model, whichever department uploaded second would have been the only one here.
     expect(lcr.hqla).toBeGreaterThan(0);
     expect(lcr.grossOutflows).toBeGreaterThan(0);

@@ -29,7 +29,7 @@ export interface KriEvaluation {
   currentValue: number | null;
   priorValue: number | null;
   changeOverWindow: number | null;
-  /** Average change per observation — the slope, not just the endpoints. */
+  /** Average change per observation - the slope, not just the endpoints. */
   slopePerPeriod: number | null;
   trend: TrendDirection;
   status: LimitStatus | 'No data';
@@ -78,7 +78,7 @@ export function evaluateKri(definition: KriDefinition, observations: KriObservat
       trend: 'Stable',
       status: 'No data',
       projectedValue: null,
-      narrative: `Only ${window.length} observation(s) — at least 3 as-of dates are needed before a trend is meaningful.`,
+      narrative: `Only ${window.length} observation(s) - at least 3 as-of dates are needed before a trend is meaningful.`,
     };
   }
 

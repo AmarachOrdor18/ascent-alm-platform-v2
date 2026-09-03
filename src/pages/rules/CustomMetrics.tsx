@@ -46,7 +46,7 @@ function evaluate(expression: string, values: Record<string, number>): { value: 
     }
     return { value: result, error: null };
   } catch {
-    return { value: null, error: 'Expression could not be evaluated — check the brackets.' };
+    return { value: null, error: 'Expression could not be evaluated - check the brackets.' };
   }
 }
 
@@ -60,7 +60,7 @@ export function CustomMetrics() {
   return (
     <RuleEditor<CustomMetricRule>
       title="Custom Metrics"
-      description="Derived measures over run outputs. Define the bank's own ratio without waiting for a release."
+      description="Derived measures over run outputs. Define the bank's own ratio without waiting for a release. Definition only for now - no screen yet evaluates a saved formula against a run's results."
       noun="metric"
       rules={rules}
       isLoading={isLoading}
@@ -83,7 +83,7 @@ export function CustomMetrics() {
       guidance={
         <>
           <span className="font-bold">Arithmetic over named run outputs only.</span> A formula cannot reach data it was
-          not given, and an unrecognised name is reported rather than treated as zero — a metric that silently reads
+          not given, and an unrecognised name is reported rather than treated as zero - a metric that silently reads
           zero is worse than one that refuses to save.
         </>
       }

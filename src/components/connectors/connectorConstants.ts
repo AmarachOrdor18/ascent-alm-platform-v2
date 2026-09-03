@@ -14,9 +14,8 @@ export const DOMAIN_LABEL: Record<DataDomain, string> = {
   EconomicIndicators: 'Economic indicators',
 };
 
-// "Blocked" is the stored value everywhere; this label only softens what a viewer reads.
 export const STATUS_LABEL: Record<ConnectorStatus, string> = {
-  Available: 'Available', Blocked: 'Not configured', Planned: 'Planned', Retired: 'Retired',
+  Available: 'Available', Blocked: 'Blocked', Planned: 'Planned', Retired: 'Retired',
 };
 
 export const STATUS_TONE: Record<ConnectorStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {

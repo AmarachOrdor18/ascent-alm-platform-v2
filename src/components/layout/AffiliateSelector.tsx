@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { AffiliateStatus } from '@/engine/types';
 
 const STATUS_TONE: Record<AffiliateStatus, string> = {
@@ -17,10 +18,13 @@ export function AffiliateSelector({
   affiliates,
   value,
   onChange,
+  children,
 }: {
   affiliates: SelectableAffiliate[];
   value: string | undefined;
   onChange: (code: string) => void;
+  /** Extra controls (e.g. a domain selector) rendered inline in the same bar - for a caller that scopes on more than just the affiliate. */
+  children?: ReactNode;
 }) {
   // Deliberately independent of the global Scope switcher (which only lists Live affiliates); this lists every affiliate regardless of status.
   const options = affiliates.filter((a) => a.code !== 'GROUP');
@@ -48,6 +52,7 @@ export function AffiliateSelector({
       {current && (
         <span className={`text-[11px] font-bold ${STATUS_TONE[current.status]}`}>{current.status}</span>
       )}
+      {children}
     </div>
   );
 }

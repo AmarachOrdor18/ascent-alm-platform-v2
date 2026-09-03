@@ -56,7 +56,7 @@ export function ladderLabels(ladder: TimeBucketLadder): string[] {
   return labels;
 }
 
-/** Midpoint of a bucket in years — a proxy used only where no instrument duration exists. */
+/** Midpoint of a bucket in years - a proxy used only where no instrument duration exists. */
 export function bucketMidpointYears(ladder: TimeBucketLadder, label: string): number | null {
   const index = ladder.buckets.findIndex((b) => b.label === label);
   if (index < 0) return null;

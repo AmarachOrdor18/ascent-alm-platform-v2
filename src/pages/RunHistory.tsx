@@ -8,14 +8,28 @@ import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useRunResults, useRuns, useExecuteRun, runHeadlines } from '@/lib/runHooks';
 import { useBatches } from '@/lib/hooks';
+import { isRunStale, isRunUnreconciled } from '@/lib/runStaleness';
 import { formatDate, formatPct } from '@/lib/format';
 import type { ProcessRun } from '@/engine/types';
 
-const STATUS_TONE = { Completed: 'success', Running: 'info', Queued: 'warning', Draft: 'neutral', Failed: 'danger' } as const;
+const STATUS_TONE = {
+  Completed: 'success',
+  Running: 'info',
+  Queued: 'warning',
+  Draft: 'neutral',
+  Failed: 'danger',
+} as const;
+
+function formatComparisonValue(v: number | null, unit: 'percent' | 'amount' | 'days', currency: string) {
+  if (v === null) return <span className="text-gray-300">-</span>;
+  if (unit === 'percent') return formatPct(v, 2);
+  if (unit === 'days') return `${v} days`;
+  return <Amount value={v} currency={currency} />;
+}
 
 export function RunHistory() {
   const { hasPermission } = useAuth();
-  // Viewing history only needs risk.view (several roles, e.g. Reporting User, hold it) — re-running one is a
+  // Viewing history only needs risk.view (several roles, e.g. Reporting User, hold it) - re-running one is a
   // real execution and needs run.execute specifically, which Reporting User does not have.
   const canRun = hasPermission('run.execute');
   const { affiliateCode, setRun } = useScope();
@@ -46,24 +60,48 @@ export function RunHistory() {
   const completed = runs.filter((r) => r.status === 'Completed');
   const failed = runs.filter((r) => r.status === 'Failed');
 
-  /** A run is stale once its pinned data version has been superseded. */
-  const isStale = (run: ProcessRun) =>
-    run.positionBatchIds.some((id) => batches.find((b) => b.id === id)?.status === 'Superseded');
+  const isStale = (run: ProcessRun) => isRunStale(run, batches);
+  const isUnreconciled = (run: ProcessRun) => isRunUnreconciled(run, batches);
 
   const columns: ResultColumn<ProcessRun>[] = [
     { key: 'name', header: 'Run', render: (r) => <span className="font-medium text-navy-900">{r.name}</span> },
-    { key: 'affiliate', header: 'Scope', render: (r) => <span className="font-mono text-[11px]">{r.affiliateCode}</span> },
-    { key: 'asOf', header: 'As at', render: (r) => <span className="font-mono text-[11px]">{formatDate(r.asOfDate)}</span> },
+    {
+      key: 'affiliate',
+      header: 'Scope',
+      render: (r) => <span className="font-mono text-[11px]">{r.affiliateCode}</span>,
+    },
+    {
+      key: 'asOf',
+      header: 'As at',
+      render: (r) => <span className="font-mono text-[11px]">{formatDate(r.asOfDate)}</span>,
+    },
     { key: 'type', header: 'Type', render: (r) => <StatusBadge status={r.processType} tone="neutral" /> },
-    { key: 'elements', header: 'Elements', align: 'right', render: (r) => <span className="font-mono">{r.elements.length}</span> },
+    {
+      key: 'elements',
+      header: 'Elements',
+      align: 'right',
+      render: (r) => <span className="font-mono">{r.elements.length}</span>,
+    },
     { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} tone={STATUS_TONE[r.status]} /> },
     {
       key: 'freshness',
       header: 'Data',
-      render: (r) =>
-        isStale(r) ? <StatusBadge status="Superseded" tone="warning" /> : <StatusBadge status="Current" tone="success" />,
+      render: (r) => (
+        <div className="flex flex-wrap gap-1">
+          {isStale(r) ? (
+            <StatusBadge status="Superseded" tone="warning" />
+          ) : (
+            <StatusBadge status="Current" tone="success" />
+          )}
+          {isUnreconciled(r) && <StatusBadge status="Not reconciled" tone="warning" />}
+        </div>
+      ),
     },
-    { key: 'created', header: 'Run at', render: (r) => <span className="text-[11px] text-gray-500">{new Date(r.createdAt).toLocaleString()}</span> },
+    {
+      key: 'created',
+      header: 'Run at',
+      render: (r) => <span className="text-[11px] text-gray-500">{new Date(r.createdAt).toLocaleString()}</span>,
+    },
   ];
 
   return (
@@ -74,14 +112,30 @@ export function RunHistory() {
         asOfDate={null}
         scope={affiliateCode === 'GROUP' ? 'All scopes' : affiliateCode}
         metrics={[
-          { label: 'Runs', value: String(runs.length), about: 'Every run ever executed in this scope, regardless of outcome.' },
-          { label: 'Completed', value: String(completed.length), tone: 'success', about: 'Runs that finished and produced results, available to results screens.' },
-          { label: 'Failed', value: String(failed.length), tone: failed.length > 0 ? 'danger' : 'neutral', about: 'Runs that stopped rather than silently producing a partial answer — check the error log in each row.' },
+          {
+            label: 'Runs',
+            value: String(runs.length),
+            about: 'Every run ever executed in this scope, regardless of outcome.',
+          },
+          {
+            label: 'Completed',
+            value: String(completed.length),
+            tone: 'success',
+            about: 'Runs that finished and produced results, available to results screens.',
+          },
+          {
+            label: 'Failed',
+            value: String(failed.length),
+            tone: failed.length > 0 ? 'danger' : 'neutral',
+            about:
+              'Runs that stopped rather than silently producing a partial answer - check the error log in each row.',
+          },
           {
             label: 'On superseded data',
             value: String(runs.filter(isStale).length),
             tone: runs.some(isStale) ? 'warning' : 'neutral',
-            about: 'Completed runs whose pinned data version has since been replaced by a newer batch — the figures are still exactly what was computed at the time, just no longer current.',
+            about:
+              'Completed runs whose pinned data version has since been replaced by a newer batch - the figures are still exactly what was computed at the time, just no longer current.',
           },
         ]}
       />
@@ -98,7 +152,7 @@ export function RunHistory() {
               <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Detail label="Run ID" value={run.id} mono />
                 <Detail label="Reporting currency" value={run.reportingCurrency} mono />
-                <Detail label="Data version pinned" value={run.positionBatchIds.join(', ') || '—'} mono />
+                <Detail label="Data version pinned" value={run.positionBatchIds.join(', ') || '-'} mono />
                 <Detail label="Bucket rule" value={run.timeBucketRuleId || 'engine default'} mono />
                 <Detail label="Behaviour rule" value={run.behaviourPatternRuleId ?? 'engine default'} mono />
                 <Detail label="New business" value={run.newBusinessRuleId ?? 'none (static)'} mono />
@@ -112,7 +166,7 @@ export function RunHistory() {
                   <ul className="mt-1 space-y-0.5">
                     {run.errorLog.map((e, i) => (
                       <li key={i}>
-                        <span className="font-mono">{e.code}</span> — {e.message}
+                        <span className="font-mono">{e.code}</span> - {e.message}
                       </li>
                     ))}
                   </ul>
@@ -122,7 +176,17 @@ export function RunHistory() {
               {isStale(run) && (
                 <p className="rounded bg-warning-bg px-3 py-2 leading-relaxed text-warning">
                   The data version this run consumed has since been superseded. The figures below are what it actually
-                  computed — re-run it to reflect current data.
+                  computed - re-run it to reflect current data.
+                </p>
+              )}
+
+              {isUnreconciled(run) && (
+                <p className="rounded bg-warning-bg px-3 py-2 leading-relaxed text-warning">
+                  This run consumed Positions data that was never checked against a GL trial balance.{' '}
+                  <Link href="/data/operations/gl-reconciliation" className="font-bold underline hover:no-underline">
+                    Reconcile it
+                  </Link>{' '}
+                  - the figures below aren&rsquo;t wrong, just unverified against the ledger.
                 </p>
               )}
 
@@ -191,64 +255,59 @@ export function RunHistory() {
                 <span className="font-bold text-navy-900">B:</span> {right.name}
               </>
             )}
-            {!right && ' — select a second run to compare against.'}
+            {!right && ' - select a second run to compare against.'}
           </p>
 
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                <th className="py-2 px-3 font-bold">Metric</th>
-                <th className="py-2 px-3 text-right font-bold">A</th>
-                {right && <th className="py-2 px-3 text-right font-bold">B</th>}
-                {right && <th className="py-2 px-3 text-right font-bold">Change</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {comparison?.map((m) => {
-                const improving = m.delta === null ? null : m.higherIsBetter ? m.delta > 0 : m.delta < 0;
-                return (
-                  <tr key={m.label} className="border-b border-gray-100">
-                    <td className="py-2 px-3 font-medium text-navy-900">{m.label}</td>
-                    <td className="py-2 px-3 text-right font-mono">
-                      {m.value === null ? (
-                        <span className="text-gray-300">—</span>
-                      ) : m.unit === 'percent' ? (
-                        formatPct(m.value, 2)
-                      ) : m.unit === 'days' ? (
-                        `${m.value} days`
-                      ) : (
-                        <Amount value={m.value} currency={left.reportingCurrency} />
-                      )}
-                    </td>
-                    {right && (
-                      <td className="py-2 px-3 text-right font-mono">
-                        {m.other === null ? (
-                          <span className="text-gray-300">—</span>
-                        ) : m.unit === 'percent' ? (
-                          formatPct(m.other, 2)
-                        ) : m.unit === 'days' ? (
-                          `${m.other} days`
-                        ) : (
-                          <Amount value={m.other} currency={right.reportingCurrency} />
-                        )}
-                      </td>
-                    )}
-                    {right && (
-                      <td
-                        className={`py-2 px-3 text-right font-mono ${
-                          m.delta === null ? 'text-gray-300' : improving ? 'text-success' : 'text-danger'
-                        }`}
-                      >
-                        {m.delta === null
-                          ? '—'
-                          : `${m.delta > 0 ? '+' : ''}${m.delta.toFixed(2)}${m.unit === 'percent' ? 'pp' : ''}`}
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <ResultTable
+            rows={comparison ?? []}
+            rowKey={(m) => m.label}
+            columns={[
+              {
+                key: 'metric',
+                header: 'Metric',
+                render: (m) => <span className="font-medium text-navy-900">{m.label}</span>,
+              },
+              {
+                key: 'a',
+                header: 'A',
+                align: 'right',
+                render: (m) => (
+                  <span className="font-mono">{formatComparisonValue(m.value, m.unit, left.reportingCurrency)}</span>
+                ),
+              },
+              ...(right
+                ? [
+                    {
+                      key: 'b',
+                      header: 'B',
+                      align: 'right' as const,
+                      render: (m: NonNullable<typeof comparison>[number]) => (
+                        <span className="font-mono">
+                          {formatComparisonValue(m.other, m.unit, right.reportingCurrency)}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'change',
+                      header: 'Change',
+                      align: 'right' as const,
+                      render: (m: NonNullable<typeof comparison>[number]) => {
+                        const improving = m.delta === null ? null : m.higherIsBetter ? m.delta > 0 : m.delta < 0;
+                        return (
+                          <span
+                            className={`font-mono ${m.delta === null ? 'text-gray-300' : improving ? 'text-success' : 'text-danger'}`}
+                          >
+                            {m.delta === null
+                              ? '-'
+                              : `${m.delta > 0 ? '+' : ''}${m.delta.toFixed(2)}${m.unit === 'percent' ? 'pp' : ''}`}
+                          </span>
+                        );
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+          />
 
           {right && left.asOfDate !== right.asOfDate && (
             <p className="mt-4 rounded-lg bg-navy-50 px-3 py-2 text-[11px] leading-relaxed text-navy-900">

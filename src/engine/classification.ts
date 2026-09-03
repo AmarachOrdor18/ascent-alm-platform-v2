@@ -1,4 +1,4 @@
-// Regulatory/behavioural classification (build plan §6, screen 17) — the piece skills.md calls the Rules
+// Regulatory/behavioural classification (build plan §6, screen 17) - the piece skills.md calls the Rules
 // Engine: HQLA level, haircuts, LCR/ASF/RSF factors and rate-sensitivity are configured once per product and
 // currency here, rather than typed by hand into every uploaded file. A department uploading Loans or Deposits
 // data does not need to know what HQLA Level 2A means; they classify their book by product, and this applies
@@ -9,7 +9,7 @@ import type { ProductAssumption } from './ruleTypes';
 /**
  * Overrides a position's classification fields from the matching product/currency assumption, where one
  * exists. Positions whose product/currency has no configured assumption pass through with whatever the
- * source file supplied — an unconfigured product is a gap to close in the rule, not a reason to fail the run.
+ * source file supplied - an unconfigured product is a gap to close in the rule, not a reason to fail the run.
  */
 export function applyProductCharacteristics(positions: Position[], assumptions: ProductAssumption[]): Position[] {
   if (assumptions.length === 0) return positions;
@@ -34,7 +34,7 @@ export function applyProductCharacteristics(positions: Position[], assumptions: 
   });
 }
 
-/** Positions whose product/currency has no configured assumption — surfaced so a gap in the rule is visible, not silent. */
+/** Positions whose product/currency has no configured assumption - surfaced so a gap in the rule is visible, not silent. */
 export function unclassifiedProducts(positions: Position[], assumptions: ProductAssumption[]): Array<{ productCode: string; currency: string; count: number }> {
   const known = new Set(assumptions.map((a) => `${a.productCode}|${a.currency}`));
   const missing = new Map<string, { productCode: string; currency: string; count: number }>();

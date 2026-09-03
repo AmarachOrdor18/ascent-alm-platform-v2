@@ -48,7 +48,7 @@ export function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
-/** Denominator for Actual/Actual — 366 where the span touches a leap year. */
+/** Denominator for Actual/Actual - 366 where the span touches a leap year. */
 function daysInYearSpan(from: IsoDate, to: IsoDate): number {
   const a = parse(from);
   const b = parse(to);

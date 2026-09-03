@@ -12,7 +12,7 @@ export interface LimitConfig {
   greenThreshold: number;
   amberThreshold: number;
   redThreshold: number;
-  /** The regulator's own floor, where one exists — distinct from internal appetite. */
+  /** The regulator's own floor, where one exists - distinct from internal appetite. */
   regulatoryMinimum: number | null;
   isActive: boolean;
   updatedBy: string;
@@ -63,7 +63,7 @@ function isEffective(temp: TemporaryLimit, asOfDate: IsoDate): boolean {
   return temp.effectiveFrom <= asOfDate && asOfDate <= temp.expiresOn;
 }
 
-// A null value yields 'No data' rather than 'Green' — an unmeasured metric is not a compliant one.
+// A null value yields 'No data' rather than 'Green' - an unmeasured metric is not a compliant one.
 export function evaluateLimit(
   config: LimitConfig,
   value: number | null,
@@ -159,16 +159,23 @@ export function detectTransition(previous: LimitEvaluation | null, current: Limi
   };
 }
 
-/** Temporary limits expiring within the window — the reminder that stops silent reversion. */
+/** Temporary limits expiring within the window - the reminder that stops silent reversion. */
 export function expiringSoon(temporaryLimits: TemporaryLimit[], asOfDate: IsoDate, withinDays = 14): TemporaryLimit[] {
   const cutoff = new Date(Date.parse(`${asOfDate}T00:00:00Z`) + withinDays * 86_400_000).toISOString().slice(0, 10);
   return temporaryLimits.filter((t) => t.expiresOn >= asOfDate && t.expiresOn <= cutoff);
 }
 
-// Seeded per regulator during onboarding — requirements are not uniform across jurisdictions.
+// Seeded per regulator during onboarding - requirements are not uniform across jurisdictions.
 export const REGULATORY_MINIMA: Record<string, Record<string, number>> = {
   CBN: { lcrPercent: 100, nsfrPercent: 100, loanToDepositPercent: 65 },
   'Bank of Ghana': { lcrPercent: 100, nsfrPercent: 100 },
   BCEAO: { lcrPercent: 100, nsfrPercent: 100 },
   'Central Bank of Kenya': { lcrPercent: 100, nsfrPercent: 100 },
+};
+
+/** Short display labels for REGULATORY_MINIMA's metric keys - compact enough for a threshold table cell. */
+export const METRIC_LABEL: Record<string, string> = {
+  lcrPercent: 'LCR',
+  nsfrPercent: 'NSFR',
+  loanToDepositPercent: 'Loan-to-Deposit',
 };

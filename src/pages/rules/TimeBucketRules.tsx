@@ -1,9 +1,10 @@
-import { RuleEditor, RuleField, ruleInput, ruleNumber } from '@/components/ui/RuleEditor';
+import { RuleEditor, RuleField } from '@/components/ui/RuleEditor';
 import { BucketTimeline } from '@/components/ui/BucketTimeline';
+import { RuleRows, RowInput, type RowColumn } from '@/components/ui/RuleRows';
 import { useAuth } from '@/context/AuthContext';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { defaultLadder } from '@/engine/buckets';
-import type { LadderKind, TimeBucketLadder, TimeBucketRule } from '@/engine/types';
+import type { LadderKind, TimeBucket, TimeBucketLadder, TimeBucketRule } from '@/engine/types';
 
 const LADDERS: Array<{ kind: LadderKind; label: string; purpose: string }> = [
   { kind: 'IncomeSimulation', label: 'Income Simulation', purpose: 'Reporting periods for projected earnings.' },
@@ -29,7 +30,7 @@ export function TimeBucketRules() {
   return (
     <RuleEditor<TimeBucketRule>
       title="Time Bucket Rules"
-      description="The ladders results are bucketed into. Three independent sets, because liquidity and repricing are different questions."
+      description="The ladders results are bucketed into. Three independent sets, because liquidity and repricing are different questions. Selected on Process Run's Rules panel; left unselected, the engine default ladder applies and the result discloses which basis it used."
       noun="bucket rule"
       rules={rules}
       isLoading={isLoading}
@@ -45,7 +46,7 @@ export function TimeBucketRules() {
           // Buckets must ascend, or a position could match two of them.
           for (let i = 1; i < bounded.length; i += 1) {
             if (bounded[i]! <= bounded[i - 1]!) {
-              return `${ladder.kind} buckets must ascend — ${bounded[i]} follows ${bounded[i - 1]}.`;
+              return `${ladder.kind} buckets must ascend - ${bounded[i]} follows ${bounded[i - 1]}.`;
             }
           }
           if (ladder.buckets[ladder.buckets.length - 1]!.upperBoundDays !== null) {
@@ -57,7 +58,7 @@ export function TimeBucketRules() {
       guidance={
         <>
           <span className="font-bold">Buckets are derived from dates.</span> A position is placed by its maturity or
-          repricing date against the active ladder, so changing a ladder genuinely changes the allocation — it is not a
+          repricing date against the active ladder, so changing a ladder genuinely changes the allocation - it is not a
           relabelling of pre-assigned buckets.
         </>
       }
@@ -107,101 +108,59 @@ export function TimeBucketRules() {
                   </div>
                 )}
 
-                <table className="w-full text-[12px]">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-                      <th className="py-1.5 px-3 font-bold">Label</th>
-                      <th className="py-1.5 px-3 text-right font-bold">Upper bound (days)</th>
-                      <th className="py-1.5 px-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ladder.buckets.map((bucket, i) => (
-                      <tr key={`${ladder.kind}-${i}`} className="border-b border-gray-100">
-                        <td className="py-1.5 pr-2">
-                          <label htmlFor={`lbl-${ladderIndex}-${i}`} className="sr-only">
-                            Bucket {i + 1} label
-                          </label>
-                          <input
-                            id={`lbl-${ladderIndex}-${i}`}
+                <RuleRows<TimeBucket>
+                  rows={ladder.buckets}
+                  readOnly={readOnly}
+                  addLabel="Add bucket"
+                  rowKey={(_bucket, i) => `${ladder.kind}-${i}`}
+                  onChange={(buckets) => setLadder({ buckets })}
+                  // The open-ended terminal bucket must stay last, so it's never removable, and a
+                  // ladder must keep at least two rows or the "ascending buckets" check has nothing to check.
+                  canRemove={(bucket) => bucket.upperBoundDays !== null && ladder.buckets.length > 2}
+                  onAdd={() => {
+                    const last = ladder.buckets[ladder.buckets.length - 1]!;
+                    const prior = ladder.buckets[ladder.buckets.length - 2];
+                    const bound = (prior?.upperBoundDays ?? 30) * 2;
+                    setLadder({
+                      buckets: [...ladder.buckets.slice(0, -1), { label: `${bound}d`, upperBoundDays: bound }, last],
+                    });
+                  }}
+                  columns={
+                    [
+                      {
+                        key: 'label',
+                        header: 'Label',
+                        render: (bucket, update, disabled) => (
+                          <RowInput
+                            id={`lbl-${ladderIndex}-${ladder.buckets.indexOf(bucket)}`}
+                            label={`Bucket ${ladder.buckets.indexOf(bucket) + 1} label`}
                             value={bucket.label}
-                            disabled={readOnly}
-                            onChange={(e) =>
-                              setLadder({
-                                buckets: ladder.buckets.map((b, j) => (j === i ? { ...b, label: e.target.value } : b)),
-                              })
-                            }
-                            className={ruleInput}
+                            disabled={disabled}
+                            onChange={(v) => update({ label: v })}
                           />
-                        </td>
-                        <td className="py-1.5 px-3">
-                          <label htmlFor={`ub-${ladderIndex}-${i}`} className="sr-only">
-                            Bucket {i + 1} upper bound
-                          </label>
-                          {bucket.upperBoundDays === null ? (
+                        ),
+                      },
+                      {
+                        key: 'upperBound',
+                        header: 'Upper bound (days)',
+                        align: 'right',
+                        render: (bucket, update, disabled) =>
+                          bucket.upperBoundDays === null ? (
                             <span className="block py-1 text-right text-[11px] italic text-gray-400">open-ended</span>
                           ) : (
-                            <input
-                              id={`ub-${ladderIndex}-${i}`}
+                            <RowInput
+                              id={`ub-${ladderIndex}-${ladder.buckets.indexOf(bucket)}`}
+                              label={`Bucket ${ladder.buckets.indexOf(bucket) + 1} upper bound`}
                               type="number"
-                              min={1}
                               value={bucket.upperBoundDays}
-                              disabled={readOnly}
-                              onChange={(e) =>
-                                setLadder({
-                                  buckets: ladder.buckets.map((b, j) =>
-                                    j === i ? { ...b, upperBoundDays: Number(e.target.value) } : b,
-                                  ),
-                                })
-                              }
-                              className={ruleNumber}
+                              disabled={disabled}
+                              onChange={(v) => update({ upperBoundDays: Number(v) })}
                             />
-                          )}
-                        </td>
-                        <td className="py-1.5 pl-2 text-right">
-                          {!readOnly && ladder.buckets.length > 2 && (
-                            <button
-                              type="button"
-                              onClick={() => setLadder({ buckets: ladder.buckets.filter((_, j) => j !== i) })}
-                              className="text-[11px] font-bold text-danger hover:underline"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Insert before the open-ended terminal bucket, which must stay last.
-                      const last = ladder.buckets[ladder.buckets.length - 1]!;
-                      const prior = ladder.buckets[ladder.buckets.length - 2];
-                      const bound = (prior?.upperBoundDays ?? 30) * 2;
-                      update({
-                        ladders: rule.ladders.map((l, i) =>
-                          i === ladderIndex
-                            ? {
-                                ...l,
-                                buckets: [
-                                  ...l.buckets.slice(0, -1),
-                                  { label: `${bound}d`, upperBoundDays: bound },
-                                  last,
-                                ],
-                              }
-                            : l,
-                        ),
-                      });
-                    }}
-                    className="mt-2 text-[11px] font-bold text-navy-700 hover:text-navy-900"
-                  >
-                    Add bucket
-                  </button>
-                )}
+                          ),
+                      },
+                    ] satisfies RowColumn<TimeBucket>[]
+                  }
+                />
               </div>
             );
           })}

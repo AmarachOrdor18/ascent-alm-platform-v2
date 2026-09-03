@@ -1,5 +1,5 @@
 /**
- * `deriveMembersFromFile` — the "map from this file" action on Data Upload.
+ * `deriveMembersFromFile` - the "map from this file" action on Data Upload.
  *
  * Before this existed, a newly onboarded affiliate could never commit its
  * first position book: `GlAccount` was never seeded per affiliate (seeding
@@ -7,7 +7,7 @@
  * chart, which share the same code space), so every one of its GL codes
  * showed up "unmapped" with no in-app way to resolve it short of manually
  * re-typing twenty-odd codes on the Dimensions screen. The file already says
- * what each code is — a product class, a counterparty id — so this reads
+ * what each code is - a product class, a counterparty id - so this reads
  * that back rather than asking a human to retype it.
  */
 
@@ -41,7 +41,7 @@ describe('deriveMembersFromFile', () => {
     const members = deriveMembersFromFile('GlAccount', ['200601'], positions, 'RW', 'Ecobank Rwanda');
 
     const root = members.find((m) => m.code === 'GL-RW');
-    expect(root).toMatchObject({ isLeaf: false, parentCode: null, name: 'Ecobank Rwanda — Local Chart' });
+    expect(root).toMatchObject({ isLeaf: false, parentCode: null, name: 'Ecobank Rwanda - Local Chart' });
     expect(members.find((m) => m.code === '200601')?.parentCode).toBe('GL-RW');
   });
 
@@ -59,14 +59,14 @@ describe('deriveMembersFromFile', () => {
     ]);
   });
 
-  it('refuses to auto-create CommonCoa members — that taxonomy is governed, not inferred', () => {
+  it('refuses to auto-create CommonCoa members - that taxonomy is governed, not inferred', () => {
     const positions = [position({ id: 'P1', commonCoaCode: 'COA-99' })];
     expect(deriveMembersFromFile('CommonCoa', ['COA-99'], positions, 'RW', 'Ecobank Rwanda')).toEqual([]);
   });
 
   it('falls back to the bare code as a name when no position actually carries it', () => {
-    // Should not happen in practice — the codes come from the same file the
-    // positions do — but a defensive default beats a crash.
+    // Should not happen in practice - the codes come from the same file the
+    // positions do - but a defensive default beats a crash.
     const members = deriveMembersFromFile('GlAccount', ['999999'], [], 'RW', 'Ecobank Rwanda');
     expect(members.find((m) => m.code === '999999')?.name).toBe('999999');
   });
@@ -75,7 +75,7 @@ describe('deriveMembersFromFile', () => {
     expect(deriveMembersFromFile('GlAccount', [], NIGERIA_POSITIONS, 'RW', 'Ecobank Rwanda')).toEqual([]);
   });
 
-  it('is stable to call twice — ids are deterministic, so a re-run upserts rather than duplicating', () => {
+  it('is stable to call twice - ids are deterministic, so a re-run upserts rather than duplicating', () => {
     const positions = [position({ id: 'P1', glAccountCode: '200601', productClass: 'Loans' })];
     const first = deriveMembersFromFile('GlAccount', ['200601'], positions, 'RW', 'Ecobank Rwanda');
     const second = deriveMembersFromFile('GlAccount', ['200601'], positions, 'RW', 'Ecobank Rwanda');

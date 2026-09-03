@@ -72,7 +72,7 @@ describe('business days', () => {
   });
 });
 
-describe('nextOccurrence — monthly', () => {
+describe('nextOccurrence - monthly', () => {
   it('steps month-end to month-end, clamping short months', () => {
     const s = schedule();
     expect(nextOccurrence(s, '2026-01-31')).toBe('2026-02-28');
@@ -83,7 +83,7 @@ describe('nextOccurrence — monthly', () => {
   it('does not drift when an occurrence is rolled for a holiday', () => {
     const s = schedule();
     // October's month end rolls into November, but November's own occurrence
-    // is still 30 November — the roll must not push the sequence forward.
+    // is still 30 November - the roll must not push the sequence forward.
     const october = nextOccurrence(s, '2026-09-30', CALENDAR);
     expect(october).toBe('2026-11-02');
     expect(nextOccurrence(s, '2026-10-31', CALENDAR)).toBe('2026-11-30');
@@ -107,7 +107,7 @@ describe('nextOccurrence — monthly', () => {
   });
 });
 
-describe('nextOccurrence — quarterly', () => {
+describe('nextOccurrence - quarterly', () => {
   it('anchors to the start month rather than the calendar quarter', () => {
     // Starting in February means Feb / May / Aug / Nov.
     const s = schedule({ frequency: 'Quarterly', startDate: '2026-02-28' });
@@ -117,7 +117,7 @@ describe('nextOccurrence — quarterly', () => {
   });
 });
 
-describe('nextOccurrence — weekly and daily', () => {
+describe('nextOccurrence - weekly and daily', () => {
   it('finds the next matching weekday', () => {
     const s = schedule({ frequency: 'Weekly', dayOfWeek: 3, startDate: '2026-01-01' });
     // 2026-01-05 is a Monday, so the next Wednesday is the 7th.

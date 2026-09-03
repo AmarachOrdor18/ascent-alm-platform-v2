@@ -35,7 +35,7 @@ export function BulkOnboardAffiliates() {
   const { data: currencies = [] } = useCurrencies();
   const { data: calendars = [] } = useHolidayCalendars();
   const { data: connectors = [] } = useConnectors();
-  // Common COA is affiliate-owned, not Group-wide — NG's copy (identical to GH's and CI's today) is used as
+  // Common COA is affiliate-owned, not Group-wide - NG's copy (identical to GH's and CI's today) is used as
   // the reference/template shown to a bulk-onboarded affiliate, and copied into each new affiliate's own list.
   const { data: commonCoa = [] } = useDimensionMembers('CommonCoa', 'NG');
 
@@ -135,7 +135,7 @@ export function BulkOnboardAffiliates() {
         if (row.coaMappings.length > 0) {
           const rootCode = `GL-${row.code}`;
           const members: DimensionMember[] = [
-            { id: `GlAccount:${row.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: row.code, code: rootCode, name: `${row.name} — Local Chart`, parentCode: null, isLeaf: false },
+            { id: `GlAccount:${row.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: row.code, code: rootCode, name: `${row.name} - Local Chart`, parentCode: null, isLeaf: false },
             ...row.coaMappings.map((m) => ({
               id: `GlAccount:${row.code}:${m.localCode}`,
               dimension: 'GlAccount' as const,
@@ -159,7 +159,7 @@ export function BulkOnboardAffiliates() {
               dimension: 'OrgUnit' as const,
               affiliateCode: row.code,
               code: `${orgRootCode}-${s.suffix}`,
-              name: `${row.name} — ${s.name}`,
+              name: `${row.name} - ${s.name}`,
               parentCode: orgRootCode,
               isLeaf: true,
             })),
@@ -179,7 +179,7 @@ export function BulkOnboardAffiliates() {
     <>
       <ModuleHeader
         title="Bulk Onboard Affiliates"
-        description="Upload a completed workbook to pre-fill a batch of affiliates at once — each still lands in Onboarding status and needs its own connectivity, data load and approval, same as onboarding one at a time."
+        description="Upload a completed workbook to pre-fill a batch of affiliates at once - each still lands in Onboarding status and needs its own connectivity, data load and approval, same as onboarding one at a time."
         asOfDate={null}
         scope="Ecobank Group"
       />
@@ -206,7 +206,7 @@ export function BulkOnboardAffiliates() {
               <div className="mt-4 space-y-3 rounded-lg bg-gray-50 p-4 text-[12px]">
                 <TemplateSheetPreview name="Affiliate Profile" cols={['Affiliate Code*', 'Legal Name*', 'Country*', 'Region*', 'Regulator*', 'Legal Entity Code', 'Functional Currency*', 'Reporting Currency*', 'Fiscal Year End', 'Holiday Calendar ID']} note="One row per affiliate." />
                 <TemplateSheetPreview name="Currencies" cols={['Affiliate Code*', 'Other Active Currency*']} note="One row per (affiliate, currency)." />
-                <TemplateSheetPreview name="Connectivity" cols={['Affiliate Code*', 'Domain*', 'Mode*', 'Connector Name', 'SLA Days*', 'Owner']} note="One row per (affiliate, domain) — six rows per affiliate." />
+                <TemplateSheetPreview name="Connectivity" cols={['Affiliate Code*', 'Domain*', 'Mode*', 'Connector Name', 'SLA Days*', 'Owner']} note="One row per (affiliate, domain) - six rows per affiliate." />
                 <TemplateSheetPreview name="COA Mapping" cols={['Affiliate Code*', 'Group COA Node Code*', 'Local GL Code*', 'Local GL Name']} note={`One row per local code mapped. ${commonCoaLeaves.length} Group COA nodes exist today.`} />
                 <TemplateSheetPreview name="Organisation" cols={['Affiliate Code*', 'Create Standard Org Template? (Y/N)*']} note="One row per affiliate." />
                 <TemplateSheetPreview name="Instructions & Reference" cols={['(free text + valid-value lists)']} note="Regulators, regions, currencies, calendars, domains, connectors and Group COA nodes, so you don't need to open the app to look anything up." />
@@ -230,7 +230,7 @@ export function BulkOnboardAffiliates() {
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">3. Validate & preview</h2>
               <p className="mb-4 text-[12px] text-gray-600">
-                {rows.length} affiliate{rows.length === 1 ? '' : 's'} detected — <span className="font-bold text-success">{validRows.length} valid</span>, <span className="font-bold text-danger">{invalidRows.length} with errors</span>.
+                {rows.length} affiliate{rows.length === 1 ? '' : 's'} detected - <span className="font-bold text-success">{validRows.length} valid</span>, <span className="font-bold text-danger">{invalidRows.length} with errors</span>.
               </p>
 
               <table className="w-full text-[12px]">
@@ -247,8 +247,8 @@ export function BulkOnboardAffiliates() {
                   {rows.map((r) => (
                     <tr key={r.rowNumber} className="border-b border-gray-100 align-top">
                       <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{r.rowNumber}</td>
-                      <td className="py-2 px-3 font-mono text-[11px]">{r.code || '—'}</td>
-                      <td className="py-2 px-3 text-navy-900">{r.name || '—'}</td>
+                      <td className="py-2 px-3 font-mono text-[11px]">{r.code || '-'}</td>
+                      <td className="py-2 px-3 text-navy-900">{r.name || '-'}</td>
                       <td className="py-2 px-3">
                         <StatusBadge status={r.errors.length === 0 ? 'Valid' : 'Error'} tone={r.errors.length === 0 ? 'success' : 'danger'} />
                       </td>
@@ -271,10 +271,10 @@ export function BulkOnboardAffiliates() {
                   onClick={() => void confirmImport()}
                   className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                 >
-                  {importing ? 'Importing…' : `Confirm import — create ${validRows.length} affiliate${validRows.length === 1 ? '' : 's'}`}
+                  {importing ? 'Importing…' : `Confirm import - create ${validRows.length} affiliate${validRows.length === 1 ? '' : 's'}`}
                 </button>
                 {invalidRows.length > 0 && (
-                  <span className="text-[11px] text-gray-500">Rows with errors are skipped, not partially created — fix and re-upload to include them.</span>
+                  <span className="text-[11px] text-gray-500">Rows with errors are skipped, not partially created - fix and re-upload to include them.</span>
                 )}
               </div>
             </section>
@@ -284,7 +284,7 @@ export function BulkOnboardAffiliates() {
             <section className="rounded-2xl border border-success/20 bg-success-bg p-8 text-center">
               <h2 className="text-[16px] font-bold text-navy-900">✓ {imported.length} affiliate{imported.length === 1 ? '' : 's'} created</h2>
               <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-600">
-                {imported.join(', ')} — all in <span className="font-bold">Onboarding</span> status. Open each from
+                {imported.join(', ')} - all in <span className="font-bold">Onboarding</span> status. Open each from
                 Affiliates to finish connectivity, initial data load and submit for approval.
               </p>
             </section>

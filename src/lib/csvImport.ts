@@ -5,6 +5,7 @@ import type {
   BehaviouralTag,
   DimensionMember,
   HqlaLevel,
+  IndicatorObservation,
   IsoDate,
   LcrCashflowRole,
   PerformingStatus,
@@ -14,6 +15,7 @@ import type {
   RecordStatus,
 } from '@/engine/types';
 import type { LedgerBalance } from '@/engine/reconciliation';
+import type { StoredFxRate } from '@/engine/types';
 
 export interface RowError {
   /** 1-based line number in the file, counting the header. */
@@ -154,7 +156,7 @@ const ACCRUAL: AccrualBasis[] = ['30/360', 'Actual/360', 'Actual/Actual', '30/36
 const STATUSES: RecordStatus[] = ['ACTIVE', 'INACTIVE', 'PENDING', 'CLOSED', 'DORMANT'];
 
 /** Every column the importer reads. Anything else is reported as ignored. */
-const KNOWN_COLUMNS = [
+export const KNOWN_COLUMNS = [
   'id',
   'accountnumber',
   'legacyaccountnumber',
@@ -362,6 +364,53 @@ function productCodeFrom(productClass: string): string {
   );
 }
 
+/** Parse a bulk series of dated observations for one economic indicator - an alternative to adding them one at a time. */
+export function importIndicatorObservations(text: string): ImportResult<IndicatorObservation> {
+  const table = parseCsv(text);
+  if (table.length === 0) {
+    return {
+      rows: [],
+      errors: [{ line: 1, column: '', message: 'File is empty' }],
+      ignoredColumns: [],
+      headerColumns: [],
+    };
+  }
+
+  const header = table[0]!.map((h) => h.trim());
+  const index = new Map(header.map((h, i) => [h.trim().toLowerCase(), i]));
+  const errors: RowError[] = [];
+  const rows: IndicatorObservation[] = [];
+
+  const dateColumn = index.has('asofdate') ? 'asofdate' : index.has('date') ? 'date' : null;
+  if (!dateColumn || !index.has('value')) {
+    errors.push({ line: 1, column: '', message: 'Required column(s) missing: asOfDate (or date), value' });
+    return { rows, errors, ignoredColumns: [], headerColumns: header };
+  }
+
+  const used = new Set([dateColumn, 'value']);
+  const ignoredColumns = header.filter((h) => !used.has(h.trim().toLowerCase()));
+
+  for (let r = 1; r < table.length; r += 1) {
+    const line = r + 1;
+    const cells = table[r]!;
+    const get = (name: string) => {
+      const i = index.get(name);
+      return i === undefined ? undefined : cells[i];
+    };
+
+    const asOfDate = isoDate(get(dateColumn), 'asOfDate', line, errors);
+    const value = optionalNumber(get('value'), 'value', line, errors);
+    if (asOfDate === null || value === null) continue;
+    rows.push({ asOfDate, value });
+  }
+
+  // Re-observing the same date replaces it rather than duplicating - agencies revise history, and the
+  // last row for a given date in the file wins, matching how a single manual re-entry already behaves.
+  const byDate = new Map(rows.map((o) => [o.asOfDate, o]));
+
+  return { rows: [...byDate.values()], errors, ignoredColumns, headerColumns: header };
+}
+
 /** Parse a general-ledger trial balance for reconciliation. */
 export function importLedger(text: string, asOfDate: IsoDate, defaultCurrency = 'USD'): ImportResult<LedgerBalance> {
   const table = parseCsv(text);
@@ -407,7 +456,7 @@ export function importLedger(text: string, asOfDate: IsoDate, defaultCurrency = 
 const COUNTERPARTY_SECTORS = ['Corporate', 'Retail', 'Sovereign', 'Public Sector', 'Financial Institution'];
 const COUNTERPARTY_COLUMNS = ['code', 'name', 'sector', 'parentcode'];
 
-/** Parse a counterparty register file. Every entry is owned by the uploading affiliate — no Group-wide list. */
+/** Parse a counterparty register file. Every entry is owned by the uploading affiliate - no Group-wide list. */
 export function importCounterparties(text: string, affiliateCode: string): ImportResult<DimensionMember> {
   const table = parseCsv(text);
   if (table.length === 0) {
@@ -455,6 +504,70 @@ export function importCounterparties(text: string, affiliateCode: string): Impor
       parentCode: optionalText(get('parentcode')) ?? 'CP-ROOT',
       isLeaf: true,
       attributes: { sector: oneOf(get('sector'), COUNTERPARTY_SECTORS, 'Corporate', 'sector', line, errors) },
+    });
+  }
+
+  return { rows, errors, ignoredColumns, headerColumns: header };
+}
+
+const FX_RATE_COLUMNS = ['base', 'quote', 'rate', 'asofdate'];
+
+/** Parse a bulk FX rate file - one row per currency pair, quoted against a base. */
+export function importFxRates(text: string, defaultAsOfDate: IsoDate, updatedBy: string): ImportResult<StoredFxRate> {
+  const table = parseCsv(text);
+  if (table.length === 0) {
+    return {
+      rows: [],
+      errors: [{ line: 1, column: '', message: 'File is empty' }],
+      ignoredColumns: [],
+      headerColumns: [],
+    };
+  }
+
+  const header = table[0]!.map((h) => h.trim());
+  const index = new Map(header.map((h, i) => [h.trim().toLowerCase(), i]));
+  const ignoredColumns = header.filter((h) => !FX_RATE_COLUMNS.includes(h.trim().toLowerCase()));
+  const errors: RowError[] = [];
+  const rows: StoredFxRate[] = [];
+
+  const missing = ['base', 'quote', 'rate'].filter((c) => !index.has(c));
+  if (missing.length > 0) {
+    errors.push({ line: 1, column: missing.join(', '), message: `Required column(s) missing: ${missing.join(', ')}` });
+    return { rows, errors, ignoredColumns, headerColumns: header };
+  }
+
+  for (let r = 1; r < table.length; r += 1) {
+    const line = r + 1;
+    const cells = table[r]!;
+    const get = (name: string): string | undefined => {
+      const i = index.get(name);
+      return i === undefined ? undefined : cells[i];
+    };
+
+    const base = optionalText(get('base'))?.toUpperCase();
+    const quote = optionalText(get('quote'))?.toUpperCase();
+    const rate = requiredNumber(get('rate'), 'rate', line, errors);
+    if (!base || !quote) {
+      errors.push({ line, column: 'base, quote', message: 'base and quote are both required' });
+      continue;
+    }
+    if (rate <= 0) {
+      errors.push({ line, column: 'rate', message: 'rate must be a positive number' });
+      continue;
+    }
+
+    const rowAsOfDate = isoDate(get('asofdate'), 'asOfDate', line, errors) ?? defaultAsOfDate;
+    rows.push({
+      // Dated, not just keyed by pair - a rate is a series like a yield curve or a Position batch, so a
+      // new date adds a row alongside prior ones instead of silently overwriting that pair's history.
+      id: `FX-${base}-${quote}-${rowAsOfDate}`,
+      base,
+      quote,
+      rate,
+      asOfDate: rowAsOfDate,
+      source: 'File upload',
+      updatedBy,
+      updatedAt: new Date().toISOString(),
     });
   }
 

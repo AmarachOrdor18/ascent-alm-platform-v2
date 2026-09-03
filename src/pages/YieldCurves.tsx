@@ -3,9 +3,12 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { ResultTable } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
-import { useCurrencies, useYieldCurves, useSaveYieldCurve } from '@/lib/hooks';
+import { useScope } from '@/context/ScopeContext';
+import { useCurrencies, useYieldCurves, useSaveYieldCurve, useSaveBatch } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
+import { referenceLoadBatch } from '@/lib/referenceBatch';
 import { interpolateCurve } from '@/engine/ftp';
 import type { AccrualBasis, CompoundingBasis, RateFormat, StoredYieldCurve } from '@/engine/types';
 
@@ -42,10 +45,12 @@ function blankCurve(currency: string, asOfDate: string): StoredYieldCurve {
 }
 
 export function YieldCurves() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const { asOfDate: scopeAsOfDate } = useScope();
   const { data: curves = [], isLoading } = useYieldCurves();
   const { data: currencies = [] } = useCurrencies();
   const save = useSaveYieldCurve();
+  const saveBatch = useSaveBatch();
   const canEdit = hasPermission('data.configure') || hasPermission('rules.edit');
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -54,20 +59,30 @@ export function YieldCurves() {
   const [creatingCurrency, setCreatingCurrency] = useState('');
 
   useEffect(() => {
-    if (!activeId && curves.length > 0) setActiveId(curves[0]!.id);
+    if (!activeId && curves.length > 0) {
+      const mostRecent = [...curves].sort((a, b) => b.asOfDate.localeCompare(a.asOfDate))[0]!;
+      setActiveId(mostRecent.id);
+    }
   }, [curves, activeId]);
 
   const active = curves.find((c) => c.id === activeId) ?? null;
   const editing = draft ?? active;
   const isNewCurve = draft !== null && !curves.some((c) => c.id === draft.id);
 
-  // Currencies that don't already have a curve — creating a second curve for one that has one happens
-  // by editing that curve directly, not through "new curve".
-  const curveless = currencies.filter((c) => !curves.some((curve) => curve.currency === c.code));
+  // Curves sorted most-recent-first within each currency, so the picker below reads as a version
+  // history rather than an arbitrary order, and the newest snapshot is the natural default to land on.
+  const sortedCurves = [...curves].sort(
+    (a, b) => a.currency.localeCompare(b.currency) || b.asOfDate.localeCompare(a.asOfDate),
+  );
 
   const handleCreate = () => {
     if (!creatingCurrency) return;
-    setDraft(blankCurve(creatingCurrency, curves[0]?.asOfDate ?? '2026-07-31'));
+    // A curve is valid for any run from its as-of date onward (see ProcessRun.tsx's hasActiveCurve
+    // check), so the scope's own current date is a far better starting point than an arbitrary fixed
+    // one - it lands the new curve already valid for whatever the uploader is actually working on. A
+    // currency that already has a curve gets an additional dated version here, not a replacement - the
+    // "New curve for currency" list intentionally isn't restricted to currencies with none.
+    setDraft(blankCurve(creatingCurrency, scopeAsOfDate ?? curves[0]?.asOfDate ?? new Date().toISOString().slice(0, 10)));
     setCreatingCurrency('');
   };
 
@@ -77,11 +92,30 @@ export function YieldCurves() {
     setDraft({ ...editing, terms });
   };
 
+  // Two curves for the same currency dated identically would be a genuine tie a run can't resolve
+  // meaningfully between - caught here rather than left to whichever one happens to load first.
+  const duplicateDate = draft
+    ? curves.some((c) => c.id !== draft.id && c.currency === draft.currency && c.asOfDate === draft.asOfDate)
+    : false;
+
   const handleSave = () => {
-    if (!draft) return;
+    if (!draft || duplicateDate) return;
     const saved = { ...draft, updatedBy: 'current-user', updatedAt: new Date().toISOString() };
     save.mutate(saved, {
       onSuccess: () => {
+        // Curves are Group-wide reference data, entered here rather than staged like a Position file -
+        // but Data Sources' freshness page only reads LoadBatch rows, so without recording one that
+        // screen reads "Never loaded" forever no matter how current the curve actually is.
+        saveBatch.mutate(
+          referenceLoadBatch({
+            domain: 'MarketRates',
+            affiliateCode: 'GROUP',
+            asOfDate: saved.asOfDate,
+            label: `${saved.code} - ${saved.name}`,
+            uploadedBy: user?.name ?? 'unknown',
+            rowCount: saved.terms.length,
+          }),
+        );
         setDraft(null);
         setActiveId(saved.id);
       },
@@ -105,9 +139,22 @@ export function YieldCurves() {
         asOfDate={editing?.asOfDate ?? null}
         scope="Group"
         metrics={[
-          { label: 'Curves defined', value: String(curves.length), about: 'Yield curves on file across every currency — these are what FTP base rates and shock scenarios are read from.' },
-          { label: 'Currencies covered', value: String(new Set(curves.map((c) => c.currency)).size), about: 'Distinct currencies with at least one curve defined.' },
-          { label: 'Term points', value: editing ? String(editing.terms.length) : '—', about: 'Tenor points on the selected curve — rates between them are linearly interpolated.' },
+          {
+            label: 'Curves defined',
+            value: String(curves.length),
+            about:
+              'Yield curves on file across every currency - these are what FTP base rates and shock scenarios are read from.',
+          },
+          {
+            label: 'Currencies covered',
+            value: String(new Set(curves.map((c) => c.currency)).size),
+            about: 'Distinct currencies with at least one curve defined.',
+          },
+          {
+            label: 'Term points',
+            value: editing ? String(editing.terms.length) : '-',
+            about: 'Tenor points on the selected curve - rates between them are linearly interpolated.',
+          },
         ]}
         actions={
           draft && canEdit ? (
@@ -122,7 +169,8 @@ export function YieldCurves() {
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={save.isPending}
+                disabled={save.isPending || duplicateDate}
+                title={duplicateDate ? `${editing?.currency} already has a curve dated ${editing?.asOfDate} - change the date or edit that one instead` : undefined}
                 className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
                 {save.isPending ? 'Saving…' : isNewCurve ? 'Create curve' : 'Save curve'}
@@ -132,23 +180,30 @@ export function YieldCurves() {
         }
       />
 
+      {duplicateDate && (
+        <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-3 text-[12px] leading-relaxed text-danger">
+          {editing?.currency} already has a curve dated {editing?.asOfDate}. Pick a different as-of date above, or
+          cancel and edit that existing curve instead.
+        </div>
+      )}
+
       {canEdit && !draft && (
         <div className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-white p-4">
           <div>
             <label htmlFor="new-curve-currency" className="mb-1 block text-[11px] text-gray-600">
-              New curve for currency
+              New dated curve for currency
             </label>
             <select
               id="new-curve-currency"
               value={creatingCurrency}
               onChange={(e) => setCreatingCurrency(e.target.value)}
-              disabled={curveless.length === 0}
+              disabled={currencies.length === 0}
               className="w-48 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
             >
-              <option value="">{curveless.length === 0 ? 'Every currency has a curve' : 'Select…'}</option>
-              {curveless.map((c) => (
+              <option value="">Select…</option>
+              {currencies.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.code} — {c.name}
+                  {c.code} - {c.name}
                 </option>
               ))}
             </select>
@@ -162,8 +217,11 @@ export function YieldCurves() {
             New curve
           </button>
           <p className="w-full text-[11px] text-gray-500">
-            Starts from a standard O/N–5Y ladder at 0% — fill in real rates before saving. A currency with no rate
+            Starts from a standard O/N–5Y ladder at 0% - fill in real rates before saving. A currency with no rate
             registered yet on Currency &amp; FX Rates can still get a curve here; register its rate separately.
+            Picking a currency that already has a curve adds another dated version alongside it - a run always uses
+            whichever is most recent as of its own date, so this is how rates move over time rather than one curve
+            being edited in place forever.
           </p>
         </div>
       )}
@@ -183,12 +241,12 @@ export function YieldCurves() {
         >
           {isNewCurve && (
             <option value={draft!.id}>
-              {draft!.code} — {draft!.name} (new, unsaved)
+              {draft!.code} - {draft!.name}, {draft!.asOfDate} (new, unsaved)
             </option>
           )}
-          {curves.map((c) => (
+          {sortedCurves.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.code} — {c.name}
+              {c.code} - {c.name}, {c.asOfDate}
             </option>
           ))}
         </select>
@@ -206,8 +264,9 @@ export function YieldCurves() {
               <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 {editing.name}
                 <InfoButton label="What this curve drives">
-                  This curve is what FTP base rates and interest-rate shock scenarios are read from for {editing.currency}.
-                  An inverted curve — the long end below the short end — is a genuine market signal, not a data error.
+                  This curve is what FTP base rates and interest-rate shock scenarios are read from for{' '}
+                  {editing.currency}. An inverted curve - the long end below the short end - is a genuine market signal,
+                  not a data error.
                 </InfoButton>
               </h2>
               {inverted && <StatusBadge status="Inverted curve" tone="warning" />}
@@ -241,59 +300,47 @@ export function YieldCurves() {
               </LineChart>
             </ResponsiveContainer>
 
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th
-                      scope="col"
-                      className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                    >
-                      Term
-                    </th>
-                    <th
-                      scope="col"
-                      className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                    >
-                      Days
-                    </th>
-                    <th
-                      scope="col"
-                      className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                    >
-                      Rate %
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editing.terms.map((t, i) => (
-                    <tr key={t.tenorDays} className="border-b border-gray-100">
-                      <td className="py-2 px-3 font-medium text-navy-900">{t.label}</td>
-                      <td className="py-2 px-3 text-right font-mono text-gray-500">{t.tenorDays}</td>
-                      <td className="py-2 px-3 text-right">
-                        {canEdit ? (
-                          <>
-                            <label htmlFor={`term-${t.tenorDays}`} className="sr-only">
-                              {t.label} rate
-                            </label>
-                            <input
-                              id={`term-${t.tenorDays}`}
-                              type="number"
-                              step="0.01"
-                              value={t.ratePercent}
-                              onChange={(e) => updateTerm(i, Number(e.target.value))}
-                              className="w-24 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                            />
-                          </>
-                        ) : (
-                          <span className="font-mono">{formatPct(t.ratePercent, 2)}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResultTable
+              className="mt-6"
+              rows={editing.terms.map((t, i) => ({ ...t, index: i }))}
+              rowKey={(t) => String(t.tenorDays)}
+              columns={[
+                {
+                  key: 'label',
+                  header: 'Term',
+                  render: (t) => <span className="font-medium text-navy-900">{t.label}</span>,
+                },
+                {
+                  key: 'days',
+                  header: 'Days',
+                  align: 'right',
+                  render: (t) => <span className="font-mono text-gray-500">{t.tenorDays}</span>,
+                },
+                {
+                  key: 'rate',
+                  header: 'Rate %',
+                  align: 'right',
+                  render: (t) =>
+                    canEdit ? (
+                      <>
+                        <label htmlFor={`term-${t.tenorDays}`} className="sr-only">
+                          {t.label} rate
+                        </label>
+                        <input
+                          id={`term-${t.tenorDays}`}
+                          type="number"
+                          step="0.01"
+                          value={t.ratePercent}
+                          onChange={(e) => updateTerm(t.index, Number(e.target.value))}
+                          className="w-24 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                        />
+                      </>
+                    ) : (
+                      <span className="font-mono">{formatPct(t.ratePercent, 2)}</span>
+                    ),
+                },
+              ]}
+            />
           </section>
 
           <section className="space-y-6">
@@ -302,12 +349,29 @@ export function YieldCurves() {
                 Conventions
                 <InfoButton label="Why these matter">
                   Rate format, compounding and accrual basis together determine what a quoted rate actually means in
-                  cash-flow terms — the same number produces different results under different conventions, which is
-                  why they're attributes of the curve rather than an assumption buried in the engine.
+                  cash-flow terms - the same number produces different results under different conventions, which is why
+                  they're attributes of the curve rather than an assumption buried in the engine.
                 </InfoButton>
               </h2>
               <div className="space-y-3">
                 <Field label="Currency" value={editing.currency} />
+                <div>
+                  <label htmlFor="curve-asof" className="mb-1 block text-[11px] text-gray-600">
+                    As of date
+                  </label>
+                  <input
+                    id="curve-asof"
+                    type="date"
+                    value={editing.asOfDate}
+                    disabled={!canEdit}
+                    onChange={(e) => setDraft({ ...editing, asOfDate: e.target.value })}
+                    className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                  />
+                  <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                    Valid for any run from this date onward, until a later curve replaces it - not a single day's
+                    snapshot.
+                  </p>
+                </div>
                 <Select
                   id="rate-format"
                   label="Rate format"
@@ -334,7 +398,7 @@ export function YieldCurves() {
                 />
               </div>
               <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
-                The same quoted rate produces different cash flows under different conventions — which is why these are
+                The same quoted rate produces different cash flows under different conventions - which is why these are
                 attributes of the curve rather than assumptions buried in the engine.
               </p>
             </div>
@@ -344,7 +408,7 @@ export function YieldCurves() {
                 Interpolation probe
                 <InfoButton label="How this is calculated">
                   Linearly interpolates between the two term points bracketing the tenor you enter, and holds flat
-                  beyond either end of the curve — the same method FTP uses to price a position repricing at an
+                  beyond either end of the curve - the same method FTP uses to price a position repricing at an
                   in-between tenor.
                 </InfoButton>
               </h2>

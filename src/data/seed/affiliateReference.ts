@@ -86,13 +86,17 @@ function node(
   return { id: `${dimension}:${affiliateCode}:${code}`, dimension, affiliateCode, code, name, parentCode, isLeaf };
 }
 
-// Treasury, Corporate & Investment Bank, and Retail — seeded so roll-ups don't hit unmapped codes.
-export const AFFILIATE_ORG_UNITS: DimensionMember[] = AFFILIATES.flatMap(([code, name]) => [
-  node('OrgUnit', code, `OU-${code}`, name, 'OU-GROUP', false),
-  node('OrgUnit', code, `OU-${code}-TSY`, `${name} — Treasury`, `OU-${code}`, true),
-  node('OrgUnit', code, `OU-${code}-CIB`, `${name} — Corporate & Investment Bank`, `OU-${code}`, true),
-  node('OrgUnit', code, `OU-${code}-RTL`, `${name} — Retail`, `OU-${code}`, true),
-]);
+// Treasury, Corporate & Investment Bank, and Retail - seeded so roll-ups don't hit unmapped codes.
+// NG excluded: dimensions.ts already seeds its own complete, richer OrgUnit hierarchy for Nigeria, and
+// with an identical id scheme this generic set would otherwise silently overwrite it on every fresh seed.
+export const AFFILIATE_ORG_UNITS: DimensionMember[] = AFFILIATES
+  .filter(([code]) => code !== 'NG')
+  .flatMap(([code, name]) => [
+    node('OrgUnit', code, `OU-${code}`, name, 'OU-GROUP', false),
+    node('OrgUnit', code, `OU-${code}-TSY`, `${name} - Treasury`, `OU-${code}`, true),
+    node('OrgUnit', code, `OU-${code}-CIB`, `${name} - Corporate & Investment Bank`, `OU-${code}`, true),
+    node('OrgUnit', code, `OU-${code}-RTL`, `${name} - Retail`, `OU-${code}`, true),
+  ]);
 
 // NG, GH and CI already have entities with subsidiaries seeded elsewhere; recreating them here would collide with those (now affiliate-namespaced) ids.
 const ALREADY_SEEDED_ENTITIES = new Set(['NG', 'GH', 'CI']);
@@ -101,22 +105,22 @@ export const AFFILIATE_LEGAL_ENTITIES: DimensionMember[] = AFFILIATES
   .filter(([code]) => !ALREADY_SEEDED_ENTITIES.has(code))
   .map(([code, name]) => node('LegalEntity', code, `LE-${code}`, name, 'LE-GROUP', true));
 
-// The general ledger is deliberately not seeded here — GL Account is genuinely different data per affiliate
+// The general ledger is deliberately not seeded here - GL Account is genuinely different data per affiliate
 // (different chart, different scheme), not filler.
 //
-// The corporate/retail depositor pool below IS filler — a generic, identical placeholder every affiliate's
-// generated demo book references — but every dimension is affiliate-owned now, so each affiliate gets its own
+// The corporate/retail depositor pool below IS filler - a generic, identical placeholder every affiliate's
+// generated demo book references - but every dimension is affiliate-owned now, so each affiliate gets its own
 // copy rather than one shared list.
 function counterpartyPoolFor(affiliateCode: string): DimensionMember[] {
   const cp = (code: string, name: string, parentCode: string | null, isLeaf: boolean) =>
     node('Counterparty', affiliateCode, code, name, parentCode, isLeaf);
   return [
     cp('CP-ROOT', 'All counterparties', null, false),
-    cp('CP-SOVEREIGN', 'Sovereign — government securities', 'CP-ROOT', true),
+    cp('CP-SOVEREIGN', 'Sovereign - government securities', 'CP-ROOT', true),
     cp('CP-INTERBANK-01', 'Interbank market counterparties', 'CP-ROOT', true),
     cp('CP-CORRESPONDENT-01', 'Correspondent banking network', 'CP-ROOT', true),
     cp('CP-DFI-01', 'Development finance institutions', 'CP-ROOT', true),
-    cp('CP-BONDHOLDERS', 'Note holders — senior unsecured', 'CP-ROOT', true),
+    cp('CP-BONDHOLDERS', 'Note holders - senior unsecured', 'CP-ROOT', true),
     cp('CP-CORP-ISSUER-01', 'Corporate bond issuers', 'CP-ROOT', true),
     // Corporate and retail depositors, numbered as the generated books reference them.
     ...Array.from({ length: 70 }, (_, i) => cp(`CP-CIB-${String(i + 1).padStart(3, '0')}`, `Corporate depositor ${i + 1}`, 'CP-ROOT', true)),
@@ -124,7 +128,11 @@ function counterpartyPoolFor(affiliateCode: string): DimensionMember[] {
   ];
 }
 
-export const AFFILIATE_COUNTERPARTIES: DimensionMember[] = AFFILIATES.flatMap(([code]) => counterpartyPoolFor(code));
+// NG excluded: Nigeria's real seeded position book (data/seed/nigeria.ts) references its own hand-named
+// counterparties (data/seed/dimensions.ts) exclusively, never this generic filler pool.
+export const AFFILIATE_COUNTERPARTIES: DimensionMember[] = AFFILIATES
+  .filter(([code]) => code !== 'NG')
+  .flatMap(([code]) => counterpartyPoolFor(code));
 
 export const ALL_AFFILIATE_REFERENCE: DimensionMember[] = [
   ...AFFILIATE_LEGAL_ENTITIES,

@@ -1,5 +1,5 @@
 // Shared by `engine/` (pure calculation) and `store/` (persistence). The engine takes these as arguments and
-// returns results; it never fetches them — enforced by an ESLint override in .eslintrc.cjs.
+// returns results; it never fetches them - enforced by an ESLint override in .eslintrc.cjs.
 
 // ─────────────────────────────────────────────────────────────────────────
 // Shared primitives
@@ -37,9 +37,9 @@ export interface DimensionMember {
   id: string;
   dimension: DimensionType;
   /**
-   * Which affiliate owns this entry — every dimension is affiliate-managed, including Common COA: there is no
+   * Which affiliate owns this entry - every dimension is affiliate-managed, including Common COA: there is no
    * Group-wide list. Use the literal code `'GROUP'` for a genuinely cross-affiliate construct (e.g. a
-   * connected-exposure counterparty group spanning two countries, or a consolidation-tree root) — `'GROUP'` is
+   * connected-exposure counterparty group spanning two countries, or a consolidation-tree root) - `'GROUP'` is
    * an ordinary affiliate row like any other, not a bypass, so it's still a real, filterable scope.
    */
   affiliateCode: string;
@@ -49,6 +49,13 @@ export interface DimensionMember {
   /** True for nodes that may be assigned to a position; rollup nodes are false. */
   isLeaf: boolean;
   attributes?: Record<string, string | number | boolean | null>;
+  /**
+   * The same real-world entity as it's identified in other source systems - e.g. a counterparty
+   * known as `CP00125` in Calypso and `BANK-007` elsewhere. Without this, the same counterparty
+   * appearing under different source-system IDs would register as unrelated members with no way
+   * to resolve them to one canonical identity. See engine/dimensions.ts's resolveByCode.
+   */
+  sourceRefs?: Array<{ system: string; sourceId: string }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -72,7 +79,7 @@ export interface DomainFeed {
   owner: string | null;
 }
 
-/** Internal risk appetite for one limit metric — always inside the regulatory floor. */
+/** Internal risk appetite for one limit metric - always inside the regulatory floor. */
 export interface InternalThreshold {
   amberPercent: number;
   redPercent: number;
@@ -103,11 +110,15 @@ export interface Affiliate {
   limitsConfirmed: boolean;
   /**
    * Which departments must submit a Positions slice before this affiliate's
-   * book is considered complete for a date — see `contributionReadiness` in
+   * book is considered complete for a date - see `contributionReadiness` in
    * engine/vintage.ts. Absent (older/seed affiliates) falls back to every
    * `PositionContributor`, so this is additive and never a breaking field.
    */
   requiredContributors?: PositionContributor[];
+  /** When this affiliate's onboarding is/was targeted to take effect - distinct from `createdAt`, which is when the record itself was created. */
+  effectiveDate?: IsoDate;
+  /** IANA zone (e.g. 'Africa/Lagos') - when its as-of dates and SLA clocks are read as local time. */
+  reportingTimezone?: string;
   createdAt: string;
 }
 
@@ -178,7 +189,7 @@ export interface Position {
 
   /** The account this position sits on. Core systems embed the GL code in it. */
   accountNumber: string;
-  /** Pre-migration account number, where one exists — migration lineage. */
+  /** Pre-migration account number, where one exists - migration lineage. */
   legacyAccountNumber: string | null;
   /** Internal and suspense accounts are excluded from customer metrics. */
   accountClass: AccountClass;
@@ -234,7 +245,7 @@ export interface Position {
   daysPastDue: number | null;
   provisionAmount: number | null;
 
-  /** Amount under lien, in the position's own currency — an amount rather than a flag, since liens are often partial. */
+  /** Amount under lien, in the position's own currency - an amount rather than a flag, since liens are often partial. */
   lienAmount: number;
   lienReason: string | null;
 
@@ -259,7 +270,7 @@ export interface Position {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Rules — every configurable rule carries this envelope (build plan §6)
+// Rules - every configurable rule carries this envelope (build plan §6)
 // ─────────────────────────────────────────────────────────────────────────
 
 export type AccessType = 'Read-Only' | 'Read-Write';
@@ -279,7 +290,9 @@ export type RuleKind =
   | 'AdjustmentRule'
   | 'Filter'
   | 'CustomMetric'
-  | 'ValidationRule';
+  | 'ValidationRule'
+  | 'FieldMapping'
+  | 'CodeMapping';
 
 // Common envelope for every rule type: folder, access type, versioning and dependency checking behave
 // identically, which is what lets one `<RuleEditor>` shell serve fourteen screens.
@@ -298,6 +311,21 @@ export interface RuleMeta {
   createdAt: string;
   updatedBy: string | null;
   updatedAt: string | null;
+}
+
+/**
+ * A rule row's content as it stood immediately before an edit overwrote it - archived by
+ * `upsertRule` so a later edit doesn't destroy the only copy of what an earlier run actually used.
+ * `snapshot` carries the full concrete rule (RuleMeta plus whatever kind-specific fields it had),
+ * not just the envelope.
+ */
+export interface RuleVersionSnapshot {
+  id: string;
+  ruleId: string;
+  version: number;
+  kind: RuleKind;
+  snapshot: RuleMeta;
+  archivedAt: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -331,7 +359,7 @@ export interface TimeBucketRule extends RuleMeta {
 export type BatchStatus = 'Staged' | 'Validated' | 'Committed' | 'Superseded' | 'Rejected';
 
 /**
- * A bank doesn't hand over one ready-made position file — the book has to
+ * A bank doesn't hand over one ready-made position file - the book has to
  * be assembled from what each department holds. Loans, Deposits and
  * Treasury each contribute their own slice of the Positions domain for the
  * same affiliate/date; General Ledger is not a contributor, it's the
@@ -362,9 +390,17 @@ export interface LoadBatch {
   uploadedAt: string;
   committedBy: string | null;
   committedAt: string | null;
-  /** Set when a GeneralLedger batch has been reconciled against positions and signed off — see `reconcile()` in engine/reconciliation.ts. Null for domains reconciliation doesn't apply to. */
+  /** Set when a GeneralLedger batch has been reconciled against positions and signed off - see `reconcile()` in engine/reconciliation.ts. Null for domains reconciliation doesn't apply to. */
   reconciledBy: string | null;
   reconciledAt: string | null;
+  /** Set when a staged batch is discarded after failing a blocking validation rule, so the attempt stays on record instead of vanishing. Null otherwise. */
+  rejectedBy: string | null;
+  rejectedAt: string | null;
+  rejectedReason: string | null;
+  /** ruleId -> version, for every FieldMapping/CodeMapping rule actually applied to this batch's file at
+   * ingestion - same pattern as ProcessRun.ruleVersionsUsed, completing the lineage chain source -> mapping
+   * version -> batch -> run -> report. Absent when no mapping rule was applied (the file was already canonical). */
+  mappingRuleVersionsUsed?: Record<string, number>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -413,6 +449,15 @@ export interface ProcessRun {
   ftpRuleId: string | null;
   adjustmentRuleId: string | null;
 
+  /**
+   * The `version` each referenced rule (by id) actually had at execution time, captured when the
+   * run's inputs were assembled. A rule id alone only resolves to whatever that row holds *now* -
+   * if it's edited later, this is what lets `getRuleVersion` recover the content this run actually
+   * used, from the history `upsertRule` archives on every edit. Absent on runs created before this
+   * existed.
+   */
+  ruleVersionsUsed?: Record<string, number>;
+
   elements: CalculationElement[];
 
   /** Pins the exact data version consumed, so a result stays defensible after a reload. */
@@ -444,13 +489,13 @@ export interface RunResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Editable snapshots (build plan §10a) — investigate, correct or run
+// Editable snapshots (build plan §10a) - investigate, correct or run
 // what-if analysis on a committed position batch without touching it.
 // ─────────────────────────────────────────────────────────────────────────
 
 export type SnapshotStatus = 'Draft' | 'Recalculated' | 'PendingApproval' | 'Committed' | 'Rejected' | 'Discarded';
 
-/** Fields a snapshot is allowed to change — the same governed subset the skill spec calls out. */
+/** Fields a snapshot is allowed to change - the same governed subset the skill spec calls out. */
 export type SnapshotEditableField =
   | 'amount'
   | 'maturityDate'
@@ -479,7 +524,7 @@ export interface SnapshotChange {
 /**
  * An editable copy of a committed batch's positions.
  *
- * The parent batch is never touched — `positions` here starts as a clone
+ * The parent batch is never touched - `positions` here starts as a clone
  * and `changes` is the audit trail of every edit made to it. Recalculating
  * runs the same engine over this set and over the parent batch's positions
  * so the two can be compared; committing turns the edited set into a new,
@@ -530,7 +575,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  /** SHA-256 hex digest — demo-grade credential storage, not production auth. */
+  /** SHA-256 hex digest - demo-grade credential storage, not production auth. */
   passwordHash: string;
   role: RoleCode;
   affiliateCode: string;
@@ -618,7 +663,7 @@ export interface IndicatorObservation {
 /**
  * Macroeconomic series feeding behavioural modelling and stress scenarios.
  * For African affiliates the ones that matter are inflation, policy rate,
- * FX reserves and — for Nigeria especially — the oil price.
+ * FX reserves and - for Nigeria especially - the oil price.
  */
 export interface EconomicIndicator {
   id: string;
@@ -704,7 +749,7 @@ export type ConnectorProtocol = 'REST' | 'SOAP' | 'SFTP' | 'JDBC' | 'Proprietary
 /**
  * Whether a connector can actually be used.
  *
- * `Blocked` is not a judgement the platform makes on the bank's behalf — it
+ * `Blocked` is not a judgement the platform makes on the bank's behalf - it
  * is a field the bank sets, with a reason, because what blocks an
  * integration is a fact about the engagement rather than about the software.
  */
@@ -720,7 +765,7 @@ export interface Connector {
   /** Which data domains this source can supply. */
   domains: DataDomain[];
   status: ConnectorStatus;
-  /** Required when status is Blocked or Planned — an unexplained block is not actionable. */
+  /** Required when status is Blocked or Planned - an unexplained block is not actionable. */
   statusReason: string | null;
 
   endpoint: string;
@@ -759,7 +804,7 @@ export type ApprovalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
  *
  * The rule the whole queue exists to enforce: `requestedBy` may never equal
  * `decidedBy`. Segregation of duties is not a policy the screen reminds you
- * of — it is a condition the approval action refuses to violate.
+ * of - it is a condition the approval action refuses to violate.
  */
 export interface ApprovalRequest {
   id: string;
@@ -793,10 +838,12 @@ export interface RemediationIssue {
   id: string;
   title: string;
   description: string;
-  /** Where it came from — a limit breach, a validation failure, an audit finding. */
+  /** Where it came from - a limit breach, a validation failure, an audit finding. */
   source: string;
   /** Set when the issue was raised by a limit breach, so the two stay linked. */
   linkedLimitId: string | null;
+  /** Set when the issue was raised by a rejected data-upload batch, so the two stay linked. */
+  linkedBatchId: string | null;
   severity: Severity;
   stage: RemediationStage;
   owner: string;
@@ -815,7 +862,7 @@ export type NotificationChannel = 'Email' | 'SMS' | 'In-App' | 'Webhook';
 export interface NotificationRule {
   id: string;
   name: string;
-  /** Which event fires it — a limit status, a run outcome, a data-freshness lapse. */
+  /** Which event fires it - a limit status, a run outcome, a data-freshness lapse. */
   event: string;
   channel: NotificationChannel;
   recipients: string[];
@@ -865,7 +912,7 @@ export interface AlcoMeeting {
   chair: string;
   attendees: string[];
   agenda: string[];
-  /** The run whose figures the pack was built from — the meeting's evidence. */
+  /** The run whose figures the pack was built from - the meeting's evidence. */
   runId: string | null;
   minutes: string;
   decisions: string[];

@@ -11,7 +11,7 @@ import {
 } from './format';
 
 describe('formatAmount', () => {
-  it('renders each currency in its own symbol — the P-02 regression guard', () => {
+  it('renders each currency in its own symbol - the P-02 regression guard', () => {
     expect(formatAmount(560_000_000_000, 'NGN')).toBe('₦560.00B');
     expect(formatAmount(560_000_000_000, 'GHS')).toBe('GH₵560.00B');
     expect(formatAmount(560_000_000_000, 'XOF')).toBe('CFA560.00B');
@@ -65,9 +65,9 @@ describe('percentage and rate helpers', () => {
   });
 
   it('renders an em dash for a null rather than inventing 0%', () => {
-    expect(formatPct(null)).toBe('—');
-    expect(formatBps(null)).toBe('—');
-    expect(formatDelta(null)).toBe('—');
+    expect(formatPct(null)).toBe('-');
+    expect(formatBps(null)).toBe('-');
+    expect(formatDelta(null)).toBe('-');
   });
 
   it('signs basis points and deltas', () => {
@@ -89,7 +89,7 @@ describe('date helpers', () => {
 
   it('formats a short date', () => {
     expect(formatDate('2026-07-31')).toBe('31 Jul 2026');
-    expect(formatDate(null)).toBe('—');
+    expect(formatDate(null)).toBe('-');
   });
 
   it('counts days between dates', () => {

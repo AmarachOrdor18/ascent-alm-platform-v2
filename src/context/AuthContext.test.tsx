@@ -51,7 +51,7 @@ function renderProbe() {
   // the actual bug: combined with `initialData` (since removed from
   // AuthContext), that staleTime marked the seeded fallback "fresh" and
   // skipped the real database fetch for the first 30 seconds of every
-  // session — precisely the window someone testing "log in as a different
+  // session - precisely the window someone testing "log in as a different
   // user" would be in.
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

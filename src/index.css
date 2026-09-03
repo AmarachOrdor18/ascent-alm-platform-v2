@@ -329,6 +329,21 @@
     @apply border-border;
   }
 
+  /* AppShell locks itself to exactly one viewport height (`h-screen overflow-hidden`) and scrolls
+     its own <main> internally — but without this, html/body have no height of their own and simply
+     grow to fit their content. A page taller than the sidebar could then make the *document* itself
+     scrollable too, so scrolling kept going past where the (viewport-height, non-scrolling) sidebar
+     ends, revealing blank body background beneath it. Pinning html/body to the viewport and hiding
+     their own overflow makes <main> the only thing that ever scrolls. */
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);

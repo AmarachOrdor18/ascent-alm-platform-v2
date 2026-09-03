@@ -100,8 +100,8 @@ export function FxPosition() {
         metrics={[
           {
             label: 'Aggregate NOP',
-            value: fx ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(fx.aggregateNetOpenPosition) : '—',
-            about: 'Aggregate Net Open Position: the sum of absolute net positions across every non-reporting currency — the conservative measure, not long netted against short.',
+            value: fx ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(fx.aggregateNetOpenPosition) : '-',
+            about: 'Aggregate Net Open Position: the sum of absolute net positions across every non-reporting currency - the conservative measure, not long netted against short.',
           },
           {
             label: 'Aggregate % of capital',
@@ -112,11 +112,11 @@ export function FxPosition() {
                 : Math.abs(fx.aggregatePercentOfCapital) > AGGREGATE_LIMIT_PCT
                   ? 'danger'
                   : 'success',
-            about: 'The aggregate net open position expressed as a share of capital — the standard way FX exposure is sized against the balance sheet that has to absorb it.',
+            about: 'The aggregate net open position expressed as a share of capital - the standard way FX exposure is sized against the balance sheet that has to absorb it.',
           },
           {
             label: 'Currencies held',
-            value: fx ? String(fx.lines.length) : '—',
+            value: fx ? String(fx.lines.length) : '-',
             about: "How many distinct currencies this run's positions are denominated in.",
           },
           {
@@ -152,7 +152,7 @@ export function FxPosition() {
                   {breaches.map((b) => (
                     <li key={b.currency}>
                       <span className="font-mono font-bold">{b.currency}</span> at{' '}
-                      <span className="font-mono">{formatPct(b.netOpenPositionPercentOfCapital, 2)}</span> —{' '}
+                      <span className="font-mono">{formatPct(b.netOpenPositionPercentOfCapital, 2)}</span> -{' '}
                       {b.netOpenPosition > 0 ? 'long' : 'short'}{' '}
                       <Amount value={Math.abs(b.netOpenPosition)} currency={currency} />
                     </li>
@@ -205,7 +205,7 @@ export function FxPosition() {
                               100,
                             1,
                           )
-                        : '—'}
+                        : '-'}
                     </span>
                   }
                 />

@@ -16,6 +16,7 @@ import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
 import { buildFxTable } from '@/engine/fx';
+import { latestCurveAsOf } from '@/engine/ftp';
 import { computeAllShocks } from '@/engine/irrbb';
 import { defaultLadder } from '@/engine/buckets';
 import type { KriObservation } from '@/engine/kri';
@@ -23,7 +24,7 @@ import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } 
 import type { EveResult, NiiResult } from '@/engine/irrbb';
 import type { ProfitabilityResult } from '@/engine/profitability';
 
-/** Which curve and policy-rate indicator stand in for "the market" at each scope — Nigeria is the default at Group level since it has the fullest data. */
+/** Which curve and policy-rate indicator stand in for "the market" at each scope - Nigeria is the default at Group level since it has the fullest data. */
 const MARKET_BY_CURRENCY: Record<string, { curveCode: string; indicatorCode?: string; indicatorLabel?: string }> = {
   NGN: { curveCode: 'NGN-NIBOR', indicatorCode: 'NG-MPR', indicatorLabel: 'CBN MPR' },
   GHS: { curveCode: 'GHS-GHREF', indicatorCode: 'GH-MPR', indicatorLabel: 'BoG MPR' },
@@ -54,12 +55,12 @@ const METRIC_ABOUT: Record<string, string> = {
   lcr: 'Liquidity Coverage Ratio: high-quality liquid assets divided by expected net cash outflows over a 30-day stress scenario. Basel III sets a 100% regulatory floor.',
   nsfr: 'Net Stable Funding Ratio: available stable funding divided by required stable funding over a one-year horizon. Basel III sets a 100% regulatory floor.',
   survival: 'Survival Horizon: how many days the counterbalancing capacity (liquid assets, committed lines) would last under a severe stressed outflow before running out.',
-  ldr: 'Loan-to-Deposit: customer loans as a share of customer deposits. A classic funding-structure indicator — a high ratio signals reliance on deposits to fund lending.',
+  ldr: 'Loan-to-Deposit: customer loans as a share of customer deposits. A classic funding-structure indicator - a high ratio signals reliance on deposits to fund lending.',
   nii: 'Net Interest Income sensitivity: how much a standard interest-rate shock (+200bp) would change this year’s net interest income, driven by the repricing gap.',
   eve: 'Economic Value of Equity sensitivity: how much an interest-rate shock would change the present value of the whole balance sheet, as a share of capital. Basel’s supervisory outlier test is ±15%.',
-  concentration: 'Largest single depositor’s share of total deposits — the single biggest funding-concentration vulnerability.',
+  concentration: 'Largest single depositor’s share of total deposits - the single biggest funding-concentration vulnerability.',
   npl: 'Non-Performing Loan ratio: share of the loan book classified Substandard, Doubtful or Loss.',
-  nim: 'Net Interest Margin: interest income less interest expense, expressed as a share of total assets — a core profitability measure.',
+  nim: 'Net Interest Margin: interest income less interest expense, expressed as a share of total assets - a core profitability measure.',
   inbreach: 'Count of the metrics on this page currently outside their configured internal limit.',
 };
 
@@ -77,7 +78,7 @@ const TONE_ICON_BG: Record<Tone, string> = {
   neutral: 'bg-navy-100 text-navy-700',
 };
 
-/** Change since the previous as-of date for this scope — a gap in history means no trend, not a fabricated one. */
+/** Change since the previous as-of date for this scope - a gap in history means no trend, not a fabricated one. */
 function trendFrom(series: KriObservation[] | undefined, higherIsGood: boolean, decimals = 1): Trend | undefined {
   if (!series || series.length < 2) return undefined;
   const latest = series[series.length - 1]!.value;
@@ -114,8 +115,11 @@ export function Dashboard() {
 
   const marketCurrency = affiliateCode !== 'GROUP' && affiliate ? affiliate.functionalCurrency : 'NGN';
   const market = MARKET_BY_CURRENCY[marketCurrency];
-  const localCurve = market ? yieldCurves.find((c) => c.code === market.curveCode) : undefined;
-  const sofrCurve = yieldCurves.find((c) => c.code === 'USD-SOFR');
+  // A live "today" snapshot, not tied to a specific run - resolves to whichever dated curve is most
+  // recent as of now, the same way any other curve consumer picks among several versions on file.
+  const today = new Date().toISOString().slice(0, 10);
+  const localCurve = market ? latestCurveAsOf(yieldCurves, today, (c) => c.code === market.curveCode) : undefined;
+  const sofrCurve = latestCurveAsOf(yieldCurves, today, (c) => c.code === 'USD-SOFR');
   const policyIndicator = market?.indicatorCode ? indicators.find((i) => i.code === market.indicatorCode) : undefined;
 
   const policyRateRow = (() => {
@@ -304,14 +308,14 @@ export function Dashboard() {
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-              Rate shock sensitivity — ΔEVE by scenario
+              Rate shock sensitivity - ΔEVE by scenario
               <InfoButton label="What this chart shows">
                 All six BCBS-standard shocks (parallel up/down, steepener, flattener, short rate up/down) applied to
                 this scope's own book, showing the economic-value impact of each. Bars beyond the dashed ±15% lines
-                are highlighted — that's the Basel supervisory outlier threshold.
+                are highlighted - that's the Basel supervisory outlier threshold.
               </InfoButton>
             </h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">Capital impact under all six BCBS supervisory shocks, this scope's own book — dashed lines mark the ±15% outlier test</p>
+            <p className="mb-4 text-[11px] font-medium text-gray-400">Capital impact under all six BCBS supervisory shocks, this scope's own book - dashed lines mark the ±15% outlier test</p>
             <div className="min-h-[260px] flex-1">
               {shockRows.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
@@ -341,7 +345,7 @@ export function Dashboard() {
             <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               Market &amp; Rate Monitor
               <InfoButton label="What this shows">
-                Live reference points for this scope's own currency — the local policy rate, an overnight interbank
+                Live reference points for this scope's own currency - the local policy rate, an overnight interbank
                 rate, a sovereign yield benchmark, SOFR, and FX rates against USD. These aren't computed by a run;
                 they're the market context the run's figures sit against.
               </InfoButton>
@@ -433,7 +437,7 @@ export function Dashboard() {
             <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               Balance sheet shape
               <InfoButton label="What this shows">
-                The size and earnings profile the run's other figures sit on top of — total assets, interest income
+                The size and earnings profile the run's other figures sit on top of - total assets, interest income
                 and expense, and the net of the two. Read from the same run and positions as every ratio above.
               </InfoButton>
             </h2>

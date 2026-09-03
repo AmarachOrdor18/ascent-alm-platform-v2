@@ -6,7 +6,7 @@ export type ReviewState = 'Draft' | 'Submitted' | 'Reviewed' | 'Approved';
 
 export interface CommentaryRecord {
   id: string;
-  /** What this commentary is attached to — a run, a result element, a breach. */
+  /** What this commentary is attached to - a run, a result element, a breach. */
   subjectId: string;
   text: string;
   authorName: string;
@@ -64,7 +64,7 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
             onChange={(e) => setDraft(e.target.value)}
             disabled={!canEdit || saving}
             rows={4}
-            placeholder="Explain the movement — what changed, why, and what is expected next period."
+            placeholder="Explain the movement - what changed, why, and what is expected next period."
             className="w-full rounded-lg border border-gray-200 p-3 text-[12px] leading-relaxed focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
           />
           <div className="mt-3 flex gap-2">

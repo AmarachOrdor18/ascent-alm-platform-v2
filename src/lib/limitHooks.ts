@@ -4,7 +4,29 @@ import { useAuth } from '@/context/AuthContext';
 import { evaluateLimit, type BreachNote, type LimitConfig, type LimitEvaluation, type TemporaryLimit } from '@/engine/limits';
 import { evaluateKri, DEFAULT_KRIS, type KriEvaluation, type KriObservation } from '@/engine/kri';
 import { extractMetrics } from './metrics';
-import type { ProcessRun, RunResult } from '@/engine/types';
+import type { ProcessRun, RunResult, User } from '@/engine/types';
+
+let auditCounter = 0;
+
+/** Limit thresholds, temporary overrides and breach notes previously had no audit trail at all - a
+ * limit could be loosened or a breach explained away with no record on the central Audit Log. */
+function recordAudit(user: User | null, module: string, action: string, entity: string, entityId: string, detail: string) {
+  if (!user) return Promise.resolve();
+  auditCounter += 1;
+  return repository.recordAuditEvent({
+    id: `AE-${Date.now()}-${auditCounter}`,
+    module,
+    action,
+    entity,
+    entityId,
+    userId: user.id,
+    userName: user.name,
+    role: user.role,
+    outcome: 'Success',
+    detail,
+    recordedAt: new Date().toISOString(),
+  });
+}
 
 export const limitKeys = {
   configs: ['limitConfigs'] as const,
@@ -32,37 +54,67 @@ export function useSaveLimitConfig() {
   const client = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: (config: LimitConfig) =>
-      repository.upsertLimitConfig({
-        ...config,
-        updatedBy: user?.name ?? 'unknown',
-        updatedAt: new Date().toISOString(),
-      }),
-    onSuccess: () => client.invalidateQueries({ queryKey: limitKeys.configs }),
+    mutationFn: async (config: LimitConfig) => {
+      const saved = { ...config, updatedBy: user?.name ?? 'unknown', updatedAt: new Date().toISOString() };
+      await repository.upsertLimitConfig(saved);
+      await recordAudit(user, 'Limits', 'Save', 'Limit Config', saved.id, `${saved.label} (${saved.metricKey})`);
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: limitKeys.configs });
+      client.invalidateQueries({ queryKey: ['auditEvents'] });
+    },
   });
 }
 
 export function useDeleteLimitConfig() {
   const client = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: (id: string) => repository.deleteLimitConfig(id),
-    onSuccess: () => client.invalidateQueries({ queryKey: limitKeys.configs }),
+    mutationFn: async (config: LimitConfig) => {
+      await repository.deleteLimitConfig(config.id);
+      await recordAudit(user, 'Limits', 'Delete', 'Limit Config', config.id, `${config.label} (${config.metricKey})`);
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: limitKeys.configs });
+      client.invalidateQueries({ queryKey: ['auditEvents'] });
+    },
   });
 }
 
 export function useSaveTemporaryLimit() {
   const client = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: (temp: TemporaryLimit) => repository.upsertTemporaryLimit(temp),
-    onSuccess: () => client.invalidateQueries({ queryKey: limitKeys.temporary }),
+    mutationFn: async (temp: TemporaryLimit) => {
+      await repository.upsertTemporaryLimit(temp);
+      await recordAudit(
+        user,
+        'Limits',
+        'Save',
+        'Temporary Limit',
+        temp.id,
+        `${temp.limitId} - amber ${temp.amberThreshold}/red ${temp.redThreshold} until ${temp.expiresOn} (${temp.reason})`,
+      );
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: limitKeys.temporary });
+      client.invalidateQueries({ queryKey: ['auditEvents'] });
+    },
   });
 }
 
 export function useSaveBreachNote() {
   const client = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: (note: BreachNote) => repository.upsertBreachNote(note),
-    onSuccess: () => client.invalidateQueries({ queryKey: limitKeys.notes }),
+    mutationFn: async (note: BreachNote) => {
+      await repository.upsertBreachNote(note);
+      await recordAudit(user, 'Limits', 'Save', 'Breach Note', note.id, `${note.breachId} - ${note.cause}`);
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: limitKeys.notes });
+      client.invalidateQueries({ queryKey: ['auditEvents'] });
+    },
   });
 }
 

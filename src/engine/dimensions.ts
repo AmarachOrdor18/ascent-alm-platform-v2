@@ -1,11 +1,25 @@
 import type { DimensionMember, DimensionType, Position } from './types';
+import type { CodeMappingRule } from './ruleTypes';
 
 /** Index a dimension's members for repeated lookup. */
 export function indexMembers(members: DimensionMember[]): Map<string, DimensionMember> {
   return new Map(members.map((m) => [m.code, m]));
 }
 
-/** Every descendant of a node, inclusive — selecting a rollup node must include everything beneath it. */
+/**
+ * Resolve a code to its canonical member - either its own code, or a source-system id registered
+ * against another member's `sourceRefs` (the same real-world counterparty appearing under a
+ * different id in Calypso, say, than in Flexcube). This is the single place that identity
+ * resolution happens; `unmappedCodes` uses it so a cross-referenced id is recognised rather than
+ * reported as missing.
+ */
+export function resolveByCode(members: DimensionMember[], code: string): DimensionMember | undefined {
+  const direct = members.find((m) => m.code === code);
+  if (direct) return direct;
+  return members.find((m) => m.sourceRefs?.some((r) => r.sourceId === code));
+}
+
+/** Every descendant of a node, inclusive - selecting a rollup node must include everything beneath it. */
 export function descendantCodes(members: DimensionMember[], rootCode: string): string[] {
   const childrenOf = new Map<string, string[]>();
   for (const m of members) {
@@ -30,7 +44,7 @@ export function descendantCodes(members: DimensionMember[], rootCode: string): s
   return out;
 }
 
-/** Path from the root down to a member — used for breadcrumbs and rollup labels. */
+/** Path from the root down to a member - used for breadcrumbs and rollup labels. */
 export function ancestorPath(members: DimensionMember[], code: string): DimensionMember[] {
   const byCode = indexMembers(members);
   const path: DimensionMember[] = [];
@@ -94,7 +108,7 @@ export function positionKeyFor(dimension: DimensionType): keyof Position | null 
 /**
  * Filter positions to a selection of dimension nodes, expanding rollups.
  *
- * An empty selection means no constraint, not an empty result — the
+ * An empty selection means no constraint, not an empty result - the
  * distinction matters because "all products" and "no products" are very
  * different scopes.
  */
@@ -157,15 +171,18 @@ export function rollup(positions: Position[], dimension: DimensionType, members:
   return out.sort((a, b) => a.depth - b.depth || b.rollupAmount - a.rollupAmount);
 }
 
-/** Codes referenced by positions that do not exist in the dimension — these block a commit. */
+/**
+ * Codes referenced by positions that do not exist in the dimension - these block a commit. A code
+ * that resolves via another member's registered source-system cross-reference (resolveByCode) is
+ * not unmapped - it's this affiliate's own counterparty, just arriving under a different system's id.
+ */
 export function unmappedCodes(positions: Position[], dimension: DimensionType, members: DimensionMember[]): string[] {
   const key = positionKeyFor(dimension);
   if (!key) return [];
-  const known = new Set(members.map((m) => m.code));
   const missing = new Set<string>();
   for (const p of positions) {
     const value = p[key];
-    if (typeof value === 'string' && value && !known.has(value)) missing.add(value);
+    if (typeof value === 'string' && value && !resolveByCode(members, value)) missing.add(value);
   }
   return Array.from(missing).sort();
 }
@@ -194,7 +211,7 @@ export function deriveMembersFromFile(
       dimension: 'GlAccount',
       affiliateCode,
       code: rootCode,
-      name: `${affiliateName} — Local Chart`,
+      name: `${affiliateName} - Local Chart`,
       parentCode: null,
       isLeaf: false,
     });
@@ -213,4 +230,37 @@ export function deriveMembersFromFile(
     });
   }
   return members;
+}
+
+/**
+ * Rewrite positions' OrgUnit/GlAccount/CommonCoa codes per a configured crosswalk, before
+ * `unmappedCodes` runs — a code with a matching entry is translated into the real target code and
+ * never shows up as unmapped at all; a position with no matching entry passes through unchanged and
+ * still falls through to today's "create from file" fallback. Pure - no store access.
+ */
+export function applyCodeMappings(positions: Position[], rules: CodeMappingRule[]): Position[] {
+  if (rules.length === 0) return positions;
+
+  const lookupsByKey = new Map<keyof Position, Map<string, string>>();
+  for (const rule of rules) {
+    const key = positionKeyFor(rule.dimension);
+    if (!key) continue;
+    const lookup = lookupsByKey.get(key) ?? new Map<string, string>();
+    for (const entry of rule.mappings) lookup.set(entry.sourceValue, entry.targetCode);
+    lookupsByKey.set(key, lookup);
+  }
+  if (lookupsByKey.size === 0) return positions;
+
+  return positions.map((p) => {
+    const changed: Partial<Position> = {};
+    let matched = false;
+    for (const [key, lookup] of lookupsByKey) {
+      const value = p[key];
+      if (typeof value === 'string' && lookup.has(value)) {
+        (changed as Record<string, string>)[key] = lookup.get(value)!;
+        matched = true;
+      }
+    }
+    return matched ? { ...p, ...changed } : p;
+  });
 }

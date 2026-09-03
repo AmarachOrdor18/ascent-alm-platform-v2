@@ -70,7 +70,7 @@ export function FtpRules() {
           label="Curve"
           value={row.curveCode ?? ''}
           options={[
-            { value: '', label: '— affiliate default —' },
+            { value: '', label: '- affiliate default -' },
             ...curves.map((c) => ({ value: c.code, label: c.code })),
           ]}
           disabled={readOnly}
@@ -243,7 +243,7 @@ export function AdjustmentRules() {
   return (
     <RuleEditor<AdjustmentRuleDef>
       title="Adjustment Rules"
-      description="Named add-ons stacked on the base transfer rate — liquidity premium, basis risk, pricing incentive."
+      description="Named add-ons stacked on the base transfer rate - liquidity premium, basis risk, pricing incentive."
       noun="adjustment rule"
       rules={rules}
       isLoading={isLoading}

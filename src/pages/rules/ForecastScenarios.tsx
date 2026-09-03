@@ -28,7 +28,7 @@ export function ForecastScenarios() {
   return (
     <RuleEditor<ForecastScenarioRule>
       title="Forecast Rate Scenarios"
-      description="Saved, reusable rate shocks — the six BCBS standardised scenarios, plus any the bank defines itself."
+      description="Saved, reusable rate shocks - the six BCBS standardised scenarios, plus any the bank defines itself. Selectable on Process Run once Approved (see Approvals); left unselected, a run computes the base case only. Also drives Stress Testing and What-If, which can use one unapproved for exploration."
       noun="scenario"
       rules={rules}
       isLoading={isLoading}
@@ -123,7 +123,7 @@ export function ForecastScenarios() {
 
           <RuleField
             label="Conditioned on"
-            hint="Macro series this scenario assumes. Recorded for narrative — the shock itself is the input to the engine."
+            hint="Macro series this scenario assumes. Recorded for narrative - the shock itself is the input to the engine."
           >
             <div className="flex flex-wrap gap-2">
               {indicators.map((ind) => (

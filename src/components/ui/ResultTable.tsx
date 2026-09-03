@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { formatDelta, formatPct } from '@/lib/format';
 import { Amount } from './Amount';
+import { ChevronRightIcon } from '@/components/icons/Icons';
 import type { CurrencyCode } from '@/engine/types';
 
 export type ColumnAlign = 'left' | 'right';
@@ -17,6 +18,9 @@ export interface ResultColumn<T> {
   /** How the variance reads: percentage points, percent, or a plain number. */
   compareUnit?: 'pp' | 'pct' | 'plain';
   className?: string;
+  /** Enables click-to-sort on this column's header. Falls back to `compareValue` when not set,
+   * so a column already wired for variance display sorts for free. */
+  sortValue?: (row: T) => string | number | null;
 }
 
 interface ResultTableProps<T> {
@@ -31,7 +35,17 @@ interface ResultTableProps<T> {
   emptyMessage?: string;
   caption?: string;
   className?: string;
+  /** Soft background tint for a row that needs attention - purely visual, never changes row order
+   * or content. Sorting (if enabled) and this are independent of the pagination/filtering a caller
+   * applies before `rows` reaches this component - neither touches that. */
+  rowTone?: (row: T) => 'danger' | 'warning' | 'success' | null;
 }
+
+const ROW_TONE_CLASS: Record<'danger' | 'warning' | 'success', string> = {
+  danger: 'bg-danger/5',
+  warning: 'bg-warning/5',
+  success: 'bg-success/5',
+};
 
 export function ResultTable<T>({
   rows,
@@ -43,8 +57,10 @@ export function ResultTable<T>({
   emptyMessage = 'No data for this selection.',
   caption,
   className,
+  rowTone,
 }: ResultTableProps<T>) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const priorByKey = new Map((priorRows ?? []).map((r) => [rowKey(r), r]));
   const comparing = priorRows !== undefined;
 
@@ -57,6 +73,25 @@ export function ResultTable<T>({
     });
   };
 
+  const sortKeyFor = (col: ResultColumn<T>) => col.sortValue ?? col.compareValue ?? null;
+
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const col = columns.find((c) => c.key === sort.key);
+    const keyFn = col ? sortKeyFor(col) : null;
+    if (!keyFn) return rows;
+    return [...rows].sort((a, b) => {
+      const va = keyFn(a);
+      const vb = keyFn(b);
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sort.dir;
+      return String(va).localeCompare(String(vb)) * sort.dir;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sortKeyFor is a plain closure over columns, already a dep
+  }, [rows, sort, columns]);
+
   if (rows.length === 0) {
     return <p className="rounded-lg bg-gray-50 p-6 text-center text-[12px] text-gray-500">{emptyMessage}</p>;
   }
@@ -68,18 +103,38 @@ export function ResultTable<T>({
         <thead>
           <tr className="border-b border-gray-200">
             {renderDetail && <th scope="col" className="w-8 py-2 px-3" />}
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                scope="col"
-                className={cn(
-                  'py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400',
-                  col.align === 'right' ? 'text-right' : 'text-left',
-                )}
-              >
-                {col.header}
-              </th>
-            ))}
+            {columns.map((col) => {
+              const keyFn = sortKeyFor(col);
+              const isSortable = !!keyFn;
+              const isActive = sort?.key === col.key;
+              return (
+                <th
+                  key={col.key}
+                  scope="col"
+                  aria-sort={isActive ? (sort!.dir === 1 ? 'ascending' : 'descending') : undefined}
+                  onClick={
+                    isSortable
+                      ? () =>
+                          setSort((s) =>
+                            s?.key === col.key ? { key: col.key, dir: s.dir === 1 ? -1 : 1 } : { key: col.key, dir: 1 },
+                          )
+                      : undefined
+                  }
+                  className={cn(
+                    'py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400',
+                    col.align === 'right' ? 'text-right' : 'text-left',
+                    isSortable && 'cursor-pointer select-none hover:text-navy-700',
+                  )}
+                >
+                  {col.header}
+                  {isActive && (
+                    <span aria-hidden="true" className="ml-0.5">
+                      {sort!.dir === 1 ? '↑' : '↓'}
+                    </span>
+                  )}
+                </th>
+              );
+            })}
             {comparing &&
               columns
                 .filter((c) => c.compareValue)
@@ -95,13 +150,20 @@ export function ResultTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {sortedRows.map((row) => {
             const key = rowKey(row);
             const prior = priorByKey.get(key);
             const isOpen = expanded.has(key);
+            const tone = rowTone?.(row) ?? null;
             return (
               <React.Fragment key={key}>
-                <tr className={cn('border-b border-gray-100', renderDetail && 'hover:bg-gray-50')}>
+                <tr
+                  className={cn(
+                    'border-b border-gray-100',
+                    renderDetail && 'hover:bg-gray-50',
+                    tone && ROW_TONE_CLASS[tone],
+                  )}
+                >
                   {renderDetail && (
                     <td className="py-2 px-3">
                       <button
@@ -109,9 +171,12 @@ export function ResultTable<T>({
                         onClick={() => toggle(key)}
                         aria-expanded={isOpen}
                         aria-label={isOpen ? `Collapse detail for ${key}` : `Expand detail for ${key}`}
-                        className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-navy-700"
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-transform hover:border-navy-700 hover:text-navy-700"
                       >
-                        <span aria-hidden="true">{isOpen ? '−' : '+'}</span>
+                        <ChevronRightIcon
+                          className={cn('h-3.5 w-3.5 transition-transform', isOpen && 'rotate-90')}
+                          aria-hidden="true"
+                        />
                       </button>
                     </td>
                   )}
@@ -154,7 +219,7 @@ export function ResultTable<T>({
 }
 
 function VarianceCell({ delta, unit }: { delta: number | null; unit: 'pp' | 'pct' | 'plain' }) {
-  if (delta === null) return <span className="text-gray-400">—</span>;
+  if (delta === null) return <span className="text-gray-400">-</span>;
   const improving = delta > 0;
   const flat = Math.abs(delta) < 0.05;
   const text = unit === 'pp' ? `${formatDelta(delta)}pp` : unit === 'pct' ? formatPct(delta) : formatDelta(delta);

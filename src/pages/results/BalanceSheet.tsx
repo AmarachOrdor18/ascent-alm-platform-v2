@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
@@ -30,8 +31,11 @@ export function BalanceSheet() {
 
   const [dimension, setDimension] = useState<DimensionType>('CommonCoa');
   // Dimension members are affiliate-owned; label lookups use the run's own affiliate (a Group run consolidates
-  // several, so there's no single affiliate's list to resolve labels from — codes show unlabelled there).
-  const { data: members = [] } = useDimensionMembers(dimension, run?.affiliateCode && run.affiliateCode !== 'GROUP' ? run.affiliateCode : '');
+  // several, so there's no single affiliate's list to resolve labels from - codes show unlabelled there).
+  const { data: members = [] } = useDimensionMembers(
+    dimension,
+    run?.affiliateCode && run.affiliateCode !== 'GROUP' ? run.affiliateCode : '',
+  );
   const { data: fxRates = [] } = useFxRates();
   const { data: allPositions = [] } = usePositions(
     run?.affiliateCode === 'GROUP' ? undefined : run?.affiliateCode,
@@ -79,12 +83,17 @@ export function BalanceSheet() {
         </span>
       ),
     },
-    { key: 'code', header: 'Code', render: (r) => <span className="font-mono text-[11px] text-gray-500">{r.code}</span> },
+    {
+      key: 'code',
+      header: 'Code',
+      render: (r) => <span className="font-mono text-[11px] text-gray-500">{r.code}</span>,
+    },
     {
       key: 'amount',
       header: 'Booked here',
       align: 'right',
-      render: (r) => (r.amount === 0 ? <span className="text-gray-300">—</span> : <Amount value={r.amount} currency={currency} />),
+      render: (r) =>
+        r.amount === 0 ? <span className="text-gray-300">-</span> : <Amount value={r.amount} currency={currency} />,
     },
     {
       key: 'rollup',
@@ -99,7 +108,7 @@ export function BalanceSheet() {
       align: 'right',
       render: (r) => (
         <span className="font-mono">
-          {totals.assets > 0 ? formatPct((r.rollupAmount / totals.assets) * 100, 1) : '—'}
+          {totals.assets > 0 ? formatPct((r.rollupAmount / totals.assets) * 100, 1) : '-'}
         </span>
       ),
     },
@@ -114,14 +123,29 @@ export function BalanceSheet() {
         scope={affiliate?.name ?? affiliateCode}
         currency={currency}
         metrics={[
-          { label: 'Total assets', value: fmt(totals.assets, currency), about: "Sum of every on-balance-sheet position flagged Asset, converted to the reporting currency at this run's own FX rates." },
-          { label: 'Total liabilities', value: fmt(totals.liabilities, currency), about: 'Sum of every on-balance-sheet position flagged Liability, converted to the reporting currency.' },
-          { label: 'Capital', value: fmt(totals.capital, currency), about: 'Sum of every position flagged Capital — the balance-sheet equity used as the capital basis elsewhere when no Tier 1 figure is loaded.' },
+          {
+            label: 'Total assets',
+            value: fmt(totals.assets, currency),
+            about:
+              "Sum of every on-balance-sheet position flagged Asset, converted to the reporting currency at this run's own FX rates.",
+          },
+          {
+            label: 'Total liabilities',
+            value: fmt(totals.liabilities, currency),
+            about: 'Sum of every on-balance-sheet position flagged Liability, converted to the reporting currency.',
+          },
+          {
+            label: 'Capital',
+            value: fmt(totals.capital, currency),
+            about:
+              'Sum of every position flagged Capital - the balance-sheet equity used as the capital basis elsewhere when no Tier 1 figure is loaded.',
+          },
           {
             label: 'Balance check',
             value: fmt(totals.plug, currency),
             tone: Math.abs(totals.plug) < Math.max(1, totals.assets * 0.0001) ? 'success' : 'warning',
-            about: 'Assets minus liabilities minus capital. Should be zero (or a rounding fraction) — a non-zero figure means the loaded book itself does not balance.',
+            about:
+              'Assets minus liabilities minus capital. Should be zero (or a rounding fraction) - a non-zero figure means the loaded book itself does not balance.',
           },
         ]}
         actions={
@@ -144,14 +168,16 @@ export function BalanceSheet() {
         {Math.abs(totals.plug) >= Math.max(1, totals.assets * 0.0001) && (
           <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
             <span className="font-bold">Assets less liabilities and capital is not zero.</span> The difference is{' '}
-            <Amount value={totals.plug} currency={currency} colorBySign /> — shown rather than plugged, because a
+            <Amount value={totals.plug} currency={currency} colorBySign /> - shown rather than plugged, because a
             balance sheet that always balances on screen hides the load that did not.
           </p>
         )}
 
         {unmapped.length > 0 && (
           <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-            <span className="font-bold">{unmapped.length} code(s) not in the {dimension} hierarchy:</span>{' '}
+            <span className="font-bold">
+              {unmapped.length} code(s) not in the {dimension} hierarchy:
+            </span>{' '}
             <span className="font-mono">{unmapped.slice(0, 8).join(', ')}</span>
             {unmapped.length > 8 && ` and ${unmapped.length - 8} more`}. Their balances are excluded from the roll-up
             below, so the roll-up will not tie to the totals above until they are mapped.
@@ -171,7 +197,9 @@ export function BalanceSheet() {
             columns={columns}
             rowKey={(r) => r.code}
             emptyMessage="No positions in this run's pinned data version."
-            renderDetail={(r) => <PositionDetail positions={positions} code={r.code} dimension={dimension} currency={currency} fx={fx} />}
+            renderDetail={(r) => (
+              <PositionDetail positions={positions} code={r.code} dimension={dimension} currency={currency} fx={fx} />
+            )}
           />
         </section>
 
@@ -217,54 +245,71 @@ function PositionDetail({
   fx: ReturnType<typeof buildFxTable>;
 }) {
   const field = positionKeyFor(dimension);
-  const matching = field ? positions.filter((p) => p[field] === code).slice(0, 50) : [];
+  const allMatching = field ? positions.filter((p) => p[field] === code) : [];
+  const matching = allMatching.slice(0, 50);
 
   if (matching.length === 0) {
-    return <p className="text-[11px] text-gray-500">This is a parent line — expand a leaf to see its accounts.</p>;
+    return <p className="text-[11px] text-gray-500">This is a parent line - expand a leaf to see its accounts.</p>;
   }
 
   return (
-    <table className="w-full text-[11px]">
-      <thead>
-        <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-          <th className="py-1.5 px-3 font-bold">Account</th>
-          <th className="py-1.5 px-3 font-bold">Product</th>
-          <th className="py-1.5 px-3 font-bold">Class</th>
-          <th className="py-1.5 px-3 text-right font-bold">Balance</th>
-          <th className="py-1.5 px-3 text-right font-bold">Lien</th>
-          <th className="py-1.5 px-3 font-bold">Matures</th>
-          <th className="py-1.5 px-3 font-bold">Quality</th>
-        </tr>
-      </thead>
-      <tbody>
-        {matching.map((p) => (
-          <tr key={p.id} className="border-b border-gray-50">
-            <td className="py-1.5 px-3 font-mono">{p.accountNumber}</td>
-            <td className="py-1.5 px-3">{p.productClass}</td>
-            <td className="py-1.5 px-3">{p.accountClass}</td>
-            <td className="py-1.5 px-3 text-right">
-              <Amount value={convert(p.amount, p.currency, currency, fx)} currency={currency} />
-            </td>
-            <td className="py-1.5 px-3 text-right">
-              {p.lienAmount > 0 ? (
+    <>
+      <ResultTable
+        className="text-[11px]"
+        rows={matching}
+        rowKey={(p) => p.id}
+        columns={[
+          { key: 'account', header: 'Account', render: (p) => <span className="font-mono">{p.accountNumber}</span> },
+          { key: 'product', header: 'Product', render: (p) => p.productClass },
+          { key: 'class', header: 'Class', render: (p) => p.accountClass },
+          {
+            key: 'balance',
+            header: 'Balance',
+            align: 'right',
+            render: (p) => <Amount value={convert(p.amount, p.currency, currency, fx)} currency={currency} />,
+          },
+          {
+            key: 'lien',
+            header: 'Lien',
+            align: 'right',
+            render: (p) =>
+              p.lienAmount > 0 ? (
                 <span title={p.lienReason ?? undefined}>
                   <Amount value={p.lienAmount} currency={p.currency} />
                 </span>
               ) : (
-                <span className="text-gray-300">—</span>
-              )}
-            </td>
-            <td className="py-1.5 px-3 font-mono">{p.maturityDate ?? '—'}</td>
-            <td className="py-1.5 px-3">
-              <StatusBadge status={p.performingStatus} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+                <span className="text-gray-300">-</span>
+              ),
+          },
+          {
+            key: 'matures',
+            header: 'Matures',
+            render: (p) => <span className="font-mono">{p.maturityDate ?? '-'}</span>,
+          },
+          { key: 'quality', header: 'Quality', render: (p) => <StatusBadge status={p.performingStatus} /> },
+          {
+            key: 'lineage',
+            header: '',
+            render: (p) => (
+              <Link
+                href={`/data/operations/position-book?batchId=${p.batchId}`}
+                className="text-[10px] font-bold text-navy-700 hover:underline"
+              >
+                Source →
+              </Link>
+            ),
+          },
+        ]}
+      />
+      {allMatching.length > 50 && (
+        <p className="mt-2 text-[11px] text-gray-400">Showing 50 of {allMatching.length} accounts.</p>
+      )}
+    </>
   );
 }
 
 function fmt(value: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value) + ` ${currency}`;
+  return (
+    new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value) + ` ${currency}`
+  );
 }

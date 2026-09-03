@@ -1,4 +1,4 @@
-/** IRRBB & Behavioural Risk module — the IRRBB screen stays primary; Behavioural Analysis joins it as a tab. */
+/** IRRBB & Behavioural Risk module - the IRRBB screen stays primary; Behavioural Analysis joins it as a tab. */
 import { lazy } from 'react';
 import { ModuleTabs, type ModuleTab } from '@/components/layout/ModuleTabs';
 

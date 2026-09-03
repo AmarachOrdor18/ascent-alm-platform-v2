@@ -108,7 +108,7 @@ export function AdminPreferences() {
           <p className="mb-4 text-[11px] leading-relaxed text-navy-900">
             Wipes every affiliate, position, rule, run, user and log entry in this browser&rsquo;s local database and
             restores the platform to its original shipped state (Nigeria Live, Ghana and Côte d&rsquo;Ivoire
-            onboarding). This cannot be undone, and it signs everyone in this browser out — the page reloads to the
+            onboarding). This cannot be undone, and it signs everyone in this browser out - the page reloads to the
             sign-in screen once it&rsquo;s done.
           </p>
           {canReset ? (
@@ -124,7 +124,7 @@ export function AdminPreferences() {
                     : 'rounded-lg border border-danger px-4 py-2 text-[12px] font-bold text-danger hover:bg-danger hover:text-white disabled:opacity-40'
                 }
               >
-                {resetting ? 'Resetting…' : armed ? 'Click again to confirm — this erases everything' : 'Reset demo data'}
+                {resetting ? 'Resetting…' : armed ? 'Click again to confirm - this erases everything' : 'Reset demo data'}
               </button>
               {armed && !resetting && (
                 <button

@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useBatches, useFxRates, usePositions, resolveSingleAffiliate } from '@/lib/hooks';
 import { useRuleMutations, newRuleMeta } from '@/lib/ruleHooks';
+import { useRequestApproval } from '@/lib/governanceHooks';
 import { buildFxTable, missingRates } from '@/engine/fx';
 import { computeLcr, computeNsfr } from '@/engine/liquidity';
 import { computeEveSensitivity, computeNiiSensitivity } from '@/engine/irrbb';
@@ -70,6 +71,7 @@ export function WhatIf() {
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
   const { save } = useRuleMutations<ForecastScenarioRule>('ForecastScenario');
+  const requestApproval = useRequestApproval();
   const canRun = hasPermission('run.execute');
 
   const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
@@ -145,8 +147,9 @@ export function WhatIf() {
 
   const handleSaveScenario = async () => {
     if (levers.rateShockBps === 0) return;
-    await save({
-      ...newRuleMeta('ForecastScenario', `What-if ${levers.rateShockBps > 0 ? '+' : ''}${levers.rateShockBps}bp`, user?.name ?? 'unknown'),
+    const name = `What-if ${levers.rateShockBps > 0 ? '+' : ''}${levers.rateShockBps}bp`;
+    const scenario: ForecastScenarioRule = {
+      ...newRuleMeta('ForecastScenario', name, user?.name ?? 'unknown'),
       kind: 'ForecastScenario',
       description: `Saved from the what-if builder. Run-off ×${levers.runoffMultiplier}, HQLA haircut ${levers.hqlaHaircutPercent}%.`,
       shockByBucket: Object.fromEntries(
@@ -154,6 +157,19 @@ export function WhatIf() {
       ),
       basedOn: null,
       economicIndicatorCodes: [],
+    };
+    await save(scenario);
+    // A scenario used only for this screen's own live exploration needs no sign-off - it's a Process
+    // Run actually consuming it (an ALCO-pack-worthy stress test) that does, so submission happens
+    // here at save time rather than adding a second, easy-to-skip step.
+    await requestApproval({
+      module: 'Stress Testing',
+      entityType: 'ForecastScenario',
+      entityId: scenario.id,
+      entityLabel: scenario.name,
+      action: 'Create',
+      summary: `${scenario.name} - ${scenario.description}`,
+      affiliateCode: affiliateCode === 'GROUP' ? null : affiliateCode,
     });
     setSaved(true);
   };
@@ -180,7 +196,7 @@ export function WhatIf() {
                 : (result?.stressedLcr.lcrPercent ?? 100) < 130
                   ? 'warning'
                   : 'success',
-            about: 'The Liquidity Coverage Ratio recomputed live under the levers set on this screen — the delta shows the move from the unstressed base case.',
+            about: 'The Liquidity Coverage Ratio recomputed live under the levers set on this screen - the delta shows the move from the unstressed base case.',
           },
           {
             label: 'NSFR',
@@ -190,14 +206,14 @@ export function WhatIf() {
           },
           {
             label: 'Survival horizon',
-            value: result ? `${result.survival.survivalHorizonDays} days` : '—',
+            value: result ? `${result.survival.survivalHorizonDays} days` : '-',
             delta: result ? `${result.survival.survivalHorizonDays - result.baseSurvival.survivalHorizonDays} days` : undefined,
             tone: (result?.survival.survivalHorizonDays ?? 30) < 20 ? 'danger' : 'success',
-            about: "Days the counterbalancing capacity lasts under this scenario's outflow assumption — the delta shows the move from the base-case survival horizon.",
+            about: "Days the counterbalancing capacity lasts under this scenario's outflow assumption - the delta shows the move from the base-case survival horizon.",
           },
           {
             label: 'ΔNII',
-            value: result ? formatPct(result.baseNii.niiSensitivityPercent) : '—',
+            value: result ? formatPct(result.baseNii.niiSensitivityPercent) : '-',
             tone: (result?.baseNii.deltaNii ?? 0) < 0 ? 'warning' : 'neutral',
             about: 'How much the rate-shock lever changes net interest income, before any deposit-beta adjustment.',
           },
@@ -216,10 +232,14 @@ export function WhatIf() {
               type="button"
               onClick={() => void handleSaveScenario()}
               disabled={!canRun || levers.rateShockBps === 0 || saved}
-              title={levers.rateShockBps === 0 ? 'Set a rate shock to save this as a scenario' : undefined}
+              title={
+                levers.rateShockBps === 0
+                  ? 'Set a rate shock to save this as a scenario'
+                  : 'Saves the scenario and submits it for approval - a Process Run can only use an Approved scenario'
+              }
               className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
-              {saved ? 'Saved as scenario' : 'Save as scenario'}
+              {saved ? 'Submitted - pending approval' : 'Submit scenario for approval'}
             </button>
           </>
         }
@@ -340,7 +360,7 @@ export function WhatIf() {
                     </label>
                     <InfoButton label="Why this matters">
                       Damps the liability leg. A bank with a negative repricing gap looks less exposed to a rate rise
-                      once betas apply — which is the real effect.
+                      once betas apply - which is the real effect.
                     </InfoButton>
                   </div>
                 </div>
@@ -418,7 +438,7 @@ export function WhatIf() {
                         label="Basel outlier test"
                         value={
                           result.eve.isBaselOutlier === null ? (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-400">-</span>
                           ) : (
                             <StatusBadge
                               status={result.eve.isBaselOutlier ? 'Outlier' : 'Within 15%'}

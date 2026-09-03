@@ -57,7 +57,7 @@ export function useFireOccurrence() {
       const cloned: ProcessRun = {
         ...template,
         id: `RUN-${Date.now().toString(36).toUpperCase()}`,
-        name: `${schedule.name} — ${occurrenceDate}`,
+        name: `${schedule.name} - ${occurrenceDate}`,
         asOfDate: occurrenceDate,
         status: 'Queued',
         createdBy: user?.name ?? 'scheduler',

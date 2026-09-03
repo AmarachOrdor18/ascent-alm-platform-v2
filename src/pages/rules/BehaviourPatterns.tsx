@@ -74,7 +74,7 @@ export function BehaviourPatterns() {
   return (
     <RuleEditor<BehaviourPatternRule>
       title="Behaviour Patterns"
-      description="How non-maturity deposits actually run off. Tiers must total 100%, and each is classified Core or Volatile."
+      description="How non-maturity deposits actually run off. Tiers must total 100%, and each is classified Core or Volatile. Feeds the Liquidity Gap's behavioural basis and NII Sensitivity's deposit betas; selected on Process Run's Rules panel, left unselected the engine default pattern set applies and the result discloses which basis it used."
       noun="pattern set"
       rules={rules}
       isLoading={isLoading}
@@ -189,7 +189,7 @@ export function BehaviourPatterns() {
             <h3 className="mb-1 text-[12px] font-bold text-navy-900">Deposit betas</h3>
             <p className="mb-3 text-[11px] leading-relaxed text-gray-500">
               What share of a policy-rate move reaches depositors. Without these, NII sensitivity assumes full
-              pass-through, which no bank experiences — stickier balances reprice least.
+              pass-through, which no bank experiences - stickier balances reprice least.
             </p>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               {rule.betas.map((b, i) => (
@@ -219,7 +219,7 @@ export function BehaviourPatterns() {
   );
 }
 
-/** Original tier indices, ordered near-term to far-term — the allocation bar reads left to right as time does. */
+/** Original tier indices, ordered near-term to far-term - the allocation bar reads left to right as time does. */
 function sortedTierOrder(tiers: RunoffTier[]): number[] {
   return tiers.map((_, i) => i).sort((a, b) => tiers[a]!.tenorDays - tiers[b]!.tenorDays);
 }

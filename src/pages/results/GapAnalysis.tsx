@@ -53,15 +53,15 @@ export function GapAnalysis() {
         metrics={[
           {
             label: 'Cumulative gap',
-            value: last ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(last.cumulativeGap) : '—',
+            value: last ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(last.cumulativeGap) : '-',
             tone: (last?.cumulativeGap ?? 0) < 0 ? 'warning' : 'neutral',
-            about: 'The running total of every bucket’s gap in order — negative means more has matured on the liability side than the asset side up to that point.',
+            about: 'The running total of every bucket’s gap in order - negative means more has matured on the liability side than the asset side up to that point.',
           },
           {
             label: 'Widest negative bucket',
-            value: worstBucket ? worstBucket.bucket : '—',
+            value: worstBucket ? worstBucket.bucket : '-',
             tone: (worstBucket?.gap ?? 0) < 0 ? 'warning' : 'neutral',
-            about: 'The single time bucket carrying the largest net cash outflow — the point of maximum funding pressure on this ladder.',
+            about: 'The single time bucket carrying the largest net cash outflow - the point of maximum funding pressure on this ladder.',
           },
           {
             label: 'Buckets',
@@ -104,7 +104,7 @@ export function GapAnalysis() {
             </h2>
             <InfoButton label="Methodology">
               {basis === 'maturity'
-                ? 'Bucketed on contractual maturity — when the cash actually moves.'
+                ? 'Bucketed on contractual maturity - when the cash actually moves.'
                 : 'Bucketed on next repricing date, falling back to maturity for fixed-rate instruments, which reprice only when they mature.'}
             </InfoButton>
           </div>
@@ -142,7 +142,7 @@ export function GapAnalysis() {
               <StatusBadge status={`${bucketRule.name} v${bucketRule.version}`} tone="neutral" />
               <InfoButton label="Why this matters">
                 This run consumed version {bucketRule.version} of the rule. Editing the rule now does not change what
-                this run reports — that is what makes the figure defensible months later.
+                this run reports - that is what makes the figure defensible months later.
               </InfoButton>
             </div>
             <div className="flex flex-wrap gap-2">

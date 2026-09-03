@@ -14,7 +14,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const steps = useMemo(() => tourStepsFor(role), [role]);
   const step = active ? (steps[stepIndex] ?? null) : null;
 
-  // navigate() runs as a plain statement, never inside a setState updater — React can re-invoke an updater and trigger a "setState while rendering a different component" warning.
+  // navigate() runs as a plain statement, never inside a setState updater - React can re-invoke an updater and trigger a "setState while rendering a different component" warning.
   const start = useCallback(() => {
     setStepIndex(0);
     setActive(true);
@@ -142,7 +142,7 @@ function TourOverlay() {
   );
 }
 
-/** The discoverable entry point — a button anywhere in the shell that starts the current role's tour. */
+/** The discoverable entry point - a button anywhere in the shell that starts the current role's tour. */
 export function TourLauncher({ className }: { className?: string }) {
   const { start } = useTour();
   return (

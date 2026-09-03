@@ -3,7 +3,7 @@
  *
  * These tests exist because the failure this code fixes was silent: the
  * limits and KRI engines were complete, the runs were producing the right
- * numbers, and nothing connected them — so the monitoring screens showed
+ * numbers, and nothing connected them - so the monitoring screens showed
  * hardcoded figures that contradicted the results screens.
  */
 
@@ -55,7 +55,7 @@ describe('extractMetrics', () => {
     const partial = extractMetrics([result('Lcr', { lcrPercent: 120 })]);
     expect(partial.has('nsfrPercent')).toBe(false);
 
-    // Present but null: it ran and could not produce a number — LCR over zero
+    // Present but null: it ran and could not produce a number - LCR over zero
     // net outflows, for instance. Reporting that as 0% would be a lie.
     const nulled = extractMetrics([result('Lcr', { lcrPercent: null })]);
     expect(nulled.has('lcrPercent')).toBe(true);
@@ -84,7 +84,7 @@ describe('formatMetric', () => {
   it('respects the unit', () => {
     expect(formatMetric(168.85759, 'lcrPercent')).toBe('168.86%');
     expect(formatMetric(17, 'survivalHorizonDays')).toBe('17 days');
-    expect(formatMetric(null, 'lcrPercent')).toBe('—');
+    expect(formatMetric(null, 'lcrPercent')).toBe('-');
   });
 });
 
@@ -95,7 +95,7 @@ describe('limits evaluated against real results', () => {
     const evals = evaluateAll(SEED_LIMITS.filter((c) => c.affiliateCode === null), FULL, '2026-07-31', temps);
     const by = (k: string) => evals.find((e) => e.metricKey === k)!;
 
-    // LCR 168.9% against green 130 — comfortably within appetite.
+    // LCR 168.9% against green 130 - comfortably within appetite.
     expect(by('lcrPercent').status).toBe('Green');
     expect(by('lcrPercent').breachesRegulatoryMinimum).toBe(false);
 

@@ -1,14 +1,30 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
-import { useCurrencies, useFxRates, useSaveCurrency, useSaveFxRate, useAffiliates } from '@/lib/hooks';
+import {
+  useCurrencies,
+  useFxRates,
+  useSaveCurrency,
+  useSaveFxRate,
+  useDeleteCurrency,
+  useDeleteFxRate,
+  useAffiliates,
+  useSaveBatch,
+} from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
 import { buildFxTable, convert, missingRates } from '@/engine/fx';
+import { importFxRates, type RowError } from '@/lib/csvImport';
+import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
+import { downloadCsvTemplate } from '@/lib/csvTemplates';
+import { referenceLoadBatch } from '@/lib/referenceBatch';
 import type { CurrencyRole, StoredCurrency, StoredFxRate } from '@/engine/types';
+
+const FX_TEMPLATE_COLUMNS = ['base', 'quote', 'rate', 'asOfDate'];
+const FX_TEMPLATE_SAMPLE = ['KES', 'USD', '129', '2026-07-31'];
 
 const ROLES: CurrencyRole[] = ['Functional', 'Reporting', 'Active'];
 
@@ -19,17 +35,69 @@ const ROLE_EXPLANATION: Record<CurrencyRole, string> = {
 };
 
 export function FxRates() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { data: currencies = [] } = useCurrencies();
   const { data: rates = [], isLoading } = useFxRates();
   const { data: affiliates = [] } = useAffiliates();
   const saveRate = useSaveFxRate();
   const saveCurrency = useSaveCurrency();
+  const deleteCurrency = useDeleteCurrency();
+  const deleteRate = useDeleteFxRate();
+  const saveBatch = useSaveBatch();
   const canEdit = hasPermission('data.configure');
 
+  // FX rates are Group-wide reference data, loaded here rather than staged like a Position file - but
+  // Data Sources' freshness page only reads LoadBatch rows (checkFreshness, engine/vintage.ts), so
+  // without recording one here that screen would read "Never loaded" forever no matter how current the
+  // rates actually are.
+  const recordFxLoad = (label: string, asOfDate: string, rowCount: number) =>
+    saveBatch.mutate(
+      referenceLoadBatch({ domain: 'FxRates', affiliateCode: 'GROUP', asOfDate, label, uploadedBy: user?.name ?? 'unknown', rowCount }),
+    );
+
   const [edits, setEdits] = useState<Record<string, number>>({});
-  const [newRate, setNewRate] = useState({ code: '', rate: '' });
+  const [newRate, setNewRate] = useState({ code: '', rate: '', asOfDate: new Date().toISOString().slice(0, 10) });
   const [newCurrency, setNewCurrency] = useState({ code: '', name: '', symbol: '' });
+
+  const bulkFileInput = useRef<HTMLInputElement>(null);
+  const [bulkStaged, setBulkStaged] = useState<StoredFxRate[] | null>(null);
+  const [bulkFileName, setBulkFileName] = useState<string | null>(null);
+  const [bulkErrors, setBulkErrors] = useState<RowError[]>([]);
+  const [bulkImporting, setBulkImporting] = useState(false);
+
+  const handleBulkFile = async (file: File) => {
+    let text: string;
+    try {
+      text = await readUploadAsCsvText(file);
+    } catch (err) {
+      setBulkStaged(null);
+      setBulkFileName(file.name);
+      setBulkErrors([{ line: 1, column: '', message: err instanceof Error ? err.message : 'This file could not be read.' }]);
+      if (bulkFileInput.current) bulkFileInput.current.value = '';
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const result = importFxRates(text, today, user?.name ?? 'unknown');
+    setBulkStaged(result.rows);
+    setBulkFileName(file.name);
+    setBulkErrors(result.errors);
+    if (bulkFileInput.current) bulkFileInput.current.value = '';
+  };
+
+  const handleBulkImport = async () => {
+    if (!bulkStaged || bulkStaged.length === 0) return;
+    setBulkImporting(true);
+    try {
+      for (const rate of bulkStaged) await saveRate.mutateAsync(rate);
+      const latestAsOf = bulkStaged.reduce((max, r) => (r.asOfDate > max ? r.asOfDate : max), bulkStaged[0]!.asOfDate);
+      recordFxLoad(bulkFileName ?? 'FX rates bulk upload', latestAsOf, bulkStaged.length);
+      setBulkStaged(null);
+      setBulkFileName(null);
+      setBulkErrors([]);
+    } finally {
+      setBulkImporting(false);
+    }
+  };
 
   const handleAddCurrency = () => {
     const code = newCurrency.code.trim().toUpperCase();
@@ -41,38 +109,71 @@ export function FxRates() {
     );
   };
 
-  const asOfDate = rates[0]?.asOfDate ?? null;
+  // Rates are a dated series (see engine/fx.ts) - "as of" here is the most recent one on file, the
+  // same "latest wins" reading buildFxTable itself applies when resolving what a run actually converts at.
+  const asOfDate = rates.reduce<string | null>((latest, r) => (!latest || r.asOfDate > latest ? r.asOfDate : latest), null);
   const table = buildFxTable('USD', rates, asOfDate ?? '');
 
-  // Currencies that don't already have a rate row — editing an existing pair happens inline in the table instead.
-  const ratelessCurrencies = currencies.filter((c) => c.code !== 'USD' && !rates.some((r) => r.base === c.code));
+  // A currency without a rate on any date at all - genuinely needs one before it can be added below.
+  const ratelessCurrencies = currencies.filter((c) => c.code !== 'USD');
 
   const addRate = () => {
-    if (!newRate.code || newRate.rate === '') return;
+    if (!newRate.code || newRate.rate === '' || !newRate.asOfDate) return;
     const value = Number(newRate.rate);
     if (Number.isNaN(value) || value <= 0) return;
     saveRate.mutate(
       {
-        id: `FX-${newRate.code}-USD`,
+        // Dated, not just keyed by pair - adding a rate for a new date adds a row alongside whatever
+        // that currency already has on file rather than overwriting it. Re-adding the same date instead
+        // corrects that day's rate in place, same as editing it inline in the table below would.
+        id: `FX-${newRate.code}-USD-${newRate.asOfDate}`,
         base: newRate.code,
         quote: 'USD',
         rate: value,
-        asOfDate: asOfDate ?? new Date().toISOString().slice(0, 10),
+        asOfDate: newRate.asOfDate,
         source: 'Manual entry',
         updatedBy: 'current-user',
         updatedAt: new Date().toISOString(),
       },
-      { onSuccess: () => setNewRate({ code: '', rate: '' }) },
+      {
+        onSuccess: () => {
+          recordFxLoad(`Manual entry - ${newRate.code}`, newRate.asOfDate, 1);
+          setNewRate({ code: '', rate: '', asOfDate: newRate.asOfDate });
+        },
+      },
     );
   };
 
   const rolesControls = useTableControls(currencies, 8, ['code', 'name']);
+  const ratesControls = useTableControls(rates, 10, ['base', 'quote']);
 
   // Every currency an affiliate transacts in must be convertible, or a Group run will fail.
   const requiredCurrencies = Array.from(
     new Set(affiliates.flatMap((a) => [a.functionalCurrency, ...a.activeCurrencies])),
   );
   const missing = missingRates(requiredCurrencies, 'USD', table);
+
+  const handleDeleteRate = (rate: StoredFxRate) => {
+    if (!window.confirm(`Delete the ${rate.base}/${rate.quote} rate? This cannot be undone.`)) return;
+    deleteRate.mutate(rate);
+  };
+
+  const handleDeleteCurrency = (currency: StoredCurrency) => {
+    if (currency.role === 'Functional') return;
+    if (requiredCurrencies.includes(currency.code)) {
+      window.alert(`${currency.code} is still in use as a functional or active currency on at least one affiliate - cannot delete while referenced.`);
+      return;
+    }
+    // A currency can now carry several dated rate rows (a series, not a single record) - every one of
+    // them references this currency and needs to go with it, not just whichever happens to be found first.
+    const existingRates = rates.filter((r) => r.base === currency.code || r.quote === currency.code);
+    if (!window.confirm(`Delete currency ${currency.code} - ${currency.name}? This also removes ${existingRates.length} FX rate${existingRates.length === 1 ? '' : 's'} on file for it. This cannot be undone.`)) return;
+    deleteCurrency.mutate(currency, {
+      onSuccess: () => {
+        for (const r of existingRates) deleteRate.mutate(r);
+      },
+    });
+  };
 
   const handleRateChange = (rate: StoredFxRate, value: number) => {
     setEdits({ ...edits, [rate.id]: value });
@@ -84,12 +185,14 @@ export function FxRates() {
     saveRate.mutate(
       { ...rate, rate: value, updatedBy: 'current-user', updatedAt: new Date().toISOString() },
       {
-        onSuccess: () =>
+        onSuccess: () => {
+          recordFxLoad(`Rate correction - ${rate.base}/${rate.quote}`, rate.asOfDate, 1);
           setEdits((prev) => {
             const next = { ...prev };
             delete next[rate.id];
             return next;
-          }),
+          });
+        },
       },
     );
   };
@@ -140,6 +243,21 @@ export function FxRates() {
       header: 'As at',
       render: (r) => <span className="font-mono text-[11px]">{formatDate(r.asOfDate)}</span>,
     },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (r) =>
+        canEdit ? (
+          <button
+            type="button"
+            onClick={() => handleDeleteRate(r)}
+            className="text-[11px] font-bold text-danger hover:underline"
+          >
+            Delete
+          </button>
+        ) : null,
+    },
   ];
 
   return (
@@ -152,13 +270,13 @@ export function FxRates() {
         currency="USD"
         staleWarning={
           missing.length > 0
-            ? `No rate loaded for ${missing.join(', ')} — any Group run including these currencies will fail rather than silently omit them.`
+            ? `No rate loaded for ${missing.join(', ')} - any Group run including these currencies will fail rather than silently omit them.`
             : null
         }
         metrics={[
           { label: 'Active currencies', value: String(currencies.filter((c) => c.isActive).length), about: 'Currencies available for positions and rules to reference.' },
           { label: 'Rates loaded', value: String(rates.length), about: 'Exchange rate pairs currently on file.' },
-          { label: 'Pivot currency', value: 'USD', about: 'Every rate converts through this currency — a NGN/GHS conversion, for example, goes via their respective USD rates.' },
+          { label: 'Pivot currency', value: 'USD', about: 'Every rate converts through this currency - a NGN/GHS conversion, for example, goes via their respective USD rates.' },
           {
             label: 'Coverage',
             value: missing.length === 0 ? 'Complete' : `${missing.length} missing`,
@@ -173,7 +291,7 @@ export function FxRates() {
           <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
             Exchange rates
             <InfoButton label="How conversion works">
-              Every rate converts through USD as the pivot currency — an NGN/GHS conversion, for example, goes via
+              Every rate converts through USD as the pivot currency - an NGN/GHS conversion, for example, goes via
               each currency's own USD rate rather than a direct quote. A currency missing a rate here fails any run
               that touches it, rather than silently being converted at 1.0.
             </InfoButton>
@@ -192,12 +310,10 @@ export function FxRates() {
                   disabled={ratelessCurrencies.length === 0}
                   className="w-40 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 >
-                  <option value="">
-                    {ratelessCurrencies.length === 0 ? 'Every currency has a rate' : 'Select…'}
-                  </option>
+                  <option value="">{ratelessCurrencies.length === 0 ? 'No other currencies' : 'Select…'}</option>
                   {ratelessCurrencies.map((c) => (
                     <option key={c.code} value={c.code}>
-                      {c.code} — {c.name}
+                      {c.code} - {c.name}
                     </option>
                   ))}
                 </select>
@@ -215,25 +331,106 @@ export function FxRates() {
                   className="w-32 rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 />
               </div>
+              <div>
+                <label htmlFor="new-rate-asof" className="mb-1 block text-[11px] text-gray-600">
+                  As of date
+                </label>
+                <input
+                  id="new-rate-asof"
+                  type="date"
+                  value={newRate.asOfDate}
+                  onChange={(e) => setNewRate({ ...newRate, asOfDate: e.target.value })}
+                  className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                />
+              </div>
               <button
                 type="button"
                 onClick={addRate}
-                disabled={saveRate.isPending || !newRate.code || newRate.rate === ''}
+                disabled={saveRate.isPending || !newRate.code || newRate.rate === '' || !newRate.asOfDate}
                 className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
                 {saveRate.isPending ? 'Saving…' : 'Add rate'}
               </button>
               <p className="w-full text-[11px] text-gray-500">
-                To change an existing pair's rate, edit it directly in the table below — this only adds a currency
-                that doesn't have a rate yet.
+                A rate is a dated series, like a yield curve - adding one for a date that currency already has
+                corrects that day's rate in place (same as editing it inline in the table below); a new date adds
+                a new row alongside its history. Runs use whichever dated rate is most recent as of their own date.
               </p>
             </div>
           )}
 
+          {canEdit && (
+            <div className="mb-4 rounded-lg bg-gray-50 p-4">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                Bulk upload - new pairs or a refreshed set of rates
+              </p>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label htmlFor="fx-bulk-file" className="mb-1 block text-[11px] text-gray-600">
+                    CSV, Excel, JSON or XML file
+                  </label>
+                  <input
+                    id="fx-bulk-file"
+                    ref={bulkFileInput}
+                    type="file"
+                    accept={UPLOAD_ACCEPT}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleBulkFile(file);
+                    }}
+                    className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => downloadCsvTemplate(FX_TEMPLATE_COLUMNS, FX_TEMPLATE_SAMPLE, 'fx_rates_template.csv')}
+                    className="mt-1 block text-[10px] font-bold text-navy-700 hover:underline"
+                  >
+                    Download CSV template
+                  </button>
+                </div>
+                {bulkStaged && bulkStaged.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkImport()}
+                    disabled={bulkImporting}
+                    className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                  >
+                    {bulkImporting ? 'Importing…' : `Import ${bulkStaged.length} rate${bulkStaged.length === 1 ? '' : 's'}`}
+                  </button>
+                )}
+              </div>
+              {bulkFileName && bulkStaged && (
+                <p className="mt-2 text-[11px] text-gray-500">
+                  {bulkFileName} - {bulkStaged.length} row{bulkStaged.length === 1 ? '' : 's'} parsed
+                  {bulkErrors.length > 0 && `, ${bulkErrors.length} error${bulkErrors.length === 1 ? '' : 's'}`}.
+                </p>
+              )}
+              {bulkErrors.length > 0 && (
+                <ul className="mt-2 space-y-1 text-[11px] text-danger">
+                  {bulkErrors.slice(0, 10).map((e, i) => (
+                    <li key={`${e.line}-${i}`}>
+                      Line {e.line} ({e.column}): {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <TableToolbar
+            searchValue={ratesControls.search}
+            onSearchChange={ratesControls.setSearch}
+            exportData={() => ratesControls.filtered}
+            exportFilename="fx-rates"
+            density={ratesControls.density}
+            onDensityChange={ratesControls.setDensity}
+          />
+
           <ResultTable
-            rows={rates}
+            rows={ratesControls.paged}
             columns={columns}
             rowKey={(r) => r.id}
+            className="mt-4"
             emptyMessage={isLoading ? 'Loading…' : 'No rates loaded.'}
             renderDetail={(r) => (
               <div className="text-[11px] leading-relaxed text-gray-600">
@@ -250,6 +447,13 @@ export function FxRates() {
                 </p>
               </div>
             )}
+          />
+
+          <TablePagination
+            currentPage={ratesControls.page}
+            totalItems={ratesControls.totalItems}
+            pageSize={ratesControls.pageSize}
+            onPageChange={ratesControls.setPage}
           />
         </section>
 
@@ -286,7 +490,7 @@ export function FxRates() {
                 {saveCurrency.isPending ? 'Adding…' : 'New currency'}
               </button>
               <p className="w-full text-[11px] text-gray-500">
-                Registers with an Active role and no rate yet — add its rate above once it exists here.
+                Registers with an Active role and no rate yet - add its rate above once it exists here.
               </p>
             </div>
           )}
@@ -343,6 +547,21 @@ export function FxRates() {
                   ) : (
                     <StatusBadge status={c.role} tone={c.role === 'Functional' ? 'info' : 'neutral'} />
                   ),
+              },
+              {
+                key: 'actions',
+                header: '',
+                align: 'right',
+                render: (c) =>
+                  canEdit && c.role !== 'Functional' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCurrency(c)}
+                      className="text-[11px] font-bold text-danger hover:underline"
+                    >
+                      Delete
+                    </button>
+                  ) : null,
               },
             ]}
           />

@@ -6,7 +6,7 @@ interface InfoButtonProps {
   label?: string;
   className?: string;
   panelClassName?: string;
-  /** Stops the click from bubbling to an ancestor link/row — for an info button nested inside a clickable card. */
+  /** Stops the click from bubbling to an ancestor link/row - for an info button nested inside a clickable card. */
   stopClickPropagation?: boolean;
 }
 
@@ -39,7 +39,7 @@ export function InfoButton({
   }, [open]);
 
   // Flips the panel to hang off the right edge of the button instead of the left
-  // when it would otherwise run past the viewport — a fixed left-0 offset overflows
+  // when it would otherwise run past the viewport - a fixed left-0 offset overflows
   // whenever the button sits in the right half of the screen (e.g. a card's top-right corner).
   useLayoutEffect(() => {
     if (!open) {

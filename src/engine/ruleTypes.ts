@@ -1,6 +1,7 @@
-import type { BehaviouralTag, IsoDate, LcrCashflowRole, RuleMeta, TimeBucketRule } from './types';
+import type { BehaviouralTag, DataDomain, DimensionType, IsoDate, LcrCashflowRole, RuleMeta, TimeBucketRule } from './types';
 import type { BehaviourPattern } from './behavioural';
 import type { AdjustmentType, TpMethod } from './ftp';
+import type { ValidationRule } from './validation';
 
 export type { TimeBucketRule };
 
@@ -12,7 +13,7 @@ export type { TimeBucketRule };
 export interface ProductAssumption {
   productCode: string;
   currency: string;
-  /** Which side of the 30-day LCR window this product sits on — computeLcr() keys off this, not hqlaLevel, to decide what counts as HQLA. */
+  /** Which side of the 30-day LCR window this product sits on - computeLcr() keys off this, not hqlaLevel, to decide what counts as HQLA. */
   lcrCashflowRole: LcrCashflowRole;
   lcrRatePct: number | null;
   asfFactorPct: number | null;
@@ -241,7 +242,54 @@ export interface CustomMetricRule extends RuleMeta {
 
 export interface ValidationRuleSet extends RuleMeta {
   kind: 'ValidationRule';
-  ruleIds: string[];
+  /** The full check catalogue with this scope's severity/blocking/active overrides applied - see engine/validation.ts. */
+  rules: ValidationRule[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Field mapping — source-column rewriting ahead of the canonical importer
+// (docs/DATA_MAPPING_PLAN.md §6.1). Code/reference-value lookups are a
+// separate, later `CodeMapping` rule kind — out of scope here.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface FieldMappingColumn {
+  /** Raw header as it appears in the source extract, e.g. "ACCT_NO". Matched case-insensitively. */
+  sourceField: string;
+  /** Canonical Position field this maps to, e.g. "accountNumber" — see csvImport.ts's KNOWN_COLUMNS. */
+  targetField: string;
+  transform: 'Direct' | 'Number' | 'Date' | 'Percent';
+}
+
+export interface FieldMappingRule extends RuleMeta {
+  kind: 'FieldMapping';
+  /** Which upload domain this mapping applies to. */
+  domain: DataDomain;
+  /** Free-text label for the source system this mapping was built for, e.g. "Flexcube" — organizational, not functional. */
+  sourceSystem: string;
+  columns: FieldMappingColumn[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Code mapping — source-code crosswalks (OrgUnit/GlAccount/CommonCoa) applied to already-parsed
+// positions, after field mapping and before unmappedCodes runs (docs/DATA_MAPPING_PLAN.md §6.2).
+// Counterparty deliberately excluded — DimensionMember.sourceRefs already covers it (a per-member
+// "also known as" alias, edited directly on the Counterparty Register), a better fit for an entity
+// identity than a bulk rule table, and having both would mean two places to define the same crosswalk.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface CodeMappingEntry {
+  /** Raw code as it appears in the source extract, e.g. "10045". Matched exactly (case-sensitive). */
+  sourceValue: string;
+  /** An existing DimensionMember's own code to translate into, e.g. "P-CORP-TERM-LOAN". */
+  targetCode: string;
+}
+
+export interface CodeMappingRule extends RuleMeta {
+  kind: 'CodeMapping';
+  dimension: Extract<DimensionType, 'OrgUnit' | 'GlAccount' | 'CommonCoa'>;
+  /** Free-text label for the source system this mapping was built for, e.g. "Flexcube" — organizational, not functional. */
+  sourceSystem: string;
+  mappings: CodeMappingEntry[];
 }
 
 /** Every stored rule shape, for narrowing after a `getRule` call. */
@@ -259,7 +307,9 @@ export type AnyRule =
   | AdjustmentRuleDef
   | FilterRule
   | CustomMetricRule
-  | ValidationRuleSet;
+  | ValidationRuleSet
+  | FieldMappingRule
+  | CodeMappingRule;
 
 /**
  * A maturity-mix or behaviour-pattern allocation must total 100%.
@@ -270,5 +320,5 @@ export function allocationError(allocation: Record<string, number> | number[]): 
   if (values.length === 0) return null;
   const total = values.reduce((s, v) => s + v, 0);
   if (Math.abs(total - 100) < 0.0001) return null;
-  return `Allocation totals ${total.toFixed(2)}% — it must total 100%`;
+  return `Allocation totals ${total.toFixed(2)}% - it must total 100%`;
 }

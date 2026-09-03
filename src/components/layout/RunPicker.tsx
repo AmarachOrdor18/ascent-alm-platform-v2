@@ -31,7 +31,7 @@ export function RunPicker({
         ))}
       </select>
       {completed.length === 0 && (
-        <p className="mt-1 text-[10px] text-gray-400">No completed runs yet — execute one on Process Run first.</p>
+        <p className="mt-1 text-[10px] text-gray-400">No completed runs yet - execute one on Process Run first.</p>
       )}
     </div>
   );

@@ -1,0 +1,6 @@
+id,category,amount,currency,orgunitcode,glaccountcode,commoncoacode,productcode,productclass,maturitydate,nextrepricingdate,ratetype,interestratepct,behaviouraltag,hqlalevel,hqlahaircutpct,lcrcashflowrole,irrbbratesensitive,approxdurationyears,performingstatus,provisionamount
+NG-LOAN-COR-01,Asset,126500000000,NGN,OU-NG-COR,NG-1030,COA-14,LOAN-COR,Loans - Corporate Term Loan,2029-03-31,2026-09-30,Floating,24.5,N/A,None,0,None,true,2.5,Performing,0
+NG-LOAN-RET-01,Asset,39500000000,NGN,OU-NG-RET,NG-1030,COA-14,LOAN-RET,Loans - Retail Mortgage,2036-06-30,2027-06-30,Fixed,21.0,N/A,None,0,None,true,8.2,Performing,0
+NG-LOAN-COR-02,Asset,57200000000,NGN,OU-NG-COR,NG-1030,COA-14,LOAN-COR,Loans - Corporate Working Capital Facility,2027-06-30,2026-12-31,Floating,25.5,N/A,None,0,None,true,0.8,Performing,0
+NG-LOAN-SME-01,Asset,18730000000,NGN,OU-NG-COR,NG-1030,COA-14,LOAN-SME,Loans - SME Term Loan,2028-09-30,2027-03-31,Fixed,26.5,N/A,None,0,None,true,2.0,Substandard,7492000000
+NG-LOAN-RET-02,Asset,22890000000,NGN,OU-NG-RET,NG-1030,COA-14,LOAN-RET,Loans - Auto Loan,2030-03-31,2027-03-31,Fixed,22.5,N/A,None,0,None,true,2.9,Performing,0

@@ -44,18 +44,30 @@ export function canConvertAll(currencies: CurrencyCode[], to: CurrencyCode, fx: 
   return currencies.every((c) => c === to || c === fx.pivot || fx.toPivot[c] !== undefined);
 }
 
-/** Which currencies are missing a rate — used to explain a blocked run rather than failing opaquely. */
+/** Which currencies are missing a rate - used to explain a blocked run rather than failing opaquely. */
 export function missingRates(currencies: CurrencyCode[], to: CurrencyCode, fx: FxTable): CurrencyCode[] {
   return Array.from(new Set(currencies)).filter((c) => c !== to && c !== fx.pivot && fx.toPivot[c] === undefined);
 }
 
-// Rates quoted against the pivot are taken directly; the reciprocal is used where a pair is quoted the other way round.
+// Rates are a dated series, same as a yield curve or a Position batch - a currency pair can carry
+// several rows on file (one per date a rate was struck), and each is kept rather than overwritten.
+// Only the row valid as of `asOfDate` - the latest one struck on or before it - is used; a rate struck
+// later has no bearing on an earlier date's conversion. Rates quoted against the pivot are taken
+// directly; the reciprocal is used where a pair is quoted the other way round.
 export function buildFxTable(pivot: CurrencyCode, rates: FxRate[], asOfDate: string): FxTable {
   const toPivot: Record<CurrencyCode, number> = { [pivot]: 1 };
+  const latestByCurrency = new Map<CurrencyCode, FxRate>();
+
   for (const r of rates) {
-    if (r.rate <= 0) continue;
-    if (r.quote === pivot) toPivot[r.base] = r.rate;
-    else if (r.base === pivot) toPivot[r.quote] = 1 / r.rate;
+    if (r.rate <= 0 || r.asOfDate > asOfDate) continue;
+    const currency = r.quote === pivot ? r.base : r.base === pivot ? r.quote : null;
+    if (!currency) continue;
+    const current = latestByCurrency.get(currency);
+    if (!current || r.asOfDate > current.asOfDate) latestByCurrency.set(currency, r);
+  }
+
+  for (const [currency, r] of latestByCurrency) {
+    toPivot[currency] = r.quote === pivot ? r.rate : 1 / r.rate;
   }
   return { pivot, toPivot, asOfDate };
 }

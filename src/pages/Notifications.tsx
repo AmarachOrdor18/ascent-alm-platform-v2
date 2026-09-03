@@ -24,14 +24,18 @@ const emptyDraft = {
   isActive: true,
 };
 
-export function Notifications() {
+export function Notifications({
+  embedded = false,
+  forcedAffiliateCode,
+}: { embedded?: boolean; forcedAffiliateCode?: string } = {}) {
   const { user, hasPermission } = useAuth();
-  // Alert routing and escalation apply platform-wide, so — unlike most screens — this isn't gated per
+  // Alert routing and escalation apply platform-wide, so - unlike most screens - this isn't gated per
   // affiliate; it's gated to Administrators only. Without this, `dashboard.view` (every role, including a
   // read-only Executive Viewer) was enough to reach this tab and freely create, edit or disable any rule.
   const canEdit = hasPermission('admin.manage');
   const { data: affiliates = [] } = useAffiliates();
-  const { data: rules = [], isLoading } = notifications.useList();
+  const { data: allRules = [], isLoading } = notifications.useList();
+  const rules = forcedAffiliateCode ? allRules.filter((r) => r.affiliateCode === forcedAffiliateCode) : allRules;
   const save = notifications.useSave();
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -47,7 +51,7 @@ export function Notifications() {
   );
 
   const openNew = () => {
-    setDraft(emptyDraft);
+    setDraft({ ...emptyDraft, affiliateCode: forcedAffiliateCode ?? '' });
     setEditorOpen(true);
   };
 
@@ -93,6 +97,7 @@ export function Notifications() {
 
   return (
     <>
+      {!embedded && (
       <ModuleHeader
         title="Notifications"
         description="Which events raise an alert, over which channel, to whom, and when it escalates."
@@ -100,7 +105,7 @@ export function Notifications() {
         scope="Ecobank Group"
         metrics={[
           { label: 'Rules', value: String(rules.length), about: 'Configured event-to-alert rules across every channel and affiliate.' },
-          { label: 'Active', value: String(active.length), tone: 'success', about: 'Rules currently live — a disabled rule stops firing without being deleted.' },
+          { label: 'Active', value: String(active.length), tone: 'success', about: 'Rules currently live - a disabled rule stops firing without being deleted.' },
           { label: 'With escalation', value: String(withEscalation.length), about: 'Rules that forward to a second recipient if nobody acts within the configured hours.' },
           { label: 'Channels used', value: String(new Set(rules.map((r) => r.channel)).size), about: 'Distinct delivery channels (Email, SMS, In-App, Webhook) in use across all rules.' },
         ]}
@@ -116,6 +121,20 @@ export function Notifications() {
           </button>
         }
       />
+      )}
+      {embedded && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={openNew}
+            disabled={!canEdit}
+            title={canEdit ? undefined : 'Only an Administrator can configure notification rules'}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            New rule
+          </button>
+        </div>
+      )}
 
       {!isLoading && rules.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">

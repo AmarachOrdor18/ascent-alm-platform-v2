@@ -108,7 +108,7 @@ export interface NiiResult {
 
 // `ΔNII = repricing gap within the horizon × shock`, the standard gap approximation: it assumes every
 // repricing instrument reprices fully and immediately. Rate caps, floors and deposit betas are not applied
-// here — `applyDepositBetas` in `behavioural.ts` adjusts the liability side where a beta rule is configured.
+// here - `applyDepositBetas` in `behavioural.ts` adjusts the liability side where a beta rule is configured.
 export function computeNiiSensitivity(
   positions: Position[],
   ctx: IrrbbContext,
@@ -171,7 +171,7 @@ export interface EveResult {
   equity: number;
   durationGap: number | null;
   deltaEve: number | null;
-  /** ΔEVE for a 1bp parallel move — the standard PV01 sensitivity figure, independent of `shockBps`. */
+  /** ΔEVE for a 1bp parallel move - the standard PV01 sensitivity figure, independent of `shockBps`. */
   pv01: number | null;
   eveSensitivityPercentOfEquity: number | null;
   eveSensitivityPercentOfTier1: number | null;
@@ -202,7 +202,7 @@ function weightedDuration(positions: Position[], ctx: IrrbbContext): number | nu
 }
 
 // ΔEVE by the duration-gap method: `DGap = D_assets − (L / A) × D_liabilities`, `ΔEVE = −DGap × A × Δr`.
-// A genuine approximation — assumes a parallel shift and linear price sensitivity, ignoring convexity and
+// A genuine approximation - assumes a parallel shift and linear price sensitivity, ignoring convexity and
 // optionality.
 export function computeEveSensitivity(positions: Position[], ctx: IrrbbContext, shockBps: number): EveResult {
   const assets = positions.filter((p) => p.category === 'Asset');
@@ -245,15 +245,37 @@ export function computeEveSensitivity(positions: Position[], ctx: IrrbbContext, 
     currency: ctx.reportingCurrency,
     methodology:
       'ΔEVE by duration gap: DGap = D(assets) − (L/A) × D(liabilities); ΔEVE = −DGap × A × Δr. Assumes a ' +
-      'parallel shift and linear price sensitivity — convexity and optionality are not modelled, and full ' +
+      'parallel shift and linear price sensitivity - convexity and optionality are not modelled, and full ' +
       'cash-flow discounting under each BCBS curve requires contract-level cash flows which are out of scope. ' +
       `The supervisory outlier test compares |ΔEVE| against 15% of ${capitalBasis.toLowerCase()}.`,
   };
 }
 
-/** Run every standardised shock, reporting the worst case — what the outlier test is judged on. */
-export function computeAllShocks(positions: Position[], ctx: IrrbbContext, ladder: TimeBucketLadder) {
-  const shocks = standardShocks(ladder);
+/** A user-defined shock curve alongside the six standard ones - e.g. a saved ForecastScenarioRule. */
+export interface CustomShock {
+  id: string;
+  label: string;
+  shockByBucket: ShockByBucket;
+}
+
+/**
+ * Run every standardised shock plus any supplied custom scenarios, reporting the worst case - what
+ * the outlier test is judged on. The six standard shocks are the BCBS-prescribed set; `custom` is
+ * where an institution's own scenario (a saved ForecastScenarioRule) joins the same comparison.
+ */
+export function computeAllShocks(
+  positions: Position[],
+  ctx: IrrbbContext,
+  ladder: TimeBucketLadder,
+  custom: CustomShock[] = [],
+) {
+  const shocks: Record<string, ShockByBucket> = { ...standardShocks(ladder) };
+  const labels: Record<string, string> = { ...SHOCK_LABELS };
+  for (const c of custom) {
+    shocks[c.id] = c.shockByBucket;
+    labels[c.id] = c.label;
+  }
+
   const results: Record<string, { nii: NiiResult; eve: EveResult; label: string }> = {};
 
   for (const [name, curve] of Object.entries(shocks)) {
@@ -264,7 +286,7 @@ export function computeAllShocks(positions: Position[], ctx: IrrbbContext, ladde
     const shortBps = values[0] ?? 0;
     const averageBps = values.reduce((s, v) => s + v, 0) / (values.length || 1);
     results[name] = {
-      label: SHOCK_LABELS[name] ?? name,
+      label: labels[name] ?? name,
       nii: computeNiiSensitivity(positions, ctx, shortBps),
       eve: computeEveSensitivity(positions, ctx, averageBps),
     };

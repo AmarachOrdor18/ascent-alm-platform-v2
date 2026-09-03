@@ -1,7 +1,7 @@
 // This platform is ledger-grain, so transfer pricing implements the non-cash-flow method family (spread/rate
 // based), not methods requiring contract-level origination and maturity data.
 
-import type { CurrencyCode, Position } from './types';
+import type { CurrencyCode, Position, StoredYieldCurve } from './types';
 
 export type TpMethod = 'SpreadFromInterestRateCode' | 'SpreadFromNoteRate' | 'RedemptionCurve' | 'MovingAverage';
 
@@ -15,6 +15,27 @@ export interface YieldCurve {
   indexCode: string;
   points: CurvePoint[];
   asOfDate: string;
+}
+
+/**
+ * A currency/index can carry several dated curves on file (a series, like an FX rate or a Position
+ * batch), so resolving "the" curve for a calculation means picking the most recent one struck on or
+ * before `asOfDate` - a curve published later did not exist yet, and an older one has since been
+ * superseded. Every consumer that reads StoredYieldCurve directly (rather than through
+ * runHooks.ts's already-deduped RunInputs) should resolve through this rather than `.find()`, which
+ * only returns whichever happens to be first in array order.
+ */
+export function latestCurveAsOf(
+  curves: StoredYieldCurve[],
+  asOfDate: string,
+  predicate: (c: StoredYieldCurve) => boolean,
+): StoredYieldCurve | null {
+  let best: StoredYieldCurve | null = null;
+  for (const c of curves) {
+    if (!c.isActive || c.asOfDate > asOfDate || !predicate(c)) continue;
+    if (!best || c.asOfDate > best.asOfDate) best = c;
+  }
+  return best;
 }
 
 /** Linear interpolation between the bracketing points; flat beyond either end. */
@@ -39,7 +60,7 @@ export function interpolateCurve(curve: YieldCurve, tenorDays: number): number |
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Adjustment rules — the add-on stack
+// Adjustment rules - the add-on stack
 // ─────────────────────────────────────────────────────────────────────────
 
 export type AdjustmentType = 'LiquidityPremium' | 'BasisRiskCost' | 'PricingIncentive' | 'OtherAdjustment';

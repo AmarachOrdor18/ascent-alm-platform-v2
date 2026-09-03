@@ -49,7 +49,7 @@ function position(id: string, overrides: Partial<Position> = {}): Position {
     branchCode: 'HQ001',
     category: 'Asset',
     productCode: 'P-LOAN',
-    productClass: 'Loans — Corporate',
+    productClass: 'Loans - Corporate',
     currency: 'NGN',
     amount: 1_000_000,
     legalEntityCode: 'LE-NG',
@@ -154,7 +154,7 @@ function run(id: string, overrides: Partial<ProcessRun> = {}): ProcessRun {
 }
 
 describe('position queries', () => {
-  it('scopes by affiliate — the D-01 regression guard', async () => {
+  it('scopes by affiliate - the D-01 regression guard', async () => {
     await repo.insertPositions([
       position('NG-1', { affiliateCode: 'NG' }),
       position('GH-1', { affiliateCode: 'GH', currency: 'GHS' }),
@@ -165,7 +165,7 @@ describe('position queries', () => {
     expect(ng).toHaveLength(1);
     expect(ng[0]!.id).toBe('NG-1');
 
-    // Unscoped is still possible — but it is an explicit choice, not a default.
+    // Unscoped is still possible - but it is an explicit choice, not a default.
     expect(await repo.queryPositions({})).toHaveLength(3);
   });
 
@@ -248,6 +248,45 @@ describe('rules', () => {
   });
 });
 
+describe('rule version history', () => {
+  it('archives the prior content on every edit, keyed by its own version', async () => {
+    await repo.upsertRule(rule('TB-1', { version: 1, name: 'First cut' }));
+    await repo.upsertRule(rule('TB-1', { version: 2, name: 'Revised' }));
+    await repo.upsertRule(rule('TB-1', { version: 3, name: 'Latest' }));
+
+    const history = await repo.listRuleVersions('TB-1');
+    expect(history.map((h) => h.version)).toEqual([1, 2]);
+    expect(history.map((h) => h.snapshot.name)).toEqual(['First cut', 'Revised']);
+
+    // The live row itself always reflects the newest edit.
+    expect((await repo.getRule('TB-1'))?.name).toBe('Latest');
+  });
+
+  it('recovers an archived version by id + version, even after later edits', async () => {
+    await repo.upsertRule(rule('TB-1', { version: 1, name: 'First cut' }));
+    await repo.upsertRule(rule('TB-1', { version: 2, name: 'Revised' }));
+    await repo.upsertRule(rule('TB-1', { version: 3, name: 'Latest' }));
+
+    expect((await repo.getRuleVersion('TB-1', 1))?.name).toBe('First cut');
+    expect((await repo.getRuleVersion('TB-1', 2))?.name).toBe('Revised');
+  });
+
+  it('resolves the current version even when nothing was ever archived over it', async () => {
+    await repo.upsertRule(rule('TB-1', { version: 1, name: 'Only cut' }));
+    expect((await repo.getRuleVersion('TB-1', 1))?.name).toBe('Only cut');
+  });
+
+  it('returns null for a version that was never recorded', async () => {
+    await repo.upsertRule(rule('TB-1', { version: 1 }));
+    expect(await repo.getRuleVersion('TB-1', 99)).toBeNull();
+  });
+
+  it('does not archive anything on a brand-new rule’s first save', async () => {
+    await repo.upsertRule(rule('TB-NEW', { version: 1 }));
+    expect(await repo.listRuleVersions('TB-NEW')).toEqual([]);
+  });
+});
+
 describe('affiliates and users', () => {
   it('round-trips an affiliate', async () => {
     await repo.upsertAffiliate(affiliate('NG'));
@@ -297,6 +336,9 @@ describe('staged batches', () => {
       committedAt: null,
       reconciledBy: null,
       reconciledAt: null,
+      rejectedBy: null,
+      rejectedAt: null,
+      rejectedReason: null,
     };
     return {
       id,
@@ -371,7 +413,7 @@ describe('dimension members are affiliate-owned', () => {
     expect(gh).toHaveLength(1);
     expect(gh[0]?.name).toBe('Something entirely different (Ghana)');
 
-    // Unscoped (no affiliateCode) is the maintenance-utility escape hatch — it sees both.
+    // Unscoped (no affiliateCode) is the maintenance-utility escape hatch - it sees both.
     expect(await repo.listDimensionMembers('GlAccount')).toHaveLength(2);
   });
 
@@ -399,6 +441,7 @@ describe('reset', () => {
         fileName: 'f.csv', fileHash: 'h', rowCount: 1, rowsAccepted: 1, rowsRejected: 0, status: 'Staged',
         supersedesBatchId: null, supersededReason: null, uploadedBy: 't', uploadedAt: '2026-08-01T00:00:00Z',
         committedBy: null, committedAt: null, reconciledBy: null, reconciledAt: null,
+        rejectedBy: null, rejectedAt: null, rejectedReason: null,
       },
       positions: [position('P-2')],
       savedAt: '2026-08-01T00:00:00Z',

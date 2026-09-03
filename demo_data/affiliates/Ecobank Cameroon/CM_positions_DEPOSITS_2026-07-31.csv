@@ -1,0 +1,14 @@
+id,accountNumber,accountClass,branchCode,category,productClass,currency,amount,legalEntityCode,orgUnitCode,glAccountCode,commonCoaCode,notes,behaviouralTag,maturityDate,rateType,interestRatePct,monthlyCredit,monthlyDebit
+CM-DP-001,40010200001,Customer,HQ001,Liability,Current,XAF,220645,LE-CM,OU-CM-RTL,400102,,,Core,,Fixed,5.06,286838,269628
+CM-DP-002,40010500001,Customer,HQ001,Liability,Current - Corporate,XAF,164746,LE-CM,OU-CM-CIB,400105,,,Operational,,Fixed,3.46,313017,294236
+CM-DP-003,40010100001,Customer,HQ001,Liability,Savings,XAF,170633,LE-CM,OU-CM-RTL,400101,,,Core,,Fixed,2.74,71666,67366
+CM-DP-004,40010300001,Customer,HQ001,Liability,Fixed,XAF,125220,LE-CM,OU-CM-RTL,400103,,,N/A,2027-01-31,Fixed,9.3,5009,4708
+CM-DP-005,40010600001,Customer,HQ001,Liability,Fixed - Corporate,XAF,38406,LE-CM,OU-CM-CIB,400106,,,N/A,2026-11-30,Fixed,4.57,2304,2074
+CM-DP-006,40010600002,Customer,HQ001,Liability,Fixed - Corporate,XAF,33605,LE-CM,OU-CM-CIB,400106,,,N/A,2026-11-30,Fixed,8.0,2016,1815
+CM-DP-007,40010600003,Customer,HQ001,Liability,Fixed - Corporate,XAF,30404,LE-CM,OU-CM-CIB,400106,,,N/A,2026-11-30,Fixed,4.17,1824,1642
+CM-DP-008,40010600004,Customer,HQ001,Liability,Fixed - Corporate,XAF,22403,LE-CM,OU-CM-CIB,400106,,,N/A,2026-11-30,Fixed,15.65,1344,1210
+CM-DP-009,40010600005,Customer,HQ001,Liability,Fixed - Corporate,XAF,19203,LE-CM,OU-CM-CIB,400106,,,N/A,2026-11-30,Fixed,6.31,1152,1037
+CM-DP-010,40010600006,Customer,HQ001,Liability,Fixed - Corporate,XAF,16002,LE-CM,OU-CM-CIB,400106,,,N/A,2026-11-30,Fixed,14.52,960,864
+CM-DP-011,40010400001,Customer,HQ001,Liability,Target,XAF,47234,LE-CM,OU-CM-RTL,400104,,,N/A,2027-06-30,Fixed,5.54,10391,9768
+CM-DP-012,40010700001,Customer,HQ001,Liability,Domiciliary Deposits,XAF,66182,LE-CM,OU-CM-CIB,400107,,,Operational,,Fixed,1.31,56254,52879
+CM-DP-013,40040200001,Suspense,HQ001,Liability,Managers Cheques Payable,XAF,4925,LE-CM,OU-CM-RTL,400402,,"Suspense — excluded from customer deposits despite the product name",N/A,,N/A,,0,0

@@ -1,35 +1,23 @@
 // Seeds the local database on first run; idempotent, so a page refresh never discards user data.
 
 import type { Repository } from '@/store/repository';
-import type { LoadBatch, Role, User } from '@/engine/types';
+import type { DataDomain, Role, User } from '@/engine/types';
 import { ROLES } from '@/context/AuthContext';
-import {
-  AFFILIATE_CURRENCIES,
-  AFFILIATE_FX_RATES,
-  ALL_AFFILIATE_REFERENCE,
-} from './affiliateReference';
 import { SEED_CONNECTORS } from './connectors';
 import { SEED_LIMITS } from './limits';
-import { NIGERIA_AS_OF, NIGERIA_BATCH_ID, NIGERIA_POSITIONS } from './nigeria';
-import { GHANA_AS_OF, GHANA_BATCH_ID, GHANA_POSITIONS } from './ghana';
-import { COTEIVOIRE_AS_OF, COTEIVOIRE_BATCH_ID, COTEIVOIRE_POSITIONS } from './cotedivoire';
-import {
-  AFFILIATES,
-  ALL_DIMENSION_MEMBERS,
-  CURRENCIES,
-  ECONOMIC_INDICATORS,
-  FX_RATES,
-  HOLIDAY_CALENDARS,
-  YIELD_CURVES,
-} from './reference';
-import { SEED_DEFAULT_RULES } from './defaultRules';
+import { AFFILIATES, ALL_DIMENSION_MEMBERS, CURRENCIES } from './reference';
+import { SEED_DEFAULT_RULES, SEED_FORECAST_SCENARIO_APPROVAL } from './defaultRules';
+import { referenceLoadBatch } from '@/lib/referenceBatch';
 
-/** The permission sets a fresh database starts with — editable afterward via Users & Roles. */
+/** The permission sets a fresh database starts with - editable afterward via Users & Roles. */
 const SEED_ROLES: Role[] = Object.values(ROLES);
 
-// SHA-256 of 'Ecobank@2026' — every seed/demo account shares this password (see src/lib/passwordHash.ts).
+// SHA-256 of 'Ecobank@2026' - every seed/demo account shares this password (see src/lib/passwordHash.ts).
 const SEED_PASSWORD_HASH = '9a3931b8a44194a83d4ca4ebb8275eb4f3566694e43f600f2befc3831fc4c05c';
 
+// Every seed login is Group-scoped, since no affiliate ships pre-onboarded for one to be confined to -
+// AFFILIATE_ADMIN is the exception: it's meaningless without a specific affiliate, so it isn't seeded at
+// all until a real one exists to assign it to.
 const SEED_USERS: User[] = [
   {
     id: 'U-001',
@@ -49,7 +37,7 @@ const SEED_USERS: User[] = [
     email: 'chinwe.okafor@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
     role: 'RISK_ANALYST',
-    affiliateCode: 'NG',
+    affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
     createdAt: '2026-01-01T00:00:00Z',
@@ -61,7 +49,7 @@ const SEED_USERS: User[] = [
     email: 'aminata.traore@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
     role: 'TREASURY_USER',
-    affiliateCode: 'CI',
+    affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
     createdAt: '2026-01-01T00:00:00Z',
@@ -85,7 +73,7 @@ const SEED_USERS: User[] = [
     email: 'fatima.bello@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
     role: 'CONTROL_TESTER',
-    affiliateCode: 'NG',
+    affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
     createdAt: '2026-01-01T00:00:00Z',
@@ -97,31 +85,22 @@ const SEED_USERS: User[] = [
     email: 'samuel.owusu@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
     role: 'REPORTING_USER',
-    affiliateCode: 'GH',
+    affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
     createdAt: '2026-01-01T00:00:00Z',
     lastLoginAt: null,
   },
+  // Second Group Administrator - segregation of duties means the person who onboards an affiliate
+  // (raises its Testing → Live activation) can never also be the one who approves it, even as Admin.
+  // Without a second ADMIN, that request would have nobody left who could decide it.
   {
     id: 'U-007',
-    name: 'Ifeoma Nwachukwu',
-    email: 'ifeoma.nwachukwu@ecobank.com',
+    name: 'David Adeyemi',
+    email: 'david.adeyemi@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
-    role: 'AFFILIATE_ADMIN',
-    affiliateCode: 'NG',
-    isActive: true,
-    mfaEnrolled: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    lastLoginAt: null,
-  },
-  {
-    id: 'U-008',
-    name: 'Tunde Adeyemi',
-    email: 'tunde.adeyemi@ecobank.com',
-    passwordHash: SEED_PASSWORD_HASH,
-    role: 'TREASURY_USER',
-    affiliateCode: 'NG',
+    role: 'ADMIN',
+    affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
     createdAt: '2026-01-01T00:00:00Z',
@@ -129,144 +108,36 @@ const SEED_USERS: User[] = [
   },
 ];
 
-const NIGERIA_BATCH: LoadBatch = {
-  id: NIGERIA_BATCH_ID,
-  affiliateCode: 'NG',
-  domain: 'Positions',
-  contributor: null,
-  asOfDate: NIGERIA_AS_OF,
-  version: 1,
-  fileName: 'ecobank_nigeria_positions_2026-07.csv',
-  fileHash: 'seed-nigeria-v1',
-  rowCount: NIGERIA_POSITIONS.length,
-  rowsAccepted: NIGERIA_POSITIONS.length,
-  rowsRejected: 0,
-  status: 'Committed',
-  supersedesBatchId: null,
-  supersededReason: null,
-  uploadedBy: 'system-seed',
-  uploadedAt: `${NIGERIA_AS_OF}T09:00:00Z`,
-  committedBy: 'system-seed',
-  committedAt: `${NIGERIA_AS_OF}T09:05:00Z`,
-  reconciledBy: null,
-  reconciledAt: null,
-};
+// Country-specific org units, legal entities, counterparties, GL accounts and product catalogues
+// (dimensions.ts, products.ts, affiliateReference.ts) are demo/engine-test fixtures, not written into a
+// fresh platform's database - only the Group-owned members (the consolidation root, the Group chart of
+// accounts, financial elements) ship, since there's no affiliate yet for the rest to belong to.
+const GROUP_DIMENSION_MEMBERS = ALL_DIMENSION_MEMBERS.filter((m) => m.affiliateCode === 'GROUP');
 
-const GHANA_BATCH: LoadBatch = {
-  id: GHANA_BATCH_ID,
-  affiliateCode: 'GH',
-  domain: 'Positions',
-  contributor: null,
-  asOfDate: GHANA_AS_OF,
-  version: 1,
-  fileName: 'ecobank_ghana_positions_2026-07.csv',
-  fileHash: 'seed-ghana-v1',
-  rowCount: GHANA_POSITIONS.length,
-  rowsAccepted: GHANA_POSITIONS.length,
-  rowsRejected: 0,
-  status: 'Committed',
-  supersedesBatchId: null,
-  supersededReason: null,
-  uploadedBy: 'system-seed',
-  uploadedAt: `${GHANA_AS_OF}T09:00:00Z`,
-  committedBy: 'system-seed',
-  committedAt: `${GHANA_AS_OF}T09:05:00Z`,
-  reconciledBy: null,
-  reconciledAt: null,
-};
-
-const COTEIVOIRE_BATCH: LoadBatch = {
-  id: COTEIVOIRE_BATCH_ID,
-  affiliateCode: 'CI',
-  domain: 'Positions',
-  contributor: null,
-  asOfDate: COTEIVOIRE_AS_OF,
-  version: 1,
-  fileName: 'ecobank_cotedivoire_positions_2026-07.csv',
-  fileHash: 'seed-cotedivoire-v1',
-  rowCount: COTEIVOIRE_POSITIONS.length,
-  rowsAccepted: COTEIVOIRE_POSITIONS.length,
-  rowsRejected: 0,
-  status: 'Committed',
-  supersedesBatchId: null,
-  supersededReason: null,
-  uploadedBy: 'system-seed',
-  uploadedAt: `${COTEIVOIRE_AS_OF}T09:00:00Z`,
-  committedBy: 'system-seed',
-  committedAt: `${COTEIVOIRE_AS_OF}T09:05:00Z`,
-  reconciledBy: null,
-  reconciledAt: null,
-};
-
-// Zero-row LoadBatch records for domains (GeneralLedger, MarketRates, etc.) whose data lives in its own
-// table rather than `positions` — without these, every affiliate would show "Never loaded" on those domains.
-function referenceDomainBatch(
-  affiliateCode: string,
-  domain: LoadBatch['domain'],
-  asOfDate: string,
-  owner: string,
-): LoadBatch {
-  return {
-    id: `B-${affiliateCode}-${domain}-SEED`,
-    affiliateCode,
-    domain,
-    contributor: null,
-    asOfDate,
-    version: 1,
-    fileName: `system — ${domain} reference feed`,
-    fileHash: `seed-${affiliateCode}-${domain}`,
-    rowCount: 0,
-    rowsAccepted: 0,
-    rowsRejected: 0,
-    status: 'Committed',
-    supersedesBatchId: null,
-    supersededReason: null,
-    uploadedBy: owner,
-    uploadedAt: `${asOfDate}T06:00:00Z`,
-    committedBy: owner,
-    committedAt: `${asOfDate}T06:00:00Z`,
-    reconciledBy: null,
-    reconciledAt: null,
-  };
-}
-
-const REFERENCE_DOMAIN_BATCHES: LoadBatch[] = [
-  ['NG', NIGERIA_AS_OF],
-  ['GH', GHANA_AS_OF],
-  ['CI', COTEIVOIRE_AS_OF],
-].flatMap(([code, asOf]) =>
-  (['GeneralLedger', 'MarketRates', 'FxRates', 'Counterparties', 'EconomicIndicators'] as const).map((domain) =>
-    referenceDomainBatch(code!, domain, asOf!, 'system-seed'),
-  ),
-);
-
+// Currency *definitions* ship (so onboarding's functional-currency dropdown has something to pick from),
+// but FX rates, yield curves, holiday calendars and economic indicator series do not - those are what an
+// affiliate's own Treasury/Risk team sets up after onboarding, not pre-populated market data. USD carries
+// no rate row of its own; buildFxTable() treats the reporting/pivot currency as an implicit 1:1 identity.
+//
+// CURRENCIES is deliberately the small, curated list - not affiliateReference.ts's AFFILIATE_CURRENCIES,
+// which covers all ~30 countries in Ecobank's full footprint regardless of whether anyone has actually
+// onboarded them. That's the same "full-footprint filler" the rest of this file avoids (see
+// ALL_AFFILIATE_REFERENCE, never imported here). Onboarding a country whose currency isn't listed yet
+// registers it from Reference Data - Currency & FX Rates' own "New currency" control, the same manual
+// step Kenya's rate already demonstrates.
 async function writeSeed(repo: Repository): Promise<void> {
   for (const affiliate of AFFILIATES) await repo.upsertAffiliate(affiliate);
-  await repo.upsertDimensionMembers(ALL_DIMENSION_MEMBERS);
-  // All 33 affiliates' org units, legal entities and the counterparty register.
-  await repo.upsertDimensionMembers(ALL_AFFILIATE_REFERENCE);
+  await repo.upsertDimensionMembers(GROUP_DIMENSION_MEMBERS);
   for (const currency of CURRENCIES) await repo.upsertCurrency(currency);
-  // Every affiliate's functional currency, so onboarding can select it.
-  for (const currency of AFFILIATE_CURRENCIES) await repo.upsertCurrency(currency);
-  for (const rate of FX_RATES) await repo.upsertFxRate(rate);
-  for (const rate of AFFILIATE_FX_RATES) await repo.upsertFxRate(rate);
-  for (const curve of YIELD_CURVES) await repo.upsertYieldCurve(curve);
-  for (const indicator of ECONOMIC_INDICATORS) await repo.upsertEconomicIndicator(indicator);
-  for (const calendar of HOLIDAY_CALENDARS) await repo.upsertHolidayCalendar(calendar);
   for (const role of SEED_ROLES) await repo.upsertRole(role);
   for (const user of SEED_USERS) await repo.upsertUser(user);
   for (const limit of SEED_LIMITS) await repo.upsertLimitConfig(limit);
   for (const connector of SEED_CONNECTORS) await repo.upsertConnector(connector);
   for (const rule of SEED_DEFAULT_RULES) await repo.upsertRule(rule);
-
-  await repo.upsertBatch(NIGERIA_BATCH);
-  await repo.insertPositions(NIGERIA_POSITIONS);
-  await repo.upsertBatch(GHANA_BATCH);
-  await repo.insertPositions(GHANA_POSITIONS);
-  await repo.upsertBatch(COTEIVOIRE_BATCH);
-  await repo.insertPositions(COTEIVOIRE_POSITIONS);
-
-  for (const batch of REFERENCE_DOMAIN_BATCHES) await repo.upsertBatch(batch);
+  // Without this, the seeded Forecast Scenario ships permanently stuck on "Pending approval" - no
+  // request was ever raised for it (it wasn't saved through WhatIf.tsx's own submit-on-save flow), so
+  // there is nothing in Approvals for anyone to actually decide. See its own comment in defaultRules.ts.
+  await repo.upsertApprovalRequest(SEED_FORECAST_SCENARIO_APPROVAL);
 }
 
 const DIMENSION_TYPES = [
@@ -274,26 +145,19 @@ const DIMENSION_TYPES = [
 ] as const;
 
 // Brings an existing database up to date with reference data a later build added. Add-only: a record
-// already present — including one a user has since edited — is left alone; only what's missing is inserted.
+// already present - including one a user has since edited - is left alone; only what's missing is inserted.
 async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingMemberIds = new Set(
     (await Promise.all(DIMENSION_TYPES.map((d) => repo.listDimensionMembers(d))))
       .flat()
       .map((m) => m.id),
   );
-  const missingMembers = [...ALL_DIMENSION_MEMBERS, ...ALL_AFFILIATE_REFERENCE].filter(
-    (m) => !existingMemberIds.has(m.id),
-  );
+  const missingMembers = GROUP_DIMENSION_MEMBERS.filter((m) => !existingMemberIds.has(m.id));
   if (missingMembers.length > 0) await repo.upsertDimensionMembers(missingMembers);
 
   const existingCurrencyCodes = new Set((await repo.listCurrencies()).map((c) => c.code));
-  for (const currency of [...CURRENCIES, ...AFFILIATE_CURRENCIES]) {
+  for (const currency of CURRENCIES) {
     if (!existingCurrencyCodes.has(currency.code)) await repo.upsertCurrency(currency);
-  }
-
-  const existingRateIds = new Set((await repo.listFxRates()).map((r) => r.id));
-  for (const rate of [...FX_RATES, ...AFFILIATE_FX_RATES]) {
-    if (!existingRateIds.has(rate.id)) await repo.upsertFxRate(rate);
   }
 
   const existingLimitIds = new Set((await repo.listLimitConfigs()).map((l) => l.id));
@@ -306,7 +170,7 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
     if (!existingConnectorIds.has(connector.id)) await repo.upsertConnector(connector);
   }
 
-  // Also patches (never overwrites other fields on) an existing seed user missing passwordHash —
+  // Also patches (never overwrites other fields on) an existing seed user missing passwordHash -
   // added after some databases were already seeded, so a plain "insert if missing" top-up would
   // leave those accounts permanently unable to log in.
   const existingUserById = new Map((await repo.listUsers()).map((u) => [u.id, u]));
@@ -319,13 +183,8 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
     }
   }
 
-  const existingBatchIds = new Set((await repo.listBatches()).map((b) => b.id));
-  for (const batch of REFERENCE_DOMAIN_BATCHES) {
-    if (!existingBatchIds.has(batch.id)) await repo.upsertBatch(batch);
-  }
-
   // Existing databases have zero rows in Roles (it used to be a hardcoded object), so this is a
-  // real top-up, not a defensive no-op — it's how a role like Affiliate Administrator reaches them.
+  // real top-up, not a defensive no-op - it's how a role like Affiliate Administrator reaches them.
   const existingRoleCodes = new Set((await repo.listRoles()).map((r) => r.code));
   for (const seedRole of SEED_ROLES) {
     if (!existingRoleCodes.has(seedRole.code)) await repo.upsertRole(seedRole);
@@ -334,6 +193,97 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingRuleIds = new Set((await repo.listRules({})).map((r) => r.id));
   for (const seedRule of SEED_DEFAULT_RULES) {
     if (!existingRuleIds.has(seedRule.id)) await repo.upsertRule(seedRule);
+  }
+
+  const existingApprovalIds = new Set((await repo.listApprovalRequests()).map((a) => a.id));
+  if (!existingApprovalIds.has(SEED_FORECAST_SCENARIO_APPROVAL.id)) {
+    await repo.upsertApprovalRequest(SEED_FORECAST_SCENARIO_APPROVAL);
+  }
+
+  await backfillReferenceLoadBatches(repo);
+}
+
+/**
+ * Retroactively closes a gap discovered after FX rates, yield curves, economic indicators and
+ * counterparties had already been saved directly into their own tables, before their screens were fixed
+ * to also record a LoadBatch on every save (see FxRates.tsx, YieldCurves.tsx, EconomicIndicators.tsx,
+ * Counterparties.tsx, DataLoadPanel.tsx's auto-create flow). Data Sources' freshness page only ever reads
+ * LoadBatch rows (checkFreshness, engine/vintage.ts), so a database that already had real data in these
+ * domains before that fix would otherwise read "Never loaded" forever, since fixing the save path only
+ * covers what's saved from here on, not what's already on file. GL trial balances are never backfilled:
+ * unlike the others, they're never persisted past the reconciliation session itself, so there is no
+ * historical ledger data left anywhere to reconstruct a batch from - only a genuine re-upload starts that
+ * domain's freshness tracking.
+ */
+async function backfillReferenceLoadBatches(repo: Repository): Promise<void> {
+  const existingBatches = await repo.listBatches();
+  const hasBatch = (domain: DataDomain, affiliateCode: string) =>
+    existingBatches.some((b) => b.domain === domain && b.affiliateCode === affiliateCode && b.status === 'Committed');
+  const today = new Date().toISOString().slice(0, 10);
+
+  const fxRates = await repo.listFxRates();
+  if (fxRates.length > 0 && !hasBatch('FxRates', 'GROUP')) {
+    const latest = fxRates.reduce((max, r) => (r.asOfDate > max ? r.asOfDate : max), fxRates[0]!.asOfDate);
+    await repo.upsertBatch(
+      referenceLoadBatch({
+        domain: 'FxRates',
+        affiliateCode: 'GROUP',
+        asOfDate: latest,
+        label: 'Backfilled from existing rates',
+        uploadedBy: 'system-backfill',
+        rowCount: fxRates.length,
+      }),
+    );
+  }
+
+  const curves = await repo.listYieldCurves();
+  if (curves.length > 0 && !hasBatch('MarketRates', 'GROUP')) {
+    const latest = curves.reduce((max, c) => (c.asOfDate > max ? c.asOfDate : max), curves[0]!.asOfDate);
+    await repo.upsertBatch(
+      referenceLoadBatch({
+        domain: 'MarketRates',
+        affiliateCode: 'GROUP',
+        asOfDate: latest,
+        label: 'Backfilled from existing curves',
+        uploadedBy: 'system-backfill',
+        rowCount: curves.length,
+      }),
+    );
+  }
+
+  const indicators = await repo.listEconomicIndicators();
+  if (indicators.length > 0 && !hasBatch('EconomicIndicators', 'GROUP')) {
+    const allObs = indicators.flatMap((i) => i.observations);
+    const latest = allObs.reduce((max, o) => (o.asOfDate > max ? o.asOfDate : max), allObs[0]?.asOfDate ?? today);
+    await repo.upsertBatch(
+      referenceLoadBatch({
+        domain: 'EconomicIndicators',
+        affiliateCode: 'GROUP',
+        asOfDate: latest,
+        label: 'Backfilled from existing series',
+        uploadedBy: 'system-backfill',
+        rowCount: indicators.length,
+      }),
+    );
+  }
+
+  // Counterparty registers carry no timestamp of their own on a member - "today" is the closest honest
+  // stand-in for when a batch would have been recorded, not a reconstruction of the true original date.
+  const affiliates = await repo.listAffiliates();
+  for (const affiliate of affiliates) {
+    if (hasBatch('Counterparties', affiliate.code)) continue;
+    const counterparties = await repo.listDimensionMembers('Counterparty', affiliate.code);
+    if (counterparties.length === 0) continue;
+    await repo.upsertBatch(
+      referenceLoadBatch({
+        domain: 'Counterparties',
+        affiliateCode: affiliate.code,
+        asOfDate: today,
+        label: 'Backfilled from existing register',
+        uploadedBy: 'system-backfill',
+        rowCount: counterparties.length,
+      }),
+    );
   }
 }
 

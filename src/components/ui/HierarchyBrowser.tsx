@@ -9,7 +9,7 @@ interface HierarchyBrowserProps {
   onChange: (codes: string[]) => void;
   /** Single-select for picking one node (a parent); multi for scoping. */
   mode?: 'single' | 'multi';
-  /** Restrict selection to leaves — assumptions attach to leaves, not rollups. */
+  /** Restrict selection to leaves - assumptions attach to leaves, not rollups. */
   leavesOnly?: boolean;
   label: string;
   emptyMessage?: string;
@@ -161,7 +161,7 @@ export function HierarchyBrowser({
       {mode === 'multi' && (
         <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2">
           <span className="text-[11px] text-gray-500">
-            {selected.size === 0 ? 'No constraint — all members included' : `${selected.size} selected`}
+            {selected.size === 0 ? 'No constraint - all members included' : `${selected.size} selected`}
           </span>
           {selected.size > 0 && (
             <button

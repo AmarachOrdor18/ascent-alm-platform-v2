@@ -2,7 +2,8 @@ import { useEffect, useMemo } from 'react';
 import { useScope } from '@/context/ScopeContext';
 import { useBatches } from './hooks';
 import { useRunResults, useRuns } from './runHooks';
-import type { CalculationElement, ProcessRun, RunResult } from '@/engine/types';
+import { isRunStale } from './runStaleness';
+import type { CalculationElement, LoadBatch, ProcessRun, RunResult } from '@/engine/types';
 
 export interface SelectedRun {
   /** The run being displayed, or null when none is available. */
@@ -16,6 +17,8 @@ export interface SelectedRun {
   isStale: boolean;
   /** Elements this run did not compute, so a screen can say why it is empty. */
   missing: (element: CalculationElement) => boolean;
+  /** The batches `run.positionBatchIds` actually pins - the lineage a results screen can point back to. */
+  sourceBatches: LoadBatch[];
 }
 
 export function useSelectedRun(): SelectedRun {
@@ -24,13 +27,18 @@ export function useSelectedRun(): SelectedRun {
   const { data: runs = [], isLoading } = useRuns(affiliateCode);
   const { data: batches = [] } = useBatches();
 
-  const available = useMemo(
-    () =>
-      runs
-        .filter((r) => r.status === 'Completed')
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [runs],
-  );
+  // One run per as-of date - re-running the same date (after a data correction, say) creates a new
+  // run rather than replacing the old one, and the old one is never deleted (results stay immutable
+  // and reproducible). Without this, the picker accumulates every superseded-data attempt at a date
+  // alongside the one that actually matters, rather than staying a picker across dates.
+  const available = useMemo(() => {
+    const completed = runs.filter((r) => r.status === 'Completed').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const latestByDate = new Map<string, ProcessRun>();
+    for (const r of completed) {
+      if (!latestByDate.has(r.asOfDate)) latestByDate.set(r.asOfDate, r);
+    }
+    return Array.from(latestByDate.values()).sort((a, b) => b.asOfDate.localeCompare(a.asOfDate));
+  }, [runs]);
 
   // Default to the most recent completed run; an explicit selection always wins.
   useEffect(() => {
@@ -49,10 +57,9 @@ export function useSelectedRun(): SelectedRun {
       if (next) setRun(next);
     },
     isLoading,
-    isStale: active
-      ? active.positionBatchIds.some((id) => batches.find((b) => b.id === id)?.status === 'Superseded')
-      : false,
+    isStale: isRunStale(active, batches),
     missing: (element) => (active ? !active.elements.includes(element) : true),
+    sourceBatches: active ? batches.filter((b) => active.positionBatchIds.includes(b.id)) : [],
   };
 }
 
@@ -64,6 +71,7 @@ export function frameProps(selected: SelectedRun) {
     onSelect: selected.select,
     isLoading: selected.isLoading,
     isStale: selected.isStale,
+    sourceBatches: selected.sourceBatches,
   };
 }
 

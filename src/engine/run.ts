@@ -57,7 +57,7 @@ export interface RunInputs {
   productMembers: DimensionMember[];
   /** Regulatory Tier 1 where known; null falls back to balance-sheet equity, and the result says so. */
   tier1Capital: number | null;
-  /** Per-product/currency HQLA, ASF/RSF and rate-sensitivity assumptions — see engine/classification.ts. Absent means every position's classification is taken as loaded, unchanged. */
+  /** Per-product/currency HQLA, ASF/RSF and rate-sensitivity assumptions - see engine/classification.ts. Absent means every position's classification is taken as loaded, unchanged. */
   productAssumptions?: ProductAssumption[];
   /** Total stressed outflow for the survival-horizon scenario. */
   stressedOutflow?: number;
@@ -102,7 +102,7 @@ export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): Run
     scoped = scoped.filter((p) => pinned.has(p.batchId));
   }
 
-  // Regulatory/behavioural classification is applied once, here, before any calculation reads a position —
+  // Regulatory/behavioural classification is applied once, here, before any calculation reads a position -
   // every element downstream (LCR, NSFR, IRRBB...) sees the ruled classification, never the raw uploaded one.
   if (inputs.productAssumptions?.length) {
     scoped = applyProductCharacteristics(scoped, inputs.productAssumptions);
@@ -225,7 +225,7 @@ export function executeRun(run: ProcessRun, inputs: RunInputs, now: string): Run
 
   record('SurvivalHorizon', () => {
     const capacity = computeCounterbalancingCapacity(scoped, stressCtx);
-    // Default the stressed outflow to total 30-day gross outflows doubled —
+    // Default the stressed outflow to total 30-day gross outflows doubled -
     // a severe but derived assumption, stated in the methodology rather than
     // hidden as a magic number.
     const grossOutflows = computeLcr(scoped, liquidityCtx).grossOutflows;
@@ -362,6 +362,7 @@ export function draftRun(params: {
     transactionStrategyId: null,
     ftpRuleId: null,
     adjustmentRuleId: null,
+    ruleVersionsUsed: {},
     elements: params.elements ?? ALL_ELEMENTS,
     positionBatchIds: params.batchIds,
     status: 'Draft',

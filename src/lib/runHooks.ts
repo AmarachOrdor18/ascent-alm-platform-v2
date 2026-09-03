@@ -39,8 +39,8 @@ export function useRunResults(runId: string | null) {
 // Rules are read at execution time so the run records the versions it
 // actually used, not whatever is current when the result is later opened.
 // Exported so callers that need to run the engine outside the ordinary
-// Process Run screen — the snapshot workbench's Original vs Snapshot
-// comparison — assemble inputs identically rather than duplicating this.
+// Process Run screen - the snapshot workbench's Original vs Snapshot
+// comparison - assemble inputs identically rather than duplicating this.
 export async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   const [positions, fxRates, orgUnitMembers, productMembers, storedCurves] = await Promise.all([
     repository.queryPositions({}),
@@ -77,16 +77,24 @@ export async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   const repricingLadder =
     bucketRule?.ladders.find((l) => l.kind === 'RepricingGap') ?? defaultLadder('RepricingGap');
 
-  // Only curves as at or before the run date — a curve published later did
-  // not exist when these balances were struck.
-  const yieldCurves: YieldCurve[] = storedCurves
-    .filter((c) => c.isActive && c.asOfDate <= run.asOfDate)
-    .map((c) => ({
-      currency: c.currency,
-      indexCode: c.code,
-      points: c.terms.map((t) => ({ tenorDays: t.tenorDays, ratePercent: t.ratePercent })),
-      asOfDate: c.asOfDate,
-    }));
+  // A currency/index can carry several dated curves on file, same as an FX rate - only the most recent
+  // one struck on or before the run date applies; a curve published later did not exist when these
+  // balances were struck, and an older one has since been superseded. ftp.ts's own curve lookup
+  // (curves.find) takes the first match per currency/indexCode, so this dedupe is what makes that
+  // unambiguous rather than dependent on array order.
+  const latestCurveByKey = new Map<string, (typeof storedCurves)[number]>();
+  for (const c of storedCurves) {
+    if (!c.isActive || c.asOfDate > run.asOfDate) continue;
+    const key = `${c.currency}|${c.code}`;
+    const current = latestCurveByKey.get(key);
+    if (!current || c.asOfDate > current.asOfDate) latestCurveByKey.set(key, c);
+  }
+  const yieldCurves: YieldCurve[] = Array.from(latestCurveByKey.values()).map((c) => ({
+    currency: c.currency,
+    indexCode: c.code,
+    points: c.terms.map((t) => ({ tenorDays: t.tenorDays, ratePercent: t.ratePercent })),
+    asOfDate: c.asOfDate,
+  }));
 
   return {
     positions,
@@ -105,6 +113,32 @@ export async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   };
 }
 
+// The rule id alone only resolves to whatever that row holds *now* - if it's edited after this run,
+// the id can no longer tell you what it held when this run actually executed. Recording the version
+// each referenced rule had at this moment is what lets a later edit be recovered from, via
+// getRuleVersion against the history upsertRule archives on every edit.
+async function collectRuleVersionsUsed(run: ProcessRun): Promise<Record<string, number>> {
+  const ids = [
+    run.timeBucketRuleId,
+    run.productCharacteristicRuleId,
+    run.behaviourPatternRuleId,
+    run.newBusinessRuleId,
+    run.transactionStrategyId,
+    run.ftpRuleId,
+    run.adjustmentRuleId,
+    ...run.forecastScenarioIds,
+  ].filter((id): id is string => !!id);
+
+  const versions: Record<string, number> = {};
+  await Promise.all(
+    ids.map(async (id) => {
+      const rule = await repository.getRule(id);
+      if (rule) versions[id] = rule.version;
+    }),
+  );
+  return versions;
+}
+
 export function useExecuteRun() {
   const client = useQueryClient();
   const { user } = useAuth();
@@ -114,8 +148,8 @@ export function useExecuteRun() {
       const queued: ProcessRun = { ...run, status: 'Running' };
       await repository.upsertRun(queued);
 
-      const inputs = await assembleInputs(run);
-      const outcome = executeRun(queued, inputs, new Date().toISOString());
+      const [inputs, ruleVersionsUsed] = await Promise.all([assembleInputs(run), collectRuleVersionsUsed(run)]);
+      const outcome = executeRun({ ...queued, ruleVersionsUsed }, inputs, new Date().toISOString());
 
       await repository.upsertRun(outcome.run);
       if (outcome.results.length > 0) await repository.insertRunResults(outcome.results);
@@ -167,7 +201,7 @@ export function methodologyOf(results: RunResult[], element: string): string | n
   return results.find((r) => r.element === element)?.methodology ?? null;
 }
 
-/** Headline figures pulled from a result set — shared by Run History's A/B compare and the snapshot workbench's Original vs Snapshot compare. */
+/** Headline figures pulled from a result set - shared by Run History's A/B compare and the snapshot workbench's Original vs Snapshot compare. */
 export interface RunHeadline {
   label: string;
   value: number | null;

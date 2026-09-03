@@ -1,10 +1,12 @@
 /**
  * Seed integrity.
  *
- * These are the checks that catch a broken demo before a demo does: every
- * position resolves to a real dimension member, every affiliate currency is
- * convertible, and the three lifecycle states the demo depends on are
- * actually present.
+ * A fresh platform ships only the Group entity - no pre-populated country
+ * affiliates, no fake position books, no login confined to one. Real
+ * affiliates come from the Onboarding wizard, not the seed. These checks
+ * confirm that stays true, and that the Nigeria fixture data still used by
+ * the engine's own tests (nigeria.ts) is internally consistent even though
+ * it's no longer written into the seeded database.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -35,59 +37,77 @@ beforeEach(async () => {
 });
 
 describe('bootstrap', () => {
-  it('seeds an empty database', async () => {
+  it('seeds an empty database with only the Group entity, no fake business data', async () => {
     expect(await ensureSeeded(repo)).toBe(true);
-    expect(await repo.listAffiliates()).toHaveLength(AFFILIATES.length);
-    expect(await repo.queryPositions({ affiliateCode: 'NG' })).toHaveLength(NIGERIA_POSITIONS.length);
+    const affiliates = await repo.listAffiliates();
+    expect(affiliates).toHaveLength(AFFILIATES.length);
+    expect(affiliates.map((a) => a.code)).toEqual(['GROUP']);
+    expect(await repo.queryPositions({})).toHaveLength(0);
+    expect(await repo.listBatches()).toHaveLength(0);
   });
 
-  it('is idempotent — a refresh never discards work', async () => {
+  it('is idempotent - a refresh never discards work', async () => {
     await ensureSeeded(repo);
-    await repo.upsertYieldCurve({ ...YIELD_CURVES[0]!, name: 'Edited by the user' });
+    const group = (await repo.getAffiliate('GROUP'))!;
+    await repo.upsertAffiliate({ ...group, name: 'Edited by the user' });
 
     expect(await ensureSeeded(repo)).toBe(false);
-    const curve = await repo.getYieldCurve(YIELD_CURVES[0]!.id);
-    expect(curve!.name).toBe('Edited by the user');
+    const after = (await repo.getAffiliate('GROUP'))!;
+    expect(after.name).toBe('Edited by the user');
   });
 
   it('reseed discards edits and restores the shipped state', async () => {
     await ensureSeeded(repo);
-    await repo.upsertYieldCurve({ ...YIELD_CURVES[0]!, name: 'Edited' });
+    const group = (await repo.getAffiliate('GROUP'))!;
+    const shippedName = group.name;
+    await repo.upsertAffiliate({ ...group, name: 'Edited' });
     await reseed(repo);
-    const curve = await repo.getYieldCurve(YIELD_CURVES[0]!.id);
-    expect(curve!.name).toBe(YIELD_CURVES[0]!.name);
+    const after = (await repo.getAffiliate('GROUP'))!;
+    expect(after.name).toBe(shippedName);
   });
 });
 
-describe('demo narrative depends on three lifecycle states', () => {
-  it('ships one Live affiliate, one mid-onboarding and one not started', async () => {
+describe('no affiliate ships pre-onboarded', () => {
+  it('has nothing for a restricted seed login to be confined to', async () => {
+    await ensureSeeded(repo);
+    const users = await repo.listUsers();
+    // Every seed login is Group-scoped - none references an affiliate that doesn't exist.
+    for (const u of users) expect(u.affiliateCode).toBe('GROUP');
+  });
+
+  it('starts every domain feed unconfigured, since there is no affiliate to configure one for', async () => {
     await ensureSeeded(repo);
     const affiliates = await repo.listAffiliates();
-
-    const ng = affiliates.find((a) => a.code === 'NG')!;
-    const gh = affiliates.find((a) => a.code === 'GH')!;
-    const ci = affiliates.find((a) => a.code === 'CI')!;
-
-    expect(ng.status).toBe('Live');
-    expect(gh.status).toBe('Onboarding');
-    expect(ci.status).toBe('Onboarding');
-
-    // Ghana has connectors configured but no data; Côte d'Ivoire has nothing.
-    expect(gh.feeds.length).toBeGreaterThan(0);
-    expect(ci.feeds).toHaveLength(0);
+    for (const a of affiliates) expect(a.feeds).toHaveLength(0);
   });
 
-  it('declares Ghana file-fed for positions, since its Flexcube is unreachable', async () => {
+  it('seeds no FX rate, yield curve, holiday calendar or economic indicator - that is Treasury/Risk\'s own setup', async () => {
     await ensureSeeded(repo);
-    const gh = (await repo.getAffiliate('GH'))!;
-    expect(gh.feeds.find((f) => f.domain === 'Positions')!.mode).toBe('File');
+    expect(await repo.listFxRates()).toHaveLength(0);
+    expect(await repo.listYieldCurves()).toHaveLength(0);
+    expect(await repo.listHolidayCalendars()).toHaveLength(0);
+    expect(await repo.listEconomicIndicators()).toHaveLength(0);
+    // Currency *definitions* still ship, so onboarding's functional-currency picker isn't empty.
+    expect((await repo.listCurrencies()).length).toBeGreaterThan(0);
   });
 
-  it('provides position data for all three affiliates', async () => {
+  it('seeds no country-specific org unit, legal entity, GL account or counterparty', async () => {
     await ensureSeeded(repo);
-    expect((await repo.queryPositions({ affiliateCode: 'GH' })).length).toBeGreaterThan(0);
-    expect((await repo.queryPositions({ affiliateCode: 'CI' })).length).toBeGreaterThan(0);
-    expect((await repo.queryPositions({ affiliateCode: 'NG' })).length).toBeGreaterThan(0);
+    const members = (
+      await Promise.all(
+        (['LegalEntity', 'OrgUnit', 'Product', 'GlAccount', 'Counterparty'] as const).map((d) =>
+          repo.listDimensionMembers(d),
+        ),
+      )
+    ).flat();
+    for (const m of members) expect(m.affiliateCode, `${m.dimension} ${m.code}`).toBe('GROUP');
+  });
+
+  it('still gives Onboarding a Group chart of accounts to clone from', async () => {
+    await ensureSeeded(repo);
+    const commonCoa = await repo.listDimensionMembers('CommonCoa');
+    const groupLeaves = commonCoa.filter((m) => m.affiliateCode === 'GROUP' && m.isLeaf);
+    expect(groupLeaves.length).toBeGreaterThan(0);
   });
 });
 
@@ -144,9 +164,11 @@ describe('yield curves', () => {
     }
   });
 
-  it('stores term points in ascending tenor order', async () => {
-    await ensureSeeded(repo);
-    for (const curve of await repo.listYieldCurves()) {
+  // Not written into the seeded database (see 'no affiliate ships pre-onboarded' above) - a fresh
+  // platform's Treasury team sets these up themselves - but the reference constant itself must still be
+  // internally sound, since it's the starting point an affiliate's own curve is built from.
+  it('stores term points in ascending tenor order', () => {
+    for (const curve of YIELD_CURVES) {
       const tenors = curve.terms.map((t) => t.tenorDays);
       expect(tenors).toEqual([...tenors].sort((a, b) => a - b));
     }
@@ -170,7 +192,7 @@ describe('yield curves', () => {
 });
 
 describe('economic indicators and calendars', () => {
-  it('gives every demo affiliate at least one indicator', () => {
+  it('gives at least one indicator to the markets Ecobank actually operates in, ready for whenever one is onboarded', () => {
     for (const code of ['NG', 'GH', 'CI']) {
       expect(
         ECONOMIC_INDICATORS.some((i) => i.countryCode === code),
@@ -179,9 +201,9 @@ describe('economic indicators and calendars', () => {
     }
   });
 
-  it('orders observations ascending on write', async () => {
-    await ensureSeeded(repo);
-    for (const indicator of await repo.listEconomicIndicators()) {
+  // Not written into the seeded database either - same reasoning as the yield curve above.
+  it('orders observations ascending in the reference constant', () => {
+    for (const indicator of ECONOMIC_INDICATORS) {
       const dates = indicator.observations.map((o) => o.asOfDate);
       expect(dates).toEqual([...dates].sort());
     }
@@ -195,11 +217,14 @@ describe('economic indicators and calendars', () => {
   });
 });
 
-describe('the seed passes its own validation rules', () => {
+describe('the Nigeria engine-test fixture passes its own validation rules', () => {
+  // NIGERIA_POSITIONS is no longer written into the seeded database (see 'no affiliate ships
+  // pre-onboarded' above), but engine.test.ts, ftpAssignment.test.ts, shocks.test.ts and others still
+  // use it as realistic sample data - it must stay internally valid on its own terms.
   it('commits without a blocking exception', () => {
     const result = validatePositions(NIGERIA_POSITIONS, {
       asOfDate: NIGERIA_AS_OF,
-      knownAffiliateCodes: AFFILIATES.map((a) => a.code),
+      knownAffiliateCodes: ['NG'],
     });
     expect(result.blocked, result.exceptions.map((e) => e.description).join('; ')).toBe(false);
   });

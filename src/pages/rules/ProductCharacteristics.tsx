@@ -13,7 +13,7 @@ const LCR_ROLES = ['HQLA', 'Inflow', 'Outflow', 'None'] as const;
 export function ProductCharacteristics() {
   const { user } = useAuth();
   const { affiliateCode } = useScope();
-  // Product is affiliate-owned; a specific affiliate scope is needed to see its catalog — Group scope shows none.
+  // Product is affiliate-owned; a specific affiliate scope is needed to see its catalog - Group scope shows none.
   const { data: products = [] } = useDimensionMembers('Product', affiliateCode === 'GROUP' ? '' : affiliateCode);
   const { data: currencies = [] } = useCurrencies();
   const { data: rules = [], isLoading } = useRules<ProductCharacteristicRule>('ProductCharacteristic');
@@ -175,8 +175,12 @@ export function ProductCharacteristics() {
   return (
     <RuleEditor<ProductCharacteristicRule>
       title="Product Characteristics"
-      description="Basel factors and behavioural attributes per product and currency. Adding a product is a row here, not a code change."
+      description="Basel factors and behavioural attributes per product and currency. Adding a product is a row here, not a code change. Selected on Process Run's Rules panel; a product/currency with no matching assumption keeps whatever classification was loaded, unchanged."
       noun="characteristics rule"
+      // This maps source product data to its risk classification (HQLA/LCR/ASF/RSF) - the same kind
+      // of data-mapping decision Dimensions and Counterparties are admin-gated for, not an ALM
+      // assumption a Risk Analyst should be able to change unilaterally.
+      editPermission="data.configure"
       rules={rules}
       isLoading={isLoading}
       createDefault={createDefault}
@@ -191,7 +195,7 @@ export function ProductCharacteristics() {
           if (seen.has(key)) return `Duplicate assumption for ${a.productCode} in ${a.currency}.`;
           seen.add(key);
           if (a.hqlaLevel !== 'None' && a.hqlaHaircutPct === 0 && a.hqlaLevel !== 'Level 1') {
-            return `${a.productCode}: Level 2 assets carry a haircut — 0% is almost certainly wrong.`;
+            return `${a.productCode}: Level 2 assets carry a haircut - 0% is almost certainly wrong.`;
           }
         }
         return null;
@@ -222,10 +226,7 @@ export function ProductCharacteristics() {
 
           {!readOnly && rule.assumptions.length > 0 && (
             <div className="rounded-lg border border-gray-200 p-4">
-              <RuleField
-                label="Copy across currencies"
-                hint="Oracle's Copy Across (ALM UG §17.4). Define once, copy, then adjust where local practice differs — most factors are Basel-standard and travel unchanged."
-              >
+              <RuleField label="Copy across currencies">
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={copyTarget}
@@ -233,7 +234,7 @@ export function ProductCharacteristics() {
                     aria-label="Target currency"
                     className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                   >
-                    <option value="">— target currency —</option>
+                    <option value="">- target currency -</option>
                     {currencies.map((c) => (
                       <option key={c.code} value={c.code}>
                         {c.code}

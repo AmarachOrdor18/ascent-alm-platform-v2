@@ -1,8 +1,8 @@
-import { REGULATORY_MINIMA, type LimitConfig } from '@/engine/limits';
+import type { LimitConfig } from '@/engine/limits';
 
 const STAMP = { updatedBy: 'SEED', updatedAt: '2026-01-01T00:00:00.000Z', isActive: true };
 
-// Thresholds below are illustrative starting points, not Ecobank's actual risk appetite — editable on the Limits screen.
+// Thresholds below are illustrative starting points, not Ecobank's actual risk appetite - editable on the Limits screen.
 // `affiliateCode: null` means the limit applies everywhere unless an affiliate-specific one overrides it.
 export const SEED_LIMITS: LimitConfig[] = [
   {
@@ -71,13 +71,5 @@ export const SEED_LIMITS: LimitConfig[] = [
     affiliateCode: null, direction: 'lower-is-better',
     greenThreshold: 10, amberThreshold: 15, redThreshold: 20,
     regulatoryMinimum: 20, ...STAMP,
-  },
-
-  // CBN sets a loan-to-deposit floor for Nigeria, not a ceiling; the Group ceiling still applies.
-  {
-    id: 'LIM-LDR-NG', metricKey: 'loanToDepositPercent', label: 'Loan-to-Deposit Ratio (CBN floor)',
-    affiliateCode: 'NG', direction: 'higher-is-better',
-    greenThreshold: 70, amberThreshold: 67, redThreshold: 65,
-    regulatoryMinimum: REGULATORY_MINIMA.CBN?.loanToDepositPercent ?? 65, ...STAMP,
   },
 ];

@@ -3,7 +3,7 @@
  *
  * `Switch` renders the first route that matches, so declaration order is a
  * correctness property, not a style choice. `/affiliates/:code` matches every
- * literal path beneath `/affiliates` — declared before the nav routes it
+ * literal path beneath `/affiliates` - declared before the nav routes it
  * swallowed `/affiliates/onboard` and rendered a blank page. The click did
  * nothing and there was no error to follow, which is the worst shape a bug
  * can take.
@@ -32,7 +32,7 @@ function firstMatch(path: string) {
   return ROUTES.find((r) => matches(r.path, path)) ?? null;
 }
 
-describe('matches — the helper itself', () => {
+describe('matches - the helper itself', () => {
   it('treats a parameter segment as a wildcard for one segment', () => {
     expect(matches('/affiliates/:code', '/affiliates/NG')).toBe(true);
     expect(matches('/affiliates/:code', '/affiliates/onboard')).toBe(true);
@@ -49,7 +49,7 @@ describe('matches — the helper itself', () => {
 describe('route order', () => {
   it('reaches the onboarding wizard rather than the affiliate detail wildcard', () => {
     // The regression. Before the fix this resolved to /affiliates/:code,
-    // whose handler returned null — a blank page under a working nav link.
+    // whose handler returned null - a blank page under a working nav link.
     expect(firstMatch('/affiliates/onboard')?.path).toBe('/affiliates/onboard');
   });
 
@@ -89,7 +89,7 @@ describe('route order', () => {
   });
 
   it('keeps the sidebar to the ~13 module-level items the navigation redesign intends', () => {
-    // Deliberately small on purpose — individual screens are tabs inside a
+    // Deliberately small on purpose - individual screens are tabs inside a
     // module (see src/pages/modules/*), not standing sidebar rows. This is
     // the inverse of the pre-redesign invariant here (which asserted > 30).
     expect(ALL_NAV_ITEMS.length).toBeGreaterThanOrEqual(10);
@@ -106,7 +106,7 @@ describe('route order', () => {
 describe('route-level permission gating', () => {
   // Regression for: the sidebar hid a link a role couldn't reach, but
   // nothing stopped that role from rendering the full screen anyway via a
-  // typed URL or an already-open tab — permission only ever gated the edit
+  // typed URL or an already-open tab - permission only ever gated the edit
   // buttons inside a page. Every route must now carry a real permission
   // string the router actually enforces (see RouteGate in App.tsx).
 
@@ -114,7 +114,7 @@ describe('route-level permission gating', () => {
     expect(ROUTES.every((r) => typeof r.permission === 'string' && r.permission.length > 0)).toBe(true);
   });
 
-  it('matches each nav-listed route\'s permission to its sidebar entry — the two must never drift apart', () => {
+  it('matches each nav-listed route\'s permission to its sidebar entry - the two must never drift apart', () => {
     for (const item of ALL_NAV_ITEMS) {
       const route = ROUTES.find((r) => r.path === item.path);
       expect(route?.permission).toBe(item.permission);

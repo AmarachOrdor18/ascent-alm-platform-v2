@@ -14,6 +14,7 @@ import type {
   ProcessRun,
   Role,
   RuleMeta,
+  RuleVersionSnapshot,
   RunResult,
   RunSchedule,
   StoredCurrency,
@@ -52,6 +53,7 @@ export class AscentDb extends Dexie {
   holidayCalendars!: EntityTable<HolidayCalendar, 'id'>;
   roles!: EntityTable<Role, 'code'>;
   snapshots!: EntityTable<PositionSnapshot, 'id'>;
+  ruleHistory!: EntityTable<RuleVersionSnapshot, 'id'>;
 
   constructor(name = 'ascent-alm') {
     super(name);
@@ -112,13 +114,20 @@ export class AscentDb extends Dexie {
       snapshots: 'id, parentBatchId, parentRunId, affiliateCode, status, [affiliateCode+status]',
     });
 
-    // Dimension members became affiliate-owned (no Group-wide list — see engine/types.ts DimensionMember).
+    // Dimension members became affiliate-owned (no Group-wide list - see engine/types.ts DimensionMember).
     // Re-declaring the whole store (Dexie requires the full index list on every version, not a delta) adds
     // affiliateCode and the compound indexes the per-affiliate queries need.
     this.version(9).stores({
       dimensionMembers:
         'id, dimension, code, parentCode, affiliateCode, [dimension+code], [dimension+parentCode], ' +
         '[dimension+affiliateCode], [dimension+affiliateCode+code]',
+    });
+
+    // Archives a rule's content the instant before an edit overwrites it, so a run pinned to a
+    // rule id + version (ProcessRun.ruleVersionsUsed) can still recover what that version actually
+    // held even after the live row has since moved on.
+    this.version(10).stores({
+      ruleHistory: 'id, ruleId, version, [ruleId+version]',
     });
   }
 }

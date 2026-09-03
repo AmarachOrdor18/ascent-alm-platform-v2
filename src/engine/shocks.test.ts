@@ -59,7 +59,7 @@ describe('computeAllShocks', () => {
     expect(results.parallelUp!.label).toBe('Parallel up (+200bp)');
   });
 
-  it('identifies the worst case — what the outlier test is judged on', () => {
+  it('identifies the worst case - what the outlier test is judged on', () => {
     expect(worstCase).not.toBeNull();
     const allDeltas = Object.values(results)
       .map((r) => r.eve.deltaEve)
@@ -75,10 +75,31 @@ describe('computeAllShocks', () => {
   it('returns a null worst case when durations are absent', () => {
     const undated = NIGERIA_POSITIONS.map((p) => ({ ...p, approxDurationYears: null }));
     const { worstCase: none } = computeAllShocks(undated, ctx, ladder);
-    // With every duration null the gap is zero, not null — the measure is
+    // With every duration null the gap is zero, not null - the measure is
     // still defined, it simply shows no sensitivity.
     expect(none).not.toBeNull();
     expect(none!.deltaEve).toBeCloseTo(0, 6);
+  });
+
+  it('joins a custom scenario alongside the six standard shocks, under its own label', () => {
+    const customLabel = 'ALCO combined stress';
+    const custom = [
+      {
+        id: 'FS-1',
+        label: customLabel,
+        shockByBucket: Object.fromEntries(ladder.buckets.map((b) => [b.label, 300])),
+      },
+    ];
+    const { results } = computeAllShocks(NIGERIA_POSITIONS, ctx, ladder, custom);
+    expect(Object.keys(results)).toHaveLength(7);
+    expect(results['FS-1']!.label).toBe(customLabel);
+    // A flat +300bp custom shock should move EVE further than the standard +200bp parallel shock.
+    expect(Math.abs(results['FS-1']!.eve.deltaEve!)).toBeGreaterThan(Math.abs(results.parallelUp!.eve.deltaEve!));
+  });
+
+  it('does not disturb the standard six when no custom scenario is supplied', () => {
+    const { results } = computeAllShocks(NIGERIA_POSITIONS, ctx, ladder, []);
+    expect(Object.keys(results)).toHaveLength(6);
   });
 });
 
@@ -225,6 +246,9 @@ describe('vintage helpers', () => {
     committedAt: '2026-07-31T09:05:00Z',
     reconciledBy: null,
     reconciledAt: null,
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectedReason: null,
     ...over,
   });
 

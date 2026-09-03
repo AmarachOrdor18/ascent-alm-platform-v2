@@ -38,7 +38,10 @@ const BLANK_USER: User = {
   lastLoginAt: null,
 };
 
-export function AdminUsers() {
+export function AdminUsers({
+  embedded = false,
+  forcedAffiliateCode,
+}: { embedded?: boolean; forcedAffiliateCode?: string } = {}) {
   const { hasPermission, user: signedIn } = useAuth();
   const { data: users = [], isLoading } = useUsers();
   const { data: affiliates = [] } = useAffiliates();
@@ -53,29 +56,42 @@ export function AdminUsers() {
   const [editing, setEditing] = useState<User | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [affiliateFilter, setAffiliateFilter] = useState('');
 
-  const scopedUsers = canEditRoles
-    ? users
-    : users.filter((u) => u.affiliateCode === signedIn?.affiliateCode);
+  // Embedded inside a specific affiliate's Settings page, that affiliate is the whole point of the
+  // view - even an Admin who could otherwise see everyone should see only this one affiliate here.
+  const scopedUsers = forcedAffiliateCode
+    ? users.filter((u) => u.affiliateCode === forcedAffiliateCode)
+    : canEditRoles
+      ? users
+      : users.filter((u) => u.affiliateCode === signedIn?.affiliateCode);
+
+  // The filter dropdown itself is only useful group-wide - embedded/single-affiliate views are
+  // already scoped to one affiliate and have nothing left to filter between.
+  const filteredUsers = !forcedAffiliateCode && affiliateFilter
+    ? scopedUsers.filter((u) => u.affiliateCode === affiliateFilter)
+    : scopedUsers;
 
   const assignableRoles = canEditRoles
     ? roleList
     : roleList.filter((r) => !r.permissions.some((p) => DANGEROUS_PERMISSIONS.includes(p)));
 
-  const assignableAffiliates = canEditRoles
-    ? affiliates
-    : affiliates.filter((a) => a.code === signedIn?.affiliateCode);
+  const assignableAffiliates = forcedAffiliateCode
+    ? affiliates.filter((a) => a.code === forcedAffiliateCode)
+    : canEditRoles
+      ? affiliates
+      : affiliates.filter((a) => a.code === signedIn?.affiliateCode);
 
-  const active = scopedUsers.filter((u) => u.isActive);
+  const active = filteredUsers.filter((u) => u.isActive);
   const withoutMfa = active.filter((u) => !u.mfaEnrolled);
   const byRole = useMemo(() => {
     const m = new Map<RoleCode, number>();
-    for (const u of scopedUsers) m.set(u.role, (m.get(u.role) ?? 0) + 1);
+    for (const u of filteredUsers) m.set(u.role, (m.get(u.role) ?? 0) + 1);
     return m;
-  }, [scopedUsers]);
+  }, [filteredUsers]);
 
   const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
-    scopedUsers,
+    filteredUsers,
     10,
     ['name', 'email', 'affiliateCode'],
   );
@@ -128,13 +144,14 @@ export function AdminUsers() {
 
   return (
     <>
+      {!embedded && (
       <ModuleHeader
         title="Users & Roles"
-        description="The register the application gates on — what a role can do here is what it can do everywhere."
+        description="The register the application gates on - what a role can do here is what it can do everywhere."
         asOfDate={null}
         metrics={[
           { label: 'Users', value: String(users.length), about: 'Every account in the register, regardless of status.' },
-          { label: 'Active', value: String(active.length), about: 'Accounts that can currently sign in — a disabled account is kept, not deleted.' },
+          { label: 'Active', value: String(active.length), about: 'Accounts that can currently sign in - a disabled account is kept, not deleted.' },
           {
             label: 'Without MFA',
             value: String(withoutMfa.length),
@@ -154,14 +171,46 @@ export function AdminUsers() {
           </button>
         }
       />
+      )}
+      {embedded && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            disabled={!canManageUsers}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            New user
+          </button>
+        </div>
+      )}
 
       <section className="mb-6 table-datagrid-container">
         <div className="border-b border-gray-100 bg-white/50 p-5">
           <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Users</h2>
+          {!forcedAffiliateCode && assignableAffiliates.length > 1 && (
+            <div className="mb-3">
+              <label htmlFor="user-affiliate-filter" className="mb-1 block text-[11px] font-medium text-gray-600">
+                Affiliate
+              </label>
+              <select
+                id="user-affiliate-filter"
+                value={affiliateFilter}
+                onChange={(e) => setAffiliateFilter(e.target.value)}
+                className="w-full max-w-xs rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+              >
+                <option value="">All affiliates</option>
+                {canEditRoles && <option value="GROUP">Ecobank Group</option>}
+                {assignableAffiliates.filter((a) => a.code !== 'GROUP').map((a) => (
+                  <option key={a.code} value={a.code}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <TableToolbar
             searchValue={search}
             onSearchChange={setSearch}
-            exportData={() => users}
+            exportData={() => filteredUsers}
             exportFilename="users"
             density={density}
             onDensityChange={setDensity}
@@ -242,7 +291,7 @@ export function AdminUsers() {
         </div>
         <p className="mt-4 border-t border-gray-50 pt-3 text-[11px] leading-relaxed text-gray-500">
           Users move between these {roleList.length} roles; permissions within each are editable here. Sign in as any
-          of them to see the effect — navigation, action buttons and run controls all read this same set, live.
+          of them to see the effect - navigation, action buttons and run controls all read this same set, live.
         </p>
       </section>
 
@@ -267,11 +316,13 @@ export function AdminUsers() {
             ...BLANK_USER,
             id: newId(),
             createdAt: new Date().toISOString(),
-            affiliateCode: canEditRoles ? BLANK_USER.affiliateCode : (signedIn?.affiliateCode ?? BLANK_USER.affiliateCode),
+            affiliateCode:
+              forcedAffiliateCode ??
+              (canEditRoles ? BLANK_USER.affiliateCode : (signedIn?.affiliateCode ?? BLANK_USER.affiliateCode)),
           }}
           affiliates={assignableAffiliates}
           roles={assignableRoles}
-          allowGroupScope={canEditRoles}
+          allowGroupScope={canEditRoles && !forcedAffiliateCode}
           existingEmails={users.map((u) => u.email.toLowerCase())}
           isNew
           onCancel={() => setCreating(false)}

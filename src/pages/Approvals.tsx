@@ -1,13 +1,17 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
-import { useAffiliates, useSaveAffiliate } from '@/lib/hooks';
+import { useAffiliates, useBatches, useSaveAffiliate } from '@/lib/hooks';
 import { approvals, approvalBlockedReason, newId } from '@/lib/governanceHooks';
 import { repository } from '@/store/localRepository';
 import { useCommitSnapshot } from '@/lib/snapshotHooks';
+import { checkAllDomains } from '@/engine/vintage';
 import type { ApprovalRequest } from '@/engine/types';
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 const ACTIONS = ['Create', 'Update', 'Delete', 'Activate', 'Override'] as const;
 
@@ -22,6 +26,7 @@ export function Approvals() {
   const { user, hasPermission } = useAuth();
   const canDecide = hasPermission('approvals.approve');
   const { data: affiliates = [] } = useAffiliates();
+  const { data: batches = [] } = useBatches();
   const { data: requests = [], isLoading } = approvals.useList();
   const save = approvals.useSave();
   const saveAffiliate = useSaveAffiliate();
@@ -29,6 +34,19 @@ export function Approvals() {
 
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
   const [newOpen, setNewOpen] = useState(false);
+  const [commitConfirmation, setCommitConfirmation] = useState<{ requestId: string; batchId: string } | null>(null);
+
+  /** Informational only - a human still decides, this just tells them what they'd otherwise have to check by hand. */
+  const activationReadiness = (r: ApprovalRequest): { issues: string[] } | null => {
+    if (r.module !== 'Affiliates' || r.action !== 'Activate') return null;
+    const affiliate = affiliates.find((a) => a.code === r.entityId);
+    if (!affiliate) return null;
+    const neverLoaded = checkAllDomains(affiliate, batches, TODAY).filter((f) => f.status === 'Never loaded').length;
+    const issues: string[] = [];
+    if (neverLoaded > 0) issues.push(`${neverLoaded} data domain${neverLoaded === 1 ? '' : 's'} never loaded`);
+    if (!affiliate.limitsConfirmed) issues.push('Risk thresholds not confirmed');
+    return { issues };
+  };
   const [draft, setDraft] = useState({
     module: '',
     entityType: '',
@@ -68,12 +86,16 @@ export function Approvals() {
     }
 
     // Approving an edited position snapshot commits it as a new, superseding
-    // Position Book version — the parent batch is never touched (see
+    // Position Book version - the parent batch is never touched (see
     // useCommitSnapshot). A rejection leaves the snapshot exactly as it was,
     // still editable from Position Book.
     if (status === 'Approved' && request.module === 'Position Snapshot') {
       void repository.getSnapshot(request.entityId).then((snapshot) => {
-        if (snapshot && snapshot.status === 'PendingApproval') void commitSnapshot.mutateAsync(snapshot);
+        if (snapshot && snapshot.status === 'PendingApproval') {
+          void commitSnapshot
+            .mutateAsync(snapshot)
+            .then((newBatch) => setCommitConfirmation({ requestId: request.id, batchId: newBatch.id }));
+        }
       });
     }
   };
@@ -123,6 +145,34 @@ export function Approvals() {
           </button>
         }
       />
+
+      {commitConfirmation && (
+        <div
+          role="status"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success"
+        >
+          <span>
+            <span className="font-bold">Committed.</span> The approved snapshot is now Position Book version{' '}
+            <span className="font-mono font-bold">{commitConfirmation.batchId}</span>.
+          </span>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/data/operations/position-book?batchId=${commitConfirmation.batchId}`}
+              className="font-bold underline hover:no-underline"
+            >
+              View in Position Book →
+            </Link>
+            <button
+              type="button"
+              onClick={() => setCommitConfirmation(null)}
+              aria-label="Dismiss"
+              className="text-success/70 hover:text-success"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-6 flex gap-2">
         <button
@@ -197,6 +247,7 @@ export function Approvals() {
                 const blocked = !canDecide
                   ? 'Your role does not have permission to approve or reject requests.'
                   : approvalBlockedReason(r, user?.name);
+                const readiness = r.status === 'Pending' ? activationReadiness(r) : null;
                 return (
                   <tr key={r.id}>
                     <td>
@@ -207,6 +258,13 @@ export function Approvals() {
                       <p className="mt-0.5 text-[11px] font-medium text-gray-400">
                         {r.action}. {r.summary}
                       </p>
+                      {readiness && (
+                        <p
+                          className={`mt-1 text-[11px] font-bold ${readiness.issues.length > 0 ? 'text-warning' : 'text-success'}`}
+                        >
+                          {readiness.issues.length > 0 ? `⚠ ${readiness.issues.join(' · ')}` : '✓ Data readiness checks pass'}
+                        </p>
+                      )}
                     </td>
                     <td>{r.requestedBy}</td>
                     <td>{new Date(r.requestedAt).toLocaleDateString()}</td>

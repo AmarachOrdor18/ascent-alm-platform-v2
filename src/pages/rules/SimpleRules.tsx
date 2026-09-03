@@ -22,7 +22,7 @@ import type {
 } from '@/engine/ruleTypes';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Prepayment & Early Redemption — screen 20
+// Prepayment & Early Redemption - screen 20
 // ─────────────────────────────────────────────────────────────────────────
 
 const PREPAYMENT_METHODS: Array<{ value: PrepaymentMethod; label: string }> = [
@@ -123,7 +123,7 @@ export function PrepaymentRules() {
   return (
     <RuleEditor<PrepaymentRule>
       title="Prepayment & Early Redemption"
-      description="How much principal comes back early, and what penalty damps the incentive."
+      description="How much principal comes back early, and what penalty damps the incentive. Not yet selectable on Process Run - computePrepayment exists in the engine but no run currently calls it."
       noun="prepayment rule"
       rules={rules}
       isLoading={isLoading}
@@ -138,7 +138,7 @@ export function PrepaymentRules() {
       summarise={(r) => `${r.assumptions.length} class assumption(s)`}
       validate={(r) =>
         r.assumptions.some((a) => a.cpr < 0 || a.cpr > 1)
-          ? 'CPR is an annual rate between 0 and 1 — 0.15 means 15% a year.'
+          ? 'CPR is an annual rate between 0 and 1 - 0.15 means 15% a year.'
           : null
       }
       renderBody={(rule, update, readOnly) => (
@@ -157,7 +157,7 @@ export function PrepaymentRules() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Discount Methods — screen 21
+// Discount Methods - screen 21
 // ─────────────────────────────────────────────────────────────────────────
 
 export function DiscountMethods() {
@@ -213,7 +213,7 @@ export function DiscountMethods() {
           label="Curve"
           value={row.curveCode ?? ''}
           options={[
-            { value: '', label: '— affiliate default —' },
+            { value: '', label: '- affiliate default -' },
             ...curves.map((c) => ({ value: c.code, label: c.code })),
           ]}
           disabled={readOnly}
@@ -226,7 +226,7 @@ export function DiscountMethods() {
   return (
     <RuleEditor<DiscountMethodRule>
       title="Discount Methods"
-      description="How future value is brought back to today, per product class."
+      description="How future value is brought back to today, per product class. Not yet consumed by any calculation - definition only, ahead of the modelling work to apply it."
       noun="discount rule"
       rules={rules}
       isLoading={isLoading}
@@ -242,7 +242,7 @@ export function DiscountMethods() {
       guidance={
         <>
           <span className="font-bold">Duration proxy is the current default.</span> Full cash-flow discounting needs
-          contract-level flows, which are out of scope — so EVE is computed by duration gap, and every result says so.
+          contract-level flows, which are out of scope - so EVE is computed by duration gap, and every result says so.
         </>
       }
       renderBody={(rule, update, readOnly) => (
@@ -261,7 +261,7 @@ export function DiscountMethods() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Payment & Repricing Patterns — screen 19
+// Payment & Repricing Patterns - screen 19
 // ─────────────────────────────────────────────────────────────────────────
 
 export function Patterns() {
@@ -306,7 +306,7 @@ export function Patterns() {
   return (
     <RuleEditor<PaymentRepricingRule>
       title="Payment & Repricing Patterns"
-      description="Repayment and reset schedules too complex for the standard instrument fields."
+      description="Repayment and reset schedules too complex for the standard instrument fields. Not yet consumed by any calculation - definition only, ahead of the modelling work to apply it."
       noun="pattern"
       rules={rules}
       isLoading={isLoading}
@@ -415,7 +415,7 @@ export function Patterns() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Filters & Expressions — screen 27
+// Filters & Expressions - screen 27
 // ─────────────────────────────────────────────────────────────────────────
 
 const FIELDS = [
@@ -495,7 +495,7 @@ export function Filters() {
   return (
     <RuleEditor<FilterRule>
       title="Filters & Expressions"
-      description="Named, reusable data selections. Attach one to a run to narrow its scope without redefining the run."
+      description="Named, reusable data selections. Process Run does not yet have a way to select one of these - scope it there directly with the Organisational Unit / Product pickers instead."
       noun="filter"
       rules={rules}
       isLoading={isLoading}
@@ -514,7 +514,7 @@ export function Filters() {
       guidance={
         <>
           Conditions combine with <span className="font-bold">AND</span>. A group filter joins other filters, which is
-          how Oracle composes them (ALM UG §3.7) — build small, reusable filters and combine rather than repeating a
+          how Oracle composes them (ALM UG §3.7) - build small, reusable filters and combine rather than repeating a
           long condition list.
         </>
       }
@@ -543,7 +543,7 @@ export function Filters() {
             onChange={(conditions) => update({ conditions })}
             readOnly={readOnly}
             addLabel="Add condition"
-            emptyMessage="No conditions — this filter would select everything."
+            emptyMessage="No conditions - this filter would select everything."
             createRow={() => ({ field: 'amount', operator: 'greaterThan', value: '0' })}
           />
 

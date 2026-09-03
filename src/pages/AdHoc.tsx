@@ -1,20 +1,33 @@
 import { useMemo, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { useAuth } from '@/context/AuthContext';
 import { useAffiliates } from '@/lib/hooks';
-import { useRuns, useRunResults } from '@/lib/runHooks';
+import { useRuns, runKeys } from '@/lib/runHooks';
+import { accessibleAffiliates, scopedListCode } from '@/lib/scope';
+import { repository } from '@/store/localRepository';
 import { METRIC_SPECS, extractMetrics, formatMetric } from '@/lib/metrics';
+import type { RunResult } from '@/engine/types';
 
 export function AdHoc() {
-  const { data: affiliates = [] } = useAffiliates();
-  const { data: runs = [] } = useRuns();
+  const { user, hasPermission } = useAuth();
+  const { data: affiliates = [], isLoading: affiliatesLoading } = useAffiliates();
+  // A user confined to one affiliate can only pick and run that affiliate here - reporting.view is
+  // broad, so without this every affiliate's figures leaked to everyone who holds it.
+  const { data: runs = [], isLoading: runsLoading } = useRuns(scopedListCode(user, hasPermission));
 
   const [metricKeys, setMetricKeys] = useState<string[]>(['lcrPercent', 'nsfrPercent']);
   const [affiliateCodes, setAffiliateCodes] = useState<string[]>([]);
   const [ran, setRan] = useState(false);
 
-  const liveAffiliates = affiliates.filter((a) => a.code !== 'GROUP');
+  const liveAffiliates = accessibleAffiliates(
+    affiliates.filter((a) => a.code !== 'GROUP'),
+    user,
+    hasPermission,
+  );
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -35,17 +48,69 @@ export function AdHoc() {
     run: latestRunByAffiliate.get(code) ?? null,
   }));
 
+  const resultQueries = useQueries({
+    queries: targets.map((t) => ({
+      queryKey: runKeys.results(t.run?.id ?? 'none'),
+      queryFn: (): Promise<RunResult[]> => (t.run ? repository.listRunResults(t.run.id) : Promise.resolve([])),
+      enabled: t.run !== null,
+    })),
+  });
+  const resultsLoading = resultQueries.some((q) => q.isLoading);
+
+  const rows = targets.map((t, i) => ({
+    code: t.code,
+    name: t.name,
+    asOfDate: t.run?.asOfDate ?? null,
+    metrics: extractMetrics(resultQueries[i]?.data ?? []),
+  }));
+
+  const columns: ResultColumn<(typeof rows)[number]>[] = [
+    {
+      key: 'affiliate',
+      header: 'Affiliate',
+      render: (r) => (
+        <span>
+          <span className="font-medium text-navy-900">{r.name}</span>
+          <span className="ml-2 font-mono text-[10px] text-gray-400">{r.asOfDate ?? 'no run'}</span>
+        </span>
+      ),
+    },
+    ...metricKeys.map((key): ResultColumn<(typeof rows)[number]> => ({
+      key,
+      header: METRIC_SPECS.find((m) => m.key === key)?.label ?? key,
+      align: 'right',
+      render: (r) => <span className="font-mono">{formatMetric(r.metrics.get(key) ?? null, key)}</span>,
+    })),
+  ];
+
   return (
     <>
       <ModuleHeader
         title="Ad-Hoc Analysis"
-        description="Pick metrics and affiliates from the platform's own catalogue and register — each read from its latest completed run."
+        description="Pick metrics and affiliates from the platform's own catalogue and register - each read from its latest completed run."
         asOfDate={null}
         metrics={[
-          { label: 'Metrics available', value: String(METRIC_SPECS.length), about: 'The full metric catalogue this screen can pull from — the same one Limits and KRI use.' },
-          { label: 'Affiliates onboarded', value: String(liveAffiliates.length), about: 'Non-Group affiliates registered in the platform, regardless of onboarding status.' },
-          { label: 'Runs with results', value: String(latestRunByAffiliate.size), about: 'Affiliates that have at least one completed run to read a metric from.' },
-          { label: 'Selected', value: `${metricKeys.length} × ${affiliateCodes.length}`, about: 'How many metrics and affiliates are currently chosen — the analysis below is this grid, one cell per pair.' },
+          {
+            label: 'Metrics available',
+            value: String(METRIC_SPECS.length),
+            about: 'The full metric catalogue this screen can pull from - the same one Limits and KRI use.',
+          },
+          {
+            label: 'Affiliates onboarded',
+            value: affiliatesLoading ? '-' : String(liveAffiliates.length),
+            about: 'Non-Group affiliates registered in the platform, regardless of onboarding status.',
+          },
+          {
+            label: 'Runs with results',
+            value: runsLoading ? '-' : String(latestRunByAffiliate.size),
+            about: 'Affiliates that have at least one completed run to read a metric from.',
+          },
+          {
+            label: 'Selected',
+            value: `${metricKeys.length} × ${affiliateCodes.length}`,
+            about:
+              'How many metrics and affiliates are currently chosen - the analysis below is this grid, one cell per pair.',
+          },
         ]}
       />
 
@@ -55,7 +120,7 @@ export function AdHoc() {
             <div className="mb-4 flex items-center gap-1.5">
               <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Metrics</h2>
               <InfoButton label="Why this list">
-                The same catalogue Limits and KRI read from — nothing metric-specific to this screen.
+                The same catalogue Limits and KRI read from - nothing metric-specific to this screen.
               </InfoButton>
             </div>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
@@ -63,7 +128,10 @@ export function AdHoc() {
                 <button
                   key={m.key}
                   type="button"
-                  onClick={() => { toggle(metricKeys, setMetricKeys, m.key); setRan(false); }}
+                  onClick={() => {
+                    toggle(metricKeys, setMetricKeys, m.key);
+                    setRan(false);
+                  }}
                   className={`rounded-lg border p-3 text-left ${metricKeys.includes(m.key) ? 'border-gold-500 bg-gold-500/5' : 'border-gray-200 hover:border-navy-700'}`}
                 >
                   <p className="text-[11px] font-bold text-navy-900">{m.label}</p>
@@ -77,17 +145,22 @@ export function AdHoc() {
             <div className="mb-4 flex items-center gap-1.5">
               <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
               <InfoButton label="Why this list">
-                Analysis, not the Group-consolidated view — any status, not just Live.
+                Analysis, not the Group-consolidated view - any status, not just Live.
               </InfoButton>
             </div>
-            {liveAffiliates.length === 0 ? (
+            {affiliatesLoading ? (
+              <p className="text-[11px] text-gray-400">Loading…</p>
+            ) : liveAffiliates.length === 0 ? (
               <p className="text-[11px] text-gray-400">No affiliates onboarded yet.</p>
             ) : (
               <MultiSelectDropdown
                 className="max-w-sm"
                 placeholder="Select affiliates…"
                 selected={affiliateCodes}
-                onChange={(next) => { setAffiliateCodes(next); setRan(false); }}
+                onChange={(next) => {
+                  setAffiliateCodes(next);
+                  setRan(false);
+                }}
                 options={liveAffiliates.map((a) => ({
                   value: a.code,
                   label: a.name,
@@ -111,53 +184,14 @@ export function AdHoc() {
       {ran && (
         <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Results</h2>
-          <ResultsTable targets={targets} metricKeys={metricKeys} />
+          <ResultTable
+            rows={rows}
+            columns={columns}
+            rowKey={(r) => r.code}
+            emptyMessage={resultsLoading ? 'Loading…' : 'Nothing selected.'}
+          />
         </section>
       )}
     </>
-  );
-}
-
-function ResultsTable({
-  targets, metricKeys,
-}: { targets: Array<{ code: string; name: string; run: { id: string; asOfDate: string } | null }>; metricKeys: string[] }) {
-  if (targets.length === 0) return <p className="text-[12px] text-gray-500">Nothing selected.</p>;
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
-            <th className="py-2 px-3 font-bold">Affiliate</th>
-            {metricKeys.map((key) => (
-              <th key={key} className="py-2 px-3 text-right font-bold">{METRIC_SPECS.find((m) => m.key === key)?.label ?? key}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {targets.map((t) => <AffiliateResultRow key={t.code} target={t} metricKeys={metricKeys} />)}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** One row, one hook call — each affiliate's results are fetched by its own component instance. */
-function AffiliateResultRow({
-  target, metricKeys,
-}: { target: { code: string; name: string; run: { id: string; asOfDate: string } | null }; metricKeys: string[] }) {
-  const { data: results = [] } = useRunResults(target.run?.id ?? null);
-  const metrics = extractMetrics(results);
-
-  return (
-    <tr className="border-b border-gray-100">
-      <td className="py-2 px-3">
-        <span className="font-medium text-navy-900">{target.name}</span>
-        <span className="ml-2 font-mono text-[10px] text-gray-400">{target.run?.asOfDate ?? 'no run'}</span>
-      </td>
-      {metricKeys.map((key) => (
-        <td key={key} className="py-2 px-3 text-right font-mono">{formatMetric(metrics.get(key) ?? null, key)}</td>
-      ))}
-    </tr>
   );
 }

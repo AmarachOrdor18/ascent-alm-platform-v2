@@ -43,7 +43,7 @@ function pricedPosition(overrides: Partial<Position> = {}): Position {
   return { ...base, ...overrides };
 }
 
-describe('computeFtp — per-COA assignments', () => {
+describe('computeFtp - per-COA assignments', () => {
   it('uses the curve the assignment names, not the position rate index', () => {
     const position = pricedPosition({
       id: 'P-ASSIGN-1',
@@ -107,7 +107,7 @@ describe('computeFtp — per-COA assignments', () => {
   });
 });
 
-describe('computeFtp — org-unit attribution', () => {
+describe('computeFtp - org-unit attribution', () => {
   it('attributes margin to the unit on the line, not to an array position', () => {
     const positions = [
       pricedPosition({ id: 'P-1', orgUnitCode: 'OU-RETAIL' }),
@@ -140,7 +140,7 @@ describe('computeFtp — org-unit attribution', () => {
   });
 });
 
-describe('run orchestrator — transfer pricing elements', () => {
+describe('run orchestrator - transfer pricing elements', () => {
   const inputs = {
     positions: NIGERIA_POSITIONS,
     fx: identityFxTable('NGN', NIGERIA_AS_OF),

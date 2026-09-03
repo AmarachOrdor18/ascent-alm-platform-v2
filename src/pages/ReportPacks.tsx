@@ -27,14 +27,14 @@ const TABS = [
     key: 'ALCO' as const,
     label: 'ALCO pack',
     title: 'ALCO Reporting',
-    description: 'The full risk pack for the committee — generated from a real run, not typed into a mock table.',
+    description: 'The full risk pack for the committee - generated from a real run, not typed into a mock table.',
     candidates: [...ALCO_SECTIONS],
   },
   {
     key: 'Management' as const,
     label: 'Management pack',
     title: 'Management Reporting',
-    description: 'A lighter KPI snapshot for management review — the same real-run pack machinery, fewer sections.',
+    description: 'A lighter KPI snapshot for management review - the same real-run pack machinery, fewer sections.',
     candidates: [...MANAGEMENT_SECTIONS],
   },
 ];

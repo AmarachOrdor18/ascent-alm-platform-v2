@@ -1,0 +1,6 @@
+id,category,amount,currency,orgunitcode,glaccountcode,commoncoacode,productcode,productclass,maturitydate,nextrepricingdate,ratetype,interestratepct,behaviouraltag,hqlalevel,hqlahaircutpct,lcrcashflowrole,irrbbratesensitive,approxdurationyears,performingstatus,provisionamount
+GH-LOAN-COR-01,Asset,2142000000,GHS,OU-GH-COR,GH-1030,COA-14,LOAN-COR,Loans - Corporate Loan,2028-12-31,2026-09-30,Floating,29.5,N/A,None,0,None,true,2.0,Performing,0
+GH-LOAN-RET-01,Asset,918000000,GHS,OU-GH-RET,GH-1030,COA-14,LOAN-RET,Loans - Retail Personal Loan,2029-06-30,2027-06-30,Fixed,31.0,N/A,None,0,None,true,2.8,Performing,0
+GH-LOAN-COR-02,Asset,1020000000,GHS,OU-GH-COR,GH-1030,COA-14,LOAN-COR,Loans - Corporate Working Capital Facility,2027-06-30,2026-12-31,Floating,30.0,N/A,None,0,None,true,0.8,Performing,0
+GH-LOAN-SME-01,Asset,357000000,GHS,OU-GH-COR,GH-1030,COA-14,LOAN-SME,Loans - SME Term Loan,2028-09-30,2027-03-31,Fixed,32.0,N/A,None,0,None,true,1.9,Substandard,142800000
+GH-LOAN-RET-02,Asset,459000000,GHS,OU-GH-RET,GH-1030,COA-14,LOAN-RET,Loans - Auto Loan,2030-03-31,2027-03-31,Fixed,28.0,N/A,None,0,None,true,2.8,Performing,0

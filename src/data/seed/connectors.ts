@@ -12,7 +12,7 @@ export const SEED_CONNECTORS: Connector[] = [
     status: 'Blocked',
     statusReason:
       'No production API credentials have been issued for this environment yet. The endpoint, cadence and window ' +
-      'below are the target configuration each affiliate will point to once Core Banking provisions access — not a ' +
+      'below are the target configuration each affiliate will point to once Core Banking provisions access - not a ' +
       'live connection today. Positions and the general ledger come in by file upload in the meantime.',
     endpoint: 'https://{affiliate}.flexcube.ecobank.internal/api/v2/extract',
     authMode: 'OAuth2',
@@ -21,11 +21,12 @@ export const SEED_CONNECTORS: Connector[] = [
     scheduleWindow: '02:00–04:00 local, after end-of-day',
     timeoutSeconds: 300,
     maxRetries: 3,
-    owner: 'Ecobank Business Services — Core Banking',
+    owner: 'Ecobank Business Services - Core Banking',
     notes:
       'One instance per affiliate, so the endpoint is templated on the affiliate code. Once connected, the extract ' +
       'would run after end-of-day, which is why the window sits overnight in local time rather than at a single ' +
-      'Group hour.',
+      'Group hour. Feeds Positions, General Ledger and Counterparties in this system’s terms - there is no ' +
+      'separate transaction-level domain here; loan and deposit balances are the unit of record.',
     ...STAMP,
   },
   {
@@ -45,7 +46,7 @@ export const SEED_CONNECTORS: Connector[] = [
     scheduleWindow: '17:30 GMT, after London close',
     timeoutSeconds: 60,
     maxRetries: 5,
-    owner: 'Group Treasury — Market Data',
+    owner: 'Group Treasury - Market Data',
     notes: 'Once entitled, one Group-wide credential would cover every affiliate, with curves and FX in the same call.',
     ...STAMP,
   },
@@ -64,7 +65,7 @@ export const SEED_CONNECTORS: Connector[] = [
     scheduleWindow: 'Intraday, session-held',
     timeoutSeconds: 30,
     maxRetries: 2,
-    owner: 'Group Treasury — Market Data',
+    owner: 'Group Treasury - Market Data',
     notes:
       'An alternative to Refinitiv for the same two domains, useful where an affiliate prices specifically off ' +
       'Bloomberg benchmarks.',
@@ -85,9 +86,13 @@ export const SEED_CONNECTORS: Connector[] = [
     scheduleWindow: '06:00 GMT, post batch',
     timeoutSeconds: 600,
     maxRetries: 2,
-    owner: 'Group Treasury — Front Office Systems',
+    owner: 'Group Treasury - Front Office Systems',
     notes:
-      'Calypso holds the treasury and derivatives book, read via a read-only schema account against the vendor database.',
+      'Calypso holds the treasury and derivatives book, read via a read-only schema account against the vendor ' +
+      'database. There is no separate trade-position or treasury-instrument domain here - Calypso-sourced exposures ' +
+      'land as ordinary Positions, same as a Flexcube loan or deposit. When uploaded manually in the meantime, ' +
+      'they’re typically tagged with the Treasury contributor - that tag identifies the submitting desk, not the ' +
+      'source system.',
     ...STAMP,
   },
 ];

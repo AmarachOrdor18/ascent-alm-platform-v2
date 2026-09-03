@@ -41,7 +41,10 @@ export function TransactionStrategies() {
           value={row.action}
           options={ACTIONS}
           disabled={readOnly}
-          onChange={(v) => update({ action: v })}
+          // A hedge is off-balance-sheet notional by definition (see the action's own label) - deriving this
+          // from the action, rather than exposing a second control the user has to remember to set, is what
+          // keeps a Hedge line actually excluded from on-balance-sheet totals downstream.
+          onChange={(v) => update({ action: v, isOffBalanceSheet: v === 'Hedge' })}
         />
       ),
     },
@@ -139,7 +142,7 @@ export function TransactionStrategies() {
   return (
     <RuleEditor<TransactionStrategyRule>
       title="Transaction Strategies"
-      description="Balance-sheet actions inside a scenario — issue, sell, hedge. The difference between shocking rates and testing a decision."
+      description="Balance-sheet actions inside a scenario - issue, sell, hedge. The difference between shocking rates and testing a decision."
       noun="strategy"
       rules={rules}
       isLoading={isLoading}
@@ -150,7 +153,7 @@ export function TransactionStrategies() {
       summarise={(r) => `${r.transactions.length} transaction(s)`}
       validate={(r) => {
         for (const t of r.transactions) {
-          if (t.amount <= 0) return 'Every transaction needs a positive amount — use the action to express direction.';
+          if (t.amount <= 0) return 'Every transaction needs a positive amount - use the action to express direction.';
           if (t.executionDate && t.maturityDate && t.maturityDate <= t.executionDate) {
             return `${t.productCode}: maturity must fall after execution.`;
           }
@@ -160,8 +163,9 @@ export function TransactionStrategies() {
       guidance={
         <>
           <span className="font-bold">Decisions, not shocks.</span> A rate scenario asks what happens if the market
-          moves. A transaction strategy asks what happens if <em>we</em> move — issue term funding, sell down the bill
-          book, hedge the duration gap. Attach one to a run to see the combined effect.
+          moves. A transaction strategy asks what happens if <em>we</em> move - issue term funding, sell down the bill
+          book, hedge the duration gap. Process Run lets a strategy be attached and pins it to the run, but does not
+          yet apply its effect to any calculated element - that modelling is a separate, not-yet-built piece of work.
         </>
       }
       renderBody={(rule, update, readOnly) => {

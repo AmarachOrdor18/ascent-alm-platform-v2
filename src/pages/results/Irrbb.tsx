@@ -11,11 +11,15 @@ import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, C
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, usePositions, useYieldCurves } from '@/lib/hooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
+import { useRules } from '@/lib/ruleHooks';
+import { approvals } from '@/lib/governanceHooks';
 import { formatPct, formatAmount } from '@/lib/format';
 import { buildFxTable } from '@/engine/fx';
+import { latestCurveAsOf } from '@/engine/ftp';
 import { defaultLadder } from '@/engine/buckets';
-import { computeAllShocks, type EveResult, type NiiResult } from '@/engine/irrbb';
+import { computeAllShocks, type CustomShock, type EveResult, type NiiResult } from '@/engine/irrbb';
 import type { RepricingGapResult } from '@/engine/irrbb';
+import type { ForecastScenarioRule } from '@/engine/ruleTypes';
 
 export function Irrbb() {
   const { affiliate, affiliateCode } = useScope();
@@ -26,6 +30,16 @@ export function Irrbb() {
   const { data: fxRates = [] } = useFxRates();
   const { data: yieldCurves = [] } = useYieldCurves();
   const { data: runPositions = [] } = usePositions(run?.affiliateCode, run?.asOfDate);
+  // A custom scenario joins the standard six only once approved - the same Submit -> Approve gate
+  // Stress Testing's scenarios go through, since both draw on the same ForecastScenarioRule.
+  const { data: scenarios = [] } = useRules<ForecastScenarioRule>('ForecastScenario');
+  const { data: approvalRequests = [] } = approvals.useList();
+  const approvedScenarioIds = new Set(
+    approvalRequests.filter((a) => a.entityType === 'ForecastScenario' && a.status === 'Approved').map((a) => a.entityId),
+  );
+  const customShocks: CustomShock[] = scenarios
+    .filter((s) => approvedScenarioIds.has(s.id))
+    .map((s) => ({ id: s.id, label: s.name, shockByBucket: s.shockByBucket }));
 
   const nii = payloadOf<NiiResult>(results, 'NiiSensitivity');
   const eve = payloadOf<EveResult>(results, 'EveSensitivity');
@@ -38,6 +52,7 @@ export function Irrbb() {
           runPositions,
           { asOfDate: run.asOfDate, reportingCurrency: currency, fx: buildFxTable('USD', fxRates, run.asOfDate), tier1Capital: null },
           ladder,
+          customShocks,
         )
       : null;
 
@@ -50,9 +65,7 @@ export function Irrbb() {
       }))
     : [];
 
-  const curve = yieldCurves
-    .filter((c) => c.currency === currency && c.isActive && (!run || c.asOfDate <= run.asOfDate))
-    .sort((a, b) => b.asOfDate.localeCompare(a.asOfDate))[0];
+  const curve = latestCurveAsOf(yieldCurves, run?.asOfDate ?? new Date().toISOString().slice(0, 10), (c) => c.currency === currency);
   const curvePoints = curve ? curve.terms.map((t) => ({ tenor: t.label, rate: t.ratePercent })) : [];
 
   return (
@@ -76,7 +89,14 @@ export function Irrbb() {
             tone: eve?.isBaselOutlier === true ? 'danger' : 'success',
             about: 'How much this shock would change the present value of the whole book, via the duration gap, as a share of capital. Basel’s supervisory outlier test is ±15%.',
           },
-          { label: 'Prescribed shock scenarios', value: String(shockRows.length), about: 'The six BCBS-standard interest-rate shocks: parallel up/down, steepener, flattener, and short rate up/down.' },
+          {
+            label: 'Shock scenarios',
+            value: String(shockRows.length),
+            about:
+              customShocks.length > 0
+                ? `The six BCBS-standard interest-rate shocks, plus ${customShocks.length} approved custom scenario(s): ${customShocks.map((c) => c.label).join(', ')}.`
+                : 'The six BCBS-standard interest-rate shocks: parallel up/down, steepener, flattener, and short rate up/down.',
+          },
           { label: 'Repricing buckets', value: String(repricingGap?.buckets.length ?? ladder.buckets.length), about: 'The number of time buckets on the active repricing ladder, into which positions are sorted by their next repricing date.' },
         ]}
         actions={
@@ -106,13 +126,17 @@ export function Irrbb() {
           <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                Basel prescribed shock scenarios
+                Shock scenarios
                 <InfoButton label="What this chart shows">
                   All six BCBS-standard shocks (parallel up/down, steepener, flattener, short rate up/down) applied to
-                  this run's own book, showing both the earnings (NII) and economic-value (EVE) impact side by side.
+                  this run's own book, showing both the earnings (NII) and economic-value (EVE) impact side by side -
+                  plus any Approved custom scenario from the What-If Builder, run against the same book.
                 </InfoButton>
               </h2>
-              <p className="mb-4 text-[11px] font-medium text-gray-400">NII and EVE impact, all six standard shocks against this run's book</p>
+              <p className="mb-4 text-[11px] font-medium text-gray-400">
+                NII and EVE impact - the six standard shocks
+                {customShocks.length > 0 ? ` plus ${customShocks.length} custom scenario(s)` : ''}, against this run's book
+              </p>
               <div style={{ width: '100%', height: 320 }}>
                 <ResponsiveContainer>
                   <BarChart data={shockRows} layout="vertical" margin={{ left: 24 }}>
@@ -133,7 +157,7 @@ export function Irrbb() {
               <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Yield curve
                 <InfoButton label="What this chart shows">
-                  The market curve used to derive the shock scenarios above — the same curve, shocked, drives both the
+                  The market curve used to derive the shock scenarios above - the same curve, shocked, drives both the
                   NII and EVE calculations.
                 </InfoButton>
               </h2>
@@ -164,7 +188,7 @@ export function Irrbb() {
             <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               Repricing gap analysis
               <InfoButton label="What this chart shows">
-                Positions bucketed by next repricing date (falling back to maturity for fixed-rate instruments) —
+                Positions bucketed by next repricing date (falling back to maturity for fixed-rate instruments) -
                 different from the maturity gap, since a floating-rate loan can reprice long before it matures. This
                 gap is what drives the NII sensitivity above.
               </InfoButton>
@@ -203,12 +227,12 @@ export function Irrbb() {
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-1 flex items-center gap-1.5">
                 <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                  Earnings view — ΔNII
+                  Earnings view - ΔNII
                 </h2>
                 <InfoButton label="Why this matters">
                   {nii.repricingGap < 0
-                    ? 'The gap is negative — more liabilities reprice inside the horizon than assets, so a rate rise costs earnings before it earns them.'
-                    : 'The gap is positive — more assets reprice inside the horizon than liabilities, so a rate rise adds to earnings.'}{' '}
+                    ? 'The gap is negative - more liabilities reprice inside the horizon than assets, so a rate rise costs earnings before it earns them.'
+                    : 'The gap is positive - more assets reprice inside the horizon than liabilities, so a rate rise adds to earnings.'}{' '}
                   Deposit betas are not applied here; the What-If Builder applies them and shows the difference.
                 </InfoButton>
               </div>
@@ -250,7 +274,7 @@ export function Irrbb() {
               <div className="mb-1 flex items-baseline justify-between">
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                    Economic value view — ΔEVE
+                    Economic value view - ΔEVE
                   </h2>
                   <InfoButton label="Capital basis">
                     <span className="font-bold text-navy-900">Capital basis: {eve.capitalBasis.toLowerCase()}.</span>{' '}
@@ -277,20 +301,20 @@ export function Irrbb() {
               <dl className="space-y-2 text-[12px]">
                 <Row
                   label="Asset duration"
-                  value={<span className="font-mono">{eve.assetDuration?.toFixed(2) ?? '—'} yrs</span>}
+                  value={<span className="font-mono">{eve.assetDuration?.toFixed(2) ?? '-'} yrs</span>}
                 />
                 <Row
                   label="Liability duration"
-                  value={<span className="font-mono">{eve.liabilityDuration?.toFixed(2) ?? '—'} yrs</span>}
+                  value={<span className="font-mono">{eve.liabilityDuration?.toFixed(2) ?? '-'} yrs</span>}
                 />
                 <Row
                   label="Duration gap"
-                  value={<span className="font-mono font-bold">{eve.durationGap?.toFixed(2) ?? '—'} yrs</span>}
+                  value={<span className="font-mono font-bold">{eve.durationGap?.toFixed(2) ?? '-'} yrs</span>}
                   bold
                 />
                 <Row
                   label="PV01 (per 1bp)"
-                  value={eve.pv01 === null ? <span className="font-mono">—</span> : <Amount value={eve.pv01} currency={currency} colorBySign />}
+                  value={eve.pv01 === null ? <span className="font-mono">-</span> : <Amount value={eve.pv01} currency={currency} colorBySign />}
                 />
                 <Row label="Total assets" value={<Amount value={eve.totalAssets} currency={currency} />} />
                 <Row label="Total liabilities" value={<Amount value={eve.totalLiabilities} currency={currency} />} />

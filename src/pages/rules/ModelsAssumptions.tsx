@@ -7,57 +7,49 @@ import { useRules } from '@/lib/ruleHooks';
 import { formatDate } from '@/lib/format';
 import type { RuleKind, RuleMeta } from '@/engine/types';
 
-const REGISTRY: Array<{ kind: RuleKind; label: string; path: string; governs: string }> = [
-  { kind: 'TimeBucket', label: 'Time Buckets', path: '/rules/time-buckets', governs: 'How results are bucketed' },
-  {
-    kind: 'ProductCharacteristic',
-    label: 'Product Characteristics',
-    path: '/rules/product-characteristics',
-    governs: 'Basel factors per product',
-  },
-  {
-    kind: 'BehaviourPattern',
-    label: 'Behaviour Patterns',
-    path: '/rules/behaviour-patterns',
-    governs: 'Deposit run-off and betas',
-  },
-  {
-    kind: 'PaymentPattern',
-    label: 'Payment & Repricing Patterns',
-    path: '/rules/patterns',
-    governs: 'Non-standard schedules',
-  },
-  { kind: 'Prepayment', label: 'Prepayment', path: '/rules/prepayment', governs: 'Early principal return' },
-  {
-    kind: 'DiscountMethod',
-    label: 'Discount Methods',
-    path: '/rules/discount-methods',
-    governs: 'Present-value basis',
-  },
-  { kind: 'ForecastScenario', label: 'Forecast Scenarios', path: '/rules/scenarios', governs: 'Rate shocks' },
-  { kind: 'NewBusiness', label: 'New Business', path: '/rules/new-business', governs: 'Growth and origination' },
-  {
-    kind: 'TransactionStrategy',
-    label: 'Transaction Strategies',
-    path: '/rules/transaction-strategies',
-    governs: 'Balance-sheet actions',
-  },
-  { kind: 'FtpRule', label: 'FTP Rules', path: '/rules/ftp', governs: 'Transfer pricing method' },
-  { kind: 'AdjustmentRule', label: 'Adjustment Rules', path: '/rules/adjustments', governs: 'FTP add-ons' },
-  { kind: 'Filter', label: 'Filters', path: '/rules/filters', governs: 'Scope selection' },
-  { kind: 'CustomMetric', label: 'Custom Metrics', path: '/rules/custom-metrics', governs: 'Derived measures' },
+/**
+ * `ifEmpty` states plainly what happens when a rule kind has nothing defined - the "is this
+ * mandatory before a run" question this registry exists to answer. Traced against `ProcessRun.tsx`'s
+ * rule selectors and `engine/run.ts`'s `executeRun`, not guessed: several kinds are stored on a run
+ * but not yet applied to any calculation at all ("not wired to a calculation"), which is a real,
+ * separate gap from a kind that safely falls back to an engine default.
+ */
+const REGISTRY: Array<{ kind: RuleKind; label: string; governs: string; ifEmpty: string }> = [
+  { kind: 'TimeBucket', label: 'Time Buckets', governs: 'How results are bucketed', ifEmpty: 'Engine default ladder applies (disclosed on the result)' },
+  { kind: 'ProductCharacteristic', label: 'Product Characteristics', governs: 'Basel factors per product', ifEmpty: 'Position keeps its as-loaded classification, unchanged' },
+  { kind: 'BehaviourPattern', label: 'Behaviour Patterns', governs: 'Deposit run-off and betas', ifEmpty: 'Engine default pattern set applies (disclosed on the result)' },
+  { kind: 'PaymentPattern', label: 'Payment & Repricing Patterns', governs: 'Non-standard schedules', ifEmpty: 'Not wired to a calculation yet' },
+  { kind: 'Prepayment', label: 'Prepayment', governs: 'Early principal return', ifEmpty: 'Not wired to a calculation yet' },
+  { kind: 'DiscountMethod', label: 'Discount Methods', governs: 'Present-value basis', ifEmpty: 'Not wired to a calculation yet' },
+  { kind: 'ForecastScenario', label: 'Forecast Scenarios', governs: 'Rate shocks', ifEmpty: 'Run computes the base case only' },
+  { kind: 'NewBusiness', label: 'New Business', governs: 'Growth and origination', ifEmpty: 'Consumed by Forecast only - no effect on a Process Run' },
+  { kind: 'TransactionStrategy', label: 'Transaction Strategies', governs: 'Balance-sheet actions', ifEmpty: 'Not wired to a calculation yet, even when attached to a run' },
+  { kind: 'FtpRule', label: 'FTP Rules', governs: 'Transfer pricing method', ifEmpty: 'All positions reported unpriced, not assumed zero-margin' },
+  { kind: 'AdjustmentRule', label: 'Adjustment Rules', governs: 'FTP add-ons', ifEmpty: 'Transfer rate is the base curve alone, no add-ons' },
+  { kind: 'Filter', label: 'Filters', governs: 'Scope selection', ifEmpty: 'Not selectable on Process Run yet - scope it there directly instead' },
+  { kind: 'CustomMetric', label: 'Custom Metrics', governs: 'Derived measures', ifEmpty: 'Not wired to a calculation yet' },
+  { kind: 'ValidationRule', label: 'Validation Rules', governs: 'Data-quality gates before commit', ifEmpty: 'Engine default validation rules apply, silently' },
+  { kind: 'FieldMapping', label: 'Field Mappings', governs: 'Source-column translation before import', ifEmpty: 'Upload expects the platform\'s own column names as-is' },
+  { kind: 'CodeMapping', label: 'Code Mappings', governs: 'Source-code crosswalks before import', ifEmpty: 'Unmapped codes are flagged at upload rather than translated' },
 ];
+
+// Every kind is now configured inline on an affiliate's (or the Group's) own Settings page - a
+// specific affiliate's fork lives on its own Settings, so this registry (inherently cross-affiliate)
+// always points at the Group's, where every kind's Group-default editor also lives.
+function settingsPathFor(kind: RuleKind): string {
+  return `/affiliates/GROUP/settings?section=rule-${kind}`;
+}
 
 interface RegistryRow {
   kind: RuleKind;
   label: string;
-  path: string;
   governs: string;
+  ifEmpty: string;
   rules: RuleMeta[];
 }
 
-export function ModelsAssumptions() {
-  // Fixed-length array of hook calls — stable hook order despite looking like a loop.
+export function ModelsAssumptions({ embedded = false }: { embedded?: boolean } = {}) {
+  // Fixed-length array of hook calls - stable hook order despite looking like a loop.
   const queries = [
     useRules('TimeBucket'),
     useRules('ProductCharacteristic'),
@@ -72,6 +64,9 @@ export function ModelsAssumptions() {
     useRules('AdjustmentRule'),
     useRules('Filter'),
     useRules('CustomMetric'),
+    useRules('ValidationRule'),
+    useRules('FieldMapping'),
+    useRules('CodeMapping'),
   ];
   const { data: audit = [] } = useAuditEvents(50);
 
@@ -92,7 +87,7 @@ export function ModelsAssumptions() {
       key: 'label',
       header: 'Rule type',
       render: (r) => (
-        <Link href={r.path} className="font-medium text-navy-900 hover:text-navy-700 hover:underline">
+        <Link href={settingsPathFor(r.kind)} className="font-medium text-navy-900 hover:text-navy-700 hover:underline">
           {r.label}
         </Link>
       ),
@@ -129,6 +124,13 @@ export function ModelsAssumptions() {
         ),
     },
     {
+      key: 'ifEmpty',
+      header: 'If nothing is defined',
+      render: (r) => (
+        <span className={r.ifEmpty.startsWith('Not wired') ? 'text-warning' : 'text-gray-500'}>{r.ifEmpty}</span>
+      ),
+    },
+    {
       key: 'updated',
       header: 'Last changed',
       render: (r) => {
@@ -136,30 +138,47 @@ export function ModelsAssumptions() {
           .map((x) => x.updatedAt ?? x.createdAt)
           .sort()
           .reverse()[0];
-        return <span className="text-[11px] text-gray-500">{latest ? formatDate(latest.slice(0, 10)) : '—'}</span>;
+        return <span className="text-[11px] text-gray-500">{latest ? formatDate(latest.slice(0, 10)) : '-'}</span>;
       },
     },
   ];
 
   return (
     <>
+      {!embedded && (
       <ModuleHeader
         title="Models & Assumptions"
         description="Every configurable rule, who owns it and when it last changed. The register a model-governance review reads."
         asOfDate={null}
         scope="All folders"
         metrics={[
-          { label: 'Rule types', value: `${configured}/${REGISTRY.length}`, about: 'How many of the 13 rule categories have at least one rule defined, versus still running on engine defaults.' },
-          { label: 'Rules defined', value: String(allRules.length), about: 'Total rule instances across every category, Group-wide and affiliate-specific combined.' },
+          {
+            label: 'Rule types',
+            value: `${configured}/${REGISTRY.length}`,
+            about:
+              `How many of the ${REGISTRY.length} rule categories have at least one rule defined, versus still running on engine defaults.`,
+          },
+          {
+            label: 'Rules defined',
+            value: String(allRules.length),
+            about: 'Total rule instances across every category, Group-wide and affiliate-specific combined.',
+          },
           {
             label: 'Affiliate overrides',
             value: String(affiliateSpecific.length),
             tone: affiliateSpecific.length > 0 ? 'warning' : 'neutral',
-            about: 'Rules scoped to a single affiliate rather than the Group standard — a deliberate fork, not an oversight, but worth knowing about.',
+            about:
+              'Rules scoped to a single affiliate rather than the Group standard - a deliberate fork, not an oversight, but worth knowing about.',
           },
-          { label: 'Inactive', value: String(inactive.length), tone: inactive.length > 0 ? 'warning' : 'neutral', about: 'Rules kept on file but not currently applied to any run.' },
+          {
+            label: 'Inactive',
+            value: String(inactive.length),
+            tone: inactive.length > 0 ? 'warning' : 'neutral',
+            about: 'Rules kept on file but not currently applied to any run.',
+          },
         ]}
       />
+      )}
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Registry</h2>
@@ -171,40 +190,50 @@ export function ModelsAssumptions() {
             r.rules.length === 0 ? (
               <p className="text-[11px] text-gray-500">
                 Nothing defined.{' '}
-                <Link href={r.path} className="font-bold text-navy-700 hover:underline">
+                <Link href={settingsPathFor(r.kind)} className="font-bold text-navy-700 hover:underline">
                   Configure {r.label}
                 </Link>
                 .
               </p>
             ) : (
-              <table className="w-full text-[11px]">
-                <thead>
-                  <tr className="border-b border-gray-200 text-left text-gray-400">
-                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Name</th>
-                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Folder</th>
-                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Scope</th>
-                    <th className="py-1 px-3 text-right font-bold uppercase tracking-wider">Version</th>
-                    <th className="py-1 px-3 font-bold uppercase tracking-wider">Owner</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {r.rules.map((rule) => (
-                    <tr key={rule.id} className="border-b border-gray-100 last:border-0">
-                      <td className="py-1.5 px-3 font-medium text-navy-900">{rule.name}</td>
-                      <td className="py-1.5 px-3 font-mono text-gray-500">{rule.folder}</td>
-                      <td className="py-1.5 px-3">
-                        {rule.affiliateCode ? (
-                          <span className="font-mono text-warning">{rule.affiliateCode}</span>
-                        ) : (
-                          <span className="text-gray-500">Group</span>
-                        )}
-                      </td>
-                      <td className="py-1.5 px-3 text-right font-mono">v{rule.version}</td>
-                      <td className="py-1.5 px-3 text-gray-500">{rule.updatedBy ?? rule.createdBy}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <ResultTable
+                className="text-[11px]"
+                rows={r.rules}
+                rowKey={(rule) => rule.id}
+                columns={[
+                  {
+                    key: 'name',
+                    header: 'Name',
+                    render: (rule) => <span className="font-medium text-navy-900">{rule.name}</span>,
+                  },
+                  {
+                    key: 'folder',
+                    header: 'Folder',
+                    render: (rule) => <span className="font-mono text-gray-500">{rule.folder}</span>,
+                  },
+                  {
+                    key: 'scope',
+                    header: 'Scope',
+                    render: (rule) =>
+                      rule.affiliateCode ? (
+                        <span className="font-mono text-warning">{rule.affiliateCode}</span>
+                      ) : (
+                        <span className="text-gray-500">Group</span>
+                      ),
+                  },
+                  {
+                    key: 'version',
+                    header: 'Version',
+                    align: 'right',
+                    render: (rule) => <span className="font-mono">v{rule.version}</span>,
+                  },
+                  {
+                    key: 'owner',
+                    header: 'Owner',
+                    render: (rule) => <span className="text-gray-500">{rule.updatedBy ?? rule.createdBy}</span>,
+                  },
+                ]}
+              />
             )
           }
         />

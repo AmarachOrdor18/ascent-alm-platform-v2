@@ -144,11 +144,68 @@ export function computeSurvivalHorizon(
       `Two-phase outflow profile: ${frontLoadedPercent}% of the total stressed outflow over the first ` +
       `${frontLoadedDays} days, the remainder spread evenly across the rest of the ${horizonDays}-day window. ` +
       'The survival horizon is the last day the buffer remains non-negative. This is an assumed profile, not a ' +
-      'behavioural model fitted to observed withdrawals — fitting one requires multi-period position history.',
+      'behavioural model fitted to observed withdrawals - fitting one requires multi-period position history.',
   };
 }
 
 /** The standard severe scenario: a 30-day window with 55% of outflows in the first 10 days. */
 export function severeOutflowProfile(totalOutflow: number): OutflowProfile {
   return { totalOutflow, horizonDays: 30, frontLoadedPercent: 55, frontLoadedDays: 10 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Reverse stress
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ReverseStressResult {
+  targetSurvivalDays: number;
+  /** The total stressed outflow that exhausts the buffer at (or as close as bisection reaches to) the target day. */
+  solvedTotalOutflow: number;
+  /** False only if the target day sits outside what a bounded search range can reach. */
+  converged: boolean;
+  timeline: SurvivalDay[];
+  methodology: string;
+}
+
+/**
+ * Solves backward from a target survival horizon to the outflow magnitude that produces it - "how severe a
+ * run would it take to exhaust our buffer in N days?" rather than "given this run, how long do we survive?"
+ * `survivalHorizonDays` is monotonically non-increasing in `totalOutflow` for a fixed profile shape, so this
+ * is a plain bisection over the existing forward calculation - no new risk model, just run it backward.
+ */
+export function solveOutflowForSurvivalTarget(
+  openingBuffer: number,
+  baseProfile: Omit<OutflowProfile, 'totalOutflow'>,
+  targetSurvivalDays: number,
+  ctx: StressContext,
+): ReverseStressResult {
+  const clampedTarget = Math.max(0, Math.min(baseProfile.horizonDays, targetSurvivalDays));
+
+  let lo = 0;
+  let hi = Math.max(openingBuffer, 1) * 20;
+  let best = computeSurvivalHorizon(openingBuffer, { ...baseProfile, totalOutflow: hi }, ctx);
+
+  // 50 iterations is far more than needed for a one-day tolerance within this bound, and keeps the function
+  // a fixed, deterministic amount of work regardless of input - no while-true risk.
+  for (let i = 0; i < 50; i += 1) {
+    const mid = (lo + hi) / 2;
+    const result = computeSurvivalHorizon(openingBuffer, { ...baseProfile, totalOutflow: mid }, ctx);
+    best = result;
+    if (result.survivalHorizonDays > clampedTarget) {
+      lo = mid; // not severe enough yet - push the outflow up
+    } else {
+      hi = mid; // at or past the target - pull back to bracket it more tightly
+    }
+  }
+
+  return {
+    targetSurvivalDays: clampedTarget,
+    solvedTotalOutflow: hi,
+    converged: Math.abs(best.survivalHorizonDays - clampedTarget) <= 1,
+    timeline: best.timeline,
+    methodology:
+      `Bisection over the same two-phase outflow model used forward: the total stressed outflow is searched ` +
+      `until the buffer would be exhausted within ${clampedTarget} day(s), rather than assuming a scenario and ` +
+      `reading off the result.`,
+  };
 }

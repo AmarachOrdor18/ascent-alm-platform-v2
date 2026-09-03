@@ -1,33 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useRoute } from 'wouter';
-import { ModuleHeader } from '@/components/layout/ModuleHeader';
+import { Link, useLocation, useRoute } from 'wouter';
 import { ShieldCheckIcon } from '@/components/icons/Icons';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { Drawer } from '@/components/ui/Drawer';
+import { Affiliates } from '@/pages/Affiliates';
 import { ConnectorFields } from '@/components/connectors/ConnectorFields';
+import { FeedStatusBadge } from '@/components/connectors/FeedStatusBadge';
 import { DOMAINS, DOMAIN_LABEL } from '@/components/connectors/connectorConstants';
-import { DataLoadPanel } from '@/components/data/DataLoadPanel';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/context/AuthContext';
 import {
   useAffiliates,
-  useBatches,
   useCurrencies,
   useDeleteAffiliate,
   useDimensionMembers,
   useHolidayCalendars,
-  usePositions,
   useSaveAffiliate,
-  useSaveBatch,
   useSaveDimensionMembers,
+  useUsers,
 } from '@/lib/hooks';
 import { availableFor, newConnector, useConnectors, useSaveConnector, validateConnector } from '@/lib/connectorHooks';
 import { approvals, newId } from '@/lib/governanceHooks';
-import { REGULATORY_MINIMA } from '@/engine/limits';
-import { reconcile } from '@/engine/reconciliation';
-import { identityFxTable } from '@/engine/fx';
-import { importLedger } from '@/lib/csvImport';
-import type { Affiliate, Connector, DataDomain, DomainFeed, FeedMode, InternalThreshold } from '@/engine/types';
+import { useRules } from '@/lib/ruleHooks';
+import { repository } from '@/store/localRepository';
+import { METRIC_LABEL, REGULATORY_MINIMA } from '@/engine/limits';
+import { COUNTRIES, REGIONS } from '@/lib/countries';
+import type { Affiliate, Connector, DataDomain, DomainFeed, FeedMode, InternalThreshold, RuleKind } from '@/engine/types';
 
 const STEPS = [
   { n: 1, title: 'Legal entity & profile', hint: 'Who the affiliate is, and who regulates it.' },
@@ -36,16 +35,12 @@ const STEPS = [
   { n: 4, title: 'Chart of accounts & organisation', hint: 'Map local GL onto the Group standard.' },
   { n: 5, title: 'Assumption inheritance', hint: 'Inherit Group defaults, or fork.' },
   { n: 6, title: 'Limits & regulatory thresholds', hint: 'Minima differ by jurisdiction; internal appetite is yours to set.' },
-  { n: 7, title: 'Initial data load', hint: 'Upload, validate, reconcile, commit — no separate screen.' },
 ];
 
-const REGULATORS = ['CBN', 'Bank of Ghana', 'BCEAO', 'BEAC', 'Bank of Zambia', 'Central Bank of Kenya'];
-
-const METRIC_LABEL: Record<string, string> = {
-  lcrPercent: 'LCR',
-  nsfrPercent: 'NSFR',
-  loanToDepositPercent: 'Loan-to-Deposit',
-};
+// Derived from the actual regulatory-minima table (same source BulkOnboardAffiliates.tsx uses) rather
+// than a separately hand-kept list - a regulator picked here that has no minima configured would
+// otherwise silently fall back to a generic {100, 100} limit at step 6 with no indication why.
+const REGULATORS = Object.keys(REGULATORY_MINIMA);
 
 interface Profile {
   code: string;
@@ -56,7 +51,7 @@ interface Profile {
   legalEntityCode: string;
 }
 
-const EMPTY_PROFILE: Profile = { code: '', name: '', country: '', region: 'West Africa', regulator: 'CBN', legalEntityCode: '' };
+const EMPTY_PROFILE: Profile = { code: '', name: '', country: '', region: '', regulator: 'CBN', legalEntityCode: '' };
 
 export function OnboardAffiliate() {
   const [, navigate] = useLocation();
@@ -70,17 +65,22 @@ export function OnboardAffiliate() {
   const { data: currencies = [] } = useCurrencies();
   const { data: calendars = [] } = useHolidayCalendars();
   const { data: connectors = [] } = useConnectors();
+  const { data: users = [] } = useUsers();
 
   const [code, setCode] = useState<string | null>(resumeCode);
   const affiliate = code ? (affiliates.find((a) => a.code === code) ?? null) : null;
 
-  // Common COA is affiliate-owned — NG's copy (identical to GH's/CI's today) is the reference this affiliate's
-  // GL mappings are built against, and gets copied into its own list on the first mapping (see addCoaMapping).
-  const { data: commonCoaReference = [] } = useDimensionMembers('CommonCoa', 'NG');
+  // Who a feed can be assigned to here: this affiliate's own staff, plus Group staff who
+  // routinely stand in as the interim owner before local users are provisioned post-onboarding.
+  const feedOwners = users.filter((u) => u.affiliateCode === code || u.affiliateCode === 'GROUP');
+
+  // Common COA is affiliate-owned - GROUP's copy is the actual Group standard, the reference every new
+  // affiliate's GL mappings are built against, and gets copied into its own list on the first mapping
+  // (see addCoaMapping).
+  const { data: commonCoaReference = [] } = useDimensionMembers('CommonCoa', 'GROUP');
   const { data: commonCoa = [] } = useDimensionMembers('CommonCoa', code ?? '');
   const { data: glAccounts = [] } = useDimensionMembers('GlAccount', code ?? '');
   const { data: orgUnits = [] } = useDimensionMembers('OrgUnit', code ?? '');
-  const { data: batches = [] } = useBatches();
 
   const save = useSaveAffiliate();
   const del = useDeleteAffiliate();
@@ -88,7 +88,6 @@ export function OnboardAffiliate() {
   const saveGlAccounts = useSaveDimensionMembers('GlAccount');
   const saveOrgUnits = useSaveDimensionMembers('OrgUnit');
   const saveCommonCoa = useSaveDimensionMembers('CommonCoa');
-  const saveBatch = useSaveBatch();
   const raiseApproval = approvals.useSave();
   const creatingRef = useRef(false);
 
@@ -152,13 +151,13 @@ export function OnboardAffiliate() {
     });
   };
 
-  // ── Step 2 — currencies & calendar ───────────────────────────────────
+  // ── Step 2 - currencies & calendar ───────────────────────────────────
   const setCurrencies = (patch: Partial<Pick<Affiliate, 'functionalCurrency' | 'reportingCurrency' | 'activeCurrencies' | 'fiscalYearEnd' | 'holidayCalendarId'>>) => {
     if (!affiliate) return;
     save.mutate({ ...affiliate, ...patch });
   };
 
-  // ── Step 3 — connectivity ────────────────────────────────────────────
+  // ── Step 3 - connectivity ────────────────────────────────────────────
   const [addingConnectorFor, setAddingConnectorFor] = useState<DataDomain | null>(null);
   const [newConnectorDraft, setNewConnectorDraft] = useState<Connector | null>(null);
 
@@ -186,7 +185,7 @@ export function OnboardAffiliate() {
 
   const complete3 = !!affiliate && affiliate.feeds.every((f) => f.mode === 'File' || (f.mode === 'Connector' && !!f.connectorId));
 
-  // ── Step 4 — COA & organisation ──────────────────────────────────────
+  // ── Step 4 - COA & organisation ──────────────────────────────────────
   const commonCoaLeaves = useMemo(() => commonCoaReference.filter((m) => m.isLeaf), [commonCoaReference]);
   const unmappedCoa = useMemo(
     () => commonCoaLeaves.filter((leaf) => !glAccounts.some((m) => m.attributes?.commonCoa === leaf.code)),
@@ -199,7 +198,7 @@ export function OnboardAffiliate() {
     const localCode = (newLocalCode[leafCode] ?? '').trim();
     if (!localCode) return;
 
-    // This affiliate's own Common COA copy — created on the first mapping, since there's no Group-wide list to
+    // This affiliate's own Common COA copy - created on the first mapping, since there's no Group-wide list to
     // point its GL accounts at instead.
     if (commonCoa.length === 0 && commonCoaReference.length > 0) {
       await saveCommonCoa.mutateAsync(
@@ -210,7 +209,7 @@ export function OnboardAffiliate() {
     const rootCode = `GL-${affiliate.code}`;
     const rootExists = glAccounts.some((m) => m.code === rootCode);
     await saveGlAccounts.mutateAsync([
-      ...(rootExists ? [] : [{ id: `GlAccount:${affiliate.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: affiliate.code, code: rootCode, name: `${affiliate.name} — Local Chart`, parentCode: null, isLeaf: false }]),
+      ...(rootExists ? [] : [{ id: `GlAccount:${affiliate.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: affiliate.code, code: rootCode, name: `${affiliate.name} - Local Chart`, parentCode: null, isLeaf: false }]),
       {
         id: `GlAccount:${affiliate.code}:${localCode}`,
         dimension: 'GlAccount' as const,
@@ -243,7 +242,7 @@ export function OnboardAffiliate() {
         dimension: 'OrgUnit' as const,
         affiliateCode: affiliate.code,
         code: `${orgRootCode}-${s.suffix}`,
-        name: `${affiliate.name} — ${s.name}`,
+        name: `${affiliate.name} - ${s.name}`,
         parentCode: orgRootCode,
         isLeaf: true,
       })),
@@ -252,13 +251,51 @@ export function OnboardAffiliate() {
 
   const complete4 = unmappedCoa.length === 0 && orgRootExists;
 
-  // ── Step 5 — assumptions ─────────────────────────────────────────────
+  // ── Step 5 - assumptions ─────────────────────────────────────────────
   const setInherit = (inheritGroupRules: boolean) => {
     if (!affiliate) return;
     save.mutate({ ...affiliate, inheritGroupRules });
   };
+  // Every rule kind the platform has, not just the four most commonly forked - a fresh affiliate
+  // should be able to start from a real Group (or peer affiliate) baseline for any of them, not just
+  // the ones someone happened to wire up a clone button for first.
+  const CLONE_KINDS: RuleKind[] = [
+    'TimeBucket', 'ProductCharacteristic', 'BehaviourPattern', 'PaymentPattern', 'Prepayment',
+    'DiscountMethod', 'ForecastScenario', 'NewBusiness', 'TransactionStrategy', 'FtpRule',
+    'AdjustmentRule', 'Filter', 'CustomMetric', 'ValidationRule', 'FieldMapping', 'CodeMapping',
+  ];
+  const [cloneSource, setCloneSource] = useState('');
+  const [cloning, setCloning] = useState(false);
+  const [cloned, setCloned] = useState(false);
+  // Fixed-length array of hook calls, in the same order as CLONE_KINDS - stable hook order despite
+  // looking like a loop (same pattern ModelsAssumptions.tsx uses for its own rule registry).
+  const cloneQueries = [
+    useRules(CLONE_KINDS[0]!), useRules(CLONE_KINDS[1]!), useRules(CLONE_KINDS[2]!), useRules(CLONE_KINDS[3]!),
+    useRules(CLONE_KINDS[4]!), useRules(CLONE_KINDS[5]!), useRules(CLONE_KINDS[6]!), useRules(CLONE_KINDS[7]!),
+    useRules(CLONE_KINDS[8]!), useRules(CLONE_KINDS[9]!), useRules(CLONE_KINDS[10]!), useRules(CLONE_KINDS[11]!),
+    useRules(CLONE_KINDS[12]!), useRules(CLONE_KINDS[13]!), useRules(CLONE_KINDS[14]!), useRules(CLONE_KINDS[15]!),
+  ];
+  const rulesByKind = new Map(CLONE_KINDS.map((kind, i) => [kind, cloneQueries[i]!.data ?? []]));
+  // Forking flips the flag immediately, but a fresh fork has nothing in it until something is
+  // edited - this actually seeds it from a chosen starting point (Group, or a peer affiliate
+  // further along) rather than leaving a blank folder the affiliate has to build from scratch.
+  const cloneStarterRules = async (sourceCode: string) => {
+    if (!affiliate) return;
+    setCloning(true);
+    try {
+      for (const kind of CLONE_KINDS) {
+        const source = rulesByKind.get(kind)!.find((r) => r.affiliateCode === (sourceCode || null));
+        if (!source) continue;
+        await repository.upsertRule({ ...source, id: `${kind}-${affiliate.code}-${Date.now()}`, affiliateCode: affiliate.code, version: 1, createdBy: user?.name ?? 'unknown', createdAt: new Date().toISOString(), updatedBy: null, updatedAt: null });
+      }
+      setCloned(true);
+      window.setTimeout(() => setCloned(false), 2000);
+    } finally {
+      setCloning(false);
+    }
+  };
 
-  // ── Step 6 — limits & thresholds ─────────────────────────────────────
+  // ── Step 6 - limits & thresholds ─────────────────────────────────────
   const minima = useMemo(
     () => (affiliate ? (REGULATORY_MINIMA[affiliate.regulator] ?? { lcrPercent: 100, nsfrPercent: 100 }) : {}),
     [affiliate],
@@ -293,66 +330,20 @@ export function OnboardAffiliate() {
 
   const complete6 = !!affiliate?.limitsConfirmed;
 
-  // ── Step 7 — initial data load ───────────────────────────────────────
-  const [asOfDate, setAsOfDate] = useState('2026-07-31');
-  const positionsBatch = affiliate ? batches.find((b) => b.affiliateCode === affiliate.code && b.domain === 'Positions' && b.status === 'Committed') : undefined;
-  const { data: committedPositions = [] } = usePositions(affiliate?.code, positionsBatch?.asOfDate);
-
-  const [ledgerFile, setLedgerFile] = useState<{ name: string } | null>(null);
-  const [ledgerRows, setLedgerRows] = useState<import('@/engine/reconciliation').LedgerBalance[]>([]);
-  const [ledgerErrors, setLedgerErrors] = useState<number>(0);
-
-  const handleLedgerFile = async (file: File) => {
-    const text = await file.text();
-    const result = importLedger(text, positionsBatch?.asOfDate ?? asOfDate, affiliate?.functionalCurrency ?? 'USD');
-    setLedgerFile({ name: file.name });
-    setLedgerRows(result.rows);
-    setLedgerErrors(result.errors.length);
-  };
-
-  // `identityFxTable` is single-currency, so a mismatch would make `convert()` throw; caught here and
-  // reported inline instead of letting it crash the wizard.
-  const reconciliationError = useMemo(() => {
-    if (!affiliate || ledgerRows.length === 0) return null;
-    const mismatched = new Set(
-      [...committedPositions.map((p) => p.currency), ...ledgerRows.map((l) => l.currency)].filter(
-        (c) => c !== affiliate.functionalCurrency,
-      ),
-    );
-    if (mismatched.size === 0) return null;
-    return `The uploaded data is stated in ${Array.from(mismatched).join(', ')}, but this affiliate's functional currency is ${affiliate.functionalCurrency}. Reconciliation compares like-for-like — either the functional currency or the source file needs to change.`;
-  }, [affiliate, committedPositions, ledgerRows]);
-
-  const reconciliation = useMemo(() => {
-    if (!affiliate || !positionsBatch || ledgerRows.length === 0 || reconciliationError) return null;
-    return reconcile(committedPositions, ledgerRows, {
-      reportingCurrency: affiliate.functionalCurrency,
-      fx: identityFxTable(affiliate.functionalCurrency, positionsBatch.asOfDate),
-      level: 'GlAccount',
-      toleranceAmount: 1000,
-      tolerancePercent: 5,
-    });
-  }, [affiliate, positionsBatch, committedPositions, ledgerRows, reconciliationError]);
-
-  const signOffReconciliation = () => {
-    if (!affiliate || !positionsBatch || !reconciliation?.canSignOff || !user) return;
-    saveBatch.mutate({ ...positionsBatch, reconciledBy: user.name, reconciledAt: new Date().toISOString() });
-  };
-
-  const reconciledPositionsBatch = positionsBatch?.reconciledAt ? positionsBatch : batches.find(
-    (b) => affiliate && b.affiliateCode === affiliate.code && b.domain === 'Positions' && b.status === 'Committed' && b.reconciledAt,
-  );
-
-  const complete7 = !!positionsBatch && !!reconciledPositionsBatch?.reconciledAt;
+  // Inheriting is instantly valid - there's nothing more to configure. Forking flips the flag
+  // immediately too, but leaves an empty rule folder until something is actually cloned or created for
+  // this affiliate - checked against real saved rules, not the transient `cloned` banner state, so it
+  // stays correct even after navigating away and back.
+  const hasOwnRules = !!affiliate && CLONE_KINDS.some((kind) => rulesByKind.get(kind)!.some((r) => r.affiliateCode === affiliate.code));
+  const complete5 = !!affiliate && (affiliate.inheritGroupRules || hasOwnRules);
 
   const complete: Record<number, boolean> = {
     1: !!affiliate,
     2: !!affiliate && affiliate.functionalCurrency !== '' && affiliate.reportingCurrency !== '',
     3: complete3,
     4: complete4,
-    5: true,
+    5: complete5,
     6: complete6,
-    7: complete7,
   };
   const allComplete = STEPS.every((s) => complete[s.n]);
 
@@ -366,7 +357,7 @@ export function OnboardAffiliate() {
       entityId: affiliate.code,
       entityLabel: affiliate.name,
       action: 'Activate',
-      summary: `Onboarding complete for ${affiliate.name} — ready to move Testing → Live and consolidate into Group.`,
+      summary: `Onboarding complete for ${affiliate.name} - ready to move Testing → Live and consolidate into Group.`,
       affiliateCode: affiliate.code,
       status: 'Pending',
       requestedBy: user.name,
@@ -390,7 +381,10 @@ export function OnboardAffiliate() {
   if (resumeCode && affiliatesLoading) {
     return (
       <>
-        <ModuleHeader title="Onboard Affiliate" description="Loading…" asOfDate={null} />
+        <Affiliates />
+        <Drawer title="Onboard Affiliate" description="Loading…" onClose={() => navigate('/affiliates')} wide>
+          <p className="text-[12px] text-gray-500">Loading…</p>
+        </Drawer>
       </>
     );
   }
@@ -398,56 +392,80 @@ export function OnboardAffiliate() {
   if (resumeCode && !affiliatesLoading && !affiliate) {
     return (
       <>
-        <ModuleHeader title="Onboard Affiliate" description="Not found." asOfDate={null} />
-        <p className="rounded-lg bg-gray-50 p-6 text-center text-[12px] text-gray-500">
-          No onboarding record with code {resumeCode}. It may already have been completed or cancelled.
-        </p>
+        <Affiliates />
+        <Drawer title="Onboard Affiliate" description="Not found." onClose={() => navigate('/affiliates')} wide>
+          <p className="rounded-lg bg-gray-50 p-6 text-center text-[12px] text-gray-500">
+            No onboarding record with code {resumeCode}. It may already have been completed or cancelled.
+          </p>
+        </Drawer>
       </>
     );
   }
 
   return (
     <>
-      <ModuleHeader
-        title={affiliate ? `Onboard ${affiliate.name}` : 'Onboard Affiliate'}
-        description="Every step happens on this screen — connector setup, initial data load and reconciliation included. Activation still requires maker-checker approval before the affiliate consolidates into Group."
-        asOfDate={null}
-        scope={affiliate?.name ?? 'New affiliate'}
-        metrics={[
-          { label: 'Step', value: `${step} of ${STEPS.length}`, about: 'Where this affiliate sits in the seven-step onboarding wizard.' },
-          { label: 'Complete', value: `${STEPS.filter((s) => complete[s.n]).length}/${STEPS.length}`, about: 'Steps marked complete so far — progress is saved, so onboarding can be resumed later from here.' },
-          { label: 'Unmapped COA', value: String(unmappedCoa.length), tone: unmappedCoa.length > 0 ? 'danger' : 'success', about: 'Local general-ledger accounts not yet mapped to the Group standard chart of accounts.' },
-          { label: 'Status', value: affiliate?.status ?? 'Not started', tone: affiliate?.status === 'Onboarding' ? 'warning' : affiliate ? 'success' : 'neutral', about: 'The affiliate’s current lifecycle status — only Live affiliates roll up into Group figures.' },
-        ]}
-        actions={
-          affiliate && affiliate.status === 'Onboarding' && !submitted ? (
-            <button
-              type="button"
-              onClick={handleCancelOnboarding}
-              className={cn(
-                'rounded-lg border px-4 py-2 text-[12px] font-bold',
-                cancelArmed ? 'border-danger bg-danger text-white' : 'border-gray-200 text-danger hover:border-danger',
-              )}
-            >
-              {cancelArmed ? 'Click again to confirm — this cannot be undone' : 'Cancel onboarding'}
+    <Affiliates />
+    <Drawer
+      title={affiliate ? `Onboard ${affiliate.name}` : 'New Affiliate Onboarding'}
+      description={submitted ? undefined : `Step ${step} of ${STEPS.length} · ${STEPS[step - 1]!.title}`}
+      onClose={() => navigate('/affiliates')}
+      wide
+      footer={
+        submitted ? undefined : (
+          <div className="flex items-center justify-between">
+            <button type="button" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900 disabled:opacity-30">
+              Previous
             </button>
-          ) : undefined
-        }
-      />
+            <div className="flex items-center gap-3">
+              {!complete[step] && <StatusBadge status="Step incomplete" tone="warning" />}
+              {step < STEPS.length ? (
+                <button type="button" onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))} disabled={step === 1 && !affiliate} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">
+                  Next Step
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!canOnboard || !allComplete}
+                  title={!allComplete ? 'Complete every step first' : undefined}
+                  className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                >
+                  Submit for approval
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      }
+    >
+      {affiliate && affiliate.status === 'Onboarding' && !submitted && (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleCancelOnboarding}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-[11px] font-bold',
+              cancelArmed ? 'border-danger bg-danger text-white' : 'border-gray-200 text-danger hover:border-danger',
+            )}
+          >
+            {cancelArmed ? 'Click again to confirm - this cannot be undone' : 'Cancel onboarding'}
+          </button>
+        </div>
+      )}
 
       {submitted ? (
         <section className="rounded-2xl border border-success/20 bg-success-bg p-8 text-center">
           <h2 className="text-[16px] font-bold text-navy-900">✓ {affiliate?.name} submitted for approval</h2>
           <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-600">
             Status: <span className="font-bold">Testing / Pending Approval</span>. It will not appear in
-            Group-consolidated figures until an authorised approver moves it to Live in Approvals — that gate is
+            Group-consolidated figures until an authorised approver moves it to Live in Approvals - that gate is
             deliberate, so a half-configured affiliate cannot quietly join the Group balance sheet.
           </p>
           <div className="mt-5 flex justify-center gap-3">
             <button type="button" onClick={() => navigate('/affiliates')} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700">
               Back to affiliates
             </button>
-            <button type="button" onClick={() => navigate('/admin')} className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700">
+            <button type="button" onClick={() => navigate('/controls')} className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700">
               View in Approvals
             </button>
           </div>
@@ -504,11 +522,23 @@ export function OnboardAffiliate() {
                     <input value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} onBlur={persistProfile} placeholder="Ecobank Zambia Limited" className={input} />
                   </Field>
                   <Field label="Country">
-                    <input value={profile.country} onChange={(e) => setProfile((p) => ({ ...p, country: e.target.value }))} onBlur={persistProfile} placeholder="Zambia" className={input} />
+                    <select
+                      value={profile.country}
+                      onChange={(e) => {
+                        const chosen = COUNTRIES.find((c) => c.name === e.target.value);
+                        setProfile((p) => ({ ...p, country: e.target.value, region: chosen?.region ?? p.region }));
+                      }}
+                      onBlur={persistProfile}
+                      className={input}
+                    >
+                      <option value="">- select -</option>
+                      {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                    </select>
                   </Field>
-                  <Field label="Region">
+                  <Field label="Region" hint="Follows the chosen country - override only for an unusual case">
                     <select value={profile.region} onChange={(e) => { setProfile((p) => ({ ...p, region: e.target.value })); }} onBlur={persistProfile} className={input}>
-                      {['West Africa', 'Anglophone West Africa', 'UEMOA', 'Central Africa', 'East Africa', 'Southern Africa', 'Nigeria'].map((r) => <option key={r} value={r}>{r}</option>)}
+                      <option value="">- select -</option>
+                      {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </Field>
                   <Field label="Regulator" hint="Determines the regulatory minima seeded at step 6">
@@ -521,7 +551,7 @@ export function OnboardAffiliate() {
                   </Field>
                 </Grid>
                 {!affiliate && !profileValid && (
-                  <p className="mt-2 text-[11px] text-gray-400">Enter a code, legal name and country — the record saves automatically the moment these are valid.</p>
+                  <p className="mt-2 text-[11px] text-gray-400">Enter a code, legal name and country - the record saves automatically the moment these are valid.</p>
                 )}
               </Step>
             )}
@@ -534,15 +564,15 @@ export function OnboardAffiliate() {
                   intermediates consolidation, and any other currencies the affiliate transacts in.
                 </p>
                 <Grid>
-                  <Field label="Functional currency" hint={affiliate.functionalCurrency ? 'Immutable — already set' : 'Immutable once set'}>
+                  <Field label="Functional currency" hint={affiliate.functionalCurrency ? 'Immutable - already set' : 'Immutable once set'}>
                     <select
                       value={affiliate.functionalCurrency}
                       disabled={!!affiliate.functionalCurrency}
                       onChange={(e) => setCurrencies({ functionalCurrency: e.target.value })}
                       className={cn(input, affiliate.functionalCurrency && 'bg-gray-50 text-gray-500')}
                     >
-                      <option value="">— select —</option>
-                      {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.name}</option>)}
+                      <option value="">- select -</option>
+                      {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
                     </select>
                   </Field>
                   <Field label="Reporting currency" hint="What this affiliate consolidates into">
@@ -555,7 +585,7 @@ export function OnboardAffiliate() {
                   </Field>
                   <Field label="Holiday calendar" hint="Determines business days for settlement">
                     <select value={affiliate.holidayCalendarId ?? ''} onChange={(e) => setCurrencies({ holidayCalendarId: e.target.value || null })} className={input}>
-                      <option value="">— none yet —</option>
+                      <option value="">- none yet -</option>
                       {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </Field>
@@ -583,7 +613,7 @@ export function OnboardAffiliate() {
               <Step title="Connectivity & data sources">
                 <p className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
                   Every domain must be fed by something. Configure or add a connector right here, or declare{' '}
-                  <span className="font-bold">file substitution</span> with a cadence and a named owner — no separate
+                  <span className="font-bold">file substitution</span> with a cadence and a named owner - no separate
                   Connectors screen needed during onboarding.
                 </p>
                 <table className="w-full text-[12px]">
@@ -610,7 +640,7 @@ export function OnboardAffiliate() {
                                 value={feed.mode}
                                 onChange={(e) => {
                                   const mode = e.target.value as FeedMode;
-                                  // Never auto-pick a connector — an existing one belongs to whichever affiliate configured it.
+                                  // Never auto-pick a connector - an existing one belongs to whichever affiliate configured it.
                                   updateFeed(domain, { mode, connectorId: mode === 'Connector' ? null : null });
                                 }}
                                 className="mb-2 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
@@ -624,7 +654,7 @@ export function OnboardAffiliate() {
                                   {usable.length > 0 && (
                                     <div>
                                       <label htmlFor={`existing-${domain}`} className="mb-0.5 block text-[10px] text-gray-400">
-                                        Reuse a shared connector (e.g. a Group-wide feed) — only if this affiliate genuinely uses the same one
+                                        Reuse a shared connector (e.g. a Group-wide feed) - only if this affiliate genuinely uses the same one
                                       </label>
                                       <select
                                         id={`existing-${domain}`}
@@ -633,7 +663,7 @@ export function OnboardAffiliate() {
                                         onChange={(e) => updateFeed(domain, { connectorId: e.target.value || null })}
                                         className="w-full rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none"
                                       >
-                                        <option value="">— select —</option>
+                                        <option value="">- select -</option>
                                         {usable.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                       </select>
                                     </div>
@@ -652,13 +682,18 @@ export function OnboardAffiliate() {
                               <input type="number" min={1} value={feed.slaDays} onChange={(e) => updateFeed(domain, { slaDays: Number(e.target.value) })} aria-label={`${domain} SLA days`} className="w-20 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
                             </td>
                             <td className="py-2 px-3">
-                              <input value={feed.owner ?? ''} onChange={(e) => updateFeed(domain, { owner: e.target.value || null })} placeholder="Named owner" aria-label={`${domain} owner`} className="w-40 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700" />
+                              <select
+                                value={feed.owner ?? ''}
+                                onChange={(e) => updateFeed(domain, { owner: e.target.value || null })}
+                                aria-label={`${domain} owner`}
+                                className="w-40 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                              >
+                                <option value="">- unassigned -</option>
+                                {feedOwners.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+                              </select>
                             </td>
                             <td className="py-2 px-3">
-                              <StatusBadge
-                                status={feed.mode === 'File' ? 'File feed' : feed.mode === 'Connector' ? (feed.connectorId ? 'Connected' : 'Not selected') : 'Not configured'}
-                                tone={feed.mode === 'File' ? 'warning' : feed.mode === 'Connector' ? (feed.connectorId ? 'success' : 'warning') : 'neutral'}
-                              />
+                              <FeedStatusBadge feed={feed} connectors={connectors} />
                             </td>
                           </tr>
                           {addingConnectorFor === domain && newConnectorDraft && (
@@ -697,7 +732,7 @@ export function OnboardAffiliate() {
             {step === 4 && affiliate && (
               <Step title="Chart of accounts & organisation">
                 <p className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-                  Map this affiliate&rsquo;s local GL codes onto the live Group standard — local charts genuinely
+                  Map this affiliate&rsquo;s local GL codes onto the live Group standard - local charts genuinely
                   differ, and this mapping is what makes them comparable. <span className="font-bold">Unmapped nodes block activation.</span>{' '}
                   A node can take more than one local code.
                 </p>
@@ -744,18 +779,24 @@ export function OnboardAffiliate() {
                 </table>
 
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Organisation structure</p>
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    Organisation structure
+                    <InfoButton label="Why this structure?">
+                      Group structure is the standard reporting framework; this affiliate&rsquo;s structure maps onto it,
+                      which is what keeps segment reporting comparable across affiliates.
+                    </InfoButton>
+                  </p>
                   {orgRootExists ? (
-                    <p className="text-[12px] text-success">✓ Standard org-unit template created — Retail, Corporate &amp; Investment Banking, Treasury, Wealth Management. Add branch or desk-level detail from Data Management → Data Structure afterwards.</p>
+                    <p className="flex items-center gap-1.5 text-[12px] text-success">
+                      ✓ Org structure created: Retail, Corporate &amp; Investment Banking, Treasury, Wealth Management.
+                      <InfoButton label="What's next for this structure?">
+                        Add branch or desk-level detail from Data Management → Data Structure once this affiliate is live.
+                      </InfoButton>
+                    </p>
                   ) : (
-                    <>
-                      <p className="mb-3 text-[11px] leading-relaxed text-gray-500">
-                        Group structure is the standard reporting framework; this affiliate&rsquo;s structure maps onto it, which is what keeps segment reporting comparable across affiliates.
-                      </p>
-                      <button type="button" onClick={createOrgTemplate} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700">
-                        Create the standard org-unit template
-                      </button>
-                    </>
+                    <button type="button" onClick={createOrgTemplate} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700">
+                      Create org structure
+                    </button>
                   )}
                 </div>
               </Step>
@@ -780,10 +821,45 @@ export function OnboardAffiliate() {
                       <span className="block text-[12px] font-bold text-navy-900">Fork affiliate-specific rules</span>
                       <span className="block text-[11px] leading-relaxed text-gray-500">
                         Copies the Group rules into this affiliate&rsquo;s own folder so they can subsequently
-                        diverge. The detailed modelling screens remain available after onboarding either way.
+                        diverge. The detailed modelling screens are reachable right away, below - no need to finish
+                        onboarding first.
                       </span>
                     </label>
                   </div>
+
+                  {!affiliate.inheritGroupRules && (
+                    <div className="rounded-lg border border-gray-200 p-4">
+                      <label htmlFor="clone-source" className="mb-1 block text-[11px] font-bold text-navy-900">Starter values</label>
+                      <p className="mb-2 text-[11px] text-gray-500">
+                        A fresh fork starts empty until something is edited - clone a starting point instead, then
+                        adjust from there.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select id="clone-source" value={cloneSource} onChange={(e) => setCloneSource(e.target.value)} className={cn(input, 'w-56')}>
+                          <option value="">Group default</option>
+                          {affiliates.filter((a) => a.code !== 'GROUP' && a.code !== affiliate.code && a.status === 'Live').map((a) => (
+                            <option key={a.code} value={a.code}>{a.name}</option>
+                          ))}
+                        </select>
+                        <button type="button" disabled={cloning} onClick={() => void cloneStarterRules(cloneSource)} className="rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">
+                          {cloning ? 'Cloning…' : 'Clone starter rules'}
+                        </button>
+                        {cloned && <StatusBadge status="Cloned" tone="success" />}
+                      </div>
+                      <div className="mt-3 border-t border-gray-100 pt-3">
+                        <Link
+                          href={`/affiliates/${affiliate.code}/settings?section=rule-coverage`}
+                          className="text-[11px] font-bold text-navy-700 hover:underline"
+                        >
+                          Go to {affiliate.name}&rsquo;s Business Rules →
+                        </Link>
+                        <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                          Whether or not you clone first, this is where each rule kind (Product Characteristics,
+                          Behaviour Patterns, FTP Rules, and the rest) actually gets edited for this affiliate.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Step>
             )}
@@ -791,13 +867,13 @@ export function OnboardAffiliate() {
             {step === 6 && affiliate && (
               <Step title="Limits & regulatory thresholds">
                 <p className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-                  Regulatory minima are seeded from the regulator selected at step 1 and locked —{' '}
+                  Regulatory minima are seeded from the regulator selected at step 1 and locked -{' '}
                   <span className="font-bold">{affiliate.regulator}</span> is applied here. Internal amber and red are
                   Ecobank&rsquo;s own appetite for this affiliate, and stay editable.{' '}
                   <InfoButton label="What do limit, threshold, breach and escalation mean?">
-                    <p className="mb-1.5"><span className="font-bold">Limit</span> — the boundary for one metric (e.g. LCR). <span className="font-bold">Threshold</span> — where along that limit a status changes: amber is an early warning, red is a breach.</p>
-                    <p className="mb-1.5"><span className="font-bold">Breach</span> — the metric has crossed red. It doesn&rsquo;t stop the bank, but it does require a recorded reason and an action plan.</p>
-                    <p><span className="font-bold">Escalation</span> — who gets told and how urgently, once amber or red is hit. That routing lives on Limits &amp; Breaches, reached after onboarding.</p>
+                    <p className="mb-1.5"><span className="font-bold">Limit</span> - the boundary for one metric (e.g. LCR). <span className="font-bold">Threshold</span> - where along that limit a status changes: amber is an early warning, red is a breach.</p>
+                    <p className="mb-1.5"><span className="font-bold">Breach</span> - the metric has crossed red. It doesn&rsquo;t stop the bank, but it does require a recorded reason and an action plan.</p>
+                    <p><span className="font-bold">Escalation</span> - who gets told and how urgently, once amber or red is hit. That routing lives on Limits &amp; Breaches, reached after onboarding.</p>
                   </InfoButton>
                 </p>
                 <table className="w-full text-[12px]">
@@ -818,7 +894,7 @@ export function OnboardAffiliate() {
                           <td className="py-2 px-3 text-right">
                             <span
                               className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 font-mono text-gray-500"
-                              title="Locked — set by the regulator"
+                              title="Locked - set by the regulator"
                             >
                               {value}%
                               <ShieldCheckIcon className="h-3 w-3 shrink-0 text-gray-400" />
@@ -865,111 +941,10 @@ export function OnboardAffiliate() {
                 </div>
               </Step>
             )}
-
-            {step === 7 && affiliate && (
-              <Step title="Initial data load">
-                <div className="mb-4 rounded-lg bg-navy-50 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
-                  <p className="mb-1">
-                    <span className="font-bold">Required:</span> Positions, then reconciliation against the general
-                    ledger. <span className="font-bold">Optional:</span> Counterparties.
-                  </p>
-                  <p className="text-[10px] text-navy-900/70">
-                    Market rates, FX rates and economic indicators are Group-level reference data maintained
-                    centrally (Data Management → Reference Data) — they&rsquo;re not part of an affiliate&rsquo;s own
-                    initial load.
-                  </p>
-                </div>
-
-                <Field label="As-of date">
-                  <input type="date" value={positionsBatch?.asOfDate ?? asOfDate} onChange={(e) => setAsOfDate(e.target.value)} disabled={!!positionsBatch} className={cn(input, 'w-48', positionsBatch && 'bg-gray-50 text-gray-500')} />
-                </Field>
-
-                <div className="mt-4">
-                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-navy-900">1. Position book (required)</h3>
-                  <DataLoadPanel affiliate={affiliate} domain="Positions" asOfDate={positionsBatch?.asOfDate ?? asOfDate} />
-                </div>
-
-                {positionsBatch && (
-                  <div className="mt-6">
-                    <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-navy-900">2. Reconcile to the general ledger (required)</h3>
-                    {reconciledPositionsBatch?.reconciledAt ? (
-                      <div className="rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success">
-                        ✓ Reconciled by {reconciledPositionsBatch.reconciledBy} on {new Date(reconciledPositionsBatch.reconciledAt).toLocaleDateString()}.
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-gray-100 bg-white p-4">
-                        <label htmlFor="ledger-file" className="mb-1 block text-[11px] text-gray-600">GL trial balance (CSV)</label>
-                        <input
-                          id="ledger-file"
-                          type="file"
-                          accept=".csv,text/csv"
-                          onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleLedgerFile(f); }}
-                          className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
-                        />
-                        {ledgerFile && <p className="mt-2 text-[11px] text-gray-500">{ledgerFile.name} · {ledgerRows.length} row(s) parsed{ledgerErrors > 0 ? `, ${ledgerErrors} error(s)` : ''}</p>}
-
-                        {reconciliationError && (
-                          <p className="mt-3 rounded-lg bg-danger-bg px-4 py-3 text-[11px] leading-relaxed text-danger">{reconciliationError}</p>
-                        )}
-
-                        {reconciliation && (
-                          <div className="mt-4">
-                            <dl className="grid grid-cols-3 gap-4 rounded-lg bg-gray-50 p-4">
-                              <div><dt className="text-[10px] font-bold uppercase text-gray-400">Total variance</dt><dd className="font-mono text-[12px]">{reconciliation.totalVariance.toFixed(2)}</dd></div>
-                              <div><dt className="text-[10px] font-bold uppercase text-gray-400">Lines out of tolerance</dt><dd className="font-mono text-[12px]">{reconciliation.linesOutOfTolerance}</dd></div>
-                              <div><dt className="text-[10px] font-bold uppercase text-gray-400">Can sign off</dt><dd><StatusBadge status={reconciliation.canSignOff ? 'Yes' : 'No'} tone={reconciliation.canSignOff ? 'success' : 'danger'} /></dd></div>
-                            </dl>
-                            <button
-                              type="button"
-                              disabled={!reconciliation.canSignOff}
-                              onClick={signOffReconciliation}
-                              className="mt-4 rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
-                            >
-                              Sign off reconciliation
-                            </button>
-                            {!reconciliation.canSignOff && (
-                              <p className="mt-2 text-[11px] text-danger">Resolve out-of-tolerance lines before signing off — see GL Reconciliation for line-level detail and suggested plugs.</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-6">
-                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-navy-900">3. Counterparties (optional)</h3>
-                  <DataLoadPanel affiliate={affiliate} domain="Counterparties" asOfDate={positionsBatch?.asOfDate ?? asOfDate} />
-                </div>
-              </Step>
-            )}
-
-            <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-5">
-              <button type="button" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900 disabled:opacity-30">
-                Back
-              </button>
-              <div className="flex items-center gap-3">
-                {!complete[step] && <StatusBadge status="Step incomplete" tone="warning" />}
-                {step < STEPS.length ? (
-                  <button type="button" onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))} disabled={step === 1 && !affiliate} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40">
-                    Next
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={!canOnboard || !allComplete}
-                    title={!allComplete ? 'Complete every step first' : undefined}
-                    className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
-                  >
-                    Submit for approval
-                  </button>
-                )}
-              </div>
-            </div>
           </section>
         </div>
       )}
+    </Drawer>
     </>
   );
 }

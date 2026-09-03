@@ -1,0 +1,7 @@
+id,category,amount,currency,orgunitcode,glaccountcode,commoncoacode,productcode,productclass,maturitydate,nextrepricingdate,ratetype,interestratepct,behaviouraltag,hqlalevel,hqlahaircutpct,lcrcashflowrole,irrbbratesensitive,approxdurationyears,performingstatus
+GH-CASH-01,Asset,850000000,GHS,OU-GH-TSY,GH-1010,COA-11,CASH,Cash & BoG Balances,,,N/A,,N/A,Level 1,0,HQLA,false,,Performing
+GH-TBILL-01,Asset,1200000000,GHS,OU-GH-TSY,GH-1020,COA-13,TBILL,GoG Treasury Bills,2027-03-31,2027-03-31,Fixed,27.0,N/A,Level 1,0,HQLA,true,0.7,Performing
+GH-BORROW-01,Liability,700000000,GHS,OU-GH-TSY,GH-2020,COA-23,BORROW,Term Borrowing,2030-06-30,2030-06-30,Fixed,14.5,N/A,None,0,None,true,3.6,Performing
+GH-INTERBANK-01,Asset,600000000,GHS,OU-GH-TSY,GH-1015,COA-12,INTERBANK,Interbank Placement,2026-09-30,2026-09-30,Fixed,26.0,N/A,Level 2A,15,HQLA,true,0.25,Performing
+GH-GOGBOND-01,Asset,900000000,GHS,OU-GH-TSY,GH-1020,COA-13,GOGBOND,GoG Bond 2032,2032-06-30,2032-06-30,Fixed,24.5,N/A,Level 1,0,HQLA,true,5.8,Performing
+GH-CAP-01,Capital,500000000,GHS,OU-GH-TSY,GH-3010,COA-31,CAP,Stated Capital,,,N/A,,N/A,None,0,None,false,,Performing

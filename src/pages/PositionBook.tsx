@@ -16,7 +16,7 @@ import type { LoadBatch, Position, ProcessRun } from '@/engine/types';
 
 /**
  * The canonical Position Book: every committed position, with the batch and
- * run(s) that consumed it visible from every row — "where did this number
+ * run(s) that consumed it visible from every row - "where did this number
  * come from?" answered by clicking rather than by asking data management.
  */
 export function PositionBook() {
@@ -50,8 +50,17 @@ export function PositionBook() {
     return rows;
   }, [allPositions, batchIdFilter, runIdFilter, runs, affiliateFilter, categoryFilter]);
 
-  const { search: q, setSearch: setQ, page, setPage, density, setDensity, paged, totalItems, pageSize } =
-    useTableControls(scoped, 25, ['id', 'accountNumber', 'productClass', 'glAccountCode', 'counterpartyId']);
+  const {
+    search: q,
+    setSearch: setQ,
+    page,
+    setPage,
+    density,
+    setDensity,
+    paged,
+    totalItems,
+    pageSize,
+  } = useTableControls(scoped, 25, ['id', 'accountNumber', 'productClass', 'glAccountCode', 'counterpartyId']);
 
   const filterBatch = batchIdFilter ? batches.find((b) => b.id === batchIdFilter) : null;
   const filterRun = runIdFilter ? runs.find((r) => r.id === runIdFilter) : null;
@@ -79,14 +88,50 @@ export function PositionBook() {
 
   const columns: ResultColumn<Position>[] = [
     { key: 'id', header: 'Position', render: (p) => <span className="font-mono text-[11px]">{p.id}</span> },
-    { key: 'account', header: 'Account', render: (p) => <span className="font-mono text-[11px] text-gray-600">{p.accountNumber}</span> },
-    { key: 'affiliate', header: 'Affiliate', render: (p) => <span className="font-mono text-[11px]">{p.affiliateCode}</span> },
+    {
+      key: 'account',
+      header: 'Account',
+      render: (p) => <span className="font-mono text-[11px] text-gray-600">{p.accountNumber}</span>,
+    },
+    {
+      key: 'affiliate',
+      header: 'Affiliate',
+      render: (p) => <span className="font-mono text-[11px]">{p.affiliateCode}</span>,
+    },
     { key: 'product', header: 'Product', render: (p) => <span className="text-navy-900">{p.productClass}</span> },
-    { key: 'category', header: 'Category', render: (p) => <StatusBadge status={p.category} tone={p.category === 'Asset' ? 'info' : 'neutral'} /> },
-    { key: 'amount', header: 'Amount', align: 'right', render: (p) => <Amount value={p.amount} currency={p.currency} /> },
-    { key: 'maturity', header: 'Maturity', render: (p) => <span className="text-[11px] text-gray-500">{p.maturityDate ? formatDate(p.maturityDate) : '—'}</span> },
-    { key: 'hqla', header: 'HQLA', render: (p) => (p.hqlaLevel === 'None' ? <span className="text-gray-300">—</span> : <StatusBadge status={p.hqlaLevel} tone="success" />) },
-    { key: 'batch', header: 'Batch', render: (p) => <span className="font-mono text-[10px] text-gray-400">{p.batchId}</span> },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (p) => <StatusBadge status={p.category} tone={p.category === 'Asset' ? 'info' : 'neutral'} />,
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      render: (p) => <Amount value={p.amount} currency={p.currency} />,
+    },
+    {
+      key: 'maturity',
+      header: 'Maturity',
+      render: (p) => (
+        <span className="text-[11px] text-gray-500">{p.maturityDate ? formatDate(p.maturityDate) : '-'}</span>
+      ),
+    },
+    {
+      key: 'hqla',
+      header: 'HQLA',
+      render: (p) =>
+        p.hqlaLevel === 'None' ? (
+          <span className="text-gray-300">-</span>
+        ) : (
+          <StatusBadge status={p.hqlaLevel} tone="success" />
+        ),
+    },
+    {
+      key: 'batch',
+      header: 'Batch',
+      render: (p) => <span className="font-mono text-[10px] text-gray-400">{p.batchId}</span>,
+    },
   ];
 
   return (
@@ -95,39 +140,121 @@ export function PositionBook() {
         title="Position Book"
         description="The canonical, normalized position layer every ALM calculation reads from. Every row traces back to the batch and run that admitted it."
         asOfDate={null}
-        scope={affiliateFilter === 'ALL' ? (affiliateCode === 'GROUP' ? 'All affiliates' : affiliateCode) : affiliateFilter}
+        scope={
+          affiliateFilter === 'ALL' ? (affiliateCode === 'GROUP' ? 'All affiliates' : affiliateCode) : affiliateFilter
+        }
         metrics={[
-          { label: 'Positions in view', value: String(scoped.length), about: 'Rows matching the current filters — not necessarily the whole book.' },
-          { label: 'Total book', value: String(allPositions.length), about: 'Every committed position visible at this scope, before filtering.' },
+          {
+            label: 'Positions in view',
+            value: String(scoped.length),
+            about: 'Rows matching the current filters - not necessarily the whole book.',
+          },
+          {
+            label: 'Total book',
+            value: String(allPositions.length),
+            about: 'Every committed position visible at this scope, before filtering.',
+          },
           {
             label: 'Filtered by',
             value: filterBatch ? `Batch ${filterBatch.id}` : filterRun ? `Run ${filterRun.name}` : 'Nothing',
-            about: 'Position Book can be opened pre-filtered from a batch (Data Vintages) or a run (Run History) to show exactly what fed it.',
+            about:
+              'Position Book can be opened pre-filtered from a batch (Data Vintages) or a run (Run History) to show exactly what fed it.',
           },
         ]}
       />
 
-      {(filterBatch || filterRun) && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-100 bg-navy-50 p-4">
-          <p className="text-[12px] leading-relaxed text-navy-900">
-            {filterBatch && (
-              <>
-                Showing positions admitted by <span className="font-mono font-bold">{filterBatch.id}</span> (v
-                {filterBatch.version}, {filterBatch.status}) — committed {filterBatch.committedAt ? formatDate(filterBatch.committedAt.slice(0, 10)) : '—'}.
-                {runsConsuming(filterBatch.id).length > 0 && (
-                  <> Consumed by {runsConsuming(filterBatch.id).length} run(s): {runsConsuming(filterBatch.id).map((r) => r.name).join(', ')}.</>
+      <section className="mb-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <TableToolbar
+          searchValue={q}
+          onSearchChange={setQ}
+          exportData={() => scoped}
+          exportFilename="position-book"
+          density={density}
+          onDensityChange={setDensity}
+        >
+          {(filterBatch || filterRun) && (
+            <span className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-[11px] font-bold text-navy-900">
+              {filterBatch ? `Batch: ${filterBatch.id}` : `Run: ${filterRun!.name}`}
+              <InfoButton label="Filter detail" stopClickPropagation>
+                {filterBatch && (
+                  <>
+                    Admitted by {filterBatch.id} (v{filterBatch.version}, {filterBatch.status}) - committed{' '}
+                    {filterBatch.committedAt ? formatDate(filterBatch.committedAt.slice(0, 10)) : '-'}.
+                    {runsConsuming(filterBatch.id).length > 0 && (
+                      <>
+                        {' '}
+                        Consumed by {runsConsuming(filterBatch.id).length} run(s):{' '}
+                        {runsConsuming(filterBatch.id)
+                          .map((r) => r.name)
+                          .join(', ')}
+                        .
+                      </>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-            {filterRun && !filterBatch && (
-              <>
-                Showing every position consumed by run <span className="font-bold">{filterRun.name}</span> ({filterRun.positionBatchIds.join(', ')}).
-              </>
-            )}
-          </p>
-          <button type="button" onClick={() => navigate('/data/operations/position-book')} className="shrink-0 text-[11px] font-bold text-navy-700 hover:underline">
-            Clear filter
-          </button>
+                {filterRun && !filterBatch && (
+                  <>
+                    Every position consumed by run {filterRun.name} ({filterRun.positionBatchIds.join(', ')}).
+                  </>
+                )}
+              </InfoButton>
+              <button
+                type="button"
+                onClick={() => navigate('/data/operations/position-book')}
+                aria-label="Clear batch/run filter"
+                className="text-navy-400 hover:text-navy-900"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          <select
+            value={affiliateFilter}
+            onChange={(e) => {
+              setAffiliateFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by affiliate"
+            className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+          >
+            <option value="ALL">All affiliates</option>
+            {affiliates
+              .filter((a) => a.code !== 'GROUP')
+              .map((a) => (
+                <option key={a.code} value={a.code}>
+                  {a.name}
+                </option>
+              ))}
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by category"
+            className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+          >
+            <option value="ALL">All categories</option>
+            <option value="Asset">Asset</option>
+            <option value="Liability">Liability</option>
+            <option value="Capital">Capital</option>
+          </select>
+        </TableToolbar>
+      </section>
+
+      {filterBatch && filterBatch.domain === 'Positions' && !filterBatch.reconciledAt && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
+          <span>
+            <span className="font-bold">Not yet reconciled to GL.</span> This batch hasn&rsquo;t been checked against a
+            trial balance - the figures here are unverified against the ledger.
+          </span>
+          <Link
+            href="/data/operations/gl-reconciliation"
+            className="shrink-0 text-[11px] font-bold text-navy-700 hover:underline"
+          >
+            Reconcile now →
+          </Link>
         </div>
       )}
 
@@ -136,17 +263,20 @@ export function PositionBook() {
           <div className="mb-2 flex items-center gap-1.5">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-navy-900">Editable snapshot</h3>
             <InfoButton label="What an editable snapshot is">
-              A snapshot is an editable copy of this batch's positions — it never changes {filterBatch.id}. Edit it,
-              recalculate to see the impact on LCR/NSFR/IRRBB, then submit for maker-checker approval to commit it as
-              a new Position Book version.
+              A snapshot is an editable copy of this batch's positions - it never changes {filterBatch.id}. Edit it,
+              recalculate to see the impact on LCR/NSFR/IRRBB, then submit for maker-checker approval to commit it as a
+              new Position Book version.
             </InfoButton>
           </div>
           {openSnapshots(filterBatch.id).length > 0 && (
             <ul className="mb-2 space-y-1">
               {openSnapshots(filterBatch.id).map((s) => (
                 <li key={s.id}>
-                  <Link href={`/position-book/snapshot/${s.id}`} className="text-[11px] font-bold text-navy-700 hover:underline">
-                    Resume {s.name} — {s.status} ({s.changes.length} change{s.changes.length === 1 ? '' : 's'})
+                  <Link
+                    href={`/position-book/snapshot/${s.id}`}
+                    className="text-[11px] font-bold text-navy-700 hover:underline"
+                  >
+                    Resume {s.name} - {s.status} ({s.changes.length} change{s.changes.length === 1 ? '' : 's'})
                   </Link>
                 </li>
               ))}
@@ -155,7 +285,9 @@ export function PositionBook() {
           {snapshotBatch === filterBatch.id ? (
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[280px] flex-1">
-                <label htmlFor="snap-reason" className="mb-1 block text-[11px] text-gray-600">Reason for the snapshot</label>
+                <label htmlFor="snap-reason" className="mb-1 block text-[11px] text-gray-600">
+                  Reason for the snapshot
+                </label>
                 <input
                   id="snap-reason"
                   value={snapshotReason}
@@ -172,7 +304,11 @@ export function PositionBook() {
               >
                 {createSnapshot.isPending ? 'Creating…' : 'Create snapshot'}
               </button>
-              <button type="button" onClick={() => setSnapshotBatch(null)} className="text-[11px] font-bold text-gray-500 hover:text-navy-900">
+              <button
+                type="button"
+                onClick={() => setSnapshotBatch(null)}
+                className="text-[11px] font-bold text-gray-500 hover:text-navy-900"
+              >
                 Cancel
               </button>
             </div>
@@ -189,39 +325,6 @@ export function PositionBook() {
       )}
 
       <section className="table-datagrid-container">
-        <div className="border-b border-gray-100 bg-white/50 p-5">
-          <TableToolbar
-            searchValue={q}
-            onSearchChange={setQ}
-            exportData={() => scoped}
-            exportFilename="position-book"
-            density={density}
-            onDensityChange={setDensity}
-          >
-            <select
-              value={affiliateFilter}
-              onChange={(e) => { setAffiliateFilter(e.target.value); setPage(1); }}
-              aria-label="Filter by affiliate"
-              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
-            >
-              <option value="ALL">All affiliates</option>
-              {affiliates.filter((a) => a.code !== 'GROUP').map((a) => (
-                <option key={a.code} value={a.code}>{a.name}</option>
-              ))}
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-              aria-label="Filter by category"
-              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
-            >
-              <option value="ALL">All categories</option>
-              <option value="Asset">Asset</option>
-              <option value="Liability">Liability</option>
-              <option value="Capital">Capital</option>
-            </select>
-          </TableToolbar>
-        </div>
         <ResultTable
           rows={paged}
           columns={columns}
@@ -248,6 +351,8 @@ function PositionDetail({
   const consumingRuns = runsConsuming(position.batchId);
 
   const fields: Array<[string, string | number | null]> = [
+    ['Product code', position.productCode],
+    ['Product class', position.productClass],
     ['Legal entity', position.legalEntityCode],
     ['Org unit', position.orgUnitCode],
     ['GL account', position.glAccountCode],
@@ -273,21 +378,35 @@ function PositionDetail({
         {fields.map(([label, value]) => (
           <div key={label}>
             <dt className="font-bold uppercase tracking-wider text-gray-400">{label}</dt>
-            <dd className="break-all text-gray-700">{value ?? '—'}</dd>
+            <dd className="break-all text-gray-700">{value ?? '-'}</dd>
           </div>
         ))}
       </dl>
 
       <div className="rounded-lg bg-navy-50 px-3 py-2 leading-relaxed text-navy-900">
         <span className="font-bold">Lineage: </span>
-        Source batch <Link href={`/data/operations/position-book?batchId=${position.batchId}`} className="font-mono font-bold underline hover:no-underline">{position.batchId}</Link>
-        {batch && <> — {batch.status}, uploaded by {batch.uploadedBy} on {formatDate(batch.uploadedAt.slice(0, 10))}</>}
+        Source batch{' '}
+        <Link
+          href={`/data/operations/position-book?batchId=${position.batchId}`}
+          className="font-mono font-bold underline hover:no-underline"
+        >
+          {position.batchId}
+        </Link>
+        {batch && (
+          <>
+            {' '}
+            - {batch.status}, uploaded by {batch.uploadedBy} on {formatDate(batch.uploadedAt.slice(0, 10))}
+          </>
+        )}
         {consumingRuns.length > 0 ? (
           <>
-            {' '}· consumed by {consumingRuns.length} run(s):{' '}
+            {' '}
+            · consumed by {consumingRuns.length} run(s):{' '}
             {consumingRuns.map((r, i) => (
               <span key={r.id}>
-                <Link href={`/execution/history`} className="font-bold underline hover:no-underline">{r.name}</Link>
+                <Link href={`/execution/history`} className="font-bold underline hover:no-underline">
+                  {r.name}
+                </Link>
                 {i < consumingRuns.length - 1 ? ', ' : ''}
               </span>
             ))}

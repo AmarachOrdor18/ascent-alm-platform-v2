@@ -4,13 +4,16 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { RunPicker } from '@/components/layout/RunPicker';
 import { useAuth } from '@/context/AuthContext';
+import { GROUP_CODE } from '@/context/ScopeContext';
 import { useAffiliates } from '@/lib/hooks';
 import { accessibleAffiliates, scopedListCode } from '@/lib/scope';
 import { regulatoryReturns, newId } from '@/lib/governanceHooks';
 import { useRuns, useRunResults } from '@/lib/runHooks';
+import { useBatches } from '@/lib/hooks';
+import { isRunStale, isRunUnreconciled } from '@/lib/runStaleness';
 import { metricValue, formatMetric } from '@/lib/metrics';
 import { REGULATORY_MINIMA } from '@/engine/limits';
-import type { RegulatoryReturn, ReturnStatus } from '@/engine/types';
+import type { ProcessRun, RegulatoryReturn, ReturnStatus } from '@/engine/types';
 
 const STATUSES: ReturnStatus[] = ['Not started', 'In preparation', 'Under review', 'Submitted', 'Accepted', 'Rejected'];
 const STATUS_TONE: Record<ReturnStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -21,12 +24,20 @@ const STATUS_TONE: Record<ReturnStatus, 'success' | 'warning' | 'danger' | 'neut
 export function RegulatoryReporting() {
   const { hasPermission, user } = useAuth();
   const canEdit = hasPermission('reporting.generate') || hasPermission('reporting.manage') || hasPermission('run.execute');
-  // A user confined to one affiliate only sees that affiliate's own returns, plus any Group-wide ones —
+  // A user confined to one affiliate only sees that affiliate's own returns, plus any Group-wide ones -
   // reporting.view is broad, so without this every affiliate's returns leaked to everyone who holds it.
   const { data: rows = [], isLoading } = regulatoryReturns.useList(scopedListCode(user, hasPermission));
   const { data: allAffiliates = [] } = useAffiliates();
   const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
-  const { data: runs = [] } = useRuns();
+  // Same restriction as `rows` above - otherwise a restricted user could attach another affiliate's
+  // run to a return even though they'd never see that affiliate's returns listed.
+  const { data: runsForScope = [] } = useRuns(scopedListCode(user, hasPermission));
+  // A run belonging to an affiliate that isn't (or is no longer) Live never belongs in a real
+  // regulatory submission's picker - Group runs are always fine, since Group consolidation itself
+  // only ever draws from Live affiliates.
+  const runs = runsForScope.filter(
+    (r) => r.affiliateCode === GROUP_CODE || allAffiliates.find((a) => a.code === r.affiliateCode)?.status === 'Live',
+  );
   const save = regulatoryReturns.useSave();
 
   const [regulator, setRegulator] = useState<'all' | string>('all');
@@ -116,8 +127,8 @@ export function RegulatoryReporting() {
           rows={filtered}
           columns={columns}
           rowKey={(r) => r.id}
-          emptyMessage={isLoading ? 'Loading…' : 'No regulatory returns yet — add one for an affiliate and its regulator.'}
-          renderDetail={(r) => <ReturnDetail ret={r} />}
+          emptyMessage={isLoading ? 'Loading…' : 'No regulatory returns yet - add one for an affiliate and its regulator.'}
+          renderDetail={(r) => <ReturnDetail ret={r} runs={runs} />}
         />
       </section>
 
@@ -134,14 +145,26 @@ export function RegulatoryReporting() {
   );
 }
 
-function ReturnDetail({ ret }: { ret: RegulatoryReturn }) {
+function ReturnDetail({ ret, runs }: { ret: RegulatoryReturn; runs: ProcessRun[] }) {
   const { data: results = [] } = useRunResults(ret.runId);
+  const { data: batches = [] } = useBatches();
   const minima = REGULATORY_MINIMA[ret.regulator];
-  if (!ret.runId) return <p className="text-[11px] text-gray-500">No run attached — nothing to report yet.</p>;
+  if (!ret.runId) return <p className="text-[11px] text-gray-500">No run attached - nothing to report yet.</p>;
   if (results.length === 0) return <p className="text-[11px] text-gray-500">The attached run has no results.</p>;
+
+  const sourceRun = runs.find((r) => r.id === ret.runId) ?? null;
+  const stale = isRunStale(sourceRun, batches);
+  const unreconciled = isRunUnreconciled(sourceRun, batches);
 
   return (
     <div className="space-y-2 text-[11px]">
+      {(stale || unreconciled) && (
+        <p className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 leading-relaxed text-navy-900">
+          {stale && <span className="font-bold">Source run's data has since been superseded. </span>}
+          {unreconciled && <span className="font-bold">Source positions are not GL-reconciled. </span>}
+          Worth checking before this return is submitted.
+        </p>
+      )}
       {Object.keys(minima ?? { lcrPercent: 100 }).map((key) => {
         const value = metricValue(results, key);
         const min = minima?.[key];
@@ -215,14 +238,14 @@ function ReturnEditor({
 
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2 text-[11px]">
           <span className="text-gray-500">Prepared by</span>
-          <span className="font-bold">{draft.preparedBy ?? '—'}</span>
+          <span className="font-bold">{draft.preparedBy ?? '-'}</span>
           <button type="button" onClick={() => set({ preparedBy: user?.name ?? null })} className="ml-auto rounded border border-gray-200 px-2 py-1 text-[10px] font-bold text-navy-900 hover:border-navy-700">
             Claim as preparer
           </button>
         </div>
         {draft.status === 'Under review' && (
           <p className="mt-2 text-[10px] text-gray-400">
-            {canMarkReviewed ? 'A different reviewer than the preparer may submit this return.' : 'The preparer cannot also be the reviewer — sign in as someone else to submit.'}
+            {canMarkReviewed ? 'A different reviewer than the preparer may submit this return.' : 'The preparer cannot also be the reviewer - sign in as someone else to submit.'}
           </p>
         )}
 

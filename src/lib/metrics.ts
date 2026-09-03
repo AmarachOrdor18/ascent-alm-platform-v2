@@ -66,7 +66,7 @@ export function metricValue(results: RunResult[], key: string): number | null {
 
 /** Format a metric for display, respecting its unit. */
 export function formatMetric(value: number | null, key: string): string {
-  if (value === null) return '—';
+  if (value === null) return '-';
   const unit = METRIC_BY_KEY.get(key)?.unit ?? 'percent';
   if (unit === 'days') return `${Math.round(value)} days`;
   if (unit === 'amount') return value.toLocaleString(undefined, { maximumFractionDigits: 0 });

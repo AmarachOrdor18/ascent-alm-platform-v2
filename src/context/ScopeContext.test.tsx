@@ -1,7 +1,7 @@
 /**
  * Regression check for the real reported bug: two different logins showed
  * the same data. The permission mechanism (AuthContext.test.tsx) was never
- * the cause — ScopeContext always defaulted to Group and never looked at
+ * the cause - ScopeContext always defaulted to Group and never looked at
  * who was signed in, so every account could freely browse every
  * affiliate's numbers regardless of which one it was actually assigned to.
  */

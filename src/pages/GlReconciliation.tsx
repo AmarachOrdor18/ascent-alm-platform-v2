@@ -4,11 +4,18 @@ import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
+import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { resolveSingleAffiliate, useAffiliates, usePositions } from '@/lib/hooks';
+import { resolveSingleAffiliate, useAffiliates, useBatches, usePositions, useSaveBatch } from '@/lib/hooks';
 import { accessibleAffiliates } from '@/lib/scope';
 import { importLedger } from '@/lib/csvImport';
+import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
+import { downloadCsvTemplate } from '@/lib/csvTemplates';
+import { referenceLoadBatch } from '@/lib/referenceBatch';
+
+const LEDGER_TEMPLATE_COLUMNS = ['glAccountCode', 'orgUnitCode', 'currency', 'endingBalance', 'asOfDate'];
+const LEDGER_TEMPLATE_SAMPLE = ['200601', '', 'NGN', '150000000', '2026-07-31'];
 import { identityFxTable } from '@/engine/fx';
 import {
   reconcile,
@@ -33,11 +40,11 @@ export function GlReconciliation() {
   const [tolerancePercent, setTolerancePercent] = useState(5);
   const [ledger, setLedger] = useState<LedgerBalance[] | null>(null);
   const [ledgerName, setLedgerName] = useState<string | null>(null);
+  const [ledgerFileError, setLedgerFileError] = useState<string | null>(null);
   const [approvedPlugs, setApprovedPlugs] = useState<Set<string>>(new Set());
-  const [signedOff, setSignedOff] = useState(false);
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
-  // At Group scope there is no single affiliate to default to — silently picking one would mean
+  // At Group scope there is no single affiliate to default to - silently picking one would mean
   // reconciling (and potentially signing off) an affiliate's book nobody actually chose. Leaving
   // affiliate undefined here also matters for usePositions below: an undefined code, unlike 'GROUP',
   // is read as "no filter" and would otherwise pull every affiliate's positions into the count.
@@ -46,6 +53,18 @@ export function GlReconciliation() {
     (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
   const currency = affiliate?.functionalCurrency ?? 'USD';
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
+  const { data: batches = [] } = useBatches();
+  const saveBatch = useSaveBatch();
+
+  // Sign-off is recorded on the Position Book batch(es) this affiliate/date actually consumed - same field
+  // and pattern OnboardAffiliate uses - so it survives a refresh and shows up wherever reconciledAt is read,
+  // rather than living only in this screen's own state.
+  const positionsBatchesForDate = affiliate
+    ? batches.filter(
+        (b) => b.affiliateCode === affiliate.code && b.domain === 'Positions' && b.status === 'Committed' && b.asOfDate === asOfDate,
+      )
+    : [];
+  const signedOff = positionsBatchesForDate.length > 0 && positionsBatchesForDate.every((b) => !!b.reconciledAt);
 
   const result = useMemo(() => {
     if (!ledger || !affiliate) return null;
@@ -58,14 +77,45 @@ export function GlReconciliation() {
     });
   }, [ledger, positions, affiliate, currency, asOfDate, level, toleranceAmount, tolerancePercent]);
 
+  const lineControls = useTableControls(result?.lines ?? [], 25, ['glAccountCode', 'orgUnitCode']);
+
   const handleLedgerFile = async (file: File) => {
-    const text = await file.text();
+    setLedgerFileError(null);
+    let text: string;
+    try {
+      text = await readUploadAsCsvText(file);
+    } catch (err) {
+      setLedgerFileError(err instanceof Error ? err.message : 'This file could not be read.');
+      if (fileInput.current) fileInput.current.value = '';
+      return;
+    }
     const parsed = importLedger(text, asOfDate, currency);
     setLedger(parsed.rows);
     setLedgerName(file.name);
     setApprovedPlugs(new Set());
-    setSignedOff(false);
     if (fileInput.current) fileInput.current.value = '';
+    // GeneralLedger is genuinely per-affiliate, unlike the Group-wide reference domains - but same
+    // underlying gap: Data Sources' freshness page only reads LoadBatch rows, so without recording one
+    // here it reads "Never loaded" for this affiliate no matter how current the trial balance actually is.
+    if (affiliate && user) {
+      saveBatch.mutate(
+        referenceLoadBatch({
+          domain: 'GeneralLedger',
+          affiliateCode: affiliate.code,
+          asOfDate,
+          label: file.name,
+          uploadedBy: user.name,
+          rowCount: parsed.rows.length,
+        }),
+      );
+    }
+  };
+
+  const handleSignOff = () => {
+    if (!canComplete || !user) return;
+    for (const b of positionsBatchesForDate) {
+      void saveBatch.mutateAsync({ ...b, reconciledBy: user.name, reconciledAt: new Date().toISOString() });
+    }
   };
 
   const togglePlug = (key: string) => {
@@ -78,7 +128,8 @@ export function GlReconciliation() {
   };
 
   const allPlugsApproved = result !== null && result.suggestedPlugs.every((p) => approvedPlugs.has(p.key));
-  const canComplete = result !== null && result.canSignOff && allPlugsApproved && canSignOff;
+  const canComplete =
+    result !== null && result.canSignOff && allPlugsApproved && canSignOff && positionsBatchesForDate.length > 0;
 
   const columns: ResultColumn<ReconciliationLine>[] = [
     {
@@ -92,7 +143,7 @@ export function GlReconciliation() {
             key: 'ou',
             header: 'Org unit',
             render: (l: ReconciliationLine) => (
-              <span className="font-mono text-[11px] text-gray-500">{l.orgUnitCode ?? '—'}</span>
+              <span className="font-mono text-[11px] text-gray-500">{l.orgUnitCode ?? '-'}</span>
             ),
           },
         ]
@@ -115,7 +166,7 @@ export function GlReconciliation() {
       align: 'right',
       render: (l) =>
         Math.abs(l.variance) < 0.005 ? (
-          <span className="font-mono text-gray-300">—</span>
+          <span className="font-mono text-gray-300">-</span>
         ) : (
           <Amount value={l.variance} currency={currency} colorBySign />
         ),
@@ -149,19 +200,19 @@ export function GlReconciliation() {
         scope={affiliate?.name ?? 'No affiliate selected'}
         currency={currency}
         metrics={[
-          { label: 'Positions', value: String(positions.length), about: 'Instrument-level positions loaded for this affiliate and as-of date — one side of the reconciliation.' },
-          { label: 'Ledger accounts', value: ledger ? String(ledger.length) : '—', about: 'Accounts in the uploaded trial balance — the other side of the reconciliation.' },
+          { label: 'Positions', value: String(positions.length), about: 'Instrument-level positions loaded for this affiliate and as-of date - one side of the reconciliation.' },
+          { label: 'Ledger accounts', value: ledger ? String(ledger.length) : '-', about: 'Accounts in the uploaded trial balance - the other side of the reconciliation.' },
           {
             label: 'Out of tolerance',
-            value: result ? String(result.linesOutOfTolerance) : '—',
+            value: result ? String(result.linesOutOfTolerance) : '-',
             tone: result ? (result.linesOutOfTolerance > 0 ? 'danger' : 'success') : 'neutral',
-            about: 'Accounts whose variance exceeds both the absolute and percentage tolerance — these block sign-off rather than being plugged.',
+            about: 'Accounts whose variance exceeds both the absolute and percentage tolerance - these block sign-off rather than being plugged.',
           },
           {
             label: 'Sign-off',
-            value: signedOff ? 'Complete' : result ? (result.canSignOff ? 'Available' : 'Blocked') : '—',
+            value: signedOff ? 'Complete' : result ? (result.canSignOff ? 'Available' : 'Blocked') : '-',
             tone: signedOff ? 'success' : result?.canSignOff ? 'warning' : 'danger',
-            about: 'Whether the period can be signed off — requires every line within tolerance and every suggested plug approved.',
+            about: 'Whether the period can be signed off - requires every line within tolerance and every suggested plug approved.',
           },
         ]}
       />
@@ -224,19 +275,27 @@ export function GlReconciliation() {
           </div>
           <div>
             <label htmlFor="rec-file" className="mb-1 block text-[11px] text-gray-600">
-              Trial balance (CSV)
+              Trial balance (CSV, Excel, JSON or XML)
             </label>
             <input
               id="rec-file"
               ref={fileInput}
               type="file"
-              accept=".csv,text/csv"
+              accept={UPLOAD_ACCEPT}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void handleLedgerFile(file);
               }}
               className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
             />
+            {ledgerFileError && <p className="mt-1 max-w-xs text-[11px] text-red-700">{ledgerFileError}</p>}
+            <button
+              type="button"
+              onClick={() => downloadCsvTemplate(LEDGER_TEMPLATE_COLUMNS, LEDGER_TEMPLATE_SAMPLE, 'gl_ledger_template.csv')}
+              className="mt-1 block text-[10px] font-bold text-navy-700 hover:underline"
+            >
+              Download CSV template
+            </button>
           </div>
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
@@ -266,7 +325,7 @@ export function GlReconciliation() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
-                    Reconciliation — {ledgerName}
+                    Reconciliation - {ledgerName}
                   </h2>
                   <p className="mt-1 text-[11px] text-gray-500">
                     Total variance{' '}
@@ -278,14 +337,18 @@ export function GlReconciliation() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSignedOff(true)}
+                  onClick={handleSignOff}
                   disabled={!canComplete || signedOff}
                   title={
-                    !result.canSignOff
-                      ? 'Resolve the out-of-tolerance lines first'
-                      : !allPlugsApproved
-                        ? 'Approve every suggested plug first'
-                        : undefined
+                    !canSignOff
+                      ? 'Your role does not have permission to sign off a reconciliation'
+                      : !result.canSignOff
+                        ? 'Resolve the out-of-tolerance lines first'
+                        : !allPlugsApproved
+                          ? 'Approve every suggested plug first'
+                          : positionsBatchesForDate.length === 0
+                            ? 'No committed Position Book batch for this affiliate and date to sign off'
+                            : undefined
                   }
                   className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                 >
@@ -293,7 +356,21 @@ export function GlReconciliation() {
                 </button>
               </div>
 
-              <ResultTable rows={result.lines} columns={columns} rowKey={(l) => l.key} />
+              <TableToolbar
+                searchValue={lineControls.search}
+                onSearchChange={lineControls.setSearch}
+                exportData={() => lineControls.filtered}
+                exportFilename={`gl-reconciliation-${affiliate.code}-${asOfDate}`}
+                density={lineControls.density}
+                onDensityChange={lineControls.setDensity}
+              />
+              <ResultTable rows={lineControls.paged} columns={columns} rowKey={(l) => l.key} className="mt-4" />
+              <TablePagination
+                currentPage={lineControls.page}
+                totalItems={lineControls.totalItems}
+                pageSize={lineControls.pageSize}
+                onPageChange={lineControls.setPage}
+              />
             </section>
 
             {result.suggestedPlugs.length > 0 && (
@@ -340,7 +417,7 @@ export function GlReconciliation() {
               <div role="alert" className="rounded-lg bg-danger-bg px-4 py-3 text-[12px] leading-relaxed text-danger">
                 <span className="font-bold">Sign-off blocked.</span> {result.linesOutOfTolerance} line
                 {result.linesOutOfTolerance === 1 ? '' : 's'} exceed tolerance. These go back to the affiliate rather
-                than being plugged — that is the point of the control.
+                than being plugged - that is the point of the control.
               </div>
             )}
 

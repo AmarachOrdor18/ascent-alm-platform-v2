@@ -1,14 +1,35 @@
+import { useQueries } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates, useBatches, useDeleteAffiliate } from '@/lib/hooks';
-import { checkAllDomains, type FreshnessCheck } from '@/engine/vintage';
+import { useRuns, runKeys } from '@/lib/runHooks';
+import { repository } from '@/store/localRepository';
+import { accessibleAffiliates } from '@/lib/scope';
+import { checkAllDomains, worstFreshness as computeWorstFreshness, type FreshnessCheck } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
-import type { Affiliate } from '@/engine/types';
+import { metricValue } from '@/lib/metrics';
+import type { Affiliate, RunResult } from '@/engine/types';
 
-const TODAY = '2026-08-25';
+type RiskSeverity = 'Low' | 'Medium' | 'High' | 'No run';
+const RISK_TONE: Record<RiskSeverity, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  Low: 'success',
+  Medium: 'warning',
+  High: 'danger',
+  'No run': 'neutral',
+};
+// A lighter read than the full Risk Map (which also weighs Group deposit-share) - LCR alone,
+// since that's the single number this list needs to flag "worth a closer look" at a glance.
+function classifyByLcr(lcr: number | null): RiskSeverity {
+  if (lcr === null) return 'No run';
+  if (lcr < 100) return 'High';
+  if (lcr < 130) return 'Medium';
+  return 'Low';
+}
+
+const TODAY = new Date().toISOString().slice(0, 10);
 
 const FRESHNESS_TONE = {
   Fresh: 'success',
@@ -19,29 +40,52 @@ const FRESHNESS_TONE = {
 
 export function Affiliates() {
   const [, navigate] = useLocation();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canOnboard = hasPermission('group.manage');
   const { data: affiliates = [], isLoading } = useAffiliates();
   const { data: batches = [] } = useBatches();
+  const { data: runs = [] } = useRuns();
   const deleteAffiliate = useDeleteAffiliate();
 
-  const rows = affiliates.filter((a) => a.code !== 'GROUP');
+  // An Affiliate Admin (or anyone else without group.manage) sees only their own affiliate here -
+  // otherwise this list and the detail screen it links to would leak every other affiliate's profile,
+  // feeds and balance sheet to someone who can't act on them anyway.
+  const rows = accessibleAffiliates(
+    affiliates.filter((a) => a.code !== 'GROUP'),
+    user,
+    hasPermission,
+  );
+
+  const latestRunByAffiliate = new Map<string, (typeof runs)[number]>();
+  for (const run of runs) {
+    if (run.status !== 'Completed') continue;
+    const held = latestRunByAffiliate.get(run.affiliateCode);
+    if (!held || run.createdAt > held.createdAt) latestRunByAffiliate.set(run.affiliateCode, run);
+  }
+  const resultQueries = useQueries({
+    queries: rows.map((a) => {
+      const runId = latestRunByAffiliate.get(a.code)?.id ?? null;
+      return {
+        queryKey: runKeys.results(runId ?? 'none'),
+        queryFn: (): Promise<RunResult[]> => (runId ? repository.listRunResults(runId) : Promise.resolve([])),
+        enabled: runId !== null,
+      };
+    }),
+  });
+  const riskFor = (a: Affiliate): RiskSeverity => {
+    const i = rows.findIndex((r) => r.code === a.code);
+    const results = resultQueries[i]?.data ?? [];
+    return classifyByLcr(metricValue(results, 'lcrPercent'));
+  };
 
   const cancelOnboarding = (a: Affiliate) => {
-    if (!window.confirm(`Abandon onboarding for ${a.name}? This deletes the record — it cannot be undone.`)) return;
+    if (!window.confirm(`Abandon onboarding for ${a.name}? This deletes the record - it cannot be undone.`)) return;
     deleteAffiliate.mutate(a);
   };
 
   const freshnessFor = (a: Affiliate): FreshnessCheck[] => checkAllDomains(a, batches, TODAY);
 
-  const worstFreshness = (a: Affiliate): FreshnessCheck['status'] => {
-    const checks = freshnessFor(a);
-    if (checks.length === 0) return 'Never loaded';
-    if (checks.some((c) => c.status === 'Stale')) return 'Stale';
-    if (checks.some((c) => c.status === 'Never loaded')) return 'Never loaded';
-    if (checks.some((c) => c.status === 'Due')) return 'Due';
-    return 'Fresh';
-  };
+  const worstFreshness = (a: Affiliate): FreshnessCheck['status'] => computeWorstFreshness(freshnessFor(a));
 
   const live = rows.filter((a) => a.status === 'Live');
   const onboarding = rows.filter((a) => a.status === 'Onboarding');
@@ -50,14 +94,7 @@ export function Affiliates() {
     {
       key: 'name',
       header: 'Affiliate',
-      render: (a) => (
-        <Link
-          href={a.status === 'Onboarding' ? `/affiliates/onboard/${a.code}` : `/affiliates/${a.code}`}
-          className="font-medium text-navy-900 hover:text-navy-700 hover:underline"
-        >
-          {a.name}
-        </Link>
-      ),
+      render: (a) => <span className="font-medium text-navy-900">{a.name}</span>,
     },
     { key: 'country', header: 'Country', render: (a) => <span className="text-gray-600">{a.country}</span> },
     { key: 'regulator', header: 'Regulator', render: (a) => <span className="text-gray-600">{a.regulator}</span> },
@@ -76,27 +113,62 @@ export function Affiliates() {
       },
     },
     {
-      key: 'onboarding',
+      key: 'lastRun',
+      header: 'Last Run',
+      render: (a) => {
+        const run = latestRunByAffiliate.get(a.code);
+        return run ? (
+          <span className="font-mono text-[11px] text-gray-600">{formatDate(run.asOfDate)}</span>
+        ) : (
+          <span className="text-gray-300">-</span>
+        );
+      },
+    },
+    {
+      key: 'risk',
+      header: 'Risk Status',
+      render: (a) => {
+        const risk = riskFor(a);
+        return <StatusBadge status={risk} tone={RISK_TONE[risk]} />;
+      },
+    },
+    {
+      key: 'actions',
       header: '',
-      render: (a) =>
-        a.status === 'Onboarding' && canOnboard ? (
-          <div className="flex justify-end gap-2">
+      render: (a) => {
+        if (!canOnboard) return null;
+        if (a.status === 'Onboarding') {
+          return (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/affiliates/onboard/${a.code}`)}
+                className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+              >
+                Resume
+              </button>
+              <button
+                type="button"
+                onClick={() => cancelOnboarding(a)}
+                className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-danger hover:border-danger"
+              >
+                Cancel
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => navigate(`/affiliates/onboard/${a.code}`)}
-              className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+              onClick={() => navigate(`/affiliates/${a.code}/settings`)}
+              className="rounded border border-gray-200 px-3 py-1 text-[11px] font-bold text-navy-900 hover:border-navy-700"
             >
-              Resume
-            </button>
-            <button
-              type="button"
-              onClick={() => cancelOnboarding(a)}
-              className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-danger hover:border-danger"
-            >
-              Cancel
+              Settings →
             </button>
           </div>
-        ) : null,
+        );
+      },
       align: 'right',
     },
   ];
@@ -115,7 +187,7 @@ export function Affiliates() {
             label: 'Onboarding',
             value: String(onboarding.length),
             tone: onboarding.length > 0 ? 'warning' : 'neutral',
-            about: 'Affiliates still being configured — not yet contributing to Group-consolidated results.',
+            about: 'Affiliates still being configured - not yet contributing to Group-consolidated results.',
           },
           {
             label: 'Stale data',
@@ -127,6 +199,15 @@ export function Affiliates() {
         actions={
           canOnboard ? (
             <div className="flex gap-2">
+              {/* Group-level configuration (connectors, business rules, reference data) lives on the
+                  Group row's Settings, not in a sidebar module - surface it here since the list
+                  below only shows individual affiliates. */}
+              <Link
+                href="/affiliates/GROUP/settings"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+              >
+                Group settings
+              </Link>
               <Link
                 href="/affiliates/bulk-onboard"
                 className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
@@ -155,7 +236,7 @@ export function Affiliates() {
               <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Feeds by domain</h3>
               {a.feeds.length === 0 ? (
                 <p className="text-[12px] text-gray-500">
-                  No feeds configured — this affiliate has not started onboarding.
+                  No feeds configured - this affiliate has not started onboarding.
                 </p>
               ) : (
                 <table className="w-full text-[11px]">
@@ -180,7 +261,7 @@ export function Affiliates() {
                           </td>
                           <td className="py-1.5 px-3 font-mono text-gray-500">{f.slaDays}d</td>
                           <td className="py-1.5 px-3 font-mono text-gray-500">
-                            {f.lastLoadedAt ? formatDate(f.lastLoadedAt.slice(0, 10)) : '—'}
+                            {f.lastLoadedAt ? formatDate(f.lastLoadedAt.slice(0, 10)) : '-'}
                           </td>
                           <td className="py-1.5 px-3">
                             <StatusBadge status={f.status} tone={FRESHNESS_TONE[f.status]} />
@@ -198,3 +279,4 @@ export function Affiliates() {
     </>
   );
 }
+

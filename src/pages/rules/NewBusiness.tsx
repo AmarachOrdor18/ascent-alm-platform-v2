@@ -25,7 +25,7 @@ const METHODS: Array<{ value: ForecastMethod; label: string }> = [
 ];
 
 const METHOD_HINT: Record<ForecastMethod, string> = {
-  NoNewBusiness: 'Runoff without replacement — the default, and what a static run assumes.',
+  NoNewBusiness: 'Runoff without replacement - the default, and what a static run assumes.',
   TargetEndBalance: 'Originate whatever is needed to reach this closing balance.',
   TargetAverageBalance: 'Timing is solved so the average balance hits the target.',
   TargetGrowthPercent: 'Grow the book by this percentage each bucket.',
@@ -153,7 +153,7 @@ export function NewBusiness() {
   return (
     <RuleEditor<NewBusinessRule>
       title="New Business Assumptions"
-      description="Forecast balances, pricing margins and maturity mix. Attaching one of these turns a static run into a dynamic one."
+      description="Forecast balances, pricing margins and maturity mix. Consumed by Forecast, and required to select a Dynamic process type on Process Run - it does not yet affect a Process Run's own calculated elements."
       noun="assumption set"
       rules={rules}
       isLoading={isLoading}
@@ -166,7 +166,7 @@ export function NewBusiness() {
         for (const line of r.lines) {
           if (line.method === 'NoNewBusiness') continue;
           const error = allocationError(line.maturityMix);
-          if (error) return `${line.productCode}: maturity mix — ${error}`;
+          if (error) return `${line.productCode}: maturity mix - ${error}`;
           if (line.method === 'TargetGrowthPercent' && Math.abs(line.value) > 100) {
             return `${line.productCode}: growth beyond ±100% per bucket is almost certainly an error.`;
           }
@@ -182,7 +182,7 @@ export function NewBusiness() {
             onChange={(lines) => update({ lines })}
             readOnly={readOnly}
             addLabel="Add product line"
-            emptyMessage="No new-business lines. Without any, a run is static."
+            emptyMessage="No new-business lines. This rule's lines feed the Forecast page, not a Process Run's own calculated elements."
             createRow={() => ({
               productCode: leaves[0]?.code ?? '',
               currency: currencies[0]?.code ?? 'USD',
@@ -200,7 +200,7 @@ export function NewBusiness() {
             return (
               <div key={`mix-${i}`} className="rounded-lg border border-gray-200 p-4">
                 <h4 className="mb-1 text-[12px] font-bold text-navy-900">
-                  Maturity mix — {leaves.find((p) => p.code === line.productCode)?.name ?? line.productCode}
+                  Maturity mix - {leaves.find((p) => p.code === line.productCode)?.name ?? line.productCode}
                 </h4>
                 <p className="mb-3 text-[11px] text-gray-500">{METHOD_HINT[line.method]}</p>
 

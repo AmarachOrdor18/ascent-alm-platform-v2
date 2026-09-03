@@ -3,7 +3,6 @@ import { Link } from 'wouter';
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
-import { GapLadderTable } from '@/components/results/GapLadder';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -51,7 +50,6 @@ export function LiquidityRisk() {
       : [];
 
   const activeGap = gapView === 'Contractual' ? gap?.contractual : gap?.behavioural;
-  const priorGap = gapView === 'Contractual' ? gap?.behavioural : gap?.contractual;
 
   return (
     <>
@@ -78,12 +76,12 @@ export function LiquidityRisk() {
             label: 'Loan-to-deposit',
             value: formatPct(ldr?.ratioPercent ?? null),
             tone: (ldr?.ratioPercent ?? 0) > 90 ? 'warning' : 'success',
-            about: 'Customer loans as a share of customer deposits — a classic funding-structure indicator. A high ratio signals reliance on deposits to fund lending.',
+            about: 'Customer loans as a share of customer deposits - a classic funding-structure indicator. A high ratio signals reliance on deposits to fund lending.',
           },
           {
             label: 'Largest affiliate deposit share',
-            value: depositsByAffiliate[0] ? formatPct(depositsByAffiliate[0].sharePercent) : '—',
-            about: 'The single affiliate holding the largest share of Group deposit funding — a Group-diversification question, distinct from depositor-level concentration.',
+            value: depositsByAffiliate[0] ? formatPct(depositsByAffiliate[0].sharePercent) : '-',
+            about: 'The single affiliate holding the largest share of Group deposit funding - a Group-diversification question, distinct from depositor-level concentration.',
           },
         ]}
         actions={
@@ -107,7 +105,7 @@ export function LiquidityRisk() {
                     <InfoButton label="What this chart shows">
                       Assets minus liabilities and capital by maturity bucket, bucketed on contractual maturity date (or
                       behavioural re-dating in the Behavioural view). A negative gap means more matures on the
-                      liability side than the asset side in that window — net cash out, not in.
+                      liability side than the asset side in that window - net cash out, not in.
                     </InfoButton>
                   </h2>
                   <p className="mt-1 text-[11px] font-medium text-gray-400">Assets vs. liabilities by maturity bucket</p>
@@ -154,7 +152,7 @@ export function LiquidityRisk() {
             <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               Deposit concentration by affiliate
               <InfoButton label="What this shows">
-                Each affiliate's share of total Group deposit funding — a diversification question at the affiliate
+                Each affiliate's share of total Group deposit funding - a diversification question at the affiliate
                 level, distinct from the depositor-level concentration on the Concentration screen.
               </InfoButton>
             </h2>
@@ -188,7 +186,7 @@ export function LiquidityRisk() {
               Cross-currency funding position
               <InfoButton label="What this shows">
                 Assets and liabilities converted to the reporting currency, broken out by the currency they are
-                actually settled in — this is where a currency mismatch shows up even when the overall book looks
+                actually settled in - this is where a currency mismatch shows up even when the overall book looks
                 balanced.
               </InfoButton>
             </h2>
@@ -290,13 +288,29 @@ export function LiquidityRisk() {
           )}
         </div>
 
-        {activeGap && (
+        {activeGap && activeGap.buckets.length > 0 && (
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
-              {gapView} ladder as numbers
-              <InfoButton label="Why this table exists">A chart is not an audit trail.</InfoButton>
-            </h2>
-            <GapLadderTable buckets={activeGap.buckets} currency={currency} priorBuckets={priorGap?.buckets} />
+            <div className="mb-1 flex items-center justify-between gap-1.5">
+              <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                {gapView} gap - summary
+                <InfoButton label="Why only a summary here">
+                  The full bucket-by-bucket ladder (chart and table, with the maturity/repricing toggle) lives on
+                  Maturity &amp; Repricing Gap - showing it twice here as well just duplicated the same numbers across
+                  two tabs.
+                </InfoButton>
+              </h2>
+              <Link href="/risk/liquidity/gap-analysis" className="text-[11px] font-bold text-navy-700 hover:underline">
+                Full ladder →
+              </Link>
+            </div>
+            <p className="font-mono text-[24px] font-bold text-navy-900">
+              <Amount
+                value={activeGap.buckets[activeGap.buckets.length - 1]!.cumulativeGap}
+                currency={currency}
+                colorBySign
+              />
+            </p>
+            <p className="text-[11px] text-gray-500">Cumulative net gap across the whole ladder, as of this run.</p>
           </section>
         )}
 
@@ -378,6 +392,12 @@ function RunoffSummary({ runoff, currency }: { runoff: DepositRunoffResult; curr
       )}
 
       <ResultTable rows={runoff.lines.slice(0, 40)} columns={columns} rowKey={(l) => l.positionId} />
+
+      {runoff.lines.length > 40 && (
+        <p className="mt-3 text-[11px] text-gray-500">
+          Showing 40 of {runoff.lines.length}. The totals above are computed over all of them.
+        </p>
+      )}
     </section>
   );
 }

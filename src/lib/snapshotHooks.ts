@@ -50,7 +50,7 @@ export function useCreateSnapshot() {
       const now = new Date().toISOString();
       const snapshot: PositionSnapshot = {
         id: newId('SNAP'),
-        name: `${batch.id} snapshot — ${reason.slice(0, 60) || 'investigation'}`,
+        name: `${batch.id} snapshot - ${reason.slice(0, 60) || 'investigation'}`,
         parentBatchId: batch.id,
         parentRunId,
         affiliateCode: batch.affiliateCode,
@@ -121,7 +121,7 @@ export function useEditSnapshotPosition() {
       };
       const updated: PositionSnapshot = {
         ...snapshot,
-        status: 'Draft', // an edit after recalculation invalidates the last comparison — back to Draft until recalculated again
+        status: 'Draft', // an edit after recalculation invalidates the last comparison - back to Draft until recalculated again
         positions: snapshot.positions.map((p) => (p.id === positionId ? { ...p, [field]: newValue } : p)),
         changes: [...snapshot.changes, change],
         updatedAt: now,
@@ -137,7 +137,7 @@ export function useEditSnapshotPosition() {
   });
 }
 
-/** Moves a Recalculated snapshot into the approval queue — segregation of duties applies from here on: the requester cannot also approve it. */
+/** Moves a Recalculated snapshot into the approval queue - segregation of duties applies from here on: the requester cannot also approve it. */
 export function useSubmitSnapshotForApproval() {
   const client = useQueryClient();
   const { user } = useAuth();
@@ -204,9 +204,9 @@ export interface SnapshotComparison {
 }
 
 /**
- * Recalculates the full element set twice over the same scope — once against
+ * Recalculates the full element set twice over the same scope - once against
  * the parent batch's untouched positions (baseline) and once with this
- * snapshot's edited positions substituted in (edited) — so Original vs
+ * snapshot's edited positions substituted in (edited) - so Original vs
  * Snapshot reflects exactly one difference: the edits.
  */
 export function useRecalculateSnapshot() {
@@ -217,7 +217,7 @@ export function useRecalculateSnapshot() {
       const affiliate = await repository.getAffiliate(snapshot.affiliateCode);
       const compareRun = draftRun({
         id: `${snapshot.id}-COMPARE`,
-        name: `${snapshot.name} — comparison`,
+        name: `${snapshot.name} - comparison`,
         asOfDate: snapshot.asOfDate,
         affiliateCode: snapshot.affiliateCode,
         reportingCurrency: affiliate?.functionalCurrency ?? 'USD',
@@ -283,11 +283,14 @@ export function useCommitSnapshot() {
         committedAt: now,
         reconciledBy: null,
         reconciledAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
+        rejectedReason: null,
       };
 
       // The adjusted rows carry both a new id and the new batch's id: positions are keyed by id alone
       // (see AscentDb.positions in store/db.ts), so reusing the parent's position id here would overwrite
-      // that row in place — silently mutating the very history this flow exists to protect.
+      // that row in place - silently mutating the very history this flow exists to protect.
       const adjustedPositions = snapshot.positions.map((p) => ({ ...p, id: `${p.id}-v${newBatch.version}`, batchId: newBatch.id }));
 
       await repository.upsertBatch({ ...parent, status: 'Superseded', supersededReason: newBatch.supersededReason });

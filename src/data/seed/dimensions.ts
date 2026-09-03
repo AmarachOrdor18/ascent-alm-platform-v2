@@ -1,6 +1,6 @@
 import type { DimensionMember, DimensionType, GlLevel } from '@/engine/types';
 
-/** The literal affiliate code for a genuinely cross-affiliate construct — a consolidation-tree root, a
+/** The literal affiliate code for a genuinely cross-affiliate construct - a consolidation-tree root, a
  * connected-exposure group spanning countries. An ordinary, filterable affiliate value, not a bypass. */
 const GROUP = 'GROUP';
 
@@ -25,9 +25,9 @@ function node(
   };
 }
 
-// Legal Entity — each affiliate owns its own entity, plus subsidiaries. LE-GROUP is the consolidation root,
+// Legal Entity - each affiliate owns its own entity, plus subsidiaries. LE-GROUP is the consolidation root,
 // owned by the literal 'GROUP' affiliate; a country's entities reference it as `parentCode` without needing
-// it in their own affiliate-scoped list — buildHierarchy() treats an out-of-scope parent as a root.
+// it in their own affiliate-scoped list - buildHierarchy() treats an out-of-scope parent as a root.
 
 export const LEGAL_ENTITIES: DimensionMember[] = [
   node('LegalEntity', GROUP, 'LE-GROUP', 'Ecobank Transnational Incorporated', null, false, {
@@ -37,20 +37,20 @@ export const LEGAL_ENTITIES: DimensionMember[] = [
 
   node('LegalEntity', 'NG', 'LE-NG', 'Ecobank Nigeria Limited', 'LE-GROUP', false, {
     regulator: 'CBN',
-    licence: 'Commercial Banking — International',
+    licence: 'Commercial Banking - International',
     consolidationBasis: 'Full',
   }),
   node('LegalEntity', 'NG', 'LE-NG-AM', 'EDC Asset Management Limited', 'LE-NG', true, {
     regulator: 'SEC Nigeria',
     licence: 'Fund Management',
     consolidationBasis: 'Full',
-    note: 'Not a deposit-taker — outside the LCR perimeter',
+    note: 'Not a deposit-taker - outside the LCR perimeter',
   }),
   node('LegalEntity', 'NG', 'LE-NG-SEC', 'EDC Securities Limited', 'LE-NG', true, {
     regulator: 'SEC Nigeria',
     licence: 'Broker-Dealer',
     consolidationBasis: 'Full',
-    note: 'Not a deposit-taker — outside the LCR perimeter',
+    note: 'Not a deposit-taker - outside the LCR perimeter',
   }),
 
   node('LegalEntity', 'GH', 'LE-GH', 'Ecobank Ghana PLC', 'LE-GROUP', false, {
@@ -84,7 +84,7 @@ export const LEGAL_ENTITIES: DimensionMember[] = [
   }),
 ];
 
-// Organisational Unit — Retail / Corporate / Treasury / Wealth, with branch/region beneath
+// Organisational Unit - Retail / Corporate / Treasury / Wealth, with branch/region beneath
 
 const SEGMENTS: Array<{ suffix: string; name: string }> = [
   { suffix: 'RET', name: 'Retail Banking' },
@@ -112,7 +112,7 @@ export const ORG_UNITS: DimensionMember[] = [
     for (const segment of SEGMENTS) {
       const segmentCode = `OU-${code}-${segment.suffix}`;
       const hasChildren = segment.suffix === 'RET' || segment.suffix === 'COR';
-      units.push(node('OrgUnit', code, segmentCode, `${label} — ${segment.name}`, `OU-${code}`, !hasChildren));
+      units.push(node('OrgUnit', code, segmentCode, `${label} - ${segment.name}`, `OU-${code}`, !hasChildren));
 
       if (segment.suffix === 'RET') {
         for (const region of REGIONS[code] ?? []) {
@@ -146,7 +146,7 @@ function slug(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
-// Common Chart of Accounts — every affiliate that reconciles to it owns its own copy of the same standard
+// Common Chart of Accounts - every affiliate that reconciles to it owns its own copy of the same standard
 // (no Group-wide list). The three affiliates below share identical content today because it genuinely is one
 // standard; a country that needs to diverge just edits its own copy without touching anyone else's.
 
@@ -175,9 +175,13 @@ function commonCoaFor(affiliateCode: string): DimensionMember[] {
   ];
 }
 
-export const COMMON_COA: DimensionMember[] = ['NG', 'GH', 'CI'].flatMap(commonCoaFor);
+// GROUP's own copy is the actual Group standard onboarding clones from (see OnboardAffiliate.tsx);
+// NG/GH/CI's copies are demo-only, kept so the Nigeria engine-test fixture (nigeria.ts) still resolves
+// against a seeded chart of accounts, but no longer written into a fresh platform's database - see
+// bootstrap.ts's `writeSeed`.
+export const COMMON_COA: DimensionMember[] = ['GROUP', 'NG', 'GH', 'CI'].flatMap(commonCoaFor);
 
-// General Ledger Account — the affiliate's local chart (two-digit category /
+// General Ledger Account - the affiliate's local chart (two-digit category /
 // four-digit group / six-digit account). Category codes: 10 Fixed assets,
 // 20 Current assets, 30 Equity, 40 Liabilities, 50 Income, 60 Expenses.
 
@@ -189,7 +193,7 @@ export interface LocalGlAccount {
   parent: string;
 }
 
-/** Nigeria — three-level numeric, the structure a core system emits. */
+/** Nigeria - three-level numeric, the structure a core system emits. */
 const NG_GL: LocalGlAccount[] = [
   { code: '10', name: 'Fixed Assets', commonCoa: 'COA-15', level: 'Category', parent: 'GL-NG' },
   { code: '1001', name: 'Property & Equipment', commonCoa: 'COA-15', level: 'Level1', parent: '10' },
@@ -229,7 +233,7 @@ const NG_GL: LocalGlAccount[] = [
   { code: '400901', name: 'SUNDRY CREDITORS AND PROVISIONS', commonCoa: 'COA-24', level: 'Level2', parent: '4009' },
 ];
 
-/** Ghana — letter-prefixed, a completely different shape. */
+/** Ghana - letter-prefixed, a completely different shape. */
 const GH_GL: LocalGlAccount[] = [
   { code: 'GH-A', name: 'Assets', commonCoa: 'COA-1', level: 'Category', parent: 'GL-GH' },
   { code: 'GH-A-100', name: 'Cash and BoG Balances', commonCoa: 'COA-11', level: 'Level2', parent: 'GH-A' },
@@ -247,18 +251,18 @@ const GH_GL: LocalGlAccount[] = [
   { code: 'GH-E-200', name: 'Income Surplus', commonCoa: 'COA-32', level: 'Level2', parent: 'GH-E' },
 ];
 
-/** Côte d'Ivoire — SYSCOHADA, the UEMOA regional standard. */
+/** Côte d'Ivoire - SYSCOHADA, the UEMOA regional standard. */
 const CI_GL: LocalGlAccount[] = [
-  { code: 'CI-1', name: 'Classe 1 — Ressources durables', commonCoa: 'COA-3', level: 'Category', parent: 'GL-CI' },
+  { code: 'CI-1', name: 'Classe 1 - Ressources durables', commonCoa: 'COA-3', level: 'Category', parent: 'GL-CI' },
   { code: 'CI-101000', name: 'Capital social', commonCoa: 'COA-31', level: 'Level2', parent: 'CI-1' },
   { code: 'CI-102000', name: 'Réserves et report à nouveau', commonCoa: 'COA-32', level: 'Level2', parent: 'CI-1' },
-  { code: 'CI-2', name: 'Classe 2 — Actif immobilisé', commonCoa: 'COA-1', level: 'Category', parent: 'GL-CI' },
+  { code: 'CI-2', name: 'Classe 2 - Actif immobilisé', commonCoa: 'COA-1', level: 'Category', parent: 'GL-CI' },
   { code: 'CI-201000', name: 'Immobilisations', commonCoa: 'COA-15', level: 'Level2', parent: 'CI-2' },
-  { code: 'CI-5', name: 'Classe 5 — Trésorerie', commonCoa: 'COA-1', level: 'Category', parent: 'GL-CI' },
+  { code: 'CI-5', name: 'Classe 5 - Trésorerie', commonCoa: 'COA-1', level: 'Category', parent: 'GL-CI' },
   { code: 'CI-501000', name: 'Caisse et BCEAO', commonCoa: 'COA-11', level: 'Level2', parent: 'CI-5' },
   { code: 'CI-502000', name: 'Créances interbancaires', commonCoa: 'COA-12', level: 'Level2', parent: 'CI-5' },
   { code: 'CI-503000', name: "Titres d'investissement", commonCoa: 'COA-13', level: 'Level2', parent: 'CI-5' },
-  { code: 'CI-4', name: 'Classe 4 — Tiers', commonCoa: 'COA-2', level: 'Category', parent: 'GL-CI' },
+  { code: 'CI-4', name: 'Classe 4 - Tiers', commonCoa: 'COA-2', level: 'Category', parent: 'GL-CI' },
   { code: 'CI-401000', name: 'Crédits à la clientèle', commonCoa: 'COA-14', level: 'Level2', parent: 'CI-4' },
   { code: 'CI-402000', name: 'Dépôts de la clientèle', commonCoa: 'COA-22', level: 'Level2', parent: 'CI-4' },
   { code: 'CI-403000', name: 'Dettes interbancaires', commonCoa: 'COA-21', level: 'Level2', parent: 'CI-4' },
@@ -274,11 +278,11 @@ const GL_SCHEME: Record<string, string> = {
   CI: 'SYSCOHADA (UEMOA regional standard)',
 };
 
-// GL Account was already, in effect, affiliate-owned data pretending to be Group-wide — the codes above show
+// GL Account was already, in effect, affiliate-owned data pretending to be Group-wide - the codes above show
 // Nigeria (numeric), Ghana (letter-prefixed) and Côte d'Ivoire (SYSCOHADA) are three unrelated schemes that
 // happened to share one bare-code namespace. Every affiliate now owns its chart for real.
 export const GL_ACCOUNTS: DimensionMember[] = Object.entries(LOCAL_GL).flatMap(([affiliate, accounts]) => [
-  node('GlAccount', affiliate, `GL-${affiliate}`, `${AFFILIATE_LABEL[affiliate]} — Local Chart`, null, false, {
+  node('GlAccount', affiliate, `GL-${affiliate}`, `${AFFILIATE_LABEL[affiliate]} - Local Chart`, null, false, {
     scheme: GL_SCHEME[affiliate] ?? 'Local',
   }),
   ...accounts.map((a) =>
@@ -289,7 +293,7 @@ export const GL_ACCOUNTS: DimensionMember[] = Object.entries(LOCAL_GL).flatMap((
   ),
 ]);
 
-// Financial Element — what is being measured. Not tied to any one country's data, so it's owned by the
+// Financial Element - what is being measured. Not tied to any one country's data, so it's owned by the
 // literal 'GROUP' affiliate rather than duplicated identically per country.
 
 export const FINANCIAL_ELEMENTS: DimensionMember[] = [
@@ -309,7 +313,7 @@ export const FINANCIAL_ELEMENTS: DimensionMember[] = [
   node('FinancialElement', GROUP, 'FE-1680', 'Cumulative Liquidity Gap', 'FE-GAP', true),
 ];
 
-// Counterparty — obligor or depositor, with a group-exposure link for
+// Counterparty - obligor or depositor, with a group-exposure link for
 // single-obligor limit aggregation (related names count as one exposure)
 
 interface Cp {
@@ -363,7 +367,7 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
   {
     code: 'CP-NG-RETAIL-POOL',
-    name: 'Retail Depositor Pool — Nigeria',
+    name: 'Retail Depositor Pool - Nigeria',
     sector: 'Retail',
     group: 'CPG-RETAIL',
     affiliate: 'NG',
@@ -371,7 +375,7 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
   {
     code: 'CP-GH-RETAIL-POOL',
-    name: 'Retail Depositor Pool — Ghana',
+    name: 'Retail Depositor Pool - Ghana',
     sector: 'Retail',
     group: 'CPG-RETAIL',
     affiliate: 'GH',
@@ -379,7 +383,7 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
   {
     code: 'CP-NG-OBLIGOR-01',
-    name: 'Industrial Group — Cement Division',
+    name: 'Industrial Group - Cement Division',
     sector: 'Corporate',
     group: 'CPG-DANGOTE',
     rating: 'BB',
@@ -387,7 +391,7 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
   {
     code: 'CP-NG-OBLIGOR-02',
-    name: 'Industrial Group — Refining Division',
+    name: 'Industrial Group - Refining Division',
     sector: 'Corporate',
     group: 'CPG-DANGOTE',
     rating: 'BB',
@@ -395,7 +399,7 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
   {
     code: 'CP-NG-OBLIGOR-03',
-    name: 'Industrial Group — Logistics Division',
+    name: 'Industrial Group - Logistics Division',
     sector: 'Corporate',
     group: 'CPG-DANGOTE',
     rating: 'BB-',
@@ -420,7 +424,7 @@ const COUNTERPARTY_LEAVES: Cp[] = [
   },
   {
     code: 'CP-GH-STATE-ENTITY',
-    name: 'Ghana State Entity — single large depositor',
+    name: 'Ghana State Entity - single large depositor',
     sector: 'Public Sector',
     group: 'CPG-SOVEREIGN',
     affiliate: 'GH',

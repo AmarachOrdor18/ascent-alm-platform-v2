@@ -16,6 +16,7 @@ import type {
   Role,
   RuleKind,
   RuleMeta,
+  RuleVersionSnapshot,
   RunResult,
   RunSchedule,
   Connector,
@@ -76,10 +77,11 @@ export interface Repository {
   upsertAffiliate(affiliate: Affiliate): Promise<void>;
   deleteAffiliate(code: string): Promise<void>;
 
-  // Dimensions — affiliate-owned; omitting affiliateCode returns every affiliate's members, for maintenance
+  // Dimensions - affiliate-owned; omitting affiliateCode returns every affiliate's members, for maintenance
   // utilities (e.g. the reference-data refresh in data/seed/bootstrap.ts) rather than ordinary screens.
   listDimensionMembers(dimension: DimensionType, affiliateCode?: string): Promise<DimensionMember[]>;
   upsertDimensionMembers(members: DimensionMember[]): Promise<void>;
+  deleteDimensionMember(id: string): Promise<void>;
 
   // Positions
   queryPositions(query: PositionQuery): Promise<Position[]>;
@@ -92,7 +94,7 @@ export interface Repository {
 
   // Staged (uncommitted) uploads
   listStagedBatches(affiliateCode?: string): Promise<StagedBatch[]>;
-  /** `contributor` disambiguates concurrent departmental drafts for the Positions domain — omit outside it. */
+  /** `contributor` disambiguates concurrent departmental drafts for the Positions domain - omit outside it. */
   getStagedBatchFor(
     affiliateCode: string,
     domain: DataDomain,
@@ -105,10 +107,15 @@ export interface Repository {
   // Rules
   listRules(query: RuleQuery): Promise<RuleMeta[]>;
   getRule<T extends RuleMeta>(id: string): Promise<T | null>;
+  /** Archives the row's current content (if any) before overwriting it - see RuleVersionSnapshot. */
   upsertRule(rule: RuleMeta): Promise<void>;
   deleteRule(id: string): Promise<void>;
   /** Empty array means the rule is safe to delete. */
   checkDependencies(id: string): Promise<Dependency[]>;
+  /** What a rule's content was at a specific past version, if that edit was archived. */
+  getRuleVersion<T extends RuleMeta>(ruleId: string, version: number): Promise<T | null>;
+  /** Every archived version of a rule, oldest first. */
+  listRuleVersions(ruleId: string): Promise<RuleVersionSnapshot[]>;
 
   // Runs
   listRuns(affiliateCode?: string): Promise<ProcessRun[]>;
@@ -186,6 +193,7 @@ export interface Repository {
 
   listCurrencies(): Promise<StoredCurrency[]>;
   upsertCurrency(currency: StoredCurrency): Promise<void>;
+  deleteCurrency(code: string): Promise<void>;
 
   listFxRates(asOfDate?: IsoDate): Promise<StoredFxRate[]>;
   upsertFxRate(rate: StoredFxRate): Promise<void>;

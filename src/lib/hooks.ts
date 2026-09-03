@@ -6,6 +6,7 @@ import type {
   Affiliate,
   AuditEvent,
   DataDomain,
+  DimensionMember,
   LoadBatch,
   Position,
   PositionContributor,
@@ -107,13 +108,17 @@ export function resolveSingleAffiliate<T extends { code: string; createdAt: stri
 }
 
 // ── Dimensions ───────────────────────────────────────────────────────────
-// affiliateCode is required — every dimension is affiliate-owned (no Group-wide list), so a caller must always
+// affiliateCode is required - every dimension is affiliate-owned (no Group-wide list), so a caller must always
 // say which affiliate's entries it means. Pass 'GROUP' explicitly for the few genuinely cross-affiliate
 // constructs seeded under that code (a consolidation-tree root, a connected-exposure counterparty group).
-export function useDimensionMembers(dimension: DimensionType, affiliateCode: string) {
+export function useDimensionMembers(dimension: DimensionType, affiliateCode: string | undefined) {
   return useQuery({
-    queryKey: [...keys.dimension(dimension), affiliateCode],
+    queryKey: [...keys.dimension(dimension), affiliateCode ?? ''],
     queryFn: () => repository.listDimensionMembers(dimension, affiliateCode),
+    // An empty/undefined affiliateCode reads as "every affiliate" at the repository layer - fine for a
+    // caller that means Group-wide, but a caller resolving "no affiliate picked yet" to '' would otherwise
+    // silently fetch every affiliate's members. Only fetch once a real code (including the literal 'GROUP') is known.
+    enabled: !!affiliateCode,
   });
 }
 
@@ -127,6 +132,17 @@ export function useSaveDimensionMembers(dimension: DimensionType) {
       id: members[0]?.code ?? null,
       detail: `${members.length} ${dimension} member(s) saved`,
     }),
+    [keys.dimension(dimension)],
+  );
+}
+
+export function useDeleteDimensionMember(dimension: DimensionType) {
+  return useAuditedMutation(
+    'Dimensions',
+    'Delete',
+    dimension,
+    (member: DimensionMember) => repository.deleteDimensionMember(member.id),
+    (member) => ({ id: member.code, detail: `${member.name} (${member.code}) removed` }),
     [keys.dimension(dimension)],
   );
 }
@@ -163,6 +179,17 @@ export function useSaveCurrency() {
   );
 }
 
+export function useDeleteCurrency() {
+  return useAuditedMutation(
+    'Rate Management',
+    'Delete',
+    'Currency',
+    (currency: StoredCurrency) => repository.deleteCurrency(currency.code),
+    (currency) => ({ id: currency.code, detail: `${currency.code} - ${currency.name} removed` }),
+    [keys.currencies],
+  );
+}
+
 export function useFxRates() {
   return useQuery({ queryKey: keys.fxRates, queryFn: () => repository.listFxRates() });
 }
@@ -174,6 +201,17 @@ export function useSaveFxRate() {
     'FX Rate',
     (rate: StoredFxRate) => repository.upsertFxRate(rate),
     (rate) => ({ id: rate.id, detail: `${rate.base}/${rate.quote} = ${rate.rate} as at ${rate.asOfDate}` }),
+    [keys.fxRates],
+  );
+}
+
+export function useDeleteFxRate() {
+  return useAuditedMutation(
+    'Rate Management',
+    'Delete',
+    'FX Rate',
+    (rate: StoredFxRate) => repository.deleteFxRate(rate.id),
+    (rate) => ({ id: rate.id, detail: `${rate.base}/${rate.quote} rate removed` }),
     [keys.fxRates],
   );
 }
@@ -273,14 +311,14 @@ export function useSaveAffiliate() {
   );
 }
 
-/** Abandons an incomplete onboarding record — only ever called on a `status: 'Onboarding'` affiliate; see OnboardAffiliate.tsx and Affiliates.tsx. */
+/** Abandons an incomplete onboarding record - only ever called on a `status: 'Onboarding'` affiliate; see OnboardAffiliate.tsx and Affiliates.tsx. */
 export function useDeleteAffiliate() {
   return useAuditedMutation(
     'Affiliates',
     'Delete',
     'Affiliate',
     (affiliate: Affiliate) => repository.deleteAffiliate(affiliate.code),
-    (affiliate) => ({ id: affiliate.code, detail: `${affiliate.name} — onboarding abandoned` }),
+    (affiliate) => ({ id: affiliate.code, detail: `${affiliate.name} - onboarding abandoned` }),
     [keys.affiliates],
   );
 }
@@ -294,7 +332,7 @@ export function useSaveBatch() {
     (batch: LoadBatch) => repository.upsertBatch(batch),
     (batch) => ({
       id: batch.id,
-      detail: `${batch.domain} for ${batch.affiliateCode} as at ${batch.asOfDate} — ${batch.status}, v${batch.version}`,
+      detail: `${batch.domain} for ${batch.affiliateCode} as at ${batch.asOfDate} - ${batch.status}, v${batch.version}`,
     }),
     [keys.batches, ['positions']],
   );

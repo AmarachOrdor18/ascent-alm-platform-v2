@@ -129,7 +129,7 @@ interface TableToolbarProps {
   children?: React.ReactNode;
 }
 
-function toCsv(rows: object[]): string {
+export function toCsv(rows: object[]): string {
   const [first] = rows;
   if (!first) return '';
   const headers = Object.keys(first);
@@ -137,7 +137,7 @@ function toCsv(rows: object[]): string {
   return [headers.join(','), ...rows.map((r) => headers.map((h) => escape((r as Record<string, unknown>)[h])).join(','))].join('\n');
 }
 
-function downloadBlob(content: string, filename: string, mime: string) {
+export function downloadBlob(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

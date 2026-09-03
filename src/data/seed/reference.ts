@@ -25,6 +25,9 @@ export const REFERENCE_AS_OF = '2026-07-31';
 // Affiliates
 // ─────────────────────────────────────────────────────────────────────────
 
+// Only the Group pseudo-entity ships pre-seeded. Real affiliates (Nigeria, Ghana, etc.) are onboarded
+// through the actual Onboarding wizard, not pre-populated with fake business activity - a fresh platform
+// should have nothing to un-configure before someone can onboard a real one.
 export const AFFILIATES: Affiliate[] = [
   {
     code: 'GROUP',
@@ -34,7 +37,7 @@ export const AFFILIATES: Affiliate[] = [
     regulator: 'Consolidated',
     functionalCurrency: 'USD',
     reportingCurrency: 'USD',
-    activeCurrencies: ['USD', 'NGN', 'GHS', 'XOF'],
+    activeCurrencies: ['USD'],
     status: 'Live',
     fiscalYearEnd: '12-31',
     holidayCalendarId: null,
@@ -44,107 +47,6 @@ export const AFFILIATES: Affiliate[] = [
     internalThresholds: {},
     limitsConfirmed: true,
     createdAt: '2026-01-01T00:00:00Z',
-  },
-  {
-    code: 'NG',
-    name: 'Ecobank Nigeria',
-    country: 'Nigeria',
-    region: 'Nigeria',
-    regulator: 'CBN',
-    functionalCurrency: 'NGN',
-    reportingCurrency: 'USD',
-    activeCurrencies: ['NGN', 'USD'],
-    status: 'Live',
-    fiscalYearEnd: '12-31',
-    holidayCalendarId: 'CAL-NG',
-    legalEntityCode: 'LE-NG',
-    feeds: [
-      { domain: 'Positions', mode: 'Connector', connectorId: 'C-FLEXCUBE', slaDays: 30, owner: 'Finance Ops' },
-      { domain: 'GeneralLedger', mode: 'Connector', connectorId: 'C-FLEXCUBE', slaDays: 30, owner: 'Finance Ops' },
-      { domain: 'MarketRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
-      { domain: 'FxRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
-      { domain: 'Counterparties', mode: 'File', connectorId: null, slaDays: 90, owner: 'Credit Risk' },
-      { domain: 'EconomicIndicators', mode: 'File', connectorId: null, slaDays: 30, owner: 'Group Research' },
-    ],
-    inheritGroupRules: true,
-    internalThresholds: {
-      lcrPercent: { amberPercent: 110, redPercent: 100 },
-      nsfrPercent: { amberPercent: 110, redPercent: 100 },
-      loanToDepositPercent: { amberPercent: 72, redPercent: 65 },
-    },
-    limitsConfirmed: true,
-    createdAt: '2026-01-01T00:00:00Z',
-  },
-  {
-    code: 'GH',
-    name: 'Ecobank Ghana',
-    country: 'Ghana',
-    region: 'Anglophone West Africa',
-    regulator: 'Bank of Ghana',
-    functionalCurrency: 'GHS',
-    reportingCurrency: 'USD',
-    activeCurrencies: ['GHS', 'USD'],
-    // Mid-onboarding: connectors configured, awaiting its first data load.
-    status: 'Onboarding',
-    fiscalYearEnd: '12-31',
-    holidayCalendarId: 'CAL-GH',
-    legalEntityCode: 'LE-GH',
-    feeds: [
-      // Flexcube is unreachable here, so Positions is file-fed instead.
-      { domain: 'Positions', mode: 'File', connectorId: null, slaDays: 30, owner: 'Finance Ops' },
-      { domain: 'GeneralLedger', mode: 'File', connectorId: null, slaDays: 30, owner: 'Finance Ops' },
-      { domain: 'MarketRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
-      { domain: 'FxRates', mode: 'Connector', connectorId: 'C-REUTERS', slaDays: 1, owner: 'Treasury' },
-      { domain: 'Counterparties', mode: 'NotConfigured', connectorId: null, slaDays: 90, owner: null },
-      { domain: 'EconomicIndicators', mode: 'File', connectorId: null, slaDays: 30, owner: 'Group Research' },
-    ],
-    inheritGroupRules: true,
-    // Bank of Ghana carries no loan-to-deposit minimum (see REGULATORY_MINIMA), hence no loanToDepositPercent below.
-    internalThresholds: {
-      lcrPercent: { amberPercent: 110, redPercent: 100 },
-      nsfrPercent: { amberPercent: 110, redPercent: 100 },
-    },
-    limitsConfirmed: true,
-    createdAt: '2026-07-15T00:00:00Z',
-  },
-  {
-    code: 'CI',
-    name: "Ecobank Côte d'Ivoire",
-    country: "Côte d'Ivoire",
-    region: 'UEMOA',
-    regulator: 'BCEAO',
-    functionalCurrency: 'XOF',
-    reportingCurrency: 'USD',
-    activeCurrencies: ['XOF', 'EUR', 'USD'],
-    status: 'Onboarding',
-    fiscalYearEnd: '12-31',
-    holidayCalendarId: null,
-    legalEntityCode: 'LE-CI',
-    feeds: [],
-    inheritGroupRules: true,
-    internalThresholds: {},
-    limitsConfirmed: false,
-    createdAt: '2026-07-31T00:00:00Z',
-  },
-  {
-    code: 'KE',
-    name: 'Ecobank Kenya',
-    country: 'Kenya',
-    region: 'East Africa',
-    regulator: 'Central Bank of Kenya',
-    functionalCurrency: 'KES',
-    reportingCurrency: 'USD',
-    activeCurrencies: ['KES', 'USD'],
-    // Just onboarded, nothing configured yet — every domain still starts from a manual upload or entry.
-    status: 'Onboarding',
-    fiscalYearEnd: '12-31',
-    holidayCalendarId: null,
-    legalEntityCode: 'LE-KE',
-    feeds: [],
-    inheritGroupRules: true,
-    internalThresholds: {},
-    limitsConfirmed: false,
-    createdAt: '2026-08-01T00:00:00Z',
   },
 ];
 
@@ -170,7 +72,7 @@ export const CURRENCIES: StoredCurrency[] = [
   { code: 'XOF', name: 'West African CFA Franc', symbol: 'CFA', role: 'Reporting', isActive: true },
   { code: 'EUR', name: 'Euro', symbol: '€', role: 'Active', isActive: true },
   { code: 'ZMW', name: 'Zambian Kwacha', symbol: 'ZK', role: 'Active', isActive: true },
-  // No rate seeded on purpose — Ecobank Kenya is a freshly onboarded affiliate, and adding its first
+  // No rate seeded on purpose - Ecobank Kenya is a freshly onboarded affiliate, and adding its first
   // FX rate is one of the manual-entry steps the demo walks through.
   { code: 'KES', name: 'Kenyan Shilling', symbol: 'KSh', role: 'Active', isActive: true },
 ];
@@ -346,7 +248,7 @@ function indicator(
 export const ECONOMIC_INDICATORS: EconomicIndicator[] = [
   indicator(
     'NG-CPI',
-    'Nigeria — Headline Inflation',
+    'Nigeria - Headline Inflation',
     'NG',
     '% y/y',
     'Percentage',
@@ -354,7 +256,7 @@ export const ECONOMIC_INDICATORS: EconomicIndicator[] = [
   ),
   indicator(
     'NG-MPR',
-    'Nigeria — Monetary Policy Rate',
+    'Nigeria - Monetary Policy Rate',
     'NG',
     '%',
     'Percentage',
@@ -369,17 +271,17 @@ export const ECONOMIC_INDICATORS: EconomicIndicator[] = [
     'Amount',
     [82.1, 86.4, 83.2, 79.8, 76.5, 74.2],
   ),
-  indicator('GH-CPI', 'Ghana — Headline Inflation', 'GH', '% y/y', 'Percentage', [23.5, 25.8, 23.1, 22.8, 20.9, 19.4]),
-  indicator('GH-MPR', 'Ghana — Monetary Policy Rate', 'GH', '%', 'Percentage', [29.0, 29.0, 29.0, 28.0, 27.0, 27.0]),
+  indicator('GH-CPI', 'Ghana - Headline Inflation', 'GH', '% y/y', 'Percentage', [23.5, 25.8, 23.1, 22.8, 20.9, 19.4]),
+  indicator('GH-MPR', 'Ghana - Monetary Policy Rate', 'GH', '%', 'Percentage', [29.0, 29.0, 29.0, 28.0, 27.0, 27.0]),
   indicator(
     'CI-CPI',
-    "Côte d'Ivoire — Headline Inflation",
+    "Côte d'Ivoire - Headline Inflation",
     'CI',
     '% y/y',
     'Percentage',
     [4.2, 4.0, 3.8, 3.6, 3.5, 3.4],
   ),
-  indicator('KE-CPI', 'Kenya — Headline Inflation', 'KE', '% y/y', 'Percentage', [6.8, 6.3, 5.8, 5.1, 4.6, 4.1]),
+  indicator('KE-CPI', 'Kenya - Headline Inflation', 'KE', '% y/y', 'Percentage', [6.8, 6.3, 5.8, 5.1, 4.6, 4.1]),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

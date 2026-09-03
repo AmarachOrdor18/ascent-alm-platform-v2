@@ -1,5 +1,5 @@
 // TimeBucket, BehaviourPattern and ForecastScenario rules mirror real engine fallbacks (defaultLadder(),
-// DEFAULT_PATTERNS, standardShocks) — a run always calculates on some basis even with no rule attached, so
+// DEFAULT_PATTERNS, standardShocks) - a run always calculates on some basis even with no rule attached, so
 // these are seeded as ordinary, versioned, editable rules rather than left implicit.
 
 import type {
@@ -9,6 +9,7 @@ import type {
   ProductCharacteristicRule,
   TimeBucketRule,
 } from '@/engine/ruleTypes';
+import type { ApprovalRequest } from '@/engine/types';
 import { defaultLadder } from '@/engine/buckets';
 import { DEFAULT_BETAS, DEFAULT_PATTERNS } from '@/engine/behavioural';
 import { standardShocks } from '@/engine/irrbb';
@@ -54,10 +55,34 @@ export const SEED_FORECAST_SCENARIO_RULE: ForecastScenarioRule = {
   economicIndicatorCodes: [],
 };
 
-// Unlike the three rules above, NewBusiness has no engine fallback — a run with none is genuinely static.
+// Every OTHER scenario gets its Activate request raised at the moment it's saved (see WhatIf.tsx's
+// handleSaveScenario) - a real user creating one, needing a real second pair of eyes. This one is
+// seeded directly into the database, never "saved" through that flow, so without this it would sit
+// forever labelled "Pending approval" on Process Run with no request anywhere in Approvals for anyone
+// to actually decide - a maker-checker gate nobody can ever pass, not maker-checker working as intended.
+// Treated as pre-vetted at the point of shipping, the same way the Time Bucket and Behaviour Pattern
+// defaults require no approval at all.
+export const SEED_FORECAST_SCENARIO_APPROVAL: ApprovalRequest = {
+  id: 'APR-FORECASTSCENARIO-DEFAULT',
+  module: 'Stress Testing',
+  entityType: 'ForecastScenario',
+  entityId: 'RULE-FORECASTSCENARIO-DEFAULT',
+  entityLabel: 'Group Default +200bp Parallel',
+  action: 'Create',
+  summary: 'Basel-standard +200bp parallel shock, shipped as the Group default and pre-approved as such.',
+  affiliateCode: null,
+  status: 'Approved',
+  requestedBy: 'system-seed',
+  requestedAt: SEEDED_AT,
+  decidedBy: 'system-seed',
+  decidedAt: SEEDED_AT,
+  decisionNote: 'Pre-approved at seed time - a shipped baseline, not a user-submitted scenario.',
+};
+
+// Unlike the three rules above, NewBusiness has no engine fallback - a run with none is genuinely static.
 // This entry is Nigeria's actual FY26 growth plan, not a Group default.
 export const SEED_NEW_BUSINESS_RULE: NewBusinessRule = {
-  ...ruleMetaSeed('RULE-NEWBUSINESS-NG-FY26', 'NewBusiness', 'Nigeria — FY26 Growth Plan'),
+  ...ruleMetaSeed('RULE-NEWBUSINESS-NG-FY26', 'NewBusiness', 'Nigeria - FY26 Growth Plan'),
   kind: 'NewBusiness',
   folder: 'Nigeria',
   affiliateCode: 'NG',
@@ -83,11 +108,11 @@ export const SEED_NEW_BUSINESS_RULE: NewBusinessRule = {
   ],
 };
 
-// Regulatory/behavioural classification by product and currency (engine/classification.ts) — derived from the
+// Regulatory/behavioural classification by product and currency (engine/classification.ts) - derived from the
 // Nigeria seed position book itself, so applying this rule reproduces exactly what's already loaded rather
 // than silently changing the demo's numbers. A department uploading Loans, Deposits or Treasury data supplies
 // productClass and currency; this rule is what turns that into HQLA level, haircuts and ASF/RSF factors,
-// which is the whole point — a Loans officer should never need to type in "HQLA Level 2A" by hand.
+// which is the whole point - a Loans officer should never need to type in "HQLA Level 2A" by hand.
 export const SEED_PRODUCT_CHARACTERISTIC_RULE: ProductCharacteristicRule = {
   ...ruleMetaSeed('RULE-PRODUCTCHARACTERISTIC-DEFAULT', 'ProductCharacteristic', 'Group Default Product Characteristics'),
   kind: 'ProductCharacteristic',
@@ -131,10 +156,12 @@ export const SEED_PRODUCT_CHARACTERISTIC_RULE: ProductCharacteristicRule = {
   ],
 };
 
-export const SEED_DEFAULT_RULES = [
-  SEED_TIME_BUCKET_RULE,
-  SEED_BEHAVIOUR_PATTERN_RULE,
-  SEED_FORECAST_SCENARIO_RULE,
-  SEED_NEW_BUSINESS_RULE,
-  SEED_PRODUCT_CHARACTERISTIC_RULE,
-];
+// SEED_NEW_BUSINESS_RULE and SEED_PRODUCT_CHARACTERISTIC_RULE are deliberately excluded from what
+// actually ships - both are derived from the old Nigeria fixture book (data/seed/nigeria.ts), keyed to
+// product codes ("P-LOANS-AND-ADVANCES---CORPORA" etc.) nothing in a real onboarded affiliate's data
+// will ever match, and NewBusiness is worse: tagged affiliateCode 'NG', it would silently attach a
+// phantom growth plan to whichever real affiliate onboards under that code. Both constants stay exported
+// - classification.test.ts still uses SEED_PRODUCT_CHARACTERISTIC_RULE.assumptions directly as a fixture
+// - only their presence in the seeded database is what's removed, consistent with the rest of this file's
+// "no affiliate ships pre-onboarded" data (FX rates, yield curves, holiday calendars, indicators).
+export const SEED_DEFAULT_RULES = [SEED_TIME_BUCKET_RULE, SEED_BEHAVIOUR_PATTERN_RULE, SEED_FORECAST_SCENARIO_RULE];

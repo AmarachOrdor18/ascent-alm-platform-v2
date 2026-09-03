@@ -10,9 +10,14 @@ export function CommandPalette({ items, collapsed }: { items: NavItem[]; collaps
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((i) => i.name.toLowerCase().includes(q));
+    const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return items;
+    // Every word must appear somewhere in the name, in any order - "affiliate management" and
+    // "management affiliate" both find "Group & Affiliate Management" just as readily.
+    return items.filter((i) => {
+      const name = i.name.toLowerCase();
+      return tokens.every((t) => name.includes(t));
+    });
   }, [items, query]);
 
   useEffect(() => {

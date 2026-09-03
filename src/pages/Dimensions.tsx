@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { HierarchyBrowser } from '@/components/ui/HierarchyBrowser';
@@ -6,8 +7,9 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { cn } from '@/lib/cn';
 import { useAuth } from '@/context/AuthContext';
-import { useAffiliates, useDimensionMembers, useSaveDimensionMembers } from '@/lib/hooks';
+import { useAffiliates, useDimensionMembers, useSaveDimensionMembers, useDeleteDimensionMember } from '@/lib/hooks';
 import { resolveSingleAffiliate } from '@/lib/hooks';
 import { accessibleAffiliates } from '@/lib/scope';
 import { buildHierarchy } from '@/engine/dimensions';
@@ -15,7 +17,7 @@ import { useScope } from '@/context/ScopeContext';
 import type { DimensionMember, DimensionType } from '@/engine/types';
 
 /**
- * Grouped, not a flat row of seven tabs — each group is one question a
+ * Grouped, not a flat row of seven tabs - each group is one question a
  * configurer actually has ("what does our org chart look like," "how does
  * our GL map to the Group standard"), not an arbitrary taxonomy split.
  */
@@ -49,7 +51,7 @@ const GROUPS: Array<{
   },
   {
     label: 'Measures',
-    hint: 'A shared, Group-wide taxonomy — not specific to any one affiliate.',
+    hint: 'A shared, Group-wide taxonomy - not specific to any one affiliate.',
     dimensions: [
       { type: 'FinancialElement', label: 'Financial Element', purpose: 'What is being measured, so one results table serves every metric.' },
     ],
@@ -62,30 +64,53 @@ export function Dimensions() {
   const { user, hasPermission } = useAuth();
   const { affiliateCode: scopeAffiliateCode } = useScope();
   const { data: allAffiliates = [] } = useAffiliates();
-  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
+  // Live-only, same as Data Upload - dimension membership only matters once an affiliate is actually
+  // working with real data.
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission).filter((a) => a.status === 'Live');
 
   const [active, setActive] = useState<DimensionType>('OrgUnit');
   const [pickedCode, setPickedCode] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [draft, setDraft] = useState<{ code: string; name: string; parentCode: string }>({
+  const [draft, setDraft] = useState<{ code: string; name: string; parentCode: string; isLeaf: boolean }>({
     code: '',
     name: '',
     parentCode: '',
+    isLeaf: true,
   });
+  // Set while editing an existing member - code stays locked (it's what the id, and every reference to
+  // this member, is keyed on), only name/parent/leaf are changed in place.
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [justSavedProduct, setJustSavedProduct] = useState(false);
+  const resetDraft = () => {
+    setDraft({ code: '', name: '', parentCode: '', isLeaf: true });
+    setEditingCode(null);
+    setJustSavedProduct(false);
+  };
 
   const definition = ALL_DIMENSIONS.find((d) => d.type === active)!;
   // Financial Element is a genuinely shared, Group-wide taxonomy (see engine/classification.ts's seed rule
-  // comment) — everything else is owned by whichever affiliate is currently selected.
+  // comment) - everything else is owned by whichever affiliate is currently selected.
   const isGroupWide = active === 'FinancialElement';
 
   const affiliate =
     affiliates.find((a) => a.code === pickedCode) ??
     (scopeAffiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, scopeAffiliateCode));
-  const effectiveAffiliateCode = isGroupWide ? 'GROUP' : (affiliate?.code ?? '');
+  const effectiveAffiliateCode = isGroupWide ? 'GROUP' : affiliate?.code;
 
   const { data: members = [], isLoading } = useDimensionMembers(active, effectiveAffiliateCode);
   const save = useSaveDimensionMembers(active);
+  const deleteMember = useDeleteDimensionMember(active);
   const canEdit = hasPermission('data.configure') || hasPermission('admin.manage');
+
+  const handleDelete = (member: DimensionMember) => {
+    const childCount = members.filter((m) => m.parentCode === member.code).length;
+    if (childCount > 0) {
+      window.alert(`${member.name} has ${childCount} child member(s) nested under it - delete those first.`);
+      return;
+    }
+    if (!window.confirm(`Delete ${member.name} (${member.code})? This cannot be undone.`)) return;
+    deleteMember.mutate(member);
+  };
 
   const roots = useMemo(() => buildHierarchy(members), [members]);
 
@@ -96,10 +121,16 @@ export function Dimensions() {
     ['code', 'name', 'parentCode'],
   );
 
-  const handleAdd = () => {
+  const handleEdit = (member: DimensionMember) => {
+    setEditingCode(member.code);
+    setDraft({ code: member.code, name: member.name, parentCode: member.parentCode ?? '', isLeaf: member.isLeaf });
+  };
+
+  const handleSubmit = () => {
     if (!draft.code.trim() || !draft.name.trim() || !effectiveAffiliateCode) return;
-    const parentCode = draft.parentCode || (roots[0]?.code ?? null);
     const code = draft.code.trim();
+    if (draft.parentCode === code) return; // can't be its own parent
+    const parentCode = draft.parentCode || (editingCode ? null : (roots[0]?.code ?? null));
     const member: DimensionMember = {
       id: `${active}:${effectiveAffiliateCode}:${code}`,
       dimension: active,
@@ -107,9 +138,15 @@ export function Dimensions() {
       code,
       name: draft.name.trim(),
       parentCode,
-      isLeaf: true,
+      isLeaf: draft.isLeaf,
     };
-    save.mutate([member], { onSuccess: () => setDraft({ code: '', name: '', parentCode: '' }) });
+    const isProductLeaf = active === 'Product' && draft.isLeaf;
+    save.mutate([member], {
+      onSuccess: () => {
+        resetDraft();
+        if (isProductLeaf) setJustSavedProduct(true);
+      },
+    });
   };
 
   const columns: ResultColumn<DimensionMember>[] = [
@@ -118,12 +155,36 @@ export function Dimensions() {
     {
       key: 'parent',
       header: 'Parent',
-      render: (m) => <span className="font-mono text-[11px] text-gray-500">{m.parentCode ?? '—'}</span>,
+      render: (m) => <span className="font-mono text-[11px] text-gray-500">{m.parentCode ?? '-'}</span>,
     },
     {
       key: 'kind',
       header: 'Type',
       render: (m) => <StatusBadge status={m.isLeaf ? 'Leaf' : 'Rollup'} tone={m.isLeaf ? 'neutral' : 'info'} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (m) =>
+        canEdit ? (
+          <span className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => handleEdit(m)}
+              className="text-[11px] font-bold text-navy-700 hover:underline"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDelete(m)}
+              className="text-[11px] font-bold text-danger hover:underline"
+            >
+              Delete
+            </button>
+          </span>
+        ) : null,
     },
   ];
 
@@ -131,29 +192,42 @@ export function Dimensions() {
     <>
       <ModuleHeader
         title="Dimensions & Hierarchies"
-        description="How this affiliate is structured, classified and mapped. Configuration data, so it carries no as-of date — and it's owned by the affiliate you pick below, never shared Group-wide (Financial Element excepted)."
+        description="How this affiliate is structured, classified and mapped. Configuration data, so it carries no as-of date - and it's owned by the affiliate you pick below, never shared Group-wide (Financial Element excepted)."
         asOfDate={null}
         scope={isGroupWide ? 'Group-wide' : (affiliate?.name ?? 'No affiliate selected')}
         actions={
           <InfoButton label="Where this data comes from">
             Each affiliate's own hierarchies (legal entities, org units, GL accounts, its copy of the Common Chart
             of Accounts, products) are seeded when it's onboarded, then are ordinary configuration data from
-            there — add, edit or reparent a member here, or via the CSV &ldquo;Create these from the file&rdquo;
+            there - add, edit or reparent a member here, or via the CSV &ldquo;Create these from the file&rdquo;
             flow on Data Upload, which adds anything a position file references that isn&rsquo;t mapped yet.
             Financial Element is the one exception: a Group-wide taxonomy of what's being measured, not tied to
             any affiliate.
           </InfoButton>
         }
-        metrics={[
-          { label: `${definition.label} members`, value: String(members.length), about: `Every code defined on the ${definition.label} dimension for this scope, at any level of its hierarchy.` },
-          { label: 'Root nodes', value: String(roots.length), about: 'Top-level entries in this dimension’s hierarchy — everything else nests beneath one of these.' },
-          { label: 'Leaves', value: String(members.filter((m) => m.isLeaf).length), about: 'Members with no children — these are what a position can actually be tagged with; a rollup node cannot carry a balance directly.' },
-        ]}
+        metrics={
+          effectiveAffiliateCode
+            ? [
+                { label: `${definition.label} members`, value: String(members.length), about: `Every code defined on the ${definition.label} dimension for this scope, at any level of its hierarchy.` },
+                { label: 'Root nodes', value: String(roots.length), about: 'Top-level entries in this dimension’s hierarchy - everything else nests beneath one of these.' },
+                { label: 'Leaves', value: String(members.filter((m) => m.isLeaf).length), about: 'Members with no children - these are what a position can actually be tagged with; a rollup node cannot carry a balance directly.' },
+              ]
+            : [{ label: `${definition.label} members`, value: '—', about: 'Pick an affiliate below to see its own dimension data.' }]
+        }
       />
 
-      {!isGroupWide && <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />}
+      {!isGroupWide && (
+        <AffiliateSelector
+          affiliates={affiliates}
+          value={affiliate?.code}
+          onChange={(code) => {
+            setPickedCode(code);
+            resetDraft();
+          }}
+        />
+      )}
 
-      <div className="mb-6 space-y-4">
+      <div className="mb-6 flex flex-wrap gap-x-8 gap-y-4">
         {GROUPS.map((group) => (
           <div key={group.label}>
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p>
@@ -167,6 +241,7 @@ export function Dimensions() {
                   onClick={() => {
                     setActive(d.type);
                     setSelected([]);
+                    resetDraft();
                   }}
                   title={d.purpose}
                   className={
@@ -191,7 +266,7 @@ export function Dimensions() {
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
           <p className="text-[13px] font-bold text-navy-900">Select an affiliate</p>
           <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
-            {definition.label} is owned by each affiliate individually — pick one above to see or edit its entries.
+            {definition.label} is owned by each affiliate individually - pick one above to see or edit its entries.
           </p>
         </section>
       ) : (
@@ -201,7 +276,7 @@ export function Dimensions() {
               Hierarchy
               <InfoButton label="How to use this tree">
                 Select one or more nodes to filter the table on the right to just those members. Selecting a rollup
-                node brings its whole subtree with it — everything nested beneath it is included automatically.
+                node brings its whole subtree with it - everything nested beneath it is included automatically.
               </InfoButton>
             </h2>
             <HierarchyBrowser
@@ -214,7 +289,9 @@ export function Dimensions() {
 
             {canEdit && (
               <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-                <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Add member</h3>
+                <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                  {editingCode ? `Editing ${editingCode}` : 'Add member'}
+                </h3>
                 <div className="space-y-2">
                   <div>
                     <label htmlFor="dim-code" className="mb-1 block text-[11px] text-gray-600">
@@ -223,10 +300,20 @@ export function Dimensions() {
                     <input
                       id="dim-code"
                       value={draft.code}
+                      disabled={!!editingCode}
                       onChange={(e) => setDraft({ ...draft, code: e.target.value })}
                       placeholder="OU-NG-RET-LAG"
-                      className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className={cn(
+                        'w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700',
+                        editingCode && 'bg-gray-50 text-gray-500',
+                      )}
                     />
+                    {editingCode && (
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        Locked - the code is what every reference to this member is keyed on. Delete and re-add to
+                        change it.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="dim-name" className="mb-1 block text-[11px] text-gray-600">
@@ -250,23 +337,68 @@ export function Dimensions() {
                       onChange={(e) => setDraft({ ...draft, parentCode: e.target.value })}
                       className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     >
-                      <option value="">— top level —</option>
-                      {members.map((m) => (
-                        <option key={m.code} value={m.code}>
-                          {m.name}
-                        </option>
-                      ))}
+                      <option value="">- top level -</option>
+                      {members
+                        .filter((m) => m.code !== editingCode)
+                        .map((m) => (
+                          <option key={m.code} value={m.code}>
+                            {m.name}
+                          </option>
+                        ))}
                     </select>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={save.isPending || !draft.code.trim() || !draft.name.trim()}
-                    className="w-full rounded-lg bg-navy-900 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
-                  >
-                    {save.isPending ? 'Saving…' : `Add to ${isGroupWide ? 'Group' : (affiliate?.name ?? '')}`}
-                  </button>
+                  <label htmlFor="dim-is-leaf" className="flex cursor-pointer items-start gap-2 text-[11px] text-gray-600">
+                    <input
+                      id="dim-is-leaf"
+                      type="checkbox"
+                      checked={draft.isLeaf}
+                      onChange={(e) => setDraft({ ...draft, isLeaf: e.target.checked })}
+                      className="mt-0.5 accent-gold-500"
+                    />
+                    <span>
+                      Leaf - can be tagged directly on a position. Uncheck for a grouping node other members will
+                      nest under (a category, not something a position codes to itself).
+                    </span>
+                  </label>
+                  <div className="flex gap-2">
+                    {editingCode && (
+                      <button
+                        type="button"
+                        onClick={resetDraft}
+                        className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:border-navy-700 hover:text-navy-900"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={save.isPending || !draft.code.trim() || !draft.name.trim()}
+                      className="flex-1 rounded-lg bg-navy-900 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                    >
+                      {save.isPending
+                        ? 'Saving…'
+                        : editingCode
+                          ? 'Save changes'
+                          : `Add to ${isGroupWide ? 'Group' : (affiliate?.name ?? '')}`}
+                    </button>
+                  </div>
                 </div>
+              </div>
+            )}
+
+            {justSavedProduct && affiliate && (
+              <div className="mt-3 rounded-lg bg-navy-50 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
+                <p className="mb-3">
+                  Saved. This is the catalogue entry only - it has no effect on any calculation until it has
+                  Basel factors defined.
+                </p>
+                <Link
+                  href={`/affiliates/${affiliate.code}/settings?section=rule-ProductCharacteristic`}
+                  className="inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+                >
+                  Set Product Characteristics →
+                </Link>
               </div>
             )}
           </section>
@@ -276,7 +408,7 @@ export function Dimensions() {
               {selected.length > 0 ? `Selected (${selected.length})` : `All ${definition.label} members`}
               <InfoButton label="Leaf vs rollup">
                 A Leaf member is what a position can actually be tagged with. A Rollup exists purely to organise leaves
-                beneath it and never carries a balance of its own — that's why its "booked here" figure elsewhere is
+                beneath it and never carries a balance of its own - that's why its "booked here" figure elsewhere is
                 always zero.
               </InfoButton>
             </h2>

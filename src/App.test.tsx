@@ -4,13 +4,14 @@
  * from a more privileged session, because permission only ever gated the
  * edit buttons inside a page, never whether the page rendered at all.
  * `RouteGate` (used by every entry in ROUTE_ORDER) is what's supposed to
- * close that gap — this proves it actually blocks and actually allows.
+ * close that gap - this proves it actually blocks and actually allows.
  */
 
 import { describe, expect, it } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ScopeProvider } from './context/ScopeContext';
 import { RouteGate } from './App';
 import type { User } from '@/engine/types';
 
@@ -32,7 +33,7 @@ function Harness({ permission }: { permission: string }) {
   return (
     <div>
       <button onClick={() => login(REPORTING_USER)}>sign-in</button>
-      <RouteGate permission={permission} screenName="Business Rules">
+      <RouteGate path="/affiliates/GROUP/settings" permission={permission} screenName="Business Rules">
         <div>real screen content</div>
       </RouteGate>
     </div>
@@ -46,7 +47,9 @@ function renderHarness(permission: string) {
   return render(
     <QueryClientProvider client={client}>
       <AuthProvider>
-        <Harness permission={permission} />
+        <ScopeProvider>
+          <Harness permission={permission} />
+        </ScopeProvider>
       </AuthProvider>
     </QueryClientProvider>,
   );

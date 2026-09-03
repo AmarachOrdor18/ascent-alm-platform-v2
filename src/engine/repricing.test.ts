@@ -1,10 +1,10 @@
 /**
- * D-06 — repricing must not be conflated with maturity.
+ * D-06 - repricing must not be conflated with maturity.
  *
  * The Nigeria seed is generated from the Ecobank mock workbook, and that
  * workbook states its own simplification plainly: "Repricing bucket is
  * assumed equal to contractual maturity bucket." The seed therefore cannot
- * demonstrate this defect being closed — it inherits the assumption, and the
+ * demonstrate this defect being closed - it inherits the assumption, and the
  * phase-1 gate depends on it.
  *
  * These tests use purpose-built fixtures instead, so the mechanism is proven
@@ -37,7 +37,7 @@ function loan(over: Partial<Position>): Position {
     branchCode: 'HQ001',
     category: 'Asset',
     productCode: 'P-LOAN',
-    productClass: 'Loans — Corporate, Floating',
+    productClass: 'Loans - Corporate, Floating',
     currency: 'NGN',
     amount: 365_000,
     legalEntityCode: 'LE-NG',
@@ -96,12 +96,12 @@ function loan(over: Partial<Position>): Position {
 
 const ladder = defaultLadder('RepricingGap');
 
-describe('D-06 — a floating loan reprices long before it matures', () => {
+describe('D-06 - a floating loan reprices long before it matures', () => {
   const floating = loan({});
 
   it('buckets on the repricing date, not the maturity date', () => {
     const repricing = computeRepricingGap([floating], ctx, ladder);
-    // 31 Jul + 3 months is 31 Oct — 92 days, so just past the 90-day 1-3M
+    // 31 Jul + 3 months is 31 Oct - 92 days, so just past the 90-day 1-3M
     // boundary and into 3-6M. The point is that it is a near bucket at all.
     const nearBucket = repricing.buckets.find((b) => b.bucket === '3-6M')!;
     const maturityBucket = repricing.buckets.find((b) => b.bucket === '3-5Y')!;
@@ -115,7 +115,7 @@ describe('D-06 — a floating loan reprices long before it matures', () => {
     const long = liquidity.buckets.find((b) => b.bucket === '3-5Y')!;
     const near = liquidity.buckets.find((b) => b.bucket === '3-6M')!;
 
-    // The cash does not come back for three years — that is a different question.
+    // The cash does not come back for three years - that is a different question.
     expect(long.assets).toBe(365_000);
     expect(near.assets).toBe(0);
   });
@@ -137,7 +137,7 @@ describe('D-06 — a floating loan reprices long before it matures', () => {
   });
 });
 
-describe('D-06 — the distinction changes NII sensitivity materially', () => {
+describe('D-06 - the distinction changes NII sensitivity materially', () => {
   it('counts a quarterly-repricing loan as rate-sensitive within one year', () => {
     const floating = loan({});
     const result = computeNiiSensitivity([floating], ctx, 200);
@@ -154,21 +154,21 @@ describe('D-06 — the distinction changes NII sensitivity materially', () => {
     expect(result.deltaNii).toBe(0);
   });
 
-  it('understates exposure by the full balance when conflated — the D-06 impact', () => {
+  it('understates exposure by the full balance when conflated - the D-06 impact', () => {
     const correct = computeNiiSensitivity([loan({})], ctx, 200);
     const conflated = computeNiiSensitivity([loan({ nextRepricingDate: null })], ctx, 200);
     expect(correct.deltaNii - conflated.deltaNii).toBeCloseTo(7_300, 6);
   });
 });
 
-describe('D-06 — administered-rate liabilities reprice faster than they mature', () => {
+describe('D-06 - administered-rate liabilities reprice faster than they mature', () => {
   it('places a non-maturity deposit in the short repricing bucket', () => {
-    // A current account has no contractual maturity but reprices at will —
+    // A current account has no contractual maturity but reprices at will -
     // the case the workbook names explicitly as needing separate modelling.
     const currentAccount = loan({
       id: 'D-1',
       category: 'Liability',
-      productClass: 'Retail Deposits — Core',
+      productClass: 'Retail Deposits - Core',
       behaviouralTag: 'Core',
       amount: 560_000,
       maturityDate: null,
@@ -202,7 +202,7 @@ describe('D-06 — administered-rate liabilities reprice faster than they mature
     });
 
     const result = computeNiiSensitivity([asset, liability], ctx, 200);
-    // Same balances, same maturity — only the repricing dates differ, and
+    // Same balances, same maturity - only the repricing dates differ, and
     // that alone makes the bank liability-sensitive.
     expect(result.rateSensitiveAssets).toBe(0);
     expect(result.rateSensitiveLiabilities).toBe(100_000);
@@ -211,7 +211,7 @@ describe('D-06 — administered-rate liabilities reprice faster than they mature
   });
 });
 
-describe('D-06 — fixed-rate instruments still fall back to maturity', () => {
+describe('D-06 - fixed-rate instruments still fall back to maturity', () => {
   it('treats a fixed-rate bond as repricing only when it matures', () => {
     const bond = loan({
       id: 'B-1',

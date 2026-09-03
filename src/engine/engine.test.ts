@@ -1,5 +1,5 @@
 /**
- * Engine tests beyond the workbook gate — the modules that implement
+ * Engine tests beyond the workbook gate - the modules that implement
  * capabilities v1 did not have at all.
  */
 
@@ -23,7 +23,7 @@ import { evaluateKri, DEFAULT_KRIS } from './kri';
 import { validatePositions } from './validation';
 import { checkFreshness, currentBatch, planSupersede, priorAsOfDate } from './vintage';
 import { reconcile, type LedgerBalance } from './reconciliation';
-import { buildHierarchy, descendantCodes, filterByDimension, rollup, unmappedCodes } from './dimensions';
+import { buildHierarchy, descendantCodes, filterByDimension, resolveByCode, rollup, unmappedCodes } from './dimensions';
 import { ORG_UNITS } from '@/data/seed/dimensions';
 import { computeProfitability, computeFxPosition } from './profitability';
 import { interpolateCurve, resolveAdjustmentBps, computeFtp, type YieldCurve, type AdjustmentRule } from './ftp';
@@ -130,7 +130,7 @@ describe('dates', () => {
 
   it('handles the 30/360 end-of-month rule in both directions', () => {
     // Day 31 is treated as day 30 on the from-side, which then pulls the
-    // to-side down as well — the standard US convention.
+    // to-side down as well - the standard US convention.
     expect(days30360('2026-01-31', '2026-03-31')).toBe(60);
     expect(days30360('2026-01-15', '2026-03-31')).toBe(76);
     expect(days30360('2026-03-31', '2026-01-31')).toBe(-60);
@@ -167,7 +167,7 @@ describe('behavioural modelling', () => {
     ).toThrow(InvalidBehaviourPatternError);
   });
 
-  it('splits deposits into core and volatile — the RFP Core/Non-Core requirement', () => {
+  it('splits deposits into core and volatile - the RFP Core/Non-Core requirement', () => {
     const result = computeDepositRunoff(NIGERIA_POSITIONS);
     expect(result.totalCore).toBeGreaterThan(0);
     expect(result.totalVolatile).toBeGreaterThan(0);
@@ -415,6 +415,9 @@ describe('vintage', () => {
     committedAt: '2026-07-31T09:05:00Z',
     reconciledBy: null,
     reconciledAt: null,
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectedReason: null,
     ...over,
   });
 
@@ -505,7 +508,7 @@ describe('reconciliation', () => {
   });
 
   it('blocks a variance that is small in absolute terms but large for the account', () => {
-    // 500 on a 100,000 account is 0.5% — inside the absolute tolerance but
+    // 500 on a 100,000 account is 0.5% - inside the absolute tolerance but
     // on the percentage limit. Both have to pass.
     const result = reconcile(NIGERIA_POSITIONS, ledgerFromPositions({ '200101': -600 }), rctx);
     expect(result.canSignOff).toBe(false);
@@ -599,12 +602,47 @@ describe('dimensions', () => {
     // Against the full hierarchy nothing is unmapped.
     expect(unmappedCodes(NIGERIA_POSITIONS, 'OrgUnit', members)).toEqual([]);
   });
+
+  describe('cross-system identity resolution', () => {
+    const counterparty: DimensionMember = {
+      id: 'Counterparty:NG:CP-001',
+      dimension: 'Counterparty',
+      affiliateCode: 'NG',
+      code: 'CP-001',
+      name: 'Example Corporate Client',
+      parentCode: 'CP-ROOT',
+      isLeaf: true,
+      sourceRefs: [{ system: 'Calypso', sourceId: 'BANK-007' }],
+    };
+
+    it('resolves a member by its own code', () => {
+      expect(resolveByCode([counterparty], 'CP-001')).toBe(counterparty);
+    });
+
+    it('resolves a member by a registered source-system id', () => {
+      expect(resolveByCode([counterparty], 'BANK-007')).toBe(counterparty);
+    });
+
+    it('does not resolve an id nobody registered', () => {
+      expect(resolveByCode([counterparty], 'UNKNOWN-ID')).toBeUndefined();
+    });
+
+    it('does not flag a cross-referenced source id as unmapped', () => {
+      const position = { ...NIGERIA_POSITIONS[0]!, counterpartyId: 'BANK-007' };
+      expect(unmappedCodes([position], 'Counterparty', [counterparty])).toEqual([]);
+    });
+
+    it('still flags a genuinely unknown counterparty id as unmapped', () => {
+      const position = { ...NIGERIA_POSITIONS[0]!, counterpartyId: 'UNKNOWN-ID' };
+      expect(unmappedCodes([position], 'Counterparty', [counterparty])).toEqual(['UNKNOWN-ID']);
+    });
+  });
 });
 
 describe('profitability', () => {
   const pctx = { reportingCurrency: 'NGN', fx };
 
-  it('computes NPL from performing status — the D-10 fix', () => {
+  it('computes NPL from performing status - the D-10 fix', () => {
     const withNpl = NIGERIA_POSITIONS.map((p) =>
       p.id === 'POS014' ? { ...p, performingStatus: 'Doubtful' as const, provisionAmount: 30_000 } : p,
     );
@@ -719,7 +757,7 @@ describe('run orchestrator', () => {
     expect(outcome.results.every((r) => r.methodology.length > 0)).toBe(true);
   });
 
-  it('is scoped by construction — the D-01 fix', () => {
+  it('is scoped by construction - the D-01 fix', () => {
     const withGhana: Position[] = [
       ...NIGERIA_POSITIONS,
       { ...NIGERIA_POSITIONS[0]!, id: 'GH-1', affiliateCode: 'GH', currency: 'GHS', amount: 999_999 },

@@ -17,6 +17,7 @@ import type {
   ProcessRun,
   Role,
   RuleMeta,
+  RuleVersionSnapshot,
   RunResult,
   RunSchedule,
   Connector,
@@ -63,6 +64,10 @@ export class LocalRepository implements Repository {
 
   async upsertDimensionMembers(members: DimensionMember[]): Promise<void> {
     await this.database.dimensionMembers.bulkPut(members);
+  }
+
+  async deleteDimensionMember(id: string): Promise<void> {
+    await this.database.dimensionMembers.delete(id);
   }
 
   // ── Positions ─────────────────────────────────────────────────────────
@@ -181,14 +186,41 @@ export class LocalRepository implements Repository {
   }
 
   async upsertRule(rule: RuleMeta): Promise<void> {
+    // Archive the row's current content before it's overwritten - otherwise a rule edit destroys
+    // the only copy of what an already-completed run actually used (see RuleVersionSnapshot).
+    const previous = await this.database.rules.get(rule.id);
+    if (previous) {
+      await this.database.ruleHistory.put({
+        id: `${previous.id}:v${previous.version}`,
+        ruleId: previous.id,
+        version: previous.version,
+        kind: previous.kind,
+        snapshot: previous,
+        archivedAt: new Date().toISOString(),
+      });
+    }
     await this.database.rules.put(rule);
+  }
+
+  async getRuleVersion<T extends RuleMeta>(ruleId: string, version: number): Promise<T | null> {
+    const row = await this.database.ruleHistory.get(`${ruleId}:v${version}`);
+    if (row) return row.snapshot as T;
+    // The current row may itself already be the version asked for - not every version has an
+    // older one to have been archived over.
+    const current = await this.database.rules.get(ruleId);
+    return current && current.version === version ? (current as T) : null;
+  }
+
+  async listRuleVersions(ruleId: string): Promise<RuleVersionSnapshot[]> {
+    const rows = await this.database.ruleHistory.where('ruleId').equals(ruleId).toArray();
+    return rows.sort((a, b) => a.version - b.version);
   }
 
   async deleteRule(id: string): Promise<void> {
     const dependants = await this.checkDependencies(id);
     if (dependants.length > 0) {
       const names = dependants.map((d) => `${d.ruleName} (${d.relation})`).join(', ');
-      throw new Error(`Cannot delete: still referenced by ${dependants.length} rule(s) — ${names}`);
+      throw new Error(`Cannot delete: still referenced by ${dependants.length} rule(s) - ${names}`);
     }
     await this.database.rules.delete(id);
   }
@@ -489,6 +521,10 @@ export class LocalRepository implements Repository {
 
   async upsertCurrency(currency: StoredCurrency): Promise<void> {
     await this.database.currencies.put(currency);
+  }
+
+  async deleteCurrency(code: string): Promise<void> {
+    await this.database.currencies.delete(code);
   }
 
   async listFxRates(asOfDate?: IsoDate): Promise<StoredFxRate[]> {

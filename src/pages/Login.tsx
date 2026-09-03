@@ -149,12 +149,6 @@ export function Login() {
             </svg>
             <p className="text-xs text-warning-700 font-medium">Multi-factor authentication required on first sign-in.</p>
           </div>
-
-          <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Demo access — Group Administrator</p>
-            <p className="mt-1 font-mono text-xs text-navy-900">adaeze.okonkwo@ecobank.com</p>
-            <p className="font-mono text-xs text-navy-900">Ecobank@2026</p>
-          </div>
         </div>
 
         <div className="text-center text-xs text-gray-400 pb-4">

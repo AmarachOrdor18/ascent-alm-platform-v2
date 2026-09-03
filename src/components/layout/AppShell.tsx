@@ -15,16 +15,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['OVERVIEW', 'RISK MANAGEMENT']));
   const { user, role, hasPermission, logout } = useAuth();
-  const { affiliateCode, setAffiliateCode, affiliates } = useScope();
+  const { affiliateCode, setAffiliateCode, affiliates, run } = useScope();
   const { data: batches = [] } = useBatches();
 
-  // "As at" is derived from the most recently committed batch, not a scope field (nothing writes to it).
-  const asOfDate = useMemo(() => {
+  // A results screen keeps scope's `run` in sync with whatever it's actually displaying
+  // (useSelectedRun, resultHooks.ts) - while one is active, "As at" should read that run's own date,
+  // not just the latest upload, or the header can disagree with the numbers on screen below it. Away
+  // from a results screen (Data Upload, Dimensions, Admin...) there's no run in play, so it falls back
+  // to the most recently committed batch, same as before.
+  const latestBatchDate = useMemo(() => {
     const committed = batches
       .filter((b) => b.status === 'Committed' && (affiliateCode === GROUP_CODE || b.affiliateCode === affiliateCode))
       .sort((a, b) => b.asOfDate.localeCompare(a.asOfDate));
     return committed[0]?.asOfDate ?? null;
   }, [batches, affiliateCode]);
+  const asOfDate = run?.asOfDate ?? latestBatchDate;
 
   const visibleGroups = useMemo(
     () =>
@@ -41,13 +46,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     [hasPermission],
   );
 
-  // A user assigned to one affiliate sees only that affiliate here, unless group.manage says otherwise —
-  // the same rule every other affiliate picker in the app applies via accessibleAffiliates(). A restricted
-  // user keeps their own affiliate regardless of its status; an unrestricted user only sees Group or Live ones.
+  // A user assigned to one affiliate sees only that affiliate here, unless group.manage says otherwise -
+  // the same rule every other affiliate picker in the app applies via accessibleAffiliates(). Live-only
+  // either way: an affiliate that hasn't gone live yet has nothing signed-off to work with in scope, even
+  // for the one user confined to it - RouteGate separately blocks the screens that would matter if this
+  // ever somehow carried a non-Live affiliateCode anyway.
   const restrictedToOwn = isRestrictedToOwnAffiliate(user, hasPermission);
-  const selectable = restrictedToOwn
-    ? accessibleAffiliates(affiliates, user, hasPermission)
-    : affiliates.filter((a) => a.code === GROUP_CODE || a.status === 'Live');
+  const selectable = (restrictedToOwn ? accessibleAffiliates(affiliates, user, hasPermission) : affiliates).filter(
+    (a) => a.code === GROUP_CODE || a.status === 'Live',
+  );
 
   const toggleGroup = (groupLabel: string) => {
     setExpandedGroups((prev) => {
@@ -74,7 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div
             className={cn(
               'flex items-center border-b border-white/10',
-              // Collapsed: stack logo + toggle, centered — the row layout doesn't fit the 64px collapsed rail.
+              // Collapsed: stack logo + toggle, centered - the row layout doesn't fit the 64px collapsed rail.
               collapsed ? 'h-20 flex-col justify-center gap-1.5 px-1' : 'h-16 gap-3 px-4',
             )}
           >
@@ -123,10 +130,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               const hasActiveItem = group.items.some(
                 (item) => location === item.path || location.startsWith(`${item.path}/`),
               );
+              // A dropdown for a single item is chrome, not navigation - single-item groups
+              // render their entry flat, exactly like an expanded multi-item group.
+              const collapsible = group.items.length > 1;
 
               return (
                 <div key={group.label} className="mb-2">
-                  {!collapsed && (
+                  {!collapsed && collapsible && (
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.label)}
@@ -153,9 +163,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </button>
                   )}
 
-                  {collapsed && <div className="px-3 mb-2 border-b border-white/10 opacity-30"></div>}
+                  {collapsed && collapsible && <div className="px-3 mb-2 border-b border-white/10 opacity-30"></div>}
 
-                  {(isExpanded || collapsed) && (
+                  {(isExpanded || collapsed || !collapsible) && (
                     <ul className={cn('mt-1 space-y-0.5', collapsed && 'px-1')}>
                       {group.items.map((item) => {
                         const active = location === item.path || location.startsWith(`${item.path}/`);
@@ -198,6 +208,48 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <p className="truncate text-[10px] text-white/50">{role?.name}</p>
                 </div>
               </div>
+              <Link
+                href="/account"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21v-1a7 7 0 0 1 14 0v1" />
+                </svg>
+                My Account
+              </Link>
+              {!hasPermission('group.manage') && hasPermission('users.manage') && (
+                <Link
+                  href={`/affiliates/${user.affiliateCode}/settings`}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                  My Affiliate Settings
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={logout}

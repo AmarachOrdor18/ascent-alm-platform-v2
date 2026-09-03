@@ -1,0 +1,7 @@
+id,category,amount,currency,orgunitcode,glaccountcode,commoncoacode,productcode,productclass,maturitydate,nextrepricingdate,ratetype,interestratepct,behaviouraltag,hqlalevel,hqlahaircutpct,lcrcashflowrole,irrbbratesensitive,approxdurationyears,performingstatus
+NG-CASH-01,Asset,42000000000,NGN,OU-NG-TSY,NG-1010,COA-11,CASH,Cash & Central Bank Balances,,,N/A,,N/A,Level 1,0,HQLA,false,,Performing
+NG-TBILL-01,Asset,65000000000,NGN,OU-NG-TSY,NG-1020,COA-13,TBILL,FGN Treasury Bills,2026-12-31,2026-12-31,Fixed,18.5,N/A,Level 1,0,HQLA,true,0.5,Performing
+NG-BOND-01,Liability,45000000000,NGN,OU-NG-TSY,NG-2020,COA-23,BOND,Eurobond 2031,2031-01-31,2031-01-31,Fixed,9.75,N/A,None,0,None,true,4.5,Performing
+NG-INTERBANK-01,Asset,30000000000,NGN,OU-NG-TSY,NG-1015,COA-12,INTERBANK,Interbank Placement,2026-09-30,2026-09-30,Fixed,19.0,N/A,Level 2A,15,HQLA,true,0.25,Performing
+NG-FGNBOND-01,Asset,50000000000,NGN,OU-NG-TSY,NG-1020,COA-13,FGNBOND,FGN Bond 2033,2033-02-28,2033-02-28,Fixed,16.25,N/A,Level 1,0,HQLA,true,6.5,Performing
+NG-CAP-01,Capital,30000000000,NGN,OU-NG-TSY,NG-3010,COA-31,CAP,Share Capital,,,N/A,,N/A,None,0,None,false,,Performing

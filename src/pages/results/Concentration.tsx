@@ -80,7 +80,7 @@ export function Concentration() {
         ) : e.sharePercent > 5 ? (
           <StatusBadge status="Above 5%" tone="warning" />
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ),
     },
   ];
@@ -91,7 +91,7 @@ export function Concentration() {
     <>
       <ModuleHeader
         title="Concentration & Large Exposures"
-        description="Depositor concentration by counterparty — whether a handful of names hold the funding base."
+        description="Depositor concentration by counterparty - whether a handful of names hold the funding base."
         asOfDate={run?.asOfDate ?? null}
         scope={affiliate?.name ?? affiliateCode}
         currency={currency}
@@ -107,13 +107,13 @@ export function Concentration() {
                   : conc.largestSharePercent > 5
                     ? 'warning'
                     : 'success',
-            about: 'Share of total deposits held by the single largest mapped counterparty — the biggest single funding-concentration vulnerability.',
+            about: 'Share of total deposits held by the single largest mapped counterparty - the biggest single funding-concentration vulnerability.',
           },
           { label: 'Top five', value: formatPct(conc?.topFiveSharePercent ?? null, 2), about: 'Combined share of total deposits held by the five largest counterparties.' },
           { label: 'Top ten', value: formatPct(conc?.topTenSharePercent ?? null, 2), about: 'Combined share of total deposits held by the ten largest counterparties.' },
           {
             label: 'Herfindahl index',
-            value: conc?.herfindahlIndex === null || conc == null ? '—' : Math.round(conc.herfindahlIndex).toString(),
+            value: conc?.herfindahlIndex === null || conc == null ? '-' : Math.round(conc.herfindahlIndex).toString(),
             tone: band.tone,
             about: 'Sum of every counterparty’s squared percentage share. Below 1,500 reads as diversified, 1,500–2,500 as moderately concentrated, above 2,500 as highly concentrated.',
           },
@@ -138,7 +138,7 @@ export function Concentration() {
               <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Herfindahl index</p>
                 <p className={`mt-1 text-[20px] font-bold ${conc.herfindahlIndex === null ? 'text-navy-900' : TONE_TEXT[band.tone]}`}>
-                  {conc.herfindahlIndex === null ? '—' : Math.round(conc.herfindahlIndex)}
+                  {conc.herfindahlIndex === null ? '-' : Math.round(conc.herfindahlIndex)}
                 </p>
               </div>
 
@@ -156,7 +156,7 @@ export function Concentration() {
                   Largest depositors
                   <InfoButton label="How exposures are flagged">
                     Deposits with no counterparty mapping are excluded here and reported separately, rather than
-                    dropped or lumped into an average — either would distort the shares. A depositor above 10% is
+                    dropped or lumped into an average - either would distort the shares. A depositor above 10% is
                     flagged as a large exposure; above 5% as worth monitoring.
                   </InfoButton>
                 </h2>

@@ -50,7 +50,7 @@ const WORKBOOK = {
   survivalHorizonDays: 17,
 };
 
-describe('phase-1 gate — Liquidity Coverage Ratio', () => {
+describe('phase-1 gate - Liquidity Coverage Ratio', () => {
   const result = computeLcr(NIGERIA_POSITIONS, ctx);
 
   it('reproduces HQLA net of per-position haircuts', () => {
@@ -80,21 +80,21 @@ describe('phase-1 gate — Liquidity Coverage Ratio', () => {
   });
 });
 
-describe('phase-1 gate — Net Stable Funding Ratio', () => {
+describe('phase-1 gate - Net Stable Funding Ratio', () => {
   it('reproduces the ratio, with capital contributing to ASF', () => {
     const result = computeNsfr(NIGERIA_POSITIONS, ctx);
     expect(result.nsfrPercent).toBeCloseTo(WORKBOOK.nsfrPercent, 6);
   });
 });
 
-describe('phase-1 gate — Loan-to-Deposit Ratio', () => {
+describe('phase-1 gate - Loan-to-Deposit Ratio', () => {
   it('reproduces the ratio', () => {
     const result = computeLoanToDeposit(NIGERIA_POSITIONS, ctx);
     expect(result.ratioPercent).toBeCloseTo(WORKBOOK.ldrPercent, 6);
   });
 });
 
-describe('phase-1 gate — NII sensitivity', () => {
+describe('phase-1 gate - NII sensitivity', () => {
   const result = computeNiiSensitivity(NIGERIA_POSITIONS, irrbbCtx, 200);
 
   it('reproduces the one-year repricing gap', () => {
@@ -115,12 +115,12 @@ describe('phase-1 gate — NII sensitivity', () => {
   });
 });
 
-describe('phase-1 gate — EVE sensitivity', () => {
+describe('phase-1 gate - EVE sensitivity', () => {
   const result = computeEveSensitivity(NIGERIA_POSITIONS, irrbbCtx, 200);
 
   it('uses real equity rather than a proxy', () => {
     expect(computeEquity(NIGERIA_POSITIONS, irrbbCtx)).toBeCloseTo(WORKBOOK.equity, 6);
-    // v1 used 10% of total assets — 228,000 here — which is 24% adrift.
+    // v1 used 10% of total assets - 228,000 here - which is 24% adrift.
     expect(result.equity).not.toBeCloseTo(WORKBOOK.totalAssets * 0.1, 0);
   });
 
@@ -154,7 +154,7 @@ describe('phase-1 gate — EVE sensitivity', () => {
   });
 });
 
-describe('phase-1 gate — survival horizon', () => {
+describe('phase-1 gate - survival horizon', () => {
   const openingBuffer = computeLcr(NIGERIA_POSITIONS, ctx).hqla;
   const result = computeSurvivalHorizon(openingBuffer, severeOutflowProfile(750_000), ctx);
 
@@ -186,7 +186,7 @@ describe('phase-1 gate — survival horizon', () => {
   });
 });
 
-describe('beyond the workbook — capabilities v1 lacked', () => {
+describe('beyond the workbook - capabilities v1 lacked', () => {
   it('excludes a fully pledged asset from HQLA and reports the amount', () => {
     // POS004 is 150,000 of FGN bonds. Pledge the lot.
     const pledged = NIGERIA_POSITIONS.map((p) =>

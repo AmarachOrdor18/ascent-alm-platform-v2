@@ -17,7 +17,7 @@ interface ScopeContextValue {
   run: ProcessRun | null;
   setRun: (run: ProcessRun | null) => void;
 
-  /** Reporting currency for the current scope — the affiliate's own, or USD at Group. */
+  /** Reporting currency for the current scope - the affiliate's own, or USD at Group. */
   currency: CurrencyCode;
 
   affiliates: Affiliate[];

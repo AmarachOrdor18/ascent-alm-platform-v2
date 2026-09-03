@@ -54,7 +54,7 @@ export interface ReconciliationContext {
 }
 
 function keyFor(glAccountCode: string, orgUnitCode: string | null, level: ReconciliationLevel): string {
-  return level === 'GlAccountByOrgUnit' ? `${glAccountCode}|${orgUnitCode ?? '—'}` : glAccountCode;
+  return level === 'GlAccountByOrgUnit' ? `${glAccountCode}|${orgUnitCode ?? '-'}` : glAccountCode;
 }
 
 // A variance inside tolerance yields a suggested plug entry requiring maker-checker approval, never an automatic adjustment.
@@ -146,7 +146,7 @@ export function reconcile(
     methodology:
       `Instrument balances compared against the general ledger at ${ctx.level === 'GlAccountByOrgUnit' ? 'GL account within organisational unit' : 'GL account'} level. ` +
       'Accounts present on only one side appear as full variances rather than being omitted. Variances inside ' +
-      'tolerance produce a suggested plug entry, which requires maker-checker approval — nothing is adjusted ' +
+      'tolerance produce a suggested plug entry, which requires maker-checker approval - nothing is adjusted ' +
       'automatically. Any line outside tolerance blocks sign-off for the period.',
   };
 }

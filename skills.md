@@ -1572,7 +1572,7 @@ Don't dump all 15 skills on it and say "build everything."
 
 Do this:
 
-### Phase 1 — Foundation
+### Phase 1 - Foundation
 
 ```text
 alm-product-architecture
@@ -1580,7 +1580,7 @@ alm-source-integration
 alm-data-foundation
 ```
 
-### Phase 2 — ALM intelligence
+### Phase 2 - ALM intelligence
 
 ```text
 alm-rules-engine
@@ -1589,20 +1589,20 @@ alm-irrbb-engine
 alm-stress-scenario-engine
 ```
 
-### Phase 3 — Reporting
+### Phase 3 - Reporting
 
 ```text
 alm-reporting-framework
 alm-workflow-controls
 ```
 
-### Phase 4 — Experience
+### Phase 4 - Experience
 
 ```text
 alm-enterprise-ui
 ```
 
-### Phase 5 — Validation
+### Phase 5 - Validation
 
 ```text
 alm-flow-audit
@@ -3614,7 +3614,7 @@ while allowing:
 The original data must remain protected and traceable throughout.
 
 
-# ALM PLATFORM — MASTER SKILL EXECUTION PROMPT
+# ALM PLATFORM - MASTER SKILL EXECUTION PROMPT
 
 You are working on the existing ALM application.
 
@@ -3653,7 +3653,7 @@ Treat them as one coordinated product architecture.
 
 ---
 
-# PHASE 0 — INSPECT BEFORE BUILDING
+# PHASE 0 - INSPECT BEFORE BUILDING
 
 **DO NOT immediately modify the application.**
 
@@ -3688,7 +3688,7 @@ Do not assume that something is missing simply because it is not obvious from th
 
 ---
 
-# PHASE 1 — CREATE THE BASELINE SUCCESS MATRIX
+# PHASE 1 - CREATE THE BASELINE SUCCESS MATRIX
 
 Before implementation, create a master Success Matrix for all 17 skills.
 
@@ -3715,7 +3715,7 @@ A feature is Verified only when the defined success criteria have been tested an
 
 ---
 
-# PHASE 2 — DEFINE THE TARGET ARCHITECTURE
+# PHASE 2 - DEFINE THE TARGET ARCHITECTURE
 
 The target architecture is:
 
@@ -3755,7 +3755,7 @@ Do not force a rewrite if the existing architecture can be extended safely.
 
 ---
 
-# PHASE 3 — PRODUCT ARCHITECTURE
+# PHASE 3 - PRODUCT ARCHITECTURE
 
 Run:
 
@@ -3777,7 +3777,7 @@ Do not implement unnecessary changes yet.
 
 ---
 
-# PHASE 4 — SOURCE INTEGRATION
+# PHASE 4 - SOURCE INTEGRATION
 
 Run:
 
@@ -3828,7 +3828,7 @@ DEPARTMENT UPLOAD ────┘
 
 ---
 
-# PHASE 5 — DATA FOUNDATION
+# PHASE 5 - DATA FOUNDATION
 
 Run:
 
@@ -3870,7 +3870,7 @@ Track:
 
 ---
 
-# PHASE 6 — RUN MANAGEMENT
+# PHASE 6 - RUN MANAGEMENT
 
 Run:
 
@@ -4036,7 +4036,7 @@ New Position Book Version
 
 ---
 
-# PHASE 7 — POSITION BOOK
+# PHASE 7 - POSITION BOOK
 
 The Position Book must be the canonical normalized ALM position layer.
 
@@ -4087,7 +4087,7 @@ Clearly distinguish:
 
 ---
 
-# PHASE 8 — RULES ENGINE
+# PHASE 8 - RULES ENGINE
 
 Run:
 
@@ -4120,7 +4120,7 @@ Changing a rule should affect applicable future calculations without requiring f
 
 ---
 
-# PHASE 9 — LIQUIDITY ENGINE
+# PHASE 9 - LIQUIDITY ENGINE
 
 Run:
 
@@ -4202,7 +4202,7 @@ Metric
 
 ---
 
-# PHASE 10 — IRRBB
+# PHASE 10 - IRRBB
 
 Run:
 
@@ -4226,7 +4226,7 @@ Users should be able to understand what positions are driving the result.
 
 ---
 
-# PHASE 11 — STRESS TESTING
+# PHASE 11 - STRESS TESTING
 
 Run:
 
@@ -4256,7 +4256,7 @@ Do not create decorative scenario charts disconnected from calculations.
 
 ---
 
-# PHASE 12 — REPORTING
+# PHASE 12 - REPORTING
 
 Run:
 
@@ -4315,7 +4315,7 @@ A user should be able to view a reporting cycle/run and understand:
 
 ---
 
-# PHASE 13 — WORKFLOW AND CONTROLS
+# PHASE 13 - WORKFLOW AND CONTROLS
 
 Run:
 
@@ -4352,7 +4352,7 @@ Do not allow users to bypass workflow through direct URLs or APIs.
 
 ---
 
-# PHASE 14 — ENTERPRISE UI
+# PHASE 14 - ENTERPRISE UI
 
 Run:
 
@@ -4381,7 +4381,7 @@ Users should not be overwhelmed with every underlying data field.
 
 ---
 
-# PHASE 15 — FLOW AUDIT
+# PHASE 15 - FLOW AUDIT
 
 Run:
 
@@ -4443,7 +4443,7 @@ Every journey must be completable without workaround.
 
 ---
 
-# PHASE 16 — PERMISSION AUDIT
+# PHASE 16 - PERMISSION AUDIT
 
 Run:
 
@@ -4478,7 +4478,7 @@ Verify maker/checker segregation.
 
 ---
 
-# PHASE 17 — DATA LINEAGE AUDIT
+# PHASE 17 - DATA LINEAGE AUDIT
 
 Run:
 
@@ -4526,7 +4526,7 @@ and:
 
 ---
 
-# PHASE 18 — RFP COMPLIANCE
+# PHASE 18 - RFP COMPLIANCE
 
 Run:
 
@@ -4548,7 +4548,7 @@ Every important requirement needs evidence.
 
 ---
 
-# PHASE 19 — UI REVIEW
+# PHASE 19 - UI REVIEW
 
 Run:
 
@@ -4576,7 +4576,7 @@ Do not redesign working functionality unnecessarily.
 
 ---
 
-# PHASE 20 — DEMO SCRIPT
+# PHASE 20 - DEMO SCRIPT
 
 Run:
 

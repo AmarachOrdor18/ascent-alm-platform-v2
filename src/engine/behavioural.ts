@@ -25,7 +25,7 @@ export interface BehaviourPattern {
 
 export class InvalidBehaviourPatternError extends Error {
   constructor(patternName: string, total: number) {
-    super(`Behaviour pattern "${patternName}" allocates ${total.toFixed(2)}% — tiers must total 100%`);
+    super(`Behaviour pattern "${patternName}" allocates ${total.toFixed(2)}% - tiers must total 100%`);
     this.name = 'InvalidBehaviourPatternError';
   }
 }
@@ -39,7 +39,7 @@ export function validateBehaviourPattern(pattern: BehaviourPattern): void {
 export const DEFAULT_PATTERNS: BehaviourPattern[] = [
   {
     id: 'BP-RETAIL-CORE',
-    name: 'Retail — core deposits',
+    name: 'Retail - core deposits',
     appliesTo: ['Core'],
     tiers: [
       { tenorDays: 30, percent: 5, type: 'Volatile' },
@@ -50,7 +50,7 @@ export const DEFAULT_PATTERNS: BehaviourPattern[] = [
   },
   {
     id: 'BP-RETAIL-NONCORE',
-    name: 'Retail — non-core deposits',
+    name: 'Retail - non-core deposits',
     appliesTo: ['Non-Core'],
     tiers: [
       { tenorDays: 30, percent: 35, type: 'Volatile' },
@@ -61,7 +61,7 @@ export const DEFAULT_PATTERNS: BehaviourPattern[] = [
   },
   {
     id: 'BP-CORP-OPERATIONAL',
-    name: 'Corporate — operational balances',
+    name: 'Corporate - operational balances',
     appliesTo: ['Operational'],
     tiers: [
       { tenorDays: 30, percent: 15, type: 'Volatile' },
@@ -71,7 +71,7 @@ export const DEFAULT_PATTERNS: BehaviourPattern[] = [
   },
   {
     id: 'BP-CORP-NONOPERATIONAL',
-    name: 'Corporate — non-operational balances',
+    name: 'Corporate - non-operational balances',
     appliesTo: ['Non-Operational'],
     tiers: [
       { tenorDays: 30, percent: 60, type: 'Volatile' },
@@ -176,7 +176,7 @@ export function computeDepositRunoff(
     methodology:
       'Non-maturity deposits split into core and volatile balances by behaviour pattern, keyed on the Basel ' +
       'deposit taxonomy (Core / Non-Core / Operational / Non-Operational). Pattern tiers must total 100%. ' +
-      'Rates are published-style assumptions, not coefficients fitted to observed withdrawals — fitting ' +
+      'Rates are published-style assumptions, not coefficients fitted to observed withdrawals - fitting ' +
       'requires multi-period position history. Deposits with no matching pattern are reported as unmodelled ' +
       'rather than defaulted into a bucket.',
   };
@@ -204,7 +204,7 @@ export function applyBehaviouralMaturity(
         id: `${p.id}#BEH${index + 1}`,
         amount: (p.amount * tier.percent) / 100,
         maturityDate: addDays(asOfDate, tier.tenorDays),
-        notes: `Behavioural tier ${index + 1} of "${pattern.name}" — ${tier.percent}% at ${tier.tenorDays}d (${tier.type})`,
+        notes: `Behavioural tier ${index + 1} of "${pattern.name}" - ${tier.percent}% at ${tier.tenorDays}d (${tier.type})`,
       });
     }
   }
@@ -290,7 +290,7 @@ export function applyDepositBetas(
     betaAdjustedDeltaNii: unadjustedDeltaNii + improvement,
     liabilityRepricingReduction,
     methodology:
-      'Deposit betas damp the liability leg only — assets reprice contractually, deposits reprice at ' +
+      'Deposit betas damp the liability leg only - assets reprice contractually, deposits reprice at ' +
       "management's discretion. Betas are assumptions by deposit type, not fitted to observed pass-through. " +
       'A bank with a negative repricing gap appears less exposed to a rate rise once betas are applied.',
   };

@@ -61,7 +61,7 @@ export function validateConnector(c: Connector): string[] {
   if (c.name.trim() === '') problems.push('Name is required.');
   if (c.domains.length === 0) problems.push('Choose at least one data domain, or the connector can feed nothing.');
   if (c.status !== 'Available' && !c.statusReason?.trim()) {
-    problems.push('A connector that is not Available needs a reason — an unexplained block is not actionable.');
+    problems.push('A connector that is not Available needs a reason - an unexplained block is not actionable.');
   }
   if (c.status === 'Available' && c.endpoint.trim() === '') {
     problems.push('An available connector needs an endpoint.');

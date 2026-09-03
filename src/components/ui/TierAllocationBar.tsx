@@ -17,7 +17,7 @@ const TONE_CLASS: Record<AllocationSegment['tone'], string> = {
   d: 'bg-[#83858C]',
 };
 
-/** Cycles a neutral palette by position — for segments with no natural Core/Volatile-style classification. */
+/** Cycles a neutral palette by position - for segments with no natural Core/Volatile-style classification. */
 export const paletteTone = (index: number): AllocationSegment['tone'] =>
   (['a', 'b', 'c', 'd'] as const)[index % 4]!;
 

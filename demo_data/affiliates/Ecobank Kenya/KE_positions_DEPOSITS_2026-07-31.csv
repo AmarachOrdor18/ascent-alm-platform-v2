@@ -1,0 +1,14 @@
+id,accountNumber,accountClass,branchCode,category,productClass,currency,amount,legalEntityCode,orgUnitCode,glAccountCode,commonCoaCode,notes,behaviouralTag,maturityDate,rateType,interestRatePct,monthlyCredit,monthlyDebit
+KE-DP-001,40010200001,Customer,HQ001,Liability,Current,KES,20781.44,LE-KE,OU-KE-RET,400102,,,Core,,Fixed,4.38,27015.87,25394.92
+KE-DP-002,40010500001,Customer,HQ001,Liability,Current - Corporate,KES,16454.63,LE-KE,OU-KE-COR,400105,,,Operational,,Fixed,7.71,31263.79,29387.96
+KE-DP-003,40010100001,Customer,HQ001,Liability,Savings,KES,16337.41,LE-KE,OU-KE-RET,400101,,,Core,,Fixed,7.28,6861.71,6450.01
+KE-DP-004,40010300001,Customer,HQ001,Liability,Fixed,KES,12335.17,LE-KE,OU-KE-RET,400103,,,N/A,2027-01-31,Fixed,0.75,493.41,463.8
+KE-DP-005,40010600001,Customer,HQ001,Liability,Fixed - Corporate,KES,3545.14,LE-KE,OU-KE-COR,400106,,,N/A,2026-11-30,Fixed,6.21,212.71,191.44
+KE-DP-006,40010600002,Customer,HQ001,Liability,Fixed - Corporate,KES,3102.0,LE-KE,OU-KE-COR,400106,,,N/A,2026-11-30,Fixed,12.08,186.12,167.51
+KE-DP-007,40010600003,Customer,HQ001,Liability,Fixed - Corporate,KES,2806.57,LE-KE,OU-KE-COR,400106,,,N/A,2026-11-30,Fixed,11.72,168.39,151.55
+KE-DP-008,40010600004,Customer,HQ001,Liability,Fixed - Corporate,KES,2068.0,LE-KE,OU-KE-COR,400106,,,N/A,2026-11-30,Fixed,14.08,124.08,111.67
+KE-DP-009,40010600005,Customer,HQ001,Liability,Fixed - Corporate,KES,1772.57,LE-KE,OU-KE-COR,400106,,,N/A,2026-11-30,Fixed,4.88,106.35,95.72
+KE-DP-010,40010600006,Customer,HQ001,Liability,Fixed - Corporate,KES,1477.14,LE-KE,OU-KE-COR,400106,,,N/A,2026-11-30,Fixed,11.98,88.63,79.77
+KE-DP-011,40010400001,Customer,HQ001,Liability,Target,KES,4192.1,LE-KE,OU-KE-RET,400104,,,N/A,2027-06-30,Fixed,11.57,922.26,866.93
+KE-DP-012,40010700001,Customer,HQ001,Liability,Domiciliary Deposits,KES,6391.59,LE-KE,OU-KE-COR,400107,,,Operational,,Fixed,13.36,5432.85,5106.88
+KE-DP-013,40040200001,Suspense,HQ001,Liability,Managers Cheques Payable,KES,653.82,LE-KE,OU-KE-RET,400402,,"Suspense — excluded from customer deposits despite the product name",N/A,,N/A,,0,0

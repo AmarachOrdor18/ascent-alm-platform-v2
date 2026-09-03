@@ -19,7 +19,7 @@ export function currencySymbol(currency: CurrencyCode): string {
 }
 
 export interface AmountFormatOptions {
-  /** Abbreviate to K/M/B. Defaults to true — balance-sheet figures are large. */
+  /** Abbreviate to K/M/B. Defaults to true - balance-sheet figures are large. */
   compact?: boolean;
   /** Show the ISO code alongside the symbol, e.g. "₦560.0B NGN". Useful in mixed-currency tables. */
   showCode?: boolean;
@@ -54,25 +54,25 @@ export function formatAmount(amount: number, currency: CurrencyCode, options: Am
 }
 
 export function formatPct(value: number | null, digits = 1): string {
-  if (value === null || Number.isNaN(value)) return '—';
+  if (value === null || Number.isNaN(value)) return '-';
   return `${value.toFixed(digits)}%`;
 }
 
 /** Basis points, for rate shocks and FTP add-ons. */
 export function formatBps(value: number | null): string {
-  if (value === null || Number.isNaN(value)) return '—';
+  if (value === null || Number.isNaN(value)) return '-';
   return `${value > 0 ? '+' : ''}${Math.round(value)}bps`;
 }
 
 /** Signed percentage-point delta, for prior-period variance columns. */
 export function formatDelta(value: number | null, digits = 1): string {
-  if (value === null || Number.isNaN(value)) return '—';
+  if (value === null || Number.isNaN(value)) return '-';
   return `${value > 0 ? '+' : ''}${value.toFixed(digits)}`;
 }
 
 /** `2026-07-31` → `31 Jul 2026`. */
 export function formatDate(date: IsoDate | null): string {
-  if (!date) return '—';
+  if (!date) return '-';
   const parsed = new Date(`${date}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return date;
   return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });

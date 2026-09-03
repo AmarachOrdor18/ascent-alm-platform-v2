@@ -41,7 +41,7 @@ function position(overrides: Partial<Position> = {}): Position {
     rateCapLifePct: null,
     rateFloorLifePct: null,
     behaviouralTag: 'N/A',
-    // Deliberately unclassified — as a department's own upload would leave it, per the narrower templates.
+    // Deliberately unclassified - as a department's own upload would leave it, per the narrower templates.
     hqlaLevel: 'None',
     hqlaHaircutPct: 0,
     lcrCashflowRole: 'None',
@@ -86,7 +86,7 @@ describe('applyProductCharacteristics', () => {
     expect(classified!.id).toBe('P-1');
   });
 
-  it('leaves a position unchanged when its product/currency has no configured assumption — a gap to close in the rule, not a run failure', () => {
+  it('leaves a position unchanged when its product/currency has no configured assumption - a gap to close in the rule, not a run failure', () => {
     const uploaded = position({ productCode: 'P-UNKNOWN-PRODUCT', currency: 'NGN' });
     const [classified] = applyProductCharacteristics([uploaded], assumptions);
     expect(classified).toEqual(uploaded);
@@ -108,9 +108,9 @@ describe('applyProductCharacteristics', () => {
 });
 
 describe('the seeded Group Default Product Characteristics rule', () => {
-  it('reproduces the same LCR as the fully-classified upload it was derived from — a faithful default, not a behaviour change', () => {
+  it('reproduces the same LCR as the fully-classified upload it was derived from - a faithful default, not a behaviour change', () => {
     // Two positions shaped like the real Nigeria seed book: a Treasury Bill (HQLA) funded by a Current
-    // account (Outflow) — both already fully classified, exactly as today's single-file upload provides.
+    // account (Outflow) - both already fully classified, exactly as today's single-file upload provides.
     const fullyClassified: Position[] = [
       position({
         id: 'P-TB-1', productCode: 'P-TREASURY-BILLS', productClass: 'Treasury Bills', category: 'Asset', amount: 2_000_000_000,
@@ -122,7 +122,7 @@ describe('the seeded Group Default Product Characteristics rule', () => {
       }),
     ];
 
-    // The same book as a department would actually upload today — unclassified, relying on the rule.
+    // The same book as a department would actually upload today - unclassified, relying on the rule.
     const asUploaded: Position[] = fullyClassified.map((p) => ({
       ...p,
       hqlaLevel: 'None',
@@ -146,7 +146,7 @@ describe('the seeded Group Default Product Characteristics rule', () => {
     expect(lcrFromRule.lcrPercent).toBe(lcrFromUpload.lcrPercent);
     expect(lcrFromRule.lcrPercent).not.toBeNull();
 
-    // And the previously-unclassified upload, left un-ruled, would have reported zero HQLA — the gap this closes.
+    // And the previously-unclassified upload, left un-ruled, would have reported zero HQLA - the gap this closes.
     const unruled = computeLcr(asUploaded, ctx);
     expect(unruled.hqla).toBe(0);
   });

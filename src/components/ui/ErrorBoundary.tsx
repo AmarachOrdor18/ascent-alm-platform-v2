@@ -40,7 +40,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             : 'This screen could not be displayed'}
         </h2>
         <p className="mb-4 text-[12px] leading-relaxed text-gray-600">
-          The rest of the application is unaffected — you can navigate elsewhere, or try this screen again.
+          The rest of the application is unaffected - you can navigate elsewhere, or try this screen again.
         </p>
         <pre className="mb-4 max-h-40 overflow-auto rounded-lg bg-white/60 p-3 font-mono text-[11px] text-gray-700">
           {error.message}

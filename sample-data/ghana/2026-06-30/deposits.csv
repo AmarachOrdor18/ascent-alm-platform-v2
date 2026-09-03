@@ -1,0 +1,5 @@
+id,category,amount,currency,orgunitcode,glaccountcode,commoncoacode,productcode,productclass,maturitydate,nextrepricingdate,ratetype,interestratepct,behaviouraltag,hqlalevel,hqlahaircutpct,lcrcashflowrole,irrbbratesensitive,approxdurationyears,performingstatus,counterpartyid
+GH-DDA-01,Liability,3400000000,GHS,OU-GH-RET,GH-2010,COA-22,DDA,Current & Savings Deposits,,,N/A,3.0,Core,None,0,Outflow,false,,Performing,CP-RETAIL-CASA
+GH-TD-01,Liability,2100000000,GHS,OU-GH-COR,GH-2010,COA-22,TD,Corporate Term Deposits,2026-11-30,2026-11-30,Fixed,22.0,Non-Core,None,0,Outflow,false,0.4,Performing,CP-CORP-TERM
+GH-DDA-02,Liability,1000000000,GHS,OU-GH-RET,GH-2010,COA-22,DDA,Retail Savings Deposits,,,N/A,5.0,Core,None,0,Outflow,false,,Performing,CP-RETAIL-SAVINGS
+GH-TD-02,Liability,650000000,GHS,OU-GH-RET,GH-2010,COA-22,TD,Retail Fixed Deposits,2026-12-31,2026-12-31,Fixed,24.0,Non-Core,None,0,Outflow,false,0.4,Performing,CP-RETAIL-TERM

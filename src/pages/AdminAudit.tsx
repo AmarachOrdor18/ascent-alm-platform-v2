@@ -6,8 +6,16 @@ import { TableToolbar, TablePagination, useTableControls } from '@/components/ui
 import { useAuditEvents } from '@/lib/hooks';
 import type { AuditEvent } from '@/engine/types';
 
-export function AdminAudit() {
-  const { data: events = [], isLoading } = useAuditEvents(500);
+export function AdminAudit({
+  embedded = false,
+  forcedAffiliateCode,
+}: { embedded?: boolean; forcedAffiliateCode?: string } = {}) {
+  const { data: allEvents = [], isLoading } = useAuditEvents(500);
+  // AuditEvent has no dedicated affiliateCode field - same heuristic used elsewhere (entityId, or the
+  // affiliate's code appearing in the free-text detail) stands in for one when scoping to one affiliate.
+  const events = forcedAffiliateCode
+    ? allEvents.filter((e) => e.entityId === forcedAffiliateCode || e.detail?.includes(forcedAffiliateCode))
+    : allEvents;
 
   const [module, setModule] = useState<string>('ALL');
   const [outcome, setOutcome] = useState<string>('ALL');
@@ -70,22 +78,24 @@ export function AdminAudit() {
 
   return (
     <>
+      {!embedded && (
       <ModuleHeader
         title="Audit Trail"
         description="Every recorded action, as it happened. Nothing on this screen is generated for display."
         asOfDate={null}
         metrics={[
-          { label: 'Events recorded', value: String(events.length), about: 'Every logged action across the platform — rule changes, run executions, data loads, sign-ins and more.' },
+          { label: 'Events recorded', value: String(events.length), about: 'Every logged action across the platform - rule changes, run executions, data loads, sign-ins and more.' },
           { label: 'Showing', value: String(totalItems), about: 'Events matching the current module, outcome and search filters below.' },
           { label: 'Distinct actors', value: String(actors), about: 'Unique users who have taken a logged action.' },
           {
             label: 'Failures',
             value: String(failures.length),
             tone: failures.length > 0 ? 'warning' : 'success',
-            about: 'Actions that were attempted but did not succeed — a failed run, a rejected save, and similar.',
+            about: 'Actions that were attempted but did not succeed - a failed run, a rejected save, and similar.',
           },
         ]}
       />
+      )}
 
       <section className="table-datagrid-container">
         <div className="border-b border-gray-100 bg-white/50 p-5">
@@ -146,7 +156,7 @@ export function AdminAudit() {
               <D label="Recorded at" value={e.recordedAt} mono />
               <div className="col-span-2 md:col-span-4">
                 <dt className="font-bold uppercase tracking-wider text-gray-400">Detail</dt>
-                <dd className="text-gray-700">{e.detail ?? '—'}</dd>
+                <dd className="text-gray-700">{e.detail ?? '-'}</dd>
               </div>
             </dl>
           )}

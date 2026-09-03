@@ -10,11 +10,11 @@ import type { Affiliate, LoadBatch, Position, PositionSnapshot } from '@/engine/
 
 // Exercises the same data flow src/lib/snapshotHooks.ts drives from React
 // (useCreateSnapshot → edit → useRecalculateSnapshot → useCommitSnapshot),
-// but against the repository and engine directly — proving the underlying
+// but against the repository and engine directly - proving the underlying
 // mechanism (not just that the hooks compile) without a browser: a
 // committed batch's positions can be cloned into an editable snapshot,
-// edited, recalculated against the real LCR/NSFR engine, and — once
-// approved — committed as a new Position Book version that supersedes the
+// edited, recalculated against the real LCR/NSFR engine, and - once
+// approved - committed as a new Position Book version that supersedes the
 // original without altering it.
 
 let db: AscentDb;
@@ -72,6 +72,9 @@ function batch(overrides: Partial<LoadBatch> = {}): LoadBatch {
     committedAt: '2026-07-31T09:05:00Z',
     reconciledBy: null,
     reconciledAt: null,
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectedReason: null,
     ...overrides,
   };
 }
@@ -196,7 +199,7 @@ describe('editable snapshot data flow', () => {
     await repo.upsertAffiliate(affiliate());
     await repo.upsertBatch(batch());
     const original = position();
-    // A funding liability so net cash outflows — and therefore LCR — are non-zero and the HQLA edit has
+    // A funding liability so net cash outflows - and therefore LCR - are non-zero and the HQLA edit has
     // something to move against; an HQLA-only book divides by zero and the assertion below would be moot.
     const deposit = position({
       id: 'P-2',
@@ -212,7 +215,7 @@ describe('editable snapshot data flow', () => {
     });
     await repo.insertPositions([original, deposit]);
 
-    // Edit: halve the HQLA position's amount — a real, governed field change, not a mock.
+    // Edit: halve the HQLA position's amount - a real, governed field change, not a mock.
     const edited: Position = { ...original, amount: original.amount / 2 };
 
     const compareRun = draftRun({
@@ -243,7 +246,7 @@ describe('editable snapshot data flow', () => {
 
     expect(baselineLcr.lcrPercent).not.toBeNull();
     expect(editedLcr.lcrPercent).not.toBeNull();
-    // Halving the only HQLA position materially lowers LCR — the comparison isn't a no-op.
+    // Halving the only HQLA position materially lowers LCR - the comparison isn't a no-op.
     expect(editedLcr.lcrPercent!).toBeLessThan(baselineLcr.lcrPercent!);
   });
 
@@ -295,6 +298,9 @@ describe('editable snapshot data flow', () => {
       committedAt: now,
       reconciledBy: null,
       reconciledAt: null,
+      rejectedBy: null,
+      rejectedAt: null,
+      rejectedReason: null,
     };
     // Mirrors the id-collision fix in useCommitSnapshot: positions are keyed by id alone, so a committed
     // snapshot position must get a new id, never the parent position's id, or it would overwrite that row.
@@ -321,8 +327,8 @@ describe('editable snapshot data flow', () => {
     expect(newPositions[0]?.amount).toBe(1_500_000_000);
     expect(newPositions[0]?.maturityDate).toBe('2028-01-01');
 
-    // Position Book at this affiliate/date now surfaces both rows — old (superseded, still queryable by
-    // batch id for lineage) and new (current) — never a silent overwrite.
+    // Position Book at this affiliate/date now surfaces both rows - old (superseded, still queryable by
+    // batch id for lineage) and new (current) - never a silent overwrite.
     const allForDate = await repo.queryPositions({ affiliateCode: 'NG', asOfDate: '2026-07-31' });
     expect(allForDate.map((p) => p.batchId).sort()).toEqual([newBatch.id, parent.id].sort());
 

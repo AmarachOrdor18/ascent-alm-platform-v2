@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { ResultTable } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useHolidayCalendars, useSaveHolidayCalendar } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
@@ -22,7 +23,7 @@ function nextBusinessDay(calendar: Calendar, date: string): string {
   return candidate;
 }
 
-export function HolidayCalendar() {
+export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {}) {
   const { hasPermission } = useAuth();
   const { data: calendars = [], isLoading } = useHolidayCalendars();
   const save = useSaveHolidayCalendar();
@@ -31,12 +32,38 @@ export function HolidayCalendar() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState({ date: '', name: '' });
   const [probe, setProbe] = useState('2026-12-25');
+  const [creating, setCreating] = useState(false);
+  const [newCalendar, setNewCalendar] = useState({ countryCode: '', name: '', weekendDays: [0, 6] as number[] });
 
   useEffect(() => {
     if (!activeId && calendars.length > 0) setActiveId(calendars[0]!.id);
   }, [calendars, activeId]);
 
   const active = calendars.find((c) => c.id === activeId) ?? null;
+
+  const handleCreateCalendar = () => {
+    const countryCode = newCalendar.countryCode.trim().toUpperCase();
+    const name = newCalendar.name.trim();
+    if (!countryCode || !name) return;
+    const created: Calendar = {
+      id: `CAL-${countryCode}`,
+      code: `CAL-${countryCode}`,
+      name,
+      countryCode,
+      weekendDays: newCalendar.weekendDays,
+      holidays: [],
+      isActive: true,
+      updatedBy: 'current-user',
+      updatedAt: new Date().toISOString(),
+    };
+    save.mutate(created, {
+      onSuccess: () => {
+        setActiveId(created.id);
+        setCreating(false);
+        setNewCalendar({ countryCode: '', name: '', weekendDays: [0, 6] });
+      },
+    });
+  };
 
   const settlement = useMemo(() => (active ? nextBusinessDay(active, probe) : null), [active, probe]);
   const shifted = settlement !== null && settlement !== probe;
@@ -65,22 +92,37 @@ export function HolidayCalendar() {
 
   return (
     <>
+      {!embedded && (
       <ModuleHeader
         title="Holiday Calendar"
         description="Business-day conventions per jurisdiction. A flow due on a holiday settles on the next business day, moving it between buckets at the short end."
         asOfDate={null}
         scope={active?.name ?? 'Group'}
         metrics={[
-          { label: 'Calendars', value: String(calendars.length), about: 'Business-day calendars defined, typically one per jurisdiction.' },
-          { label: 'Holidays defined', value: active ? String(active.holidays.length) : '—', about: 'Dates on the selected calendar that are not business days.' },
+          {
+            label: 'Calendars',
+            value: String(calendars.length),
+            about: 'Business-day calendars defined, typically one per jurisdiction.',
+          },
+          {
+            label: 'Holidays defined',
+            value: active ? String(active.holidays.length) : '-',
+            about: 'Dates on the selected calendar that are not business days.',
+          },
           {
             label: 'Weekend',
-            value: active ? active.weekendDays.map((d) => DAY_NAMES[d]!.slice(0, 3)).join(' & ') : '—',
-            about: 'Which weekdays this jurisdiction treats as non-business days — not every calendar uses Saturday/Sunday.',
+            value: active ? active.weekendDays.map((d) => DAY_NAMES[d]!.slice(0, 3)).join(' & ') : '-',
+            about:
+              'Which weekdays this jurisdiction treats as non-business days - not every calendar uses Saturday/Sunday.',
           },
-          { label: 'Exceptions', value: active ? String(active.holidays.filter((h) => h.isException).length) : '—', about: 'Holidays that move each year (like Eid) rather than falling on a fixed recurring date.' },
+          {
+            label: 'Exceptions',
+            value: active ? String(active.holidays.filter((h) => h.isException).length) : '-',
+            about: 'Holidays that move each year (like Eid) rather than falling on a fixed recurring date.',
+          },
         ]}
       />
+      )}
 
       <div className="mb-6 flex items-center gap-3">
         <label htmlFor="calendar-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -99,7 +141,80 @@ export function HolidayCalendar() {
           ))}
         </select>
         {isLoading && <span className="text-[12px] text-gray-400">Loading…</span>}
+        {canEdit && !creating && (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="ml-auto rounded-lg border border-navy-700 px-3 py-1.5 text-[11px] font-bold text-navy-700 hover:bg-navy-50"
+          >
+            New calendar
+          </button>
+        )}
       </div>
+
+      {creating && (
+        <section className="mb-6 rounded-2xl border border-navy-700 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">New calendar</h2>
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor="cal-country" className="mb-1 block text-[11px] text-gray-600">Country code</label>
+              <input
+                id="cal-country"
+                value={newCalendar.countryCode}
+                onChange={(e) => setNewCalendar({ ...newCalendar, countryCode: e.target.value.toUpperCase() })}
+                placeholder="NG"
+                className="w-24 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+              />
+            </div>
+            <div className="flex-1">
+              <label htmlFor="cal-name" className="mb-1 block text-[11px] text-gray-600">Name</label>
+              <input
+                id="cal-name"
+                value={newCalendar.name}
+                onChange={(e) => setNewCalendar({ ...newCalendar, name: e.target.value })}
+                placeholder="Nigeria"
+                className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+              />
+            </div>
+            <div>
+              <span className="mb-1 block text-[11px] text-gray-600">Weekend</span>
+              <div className="flex gap-2">
+                {DAY_NAMES.map((day, i) => (
+                  <label key={day} className="flex items-center gap-1 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={newCalendar.weekendDays.includes(i)}
+                      onChange={(e) =>
+                        setNewCalendar({
+                          ...newCalendar,
+                          weekendDays: e.target.checked
+                            ? [...newCalendar.weekendDays, i]
+                            : newCalendar.weekendDays.filter((d) => d !== i),
+                        })
+                      }
+                      className="accent-gold-500"
+                    />
+                    {day.slice(0, 3)}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateCalendar}
+              disabled={!newCalendar.countryCode.trim() || !newCalendar.name.trim()}
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            >
+              Create calendar
+            </button>
+          </div>
+        </section>
+      )}
 
       {active && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -107,8 +222,8 @@ export function HolidayCalendar() {
             <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               Public holidays
               <InfoButton label="Recurring vs exception">
-                Recurring holidays fall on the same pattern every year. Exceptions are dates added directly — a
-                declared holiday like Eid that moves each year rather than following a fixed rule.
+                Recurring holidays fall on the same pattern every year. Exceptions are dates added directly - a declared
+                holiday like Eid that moves each year rather than following a fixed rule.
               </InfoButton>
             </h2>
 
@@ -147,77 +262,69 @@ export function HolidayCalendar() {
                   Add holiday
                 </button>
                 <p className="w-full text-[11px] text-gray-500">
-                  Added dates are marked as exceptions — declared holidays such as Eid move each year and are not part
+                  Added dates are marked as exceptions - declared holidays such as Eid move each year and are not part
                   of the recurring pattern.
                 </p>
               </div>
             )}
 
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th
-                    scope="col"
-                    className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                  >
-                    Date
-                  </th>
-                  <th
-                    scope="col"
-                    className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                  >
-                    Holiday
-                  </th>
-                  <th
-                    scope="col"
-                    className="py-2 px-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                  >
-                    Weekday
-                  </th>
-                  <th
-                    scope="col"
-                    className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                  >
-                    Type
-                  </th>
-                  {canEdit && <th scope="col" className="py-2 px-3" />}
-                </tr>
-              </thead>
-              <tbody>
-                {active.holidays.map((h) => (
-                  <tr key={h.date} className="border-b border-gray-100">
-                    <td className="py-2 px-3 font-mono text-navy-900">{formatDate(h.date)}</td>
-                    <td className="py-2 px-3">{h.name}</td>
-                    <td className="py-2 px-3 text-gray-500">{DAY_NAMES[new Date(`${h.date}T00:00:00Z`).getUTCDay()]}</td>
-                    <td className="py-2 px-3 text-right">
-                      <StatusBadge
-                        status={h.isException ? 'Exception' : 'Recurring'}
-                        tone={h.isException ? 'warning' : 'neutral'}
-                      />
-                    </td>
-                    {canEdit && (
-                      <td className="py-2 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(h.date)}
-                          className="text-[11px] font-bold text-danger hover:underline"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ResultTable
+              rows={active.holidays}
+              rowKey={(h) => h.date}
+              emptyMessage="No holidays defined on this calendar."
+              columns={[
+                {
+                  key: 'date',
+                  header: 'Date',
+                  render: (h) => <span className="font-mono text-navy-900">{formatDate(h.date)}</span>,
+                },
+                { key: 'name', header: 'Holiday', render: (h) => h.name },
+                {
+                  key: 'weekday',
+                  header: 'Weekday',
+                  render: (h) => (
+                    <span className="text-gray-500">{DAY_NAMES[new Date(`${h.date}T00:00:00Z`).getUTCDay()]}</span>
+                  ),
+                },
+                {
+                  key: 'type',
+                  header: 'Type',
+                  align: 'right',
+                  render: (h) => (
+                    <StatusBadge
+                      status={h.isException ? 'Exception' : 'Recurring'}
+                      tone={h.isException ? 'warning' : 'neutral'}
+                    />
+                  ),
+                },
+                ...(canEdit
+                  ? [
+                      {
+                        key: 'actions',
+                        header: '',
+                        align: 'right' as const,
+                        render: (h: (typeof active.holidays)[number]) => (
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(h.date)}
+                            className="text-[11px] font-bold text-danger hover:underline"
+                          >
+                            Remove
+                          </button>
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
               Settlement probe
               <InfoButton label="Why this matters for buckets">
-                A flow due on a non-business day rolls forward to the next one. At the short end of a liquidity
-                ladder, that roll can shift a flow across a bucket boundary and change the reported gap.
+                A flow due on a non-business day rolls forward to the next one. At the short end of a liquidity ladder,
+                that roll can shift a flow across a bucket boundary and change the reported gap.
               </InfoButton>
             </h2>
             <label htmlFor="probe-date" className="mb-1 block text-[11px] text-gray-600">
@@ -231,10 +338,10 @@ export function HolidayCalendar() {
               className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
             />
             <p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-gray-400">It settles on</p>
-            <p className="text-[18px] font-bold text-navy-900">{settlement ? formatDate(settlement) : '—'}</p>
+            <p className="text-[18px] font-bold text-navy-900">{settlement ? formatDate(settlement) : '-'}</p>
             {shifted && (
               <p className="mt-2 rounded-lg bg-warning-bg px-3 py-2 text-[11px] leading-relaxed text-warning">
-                Shifted forward — the due date is a weekend or a public holiday in {active.name}.
+                Shifted forward - the due date is a weekend or a public holiday in {active.name}.
               </p>
             )}
             <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
@@ -243,6 +350,15 @@ export function HolidayCalendar() {
             </p>
           </section>
         </div>
+      )}
+
+      {!active && !isLoading && (
+        <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <p className="text-[13px] font-bold text-navy-900">No calendars defined</p>
+          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+            No business-day calendar has been set up yet for any jurisdiction.
+          </p>
+        </section>
       )}
     </>
   );

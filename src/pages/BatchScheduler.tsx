@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useHolidayCalendars } from '@/lib/hooks';
@@ -78,17 +79,17 @@ export function BatchScheduler() {
     <>
       <ModuleHeader
         title="Batch Scheduler"
-        description="Recurring run definitions — what runs, for whom, and how often."
+        description="Recurring run definitions - what runs, for whom, and how often."
         asOfDate={null}
         scope={affiliates.find((a) => a.code === affiliateCode)?.name ?? 'All affiliates'}
         metrics={[
           { label: 'Schedules', value: String(schedules.length), about: 'Recurring run definitions configured for this scope.' },
-          { label: 'Active', value: String(schedules.filter((s) => s.isActive).length), about: 'Schedules currently live — a paused schedule stops producing new occurrences without being deleted.' },
+          { label: 'Active', value: String(schedules.filter((s) => s.isActive).length), about: 'Schedules currently live - a paused schedule stops producing new occurrences without being deleted.' },
           {
             label: 'Occurrences overdue',
             value: String(totalOverdue),
             tone: totalOverdue > 0 ? 'warning' : 'success',
-            about: 'Reporting dates a schedule should have produced by now but has not — each is a separate date, not collapsed into the next run.',
+            about: 'Reporting dates a schedule should have produced by now but has not - each is a separate date, not collapsed into the next run.',
           },
         ]}
         actions={
@@ -109,20 +110,16 @@ export function BatchScheduler() {
       )}
 
       {completedRuns.length === 0 && (
-        <p className="mb-6 rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-[12px] text-gray-500">
+        <EmptyState cta={{ label: 'Go to Process Run', href: '/runs/new' }} className="mb-6">
           A schedule repeats an existing run. Compose and execute one on the Process Run screen first, then come back
           and put it on a cycle.
-        </p>
+        </EmptyState>
       )}
 
       {isLoading ? (
         <p className="text-[12px] text-gray-500">Loading schedules…</p>
       ) : schedules.length === 0 ? (
-        completedRuns.length > 0 && (
-          <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[12px] text-gray-500">
-            No schedules yet.
-          </p>
-        )
+        completedRuns.length > 0 && <EmptyState>No schedules yet.</EmptyState>
       ) : (
         <div className="space-y-4">
           {backlogs.map(({ schedule, backlog }) => {
@@ -191,7 +188,7 @@ export function BatchScheduler() {
                       Missed occurrences
                     </p>
                     <p className="mb-3 text-[11px] leading-relaxed text-gray-600">
-                      Each of these is a separate reporting date. They do not collapse into one — June&apos;s pack is
+                      Each of these is a separate reporting date. They do not collapse into one - June&apos;s pack is
                       not satisfied by August&apos;s.
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -364,7 +361,7 @@ function ScheduleForm({
               onChange={(e) => set({ holidayCalendarId: e.target.value || null })}
               className={INPUT}
             >
-              <option value="">None — calendar days</option>
+              <option value="">None - calendar days</option>
               {calendars.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -397,7 +394,7 @@ function ScheduleForm({
         <div className="mt-4 rounded-lg bg-gray-50 p-4">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Next occurrences</p>
           <p className="font-mono text-[12px] text-navy-900">
-            {preview.length > 0 ? preview.join(' · ') : 'None — check the start and end dates.'}
+            {preview.length > 0 ? preview.join(' · ') : 'None - check the start and end dates.'}
           </p>
         </div>
 
@@ -425,7 +422,7 @@ function ScheduleForm({
   );
 }
 
-// Unadjusted recurrence — no holiday roll — so the preview matches exactly what was entered; the list screen applies the calendar.
+// Unadjusted recurrence - no holiday roll - so the preview matches exactly what was entered; the list screen applies the calendar.
 function dueOccurrencesPreview(schedule: RunSchedule): string[] {
   const dates: string[] = [];
   let cursor = schedule.lastRunDate ?? schedule.startDate;

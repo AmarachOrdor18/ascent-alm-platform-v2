@@ -5,7 +5,7 @@
  * a user did: the generator wrote "Stable" / "Less Stable" / "Volatile",
  * plain-English labels rather than the platform's own enum (`Core` /
  * `Non-Core` / `Operational` / `Non-Operational` / `N/A`), and the CSVs
- * looked fine to read. `importPositions` enforces the schema on upload —
+ * looked fine to read. `importPositions` enforces the schema on upload -
  * "\"Stable\" is not one of: Core, Non-Core, Operational, Non-Operational,
  * N/A" is the exact message it produced. Reading every generated file
  * through that same importer here means a schema drift fails in CI, not in
@@ -54,7 +54,7 @@ describe('affiliate onboarding demo data (33 affiliates)', () => {
         expect(result.rows.length).toBeGreaterThanOrEqual(30);
       });
 
-      it('position book balances — assets equal liabilities plus capital', () => {
+      it('position book balances - assets equal liabilities plus capital', () => {
         const text = readFileSync(join(ROOT, folder, `${code}_position_book_2026-07.csv`), 'utf-8');
         const { rows } = importPositions(text, {
           affiliateCode: code,
@@ -65,7 +65,7 @@ describe('affiliate onboarding demo data (33 affiliates)', () => {
         const sum = (cat: string) => rows.filter((r) => r.category === cat).reduce((s, r) => s + r.amount, 0);
         const assets = sum('Asset');
         const diff = assets - sum('Liability') - sum('Capital');
-        // Tolerance scales with book size — a few affiliates run into the
+        // Tolerance scales with book size - a few affiliates run into the
         // millions, where float accumulation alone can move the last cent.
         expect(Math.abs(diff)).toBeLessThan(Math.max(2, assets * 1e-9));
       });
@@ -75,7 +75,7 @@ describe('affiliate onboarding demo data (33 affiliates)', () => {
         const parsed = importLedger(text, AS_OF, 'USD');
         expect(parsed.errors).toEqual([]);
 
-        // drCr is additive metadata csvImport does not parse — it exists so
+        // drCr is additive metadata csvImport does not parse - it exists so
         // the file reads as a trial balance on its own, without changing
         // what reconciliation compares against. Read it directly here.
         const rows = text

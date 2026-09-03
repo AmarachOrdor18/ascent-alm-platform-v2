@@ -28,6 +28,14 @@ export interface RuleEditorProps<T extends RuleMeta> {
   extraMetrics?: HeaderMetric[];
   /** Explains what this rule governs, shown above the list. */
   guidance?: ReactNode;
+  /**
+   * Permission required to edit. Defaults to the ordinary ALM rule-configuration permission
+   * ('rules.edit', held by Risk Analyst/Treasury/Control Tester). A rule type that translates
+   * source data into risk classification (e.g. Product Characteristics' HQLA/LCR/ASF/RSF mapping)
+   * should instead pass 'data.configure' - the same admin-only gate Dimensions and Counterparties
+   * already use - since editing it changes how source data is interpreted, not an ALM assumption.
+   */
+  editPermission?: string;
 }
 
 export function RuleEditor<T extends RuleMeta>({
@@ -45,9 +53,10 @@ export function RuleEditor<T extends RuleMeta>({
   checkDependencies,
   extraMetrics,
   guidance,
+  editPermission = 'rules.edit',
 }: RuleEditorProps<T>) {
   const { hasPermission, user } = useAuth();
-  const canEdit = hasPermission('rules.edit');
+  const canEdit = hasPermission(editPermission);
 
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -254,7 +263,7 @@ export function RuleEditor<T extends RuleMeta>({
             <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
               <p className="text-[13px] font-bold text-navy-900">No {noun} selected</p>
               <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
-                Choose one from the list to view or edit it, or create a new one. Every rule here behaves the same way —
+                Choose one from the list to view or edit it, or create a new one. Every rule here behaves the same way -
                 search, edit, copy, delete, check dependencies.
               </p>
             </div>
@@ -372,7 +381,7 @@ export function RuleEditor<T extends RuleMeta>({
                   )}
                 >
                   {dependencies.length === 0 ? (
-                    <>Nothing references this {noun} — it is safe to delete.</>
+                    <>Nothing references this {noun} - it is safe to delete.</>
                   ) : (
                     <>
                       <span className="font-bold">

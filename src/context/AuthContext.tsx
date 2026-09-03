@@ -9,7 +9,7 @@ export const ROLES: Record<RoleCode, Role> = {
   ADMIN: {
     code: 'ADMIN',
     name: 'Administrator',
-    description: 'Runs the platform — users, permissions, dimensions, connectors, configuration, audit trail.',
+    description: 'Runs the platform - users, permissions, dimensions, connectors, configuration, audit trail.',
     permissions: [
       'dashboard.view',
       'risk.view',
@@ -91,7 +91,7 @@ export const ROLES: Record<RoleCode, Role> = {
     code: 'AFFILIATE_ADMIN',
     name: 'Affiliate Administrator',
     description:
-      'Local admin for one affiliate — provisions and manages that affiliate’s own users, runs its processes and sets its reporting thresholds. Never Group-wide, never able to grant Group Administrator access.',
+      'Local admin for one affiliate - provisions and manages that affiliate’s own users, runs its processes and sets its reporting thresholds. Never Group-wide, never able to grant Group Administrator access.',
     permissions: [
       'dashboard.view',
       'risk.view',

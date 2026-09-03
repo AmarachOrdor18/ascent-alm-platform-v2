@@ -4,6 +4,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useScope } from '@/context/ScopeContext';
 import { useRuns } from '@/lib/runHooks';
 import { evaluateKris, useKriSeries } from '@/lib/limitHooks';
@@ -51,7 +52,7 @@ export function Kri() {
       align: 'right',
       render: (k) =>
         k.changeOverWindow === null ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ) : (
           <span className={`font-mono ${k.trend === 'Deteriorating' ? 'text-danger' : k.trend === 'Improving' ? 'text-success' : ''}`}>
             {k.changeOverWindow > 0 ? '+' : ''}
@@ -65,7 +66,7 @@ export function Kri() {
       align: 'right',
       render: (k) =>
         k.slopePerPeriod === null ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ) : (
           <span className="font-mono text-[11px]">
             {k.slopePerPeriod > 0 ? '+' : ''}
@@ -79,7 +80,7 @@ export function Kri() {
       align: 'right',
       render: (k) =>
         k.projectedValue === null ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ) : (
           <span className="font-mono text-[11px] text-gray-600">{formatMetric(k.projectedValue, k.metricKey)}</span>
         ),
@@ -93,11 +94,11 @@ export function Kri() {
     <>
       <ModuleHeader
         title="KRI Dashboard"
-        description="Direction of travel across your run history — the slope, not just today's level."
+        description="Direction of travel across your run history - the slope, not just today's level."
         asOfDate={null}
         scope={affiliateCode}
         metrics={[
-          { label: 'Indicators', value: String(evaluations.length), about: "Key Risk Indicators currently active — each one tracks a metric's trend across successive runs, not just its latest level." },
+          { label: 'Indicators', value: String(evaluations.length), about: "Key Risk Indicators currently active - each one tracks a metric's trend across successive runs, not just its latest level." },
           {
             label: 'Deteriorating',
             value: String(deteriorating.length),
@@ -120,21 +121,18 @@ export function Kri() {
       {isLoading ? (
         <p className="text-[12px] text-gray-500">Loading run history…</p>
       ) : completed === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <p className="text-[13px] font-bold text-navy-900">No completed runs yet</p>
-            <InfoButton label="Why this matters">
-              A KRI is a trend, so it needs the same metric at several dates. Execute runs at successive as-of dates
-              and the series builds itself — there is no separate KRI data to maintain.
-            </InfoButton>
-          </div>
-          <Link
-            href="/runs/new"
-            className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
-          >
-            Go to Process Run
-          </Link>
-        </div>
+        <EmptyState
+          title={
+            <>
+              No completed runs yet{' '}
+              <InfoButton label="Why this matters">
+                A KRI is a trend, so it needs the same metric at several dates. Execute runs at successive as-of dates
+                and the series builds itself - there is no separate KRI data to maintain.
+              </InfoButton>
+            </>
+          }
+          cta={{ label: 'Go to Process Run', href: '/runs/new' }}
+        />
       ) : (
         <>
           {observationCount < 3 && (
@@ -154,7 +152,7 @@ export function Kri() {
               <ul className="space-y-1 text-[11px] text-gray-700">
                 {deteriorating.map((k) => (
                   <li key={k.definitionId}>
-                    <span className="font-bold text-navy-900">{k.label}</span> — {k.narrative}
+                    <span className="font-bold text-navy-900">{k.label}</span> - {k.narrative}
                   </li>
                 ))}
               </ul>
@@ -167,7 +165,7 @@ export function Kri() {
               <InfoButton label="Methodology">
                 The slope is a least-squares fit over the window, not the difference between the first and last
                 observation, so one anomalous month does not read as a trend. &ldquo;If it persists&rdquo; projects
-                the current slope forward by another window — an extrapolation, not a forecast.
+                the current slope forward by another window - an extrapolation, not a forecast.
               </InfoButton>
             </div>
             <ResultTable

@@ -58,7 +58,7 @@ export function TransferPricing() {
         <span className="font-mono">
           {ftp && ftp.totalMarginContribution !== 0
             ? formatPct((r.marginContribution / ftp.totalMarginContribution) * 100, 1)
-            : '—'}
+            : '-'}
         </span>
       ),
     },
@@ -81,7 +81,7 @@ export function TransferPricing() {
       align: 'right',
       render: (l) =>
         l.adjustments.length === 0 ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ) : (
           <span className="font-mono" title={l.adjustments.map((a) => `${a.type}: ${a.bps}bp`).join('\n')}>
             {formatBps(l.totalAdjustmentBps)}
@@ -119,22 +119,22 @@ export function TransferPricing() {
         metrics={[
           {
             label: 'Total FTP margin',
-            value: ftp ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(ftp.totalMarginContribution) : '—',
+            value: ftp ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(ftp.totalMarginContribution) : '-',
             tone: (ftp?.totalMarginContribution ?? 0) < 0 ? 'danger' : 'success',
             about: 'Net margin earned across the whole book once every priced position has been charged or credited its internal transfer rate.',
           },
-          { label: 'Priced positions', value: ftp ? String(ftp.lines.length - unpricedCount) : '—', about: 'Positions that matched a yield-curve point and could be charged a transfer rate.' },
+          { label: 'Priced positions', value: ftp ? String(ftp.lines.length - unpricedCount) : '-', about: 'Positions that matched a yield-curve point and could be charged a transfer rate.' },
           {
             label: 'Unpriced',
             value: String(unpricedCount),
             tone: unpricedCount > 0 ? 'warning' : 'success',
-            about: 'Positions with no matching curve point or external rate — reported here rather than silently priced at zero.',
+            about: 'Positions with no matching curve point or external rate - reported here rather than silently priced at zero.',
           },
           {
             label: 'Balance unpriced',
-            value: ftp ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(ftp.unpriced) : '—',
+            value: ftp ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(ftp.unpriced) : '-',
             tone: (ftp?.unpriced ?? 0) > 0 ? 'warning' : 'success',
-            about: 'Total balance sitting in unpriced positions — a data or configuration gap worth closing, not a number quietly left out of the total.',
+            about: 'Total balance sitting in unpriced positions - a data or configuration gap worth closing, not a number quietly left out of the total.',
           },
         ]}
         actions={
@@ -158,7 +158,7 @@ export function TransferPricing() {
               <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Margin by business unit
                 <InfoButton label="How margin is attributed">
-                  Each position's margin is attributed to its own organisational unit — a negative Treasury figure is
+                  Each position's margin is attributed to its own organisational unit - a negative Treasury figure is
                   expected, since Treasury funds the balance sheet at cost rather than earning a lending spread.
                 </InfoButton>
               </h2>

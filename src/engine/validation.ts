@@ -20,6 +20,8 @@ export interface ValidationRule {
 }
 
 export interface ValidationException {
+  /** Stable within one validatePositions() call - lets a specific finding be referenced, not just counted. */
+  id: string;
   ruleId: string;
   ruleName: string;
   checkType: CheckType;
@@ -117,13 +119,23 @@ export function validatePositions(
   positions: Position[],
   ctx: ValidationContext,
   rules: ValidationRule[] = DEFAULT_VALIDATION_RULES,
+  /**
+   * What the balance-sheet identity (V-006) is checked against - defaults to `positions` itself, but a
+   * caller staging one contributor's slice of a multi-contributor book (Loans, Deposits, Treasury each
+   * submit independently - see PositionContributor) should pass the full assembled book instead, or every
+   * single-contributor file will always look unbalanced on its own.
+   */
+  balancePositions: Position[] = positions,
 ): ValidationResult {
   const active = rules.filter((r) => r.isActive);
   const exceptions: ValidationException[] = [];
   const affected = new Set<string>();
 
+  let sequence = 0;
   const raise = (rule: ValidationRule, positionId: string | null, description: string) => {
+    sequence += 1;
     exceptions.push({
+      id: `${rule.id}-${positionId ?? 'BATCH'}-${sequence}`,
       ruleId: rule.id,
       ruleName: rule.name,
       checkType: rule.checkType,
@@ -191,12 +203,13 @@ export function validatePositions(
     }
   }
 
-  // Balance-sheet integrity is a batch-level check, not a row-level one.
+  // Balance-sheet integrity is a batch-level check, not a row-level one - and "the batch" is
+  // balancePositions (the full assembled book), not necessarily the single slice being row-checked above.
   const balance = ruleOf('V-006');
-  if (balance && positions.length > 0) {
-    const assets = positions.filter((p) => p.category === 'Asset').reduce((s, p) => s + p.amount, 0);
-    const liabilities = positions.filter((p) => p.category === 'Liability').reduce((s, p) => s + p.amount, 0);
-    const capital = positions.filter((p) => p.category === 'Capital').reduce((s, p) => s + p.amount, 0);
+  if (balance && balancePositions.length > 0) {
+    const assets = balancePositions.filter((p) => p.category === 'Asset').reduce((s, p) => s + p.amount, 0);
+    const liabilities = balancePositions.filter((p) => p.category === 'Liability').reduce((s, p) => s + p.amount, 0);
+    const capital = balancePositions.filter((p) => p.category === 'Capital').reduce((s, p) => s + p.amount, 0);
     const difference = assets - (liabilities + capital);
     const tolerance = (assets * (ctx.balanceTolerancePercent ?? 0.01)) / 100;
     if (Math.abs(difference) > tolerance) {
@@ -204,7 +217,7 @@ export function validatePositions(
         balance,
         null,
         `Assets (${assets.toLocaleString()}) do not equal liabilities plus capital ` +
-          `(${(liabilities + capital).toLocaleString()}) — difference ${difference.toLocaleString()}`,
+          `(${(liabilities + capital).toLocaleString()}) - difference ${difference.toLocaleString()}`,
       );
     }
   }
@@ -217,6 +230,6 @@ export function validatePositions(
     methodology:
       'Configurable validation rules run as a gate before commit, modelled on Oracle Cash Flow Edits. Rules ' +
       'marked as blocking prevent the batch being committed, so data that fails integrity cannot reach a ' +
-      'calculation or a report. Rules are data, not code — a bank can add its own without a release.',
+      'calculation or a report. Rules are data, not code - a bank can add its own without a release.',
   };
 }

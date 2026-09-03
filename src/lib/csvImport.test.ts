@@ -186,7 +186,7 @@ describe('what the Ghana book is built to demonstrate', () => {
       ...rows.find((p) => p.category === 'Liability')!,
       id: 'GH-SUSPENSE-1',
       accountClass: 'Suspense' as const,
-      productClass: 'Customer Deposits — unapplied credits suspense',
+      productClass: 'Customer Deposits - unapplied credits suspense',
       amount: 4_000,
       counterpartyId: null,
     };
@@ -207,7 +207,7 @@ describe('what the Ghana book is built to demonstrate', () => {
       ...rows.find((p) => p.category === 'Liability')!,
       id: 'GH-SUSPENSE-2',
       accountClass: 'Suspense' as const,
-      productClass: 'Customer Deposits — suspense',
+      productClass: 'Customer Deposits - suspense',
       amount: 9_000,
       counterpartyId: null,
     };
@@ -240,7 +240,7 @@ describe('Ghana GL trial balance', () => {
     expect(result.suggestedPlugs).toHaveLength(1);
     expect(result.suggestedPlugs[0]!.glAccountCode).toBe('GH-A-400');
     // The ledger is 420 lighter than the loan book, so the instrument side
-    // carries +420 of variance and the plug posted against it is -420 —
+    // carries +420 of variance and the plug posted against it is -420 -
     // an adjustment to the instrument data to agree with the ledger, which
     // is the direction Oracle's reconciliation works in.
     expect(result.lines.find((l) => l.glAccountCode === 'GH-A-400')!.variance).toBeCloseTo(420, 6);

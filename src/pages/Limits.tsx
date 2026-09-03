@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'wouter';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
@@ -8,6 +8,7 @@ import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps } from '@/lib/resultHooks';
+import { useRuns, useRunResults } from '@/lib/runHooks';
 import {
   evaluateAll,
   useBreachNotes,
@@ -17,8 +18,9 @@ import {
   useTemporaryLimits,
   type EvaluatedLimit,
 } from '@/lib/limitHooks';
-import { expiringSoon } from '@/engine/limits';
+import { detectTransition, expiringSoon } from '@/engine/limits';
 import { formatMetric } from '@/lib/metrics';
+import { remediation, newId } from '@/lib/governanceHooks';
 import type { LimitConfig } from '@/engine/limits';
 
 const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -36,15 +38,106 @@ export function Limits() {
   const { data: notes = [] } = useBreachNotes();
   const saveConfig = useSaveLimitConfig();
   const saveNote = useSaveBreachNote();
+  const saveIssue = remediation.useSave();
+  const { data: openIssues = [] } = remediation.useList(affiliateCode === 'GROUP' ? undefined : affiliateCode);
+  const [, navigate] = useLocation();
 
   const canEdit = hasPermission('limits.manage') || hasPermission('run.execute');
   const [editing, setEditing] = useState<LimitConfig | null>(null);
   const [noteFor, setNoteFor] = useState<EvaluatedLimit | null>(null);
 
+  const handleRaiseIssue = async (e: EvaluatedLimit) => {
+    if (!user) return;
+    const now = new Date().toISOString();
+    await saveIssue.mutateAsync({
+      id: newId('CR'),
+      title: `${e.label} breach - ${e.config.affiliateCode ?? 'Group'}`,
+      description: `Auto-raised from a ${e.status} breach on ${e.label}.`,
+      source: 'Limits & Breaches',
+      linkedLimitId: e.limitId,
+      linkedBatchId: null,
+      severity: e.status === 'Red' ? 'High' : 'Medium',
+      stage: 'Identified',
+      owner: '',
+      affiliateCode: e.config.affiliateCode,
+      raisedBy: user.name,
+      raisedAt: now,
+      dueDate: null,
+      closedAt: null,
+      closureApprovedBy: null,
+      updates: [{ at: now, by: user.name, stage: 'Identified', note: 'Raised from a limit breach.' }],
+    });
+    navigate('/controls/remediation');
+  };
+
   const evaluations = useMemo(
     () => (run ? evaluateAll(configs, results, run.asOfDate, temporary) : []),
     [configs, results, run, temporary],
   );
+
+  // Escalation, automated: detectTransition() previously computed the same new-breach/escalation
+  // logic below but nothing ever called it - a breach only got tracked if a person happened to
+  // notice the colour change and click "Raise a remediation issue" themselves. Comparing against
+  // the most recent prior Completed run for this scope lets a genuinely new breach raise its own
+  // issue the moment this screen is opened, instead of waiting on someone to notice.
+  const runsQuery = useRuns(affiliateCode);
+  const priorRun = useMemo(() => {
+    if (!run) return null;
+    const allRuns = runsQuery.data ?? [];
+    return (
+      allRuns
+        .filter((r) => r.status === 'Completed' && r.id !== run.id && r.asOfDate < run.asOfDate)
+        .sort((a, b) => b.asOfDate.localeCompare(a.asOfDate))[0] ?? null
+    );
+  }, [runsQuery.data, run]);
+  const { data: priorResults = [] } = useRunResults(priorRun?.id ?? null);
+  const priorEvaluations = useMemo(
+    () => (priorRun ? evaluateAll(configs, priorResults, priorRun.asOfDate, temporary) : []),
+    [configs, priorResults, priorRun, temporary],
+  );
+  const transitionFor = useMemo(() => {
+    const priorByMetric = new Map(priorEvaluations.map((e) => [e.metricKey, e]));
+    const map = new Map<string, ReturnType<typeof detectTransition>>();
+    for (const e of evaluations) map.set(e.limitId, detectTransition(priorByMetric.get(e.metricKey) ?? null, e));
+    return map;
+  }, [evaluations, priorEvaluations]);
+
+  const hasOpenIssue = (limitId: string) =>
+    openIssues.some((i) => i.linkedLimitId === limitId && i.stage !== 'Closed');
+
+  const autoRaised = useRef(new Set<string>());
+  useEffect(() => {
+    // Wait for run history to actually load - otherwise an empty allRuns mid-fetch would look
+    // identical to "no prior run exists" and could raise a spurious issue before we really know.
+    if (!runsQuery.isSuccess) return;
+    for (const e of evaluations) {
+      const transition = transitionFor.get(e.limitId);
+      if (!transition?.isNewBreach || hasOpenIssue(e.limitId) || autoRaised.current.has(e.limitId)) continue;
+      autoRaised.current.add(e.limitId);
+      const now = new Date().toISOString();
+      void saveIssue.mutateAsync({
+        id: newId('CR'),
+        title: `${e.label} breach - ${e.config.affiliateCode ?? 'Group'}`,
+        description: `Automatically escalated: ${e.label} moved from ${transition.from} to ${transition.to}.`,
+        source: 'Limits & Breaches (auto-escalated)',
+        linkedLimitId: e.limitId,
+        linkedBatchId: null,
+        severity: e.status === 'Red' ? 'High' : 'Medium',
+        stage: 'Identified',
+        owner: '',
+        affiliateCode: e.config.affiliateCode,
+        raisedBy: 'System (auto-escalation)',
+        raisedAt: now,
+        dueDate: null,
+        closedAt: null,
+        closureApprovedBy: null,
+        updates: [
+          { at: now, by: 'System (auto-escalation)', stage: 'Identified', note: 'Auto-raised on a new breach transition.' },
+        ],
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per evaluation set, not on every openIssues refetch
+  }, [evaluations, transitionFor, runsQuery.isSuccess]);
 
   const red = evaluations.filter((e) => e.status === 'Red');
   const amber = evaluations.filter((e) => e.status === 'Amber');
@@ -82,7 +175,7 @@ export function Limits() {
       align: 'right',
       render: (e) =>
         e.headroom === null ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ) : (
           <span className={`font-mono ${e.headroom < 0 ? 'text-danger' : ''}`}>
             {e.headroom > 0 ? '+' : ''}
@@ -96,7 +189,7 @@ export function Limits() {
       align: 'right',
       render: (e) =>
         e.utilisationPercent === null ? (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300">-</span>
         ) : (
           <div className="flex items-center justify-end gap-2">
             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100">
@@ -128,18 +221,18 @@ export function Limits() {
     <>
       <ModuleHeader
         title="Limits & Breaches"
-        description="Risk appetite evaluated against the selected run — not a separate set of numbers."
+        description="Risk appetite evaluated against the selected run - not a separate set of numbers."
         asOfDate={run?.asOfDate ?? null}
         scope={affiliateCode}
         metrics={[
           { label: 'Limits monitored', value: String(evaluations.length), about: 'Limit configurations active for this scope, evaluated automatically against the selected run.' },
-          { label: 'In breach', value: String(red.length), tone: red.length > 0 ? 'danger' : 'success', about: 'Limits currently graded Red — inside or beyond the most severe internal threshold.' },
-          { label: 'On watch', value: String(amber.length), tone: amber.length > 0 ? 'warning' : 'success', about: 'Limits currently graded Amber — inside appetite but past the early-warning threshold.' },
+          { label: 'In breach', value: String(red.length), tone: red.length > 0 ? 'danger' : 'success', about: 'Limits currently graded Red - inside or beyond the most severe internal threshold.' },
+          { label: 'On watch', value: String(amber.length), tone: amber.length > 0 ? 'warning' : 'success', about: 'Limits currently graded Amber - inside appetite but past the early-warning threshold.' },
           {
             label: 'Below regulatory minimum',
             value: String(regBreaches.length),
             tone: regBreaches.length > 0 ? 'danger' : 'success',
-            about: "Limits breaching the regulator's own floor, not just an internal one — the most serious category, distinct from a Red internal grading.",
+            about: "Limits breaching the regulator's own floor, not just an internal one - the most serious category, distinct from a Red internal grading.",
           },
         ]}
         actions={
@@ -186,7 +279,7 @@ export function Limits() {
               {noData.length} limit{noData.length === 1 ? '' : 's'} could not be evaluated:
             </span>{' '}
             {noData.map((e) => e.label).join(', ')}. The selected run did not compute the underlying element. These
-            report as <em>No data</em> rather than Green — an unmeasured limit is not a satisfied one.
+            report as <em>No data</em> rather than Green - an unmeasured limit is not a satisfied one.
           </p>
         )}
 
@@ -209,14 +302,17 @@ export function Limits() {
             rows={evaluations}
             columns={columns}
             rowKey={(e) => e.limitId}
+            rowTone={(e) => (e.status === 'Red' ? 'danger' : e.status === 'Amber' ? 'warning' : null)}
             emptyMessage="No limits configured for this scope."
             renderDetail={(e) => (
               <LimitDetail
                 evaluation={e}
                 notes={notes.filter((n) => n.breachId === e.limitId)}
                 canEdit={canEdit}
+                alreadyEscalated={hasOpenIssue(e.limitId)}
                 onEdit={() => setEditing(e.config)}
                 onAddNote={() => setNoteFor(e)}
+                onRaiseIssue={() => void handleRaiseIssue(e)}
               />
             )}
           />
@@ -260,15 +356,20 @@ function LimitDetail({
   evaluation,
   notes,
   canEdit,
+  alreadyEscalated,
   onEdit,
   onAddNote,
+  onRaiseIssue,
 }: {
   evaluation: EvaluatedLimit;
   notes: Array<{ id: string; cause: string; resolutionAction: string; authorName: string; recordedAt: string; targetResolutionDate: string | null }>;
   canEdit: boolean;
+  alreadyEscalated: boolean;
   onEdit: () => void;
   onAddNote: () => void;
+  onRaiseIssue: () => void;
 }) {
+  const isBreached = evaluation.status === 'Red' || evaluation.status === 'Amber';
   const c = evaluation.config;
   return (
     <div className="space-y-3 text-[11px]">
@@ -278,7 +379,7 @@ function LimitDetail({
         <D label="Green" value={formatMetric(c.greenThreshold, c.metricKey)} mono />
         <D label="Regulatory floor" value={c.regulatoryMinimum === null ? 'none' : formatMetric(c.regulatoryMinimum, c.metricKey)} mono />
         <D label="Scope" value={c.affiliateCode ?? 'Group-wide'} />
-        <D label="Severity" value={evaluation.severity ?? '—'} />
+        <D label="Severity" value={evaluation.severity ?? '-'} />
         <D label="Last updated by" value={c.updatedBy} />
         <D label="When" value={new Date(c.updatedAt).toLocaleString()} />
       </dl>
@@ -303,7 +404,7 @@ function LimitDetail({
                 </p>
                 <p className="text-gray-700">
                   <span className="font-bold">Action:</span> {n.resolutionAction}
-                  {n.targetResolutionDate && <span className="text-gray-500"> — target {n.targetResolutionDate}</span>}
+                  {n.targetResolutionDate && <span className="text-gray-500"> - target {n.targetResolutionDate}</span>}
                 </p>
                 <p className="text-gray-400">
                   {n.authorName} · {new Date(n.recordedAt).toLocaleString()}
@@ -331,6 +432,21 @@ function LimitDetail({
         >
           Record a breach note
         </button>
+        {isBreached && (
+          <button
+            type="button"
+            onClick={onRaiseIssue}
+            disabled={!canEdit || alreadyEscalated}
+            className="rounded border border-danger/30 px-3 py-1.5 font-bold text-danger hover:border-danger disabled:opacity-40"
+            title={
+              alreadyEscalated
+                ? 'An open remediation issue already tracks this breach'
+                : 'Creates a tracked remediation issue linked to this breach'
+            }
+          >
+            {alreadyEscalated ? 'Already escalated' : 'Raise a remediation issue'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -384,7 +500,7 @@ function LimitEditor({
 
         {!ordered && (
           <p className="mt-3 text-[11px] font-bold text-danger">
-            Thresholds are out of order — as written, a worse figure would grade better than a good one.
+            Thresholds are out of order - as written, a worse figure would grade better than a good one.
           </p>
         )}
 
@@ -422,7 +538,7 @@ function NoteEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="mb-1 text-[14px] font-bold text-navy-900">Breach note — {evaluation.label}</h2>
+        <h2 className="mb-1 text-[14px] font-bold text-navy-900">Breach note - {evaluation.label}</h2>
         <p className="mb-4 text-[11px] text-gray-500">
           Currently {formatMetric(evaluation.value, evaluation.metricKey)} against a red threshold of{' '}
           {formatMetric(evaluation.appliedRedThreshold, evaluation.metricKey)}.

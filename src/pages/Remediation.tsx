@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ChevronRightIcon } from '@/components/icons/Icons';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates } from '@/lib/hooks';
@@ -28,7 +30,7 @@ const STAGE_TONE: Record<RemediationStage, 'success' | 'warning' | 'danger' | 'n
 
 export function Remediation() {
   const { user, hasPermission } = useAuth();
-  // Nobody at all was gated on a role before — any signed-in user, including a read-only viewer, could
+  // Nobody at all was gated on a role before - any signed-in user, including a read-only viewer, could
   // raise, advance and even close a control issue. Control Tester and Risk Analyst are the roles actually
   // meant to run this workflow, so gate writes on the permissions those two (and Administrator) hold.
   const canEdit = hasPermission('data.configure') || hasPermission('risk.configure');
@@ -97,6 +99,7 @@ export function Remediation() {
       description: draft.description,
       source: draft.source || 'Manual entry',
       linkedLimitId: null,
+      linkedBatchId: null,
       severity: draft.severity,
       stage: 'Identified',
       owner: draft.owner,
@@ -150,7 +153,7 @@ export function Remediation() {
         metrics={[
           { label: 'Open', value: String(openCount), tone: openCount > 0 ? 'warning' : 'success', about: 'Issues anywhere in the lifecycle short of Closed.' },
           { label: 'Overdue', value: String(overdueCount), tone: overdueCount > 0 ? 'danger' : 'neutral', about: 'Open issues past their due date.' },
-          { label: 'Closed', value: String(closedCount), tone: 'success', about: 'Issues verified and closed — closure requires someone other than the owner to approve it.' },
+          { label: 'Closed', value: String(closedCount), tone: 'success', about: 'Issues verified and closed - closure requires someone other than the owner to approve it.' },
           { label: 'Total tracked', value: String(issues.length), about: 'Every control issue ever raised, at any stage.' },
         ]}
         actions={
@@ -183,6 +186,14 @@ export function Remediation() {
                 <p className="mt-1 text-[11px] font-medium text-gray-400">
                   {selected.id}. {selected.source}. Owned by {selected.owner}
                 </p>
+                {selected.linkedBatchId && (
+                  <Link
+                    href="/data/operations/vintages"
+                    className="mt-1 inline-block text-[11px] font-bold text-navy-700 hover:underline"
+                  >
+                    View batch {selected.linkedBatchId} in Load History →
+                  </Link>
+                )}
               </div>
               {nextStage && (
                 <button
@@ -258,6 +269,7 @@ export function Remediation() {
               <table className="table-datagrid">
                 <thead>
                   <tr>
+                    <th className="w-8" />
                     <th>Issue</th>
                     <th>Source</th>
                     <th>Owner</th>
@@ -268,6 +280,16 @@ export function Remediation() {
                 <tbody>
                   {paged.map((c) => (
                     <tr key={c.id} onClick={() => setSelectedId(c.id)} className={c.id === effectiveId ? 'is-selected cursor-pointer' : 'cursor-pointer'}>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setSelectedId(c.id); }}
+                          aria-label={`View ${c.title}`}
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-navy-700 hover:text-navy-700"
+                        >
+                          <ChevronRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </td>
                       <td>
                         <p className="font-bold text-navy-900">{c.title}</p>
                         <p className="mt-0.5 text-[11px] font-medium text-gray-400">{c.id}</p>

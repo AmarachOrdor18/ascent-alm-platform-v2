@@ -178,7 +178,7 @@ export function computeLoanToDeposit(positions: Position[], ctx: LiquidityContex
     methodology:
       'Total customer loans over total customer deposits. Interbank placements and borrowings are excluded from ' +
       'both, being wholesale rather than customer flows, and so are internal, suspense, nostro and vostro ' +
-      'accounts — they are not customer money and counting them would inflate the ratio.',
+      'accounts - they are not customer money and counting them would inflate the ratio.',
   };
 }
 
@@ -297,7 +297,7 @@ export function computeConcentration(positions: Position[], ctx: LiquidityContex
     largestSharePercent: byCounterparty[0]?.sharePercent ?? null,
     topFiveSharePercent: topN(5),
     topTenSharePercent: topN(10),
-    // Conventional 0-10,000 scale (sum of squared percentage-point shares) — dividing by 100 before squaring would put this on a 0-1 scale instead.
+    // Conventional 0-10,000 scale (sum of squared percentage-point shares) - dividing by 100 before squaring would put this on a 0-1 scale instead.
     herfindahlIndex:
       byCounterparty.length === 0 ? null : byCounterparty.reduce((s, e) => s + e.sharePercent ** 2, 0),
     unattributedAmount,

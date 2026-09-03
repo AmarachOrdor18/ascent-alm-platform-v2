@@ -70,7 +70,7 @@ export function BehaviouralAnalysis() {
       header: 'Core %',
       align: 'right',
       render: (g) => (
-        <span className="font-mono font-bold">{g.balance > 0 ? formatPct((g.core / g.balance) * 100) : '—'}</span>
+        <span className="font-mono font-bold">{g.balance > 0 ? formatPct((g.core / g.balance) * 100) : '-'}</span>
       ),
     },
   ];
@@ -92,14 +92,14 @@ export function BehaviouralAnalysis() {
           },
           {
             label: 'Total deposits modelled',
-            value: runoff ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(runoff.totalDeposits) : '—',
-            about: 'How much of the deposit base this behavioural analysis actually covers — positions with a matching behavioural pattern.',
+            value: runoff ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(runoff.totalDeposits) : '-',
+            about: 'How much of the deposit base this behavioural analysis actually covers - positions with a matching behavioural pattern.',
           },
           {
             label: 'Unmodelled',
-            value: runoff ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(runoff.unmodelled) : '—',
+            value: runoff ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(runoff.unmodelled) : '-',
             tone: (runoff?.unmodelled ?? 0) > 0 ? 'warning' : 'success',
-            about: 'Deposits carrying a behavioural tag with no matching pattern — reported here rather than silently defaulted into core or volatile.',
+            about: 'Deposits carrying a behavioural tag with no matching pattern - reported here rather than silently defaulted into core or volatile.',
           },
           {
             label: 'Pattern rule',
@@ -190,7 +190,7 @@ export function BehaviouralAnalysis() {
                 Activity adjusts the split
                 <InfoButton label="How turnover changes the core share">
                   Account movement is read from turnover and used to shift the core share. A dormant account is
-                  stickier than an active one — it is not being used, so it is not about to leave — and the uplift
+                  stickier than an active one - it is not being used, so it is not about to leave - and the uplift
                   below is applied on top of the pattern&apos;s base split.
                 </InfoButton>
               </h2>
@@ -203,7 +203,7 @@ export function BehaviouralAnalysis() {
                       {(uplift * 100).toFixed(0)}pp
                     </dd>
                     <dd className="text-[10px] text-gray-500">
-                      {level === 'Unknown' ? 'no turnover loaded — no adjustment' : 'to the core share'}
+                      {level === 'Unknown' ? 'no turnover loaded - no adjustment' : 'to the core share'}
                     </dd>
                   </div>
                 ))}
@@ -214,7 +214,7 @@ export function BehaviouralAnalysis() {
               <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                 Patterns this run applied
                 <InfoButton label="What a pattern is">
-                  Each pattern specifies the core/volatile split by tenor tier for a set of behavioural tags — for
+                  Each pattern specifies the core/volatile split by tenor tier for a set of behavioural tags - for
                   example, more core at 30 days than at a year, since deposits get less sticky the further out you
                   look.
                 </InfoButton>
@@ -244,7 +244,7 @@ export function BehaviouralAnalysis() {
                 </div>
               ) : (
                 <p className="text-[11px] leading-relaxed text-gray-600">
-                  No Behaviour Pattern rule was attached to this run — engine defaults applied.
+                  No Behaviour Pattern rule was attached to this run - engine defaults applied.
                 </p>
               )}
             </section>

@@ -54,8 +54,8 @@ export function isBusinessDay(date: IsoDate, calendar: HolidayCalendar | null): 
  *
  * Forward rather than backward: a month-end report due on a Saturday is
  * produced on the Monday, not the Friday, because Friday's data is not the
- * month end. The 14-day cap stops an ill-formed calendar — one that marks
- * every day a holiday — from spinning.
+ * month end. The 14-day cap stops an ill-formed calendar - one that marks
+ * every day a holiday - from spinning.
  */
 export function rollToBusinessDay(date: IsoDate, calendar: HolidayCalendar | null): IsoDate {
   let candidate = date;
@@ -85,7 +85,7 @@ export function nextOccurrence(
   if (schedule.frequency === 'Daily') {
     raw = addDays(from, 1);
     // A daily schedule means every *business* day, so weekends are skipped
-    // rather than rolled — otherwise Saturday and Sunday both roll to Monday
+    // rather than rolled - otherwise Saturday and Sunday both roll to Monday
     // and the same run is due three times.
     while (!isBusinessDay(raw, calendar)) raw = addDays(raw, 1);
     return schedule.endDate && raw > schedule.endDate ? null : raw;
@@ -102,7 +102,7 @@ export function nextOccurrence(
   const step = MONTH_STEP[schedule.frequency] ?? 1;
   const startMonth = Number(schedule.startDate.slice(5, 7));
   // Quarterly fires only in months aligned to the start month, so a schedule
-  // starting in February means Feb/May/Aug/Nov — not the calendar quarters.
+  // starting in February means Feb/May/Aug/Nov - not the calendar quarters.
   const isAlignedMonth = (d: IsoDate) => (Number(d.slice(5, 7)) - startMonth + 12) % step === 0;
 
   // Step one month at a time until the anchor both clears `from` and lands
@@ -151,7 +151,7 @@ export function dueOccurrences(
     cursor = next;
   }
 
-  // Hit the limit while still behind — report the backlog and the next date
+  // Hit the limit while still behind - report the backlog and the next date
   // after it rather than pretending there is none.
   const nextDue = nextOccurrence(schedule, cursor, calendar);
   return { overdue, nextDue, isOverdue: overdue.length > 0 };

@@ -78,11 +78,11 @@ export function generateAffiliateTemplate(ref: WorkbookReferenceData): ArrayBuff
   XLSX.utils.book_append_sheet(wb, orgSheet, 'Organisation');
 
   const instructionsRows: (string | number)[][] = [
-    ['Ascent ALM — Bulk Affiliate Onboarding Template'],
+    ['Ascent ALM - Bulk Affiliate Onboarding Template'],
     [],
-    ['One row per affiliate on "Affiliate Profile". "Currencies", "Connectivity" and "COA Mapping" take one row per (Affiliate Code, value) pair — repeat the Affiliate Code on each of that affiliate\'s rows.'],
-    ['Every affiliate is created in Onboarding status only. Chart-of-accounts mapping, connectivity, initial data load and approval are not bulk-created — complete them per affiliate after import, same as onboarding one affiliate at a time.'],
-    ['Local GL structures genuinely differ by affiliate — Nigeria numeric, Ghana letter-prefixed, UEMOA SYSCOHADA. Map each affiliate\'s own local codes on the COA Mapping sheet; do not assume one scheme fits every row.'],
+    ['One row per affiliate on "Affiliate Profile". "Currencies", "Connectivity" and "COA Mapping" take one row per (Affiliate Code, value) pair - repeat the Affiliate Code on each of that affiliate\'s rows.'],
+    ['Every affiliate is created in Onboarding status only. Chart-of-accounts mapping, connectivity, initial data load and approval are not bulk-created - complete them per affiliate after import, same as onboarding one affiliate at a time.'],
+    ['Local GL structures genuinely differ by affiliate - Nigeria numeric, Ghana letter-prefixed, UEMOA SYSCOHADA. Map each affiliate\'s own local codes on the COA Mapping sheet; do not assume one scheme fits every row.'],
     [],
     ['Valid Regulators'], ...ref.regulators.map((r) => [r]),
     [],
@@ -96,7 +96,7 @@ export function generateAffiliateTemplate(ref: WorkbookReferenceData): ArrayBuff
     [],
     ['Existing Connectors (Connectivity sheet, only if Mode = Connector)'], ...ref.connectorNames.map((c) => [c]),
     [],
-    ['Group Common COA nodes (COA Mapping sheet)'], ...ref.commonCoaNodes.map((n) => [`${n.code} — ${n.name}`]),
+    ['Group Common COA nodes (COA Mapping sheet)'], ...ref.commonCoaNodes.map((n) => [`${n.code} - ${n.name}`]),
   ];
   const instructionsSheet = XLSX.utils.aoa_to_sheet(instructionsRows);
   instructionsSheet['!cols'] = [{ wch: 90 }];
@@ -161,7 +161,7 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
     if (!country) errors.push('Country is required.');
     if (!region) errors.push('Region is required.');
     if (!regulator) errors.push('Regulator is required.');
-    else if (!ctx.validRegulators.has(regulator)) errors.push(`Regulator "${regulator}" is not one of the valid regulators — see Instructions & Reference.`);
+    else if (!ctx.validRegulators.has(regulator)) errors.push(`Regulator "${regulator}" is not one of the valid regulators - see Instructions & Reference.`);
     if (!functionalCurrency) errors.push('Functional Currency is required.');
     else if (!ctx.validCurrencies.has(functionalCurrency)) errors.push(`Functional Currency "${functionalCurrency}" is not a known currency code.`);
     if (reportingCurrency && !ctx.validCurrencies.has(reportingCurrency)) errors.push(`Reporting Currency "${reportingCurrency}" is not a known currency code.`);

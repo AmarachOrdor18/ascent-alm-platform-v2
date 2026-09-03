@@ -1,14 +1,16 @@
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
 import { RatioChart } from '@/components/ui/RatioChart';
 import { Amount } from '@/components/ui/Amount';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
+import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
+import { useDimensionMembers } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
-import type { ProfitabilityResult } from '@/engine/profitability';
+import type { ProfitabilityResult, ProfitabilitySegment } from '@/engine/profitability';
 
 export function Profitability() {
   const { affiliate, affiliateCode } = useScope();
@@ -17,6 +19,59 @@ export function Profitability() {
   const currency = run?.reportingCurrency ?? 'USD';
 
   const p = payloadOf<ProfitabilityResult>(results, 'ProfitabilityRatios');
+
+  const [segmentBy, setSegmentBy] = useState<'product' | 'orgUnit'>('product');
+  const { data: orgUnits = [] } = useDimensionMembers(
+    'OrgUnit',
+    run?.affiliateCode && run.affiliateCode !== 'GROUP' ? run.affiliateCode : '',
+  );
+  const nameOf = (code: string) => orgUnits.find((u) => u.code === code)?.name ?? code;
+
+  const segments = useMemo(
+    () => (p ? (segmentBy === 'product' ? p.byProduct : p.byOrgUnit) : []),
+    [p, segmentBy],
+  );
+
+  const segmentColumns: ResultColumn<ProfitabilitySegment>[] = [
+    {
+      key: 'key',
+      header: segmentBy === 'product' ? 'Product' : 'Business unit',
+      render: (s) => <span className="font-medium">{segmentBy === 'orgUnit' ? nameOf(s.key) : s.key}</span>,
+    },
+    {
+      key: 'assets',
+      header: 'Total assets',
+      align: 'right',
+      render: (s) => <Amount value={s.totalAssets} currency={currency} />,
+      compareValue: (s) => s.totalAssets,
+    },
+    {
+      key: 'nii',
+      header: 'Net interest income',
+      align: 'right',
+      render: (s) => <Amount value={s.netInterestIncome} currency={currency} colorBySign />,
+      compareValue: (s) => s.netInterestIncome,
+    },
+    {
+      key: 'nim',
+      header: 'NIM',
+      align: 'right',
+      render: (s) => <span className="font-mono">{formatPct(s.netInterestMarginPercent, 2)}</span>,
+    },
+    {
+      key: 'npl',
+      header: 'NPL',
+      align: 'right',
+      render: (s) =>
+        s.nplRatioPercent === null ? (
+          <span className="text-gray-300">-</span>
+        ) : (
+          <span className={`font-mono ${s.nplRatioPercent > 5 ? 'text-danger' : ''}`}>
+            {formatPct(s.nplRatioPercent, 2)}
+          </span>
+        ),
+    },
+  ];
 
   return (
     <>
@@ -30,7 +85,7 @@ export function Profitability() {
           {
             label: 'Net interest margin',
             value: formatPct(p?.netInterestMarginPercent ?? null, 2),
-            about: 'Interest income less interest expense, as a share of total assets — a core profitability measure.',
+            about: 'Interest income less interest expense, as a share of total assets - a core profitability measure.',
           },
           {
             label: 'NPL ratio',
@@ -56,7 +111,7 @@ export function Profitability() {
             label: 'Non-earning assets',
             value: formatPct(p?.nonEarningAssetRatioPercent ?? null, 2),
             tone: (p?.nonEarningAssetRatioPercent ?? 0) > 15 ? 'warning' : 'neutral',
-            about: 'Share of total assets carrying a zero interest rate — cash, fixed assets and similar — that generate no interest income.',
+            about: 'Share of total assets carrying a zero interest rate - cash, fixed assets and similar - that generate no interest income.',
           },
         ]}
       />
@@ -73,7 +128,7 @@ export function Profitability() {
                 <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
                   Earnings
                   <InfoButton label="Where these come from">
-                    Computed directly from each position's balance and its own interest rate — the same positions
+                    Computed directly from each position's balance and its own interest rate - the same positions
                     that drive the liquidity and rate-risk metrics elsewhere in the platform.
                   </InfoButton>
                 </h2>
@@ -100,7 +155,7 @@ export function Profitability() {
                     value={
                       <span className="font-mono">
                         {p.interestBearingAssetsToLiabilities === null
-                          ? '—'
+                          ? '-'
                           : p.interestBearingAssetsToLiabilities.toFixed(2) + '×'}
                       </span>
                     }
@@ -114,7 +169,7 @@ export function Profitability() {
                     <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Asset quality</h2>
                     <InfoButton label="Methodology">
                       Anything classified Substandard or worse counts as non-performing, following the CBN
-                      classification. Coverage compares provisions held against that balance — below 100% means the
+                      classification. Coverage compares provisions held against that balance - below 100% means the
                       provisioning does not yet cover the impaired book.
                     </InfoButton>
                   </div>
@@ -153,7 +208,7 @@ export function Profitability() {
                   Ratios against their thresholds
                 </h2>
                 <InfoButton label="Why these thresholds">
-                  The thresholds drawn are the NPL ones — they do not apply to NIM or the non-earning ratio, which
+                  The thresholds drawn are the NPL ones - they do not apply to NIM or the non-earning ratio, which
                   have no regulatory floor. Shown together because the three move against each other: a book that
                   lends aggressively lifts NIM and NPL at once.
                 </InfoButton>
@@ -170,6 +225,45 @@ export function Profitability() {
                 ]}
                 variant="bar"
                 seriesName="Ratio"
+              />
+            </section>
+
+            <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  Profitability by segment
+                  <InfoButton label="How segments are computed">
+                    Each segment runs the exact same margin and asset-quality formulas as the book-wide figures
+                    above, just scoped to the positions in that product or business unit - not a separate
+                    calculation.
+                  </InfoButton>
+                </h2>
+                <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSegmentBy('product')}
+                    className={`rounded px-3 py-1 text-[11px] font-bold ${
+                      segmentBy === 'product' ? 'bg-navy-900 text-white' : 'text-gray-500 hover:text-navy-900'
+                    }`}
+                  >
+                    By product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSegmentBy('orgUnit')}
+                    className={`rounded px-3 py-1 text-[11px] font-bold ${
+                      segmentBy === 'orgUnit' ? 'bg-navy-900 text-white' : 'text-gray-500 hover:text-navy-900'
+                    }`}
+                  >
+                    By business unit
+                  </button>
+                </div>
+              </div>
+              <ResultTable
+                rows={segments}
+                columns={segmentColumns}
+                rowKey={(s) => s.key}
+                emptyMessage="No segments to show."
               />
             </section>
           </>

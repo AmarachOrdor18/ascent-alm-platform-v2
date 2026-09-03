@@ -1,9 +1,10 @@
 // Per-department starter CSV templates for the Positions domain (DataLoadPanel.tsx). Deliberately narrower
 // than the full Position schema: HQLA level, haircuts, LCR role/rate and ASF/RSF factors are excluded from
-// every template because they're no longer typed in by hand — engine/classification.ts derives them from
+// every template because they're no longer typed in by hand - engine/classification.ts derives them from
 // productClass/currency via the Product Characteristics rule at run time. A Loans, Deposits or Treasury
 // analyst should never need to know what "HQLA Level 2A" means to submit their book.
 import type { PositionContributor } from '@/engine/types';
+import { csvTemplateText, downloadCsvTemplate } from './csvTemplates';
 
 export interface PositionTemplate {
   columns: string[];
@@ -74,21 +75,12 @@ export const POSITION_TEMPLATES: Record<PositionContributor, PositionTemplate> =
   },
 };
 
-function escapeCsvField(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
 export function positionTemplateCsv(contributor: PositionContributor): string {
   const { columns, sampleRow } = POSITION_TEMPLATES[contributor];
-  return [columns.map(escapeCsvField).join(','), sampleRow.map(escapeCsvField).join(',')].join('\n');
+  return csvTemplateText(columns, sampleRow);
 }
 
 export function downloadPositionTemplate(contributor: PositionContributor): void {
-  const blob = new Blob([positionTemplateCsv(contributor)], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${contributor.toLowerCase()}_positions_template.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const { columns, sampleRow } = POSITION_TEMPLATES[contributor];
+  downloadCsvTemplate(columns, sampleRow, `${contributor.toLowerCase()}_positions_template.csv`);
 }
