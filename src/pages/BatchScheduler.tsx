@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useHolidayCalendars } from '@/lib/hooks';
-import { useRuns } from '@/lib/runHooks';
+import { useScopedRuns } from '@/lib/runHooks';
 import { useDeleteSchedule, useFireOccurrence, useSaveSchedule, useSchedules } from '@/lib/scheduleHooks';
 import { describeFrequency, dueOccurrences, nextOccurrence, WEEKDAY_NAMES } from '@/engine/schedule';
 import { toIso } from '@/engine/dates';
@@ -18,7 +18,7 @@ export function BatchScheduler() {
   const { affiliateCode } = useScope();
   const { data: affiliates = [] } = useAffiliates();
   const { data: schedules = [], isLoading } = useSchedules(affiliateCode);
-  const { data: runs = [] } = useRuns(affiliateCode);
+  const { data: runs = [] } = useScopedRuns(affiliateCode);
   const { data: calendars = [] } = useHolidayCalendars();
   const save = useSaveSchedule();
   const remove = useDeleteSchedule();

@@ -11,7 +11,6 @@ const DataVintages = lazy(() => import('@/pages/DataVintages').then((m) => ({ de
 const PositionBook = lazy(() => import('@/pages/PositionBook').then((m) => ({ default: m.PositionBook })));
 const Dimensions = lazy(() => import('@/pages/Dimensions').then((m) => ({ default: m.Dimensions })));
 const Counterparties = lazy(() => import('@/pages/Counterparties').then((m) => ({ default: m.Counterparties })));
-const DataQuality = lazy(() => import('@/pages/DataQuality').then((m) => ({ default: m.DataQuality })));
 
 /**
  * The three steps genuinely happen in this order - upload before reconcile before it lands in
@@ -103,11 +102,11 @@ const GROUP_TABS: ModuleTab[] = [
     Component: Counterparties,
   },
   {
-    key: 'data-quality',
-    label: 'Data Quality',
+    key: 'load-history',
+    label: 'Data Vintages & Load History',
     path: '/data/quality',
     permission: 'data.view',
-    Component: DataQuality,
+    Component: DataVintages,
   },
 ];
 

@@ -8,7 +8,7 @@ import { InfoButton } from '@/components/ui/InfoButton';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useSelectedRun, frameProps } from '@/lib/resultHooks';
-import { useRuns, useRunResults } from '@/lib/runHooks';
+import { useScopedRuns, useRunResults } from '@/lib/runHooks';
 import {
   evaluateAll,
   useBreachNotes,
@@ -80,7 +80,7 @@ export function Limits() {
   // notice the colour change and click "Raise a remediation issue" themselves. Comparing against
   // the most recent prior Completed run for this scope lets a genuinely new breach raise its own
   // issue the moment this screen is opened, instead of waiting on someone to notice.
-  const runsQuery = useRuns(affiliateCode);
+  const runsQuery = useScopedRuns(affiliateCode);
   const priorRun = useMemo(() => {
     if (!run) return null;
     const allRuns = runsQuery.data ?? [];

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/localRepository';
 import { useAuth } from '@/context/AuthContext';
@@ -26,6 +27,25 @@ export function useRuns(affiliateCode?: string) {
     queryKey: [...runKeys.all, affiliateCode ?? 'ALL'],
     queryFn: () => repository.listRuns(affiliateCode === 'GROUP' ? undefined : affiliateCode),
   });
+}
+
+/**
+ * Runs actually computed for this exact scope. `useRuns('GROUP')` deliberately returns every
+ * affiliate's runs (Run History browses across affiliates when scoped to Group), but a consumer
+ * that means "the run(s) belonging to the scope I'm currently on" - the selected run behind
+ * Dashboard/every results screen, KRI trend series, limit-breach transition detection, the batch
+ * scheduler's own history - needs the narrower answer: only runs whose own `affiliateCode` is this
+ * scope. Without this, the newest run *anywhere* (e.g. a Nigeria run created after the last real
+ * Group-consolidated run) got picked up as "the" run while at Group scope, showing NGN figures
+ * under a "Ecobank Group" header.
+ */
+export function useScopedRuns(affiliateCode: string) {
+  const query = useRuns(affiliateCode);
+  const data = useMemo(
+    () => query.data?.filter((r) => r.affiliateCode === affiliateCode),
+    [query.data, affiliateCode],
+  );
+  return { ...query, data };
 }
 
 export function useRunResults(runId: string | null) {

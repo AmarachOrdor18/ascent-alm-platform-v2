@@ -55,10 +55,10 @@ export function DataUpload() {
             about: 'Whether the staged rows pass the configured Validation Rules - a blocking finding prevents commit.',
           },
           {
-            label: 'Balance check',
-            value: panelState.balanceCheck ?? '-',
+            label: 'Combined book balance',
+            value: domain === 'Positions' ? (panelState.balanceCheck ?? 'Awaiting other departments') : (panelState.balanceCheck ?? '-'),
             tone: panelState.balanceCheck === 'Balances' ? 'success' : panelState.balanceCheck ? 'danger' : 'neutral',
-            about: 'Whether staged assets equal liabilities plus capital - catches an obviously broken file before it reaches a calculation.',
+            about: 'Whether assets equal liabilities plus capital across every department’s file for this date, not just the one being staged right now - Loans, Deposits and Treasury each submit their own one-sided slice, so this only has a real answer once all of them are in.',
           },
         ]}
       />

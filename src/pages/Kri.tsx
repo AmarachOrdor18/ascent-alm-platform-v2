@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useScope } from '@/context/ScopeContext';
-import { useRuns } from '@/lib/runHooks';
+import { useScopedRuns } from '@/lib/runHooks';
 import { evaluateKris, useKriSeries } from '@/lib/limitHooks';
 import { DEFAULT_KRIS, type KriEvaluation } from '@/engine/kri';
 import { formatMetric } from '@/lib/metrics';
@@ -21,7 +21,7 @@ const TREND_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> =
 
 export function Kri() {
   const { affiliateCode } = useScope();
-  const { data: runs = [], isLoading } = useRuns(affiliateCode);
+  const { data: runs = [], isLoading } = useScopedRuns(affiliateCode);
 
   const metricKeys = useMemo(() => DEFAULT_KRIS.filter((k) => k.isActive).map((k) => k.metricKey), []);
   const { data: series } = useKriSeries(runs, metricKeys);

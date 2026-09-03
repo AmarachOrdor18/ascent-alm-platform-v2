@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useScope } from '@/context/ScopeContext';
 import { useBatches } from './hooks';
-import { useRunResults, useRuns } from './runHooks';
+import { useRunResults, useScopedRuns } from './runHooks';
 import { isRunStale } from './runStaleness';
 import type { CalculationElement, LoadBatch, ProcessRun, RunResult } from '@/engine/types';
 
@@ -24,7 +24,7 @@ export interface SelectedRun {
 export function useSelectedRun(): SelectedRun {
   // `run` is cleared by scope context whenever the affiliate or as-of date changes.
   const { affiliateCode, run, setRun } = useScope();
-  const { data: runs = [], isLoading } = useRuns(affiliateCode);
+  const { data: runs = [], isLoading } = useScopedRuns(affiliateCode);
   const { data: batches = [] } = useBatches();
 
   // One run per as-of date - re-running the same date (after a data correction, say) creates a new

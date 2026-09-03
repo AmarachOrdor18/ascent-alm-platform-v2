@@ -200,29 +200,38 @@ export function DataLoadPanel({
       .every((c) => currentBatch(batches, affiliate.code, 'Positions', asOfDate, c) !== null);
   }, [batches, affiliate, asOfDate, isPositionsDomain, contributor]);
 
+  // What the balance-sheet identity is actually checked against - see the balanceCheck state below,
+  // which reports on this same set rather than each contributor's one-sided slice.
+  const balancePositions = useMemo(() => {
+    if (!staged) return [];
+    if (!isPositionsDomain) return staged.positions;
+    if (!bookCompleteAfterCommit) return [];
+    return [...existingPositions.filter((p) => otherContributorBatchIds.has(p.batchId)), ...staged.positions];
+  }, [staged, isPositionsDomain, bookCompleteAfterCommit, existingPositions, otherContributorBatchIds]);
+
   const validation: ValidationResult | null = useMemo(() => {
     if (!staged) return null;
-    const balancePositions = !isPositionsDomain
-      ? staged.positions
-      : bookCompleteAfterCommit
-        ? [...existingPositions.filter((p) => otherContributorBatchIds.has(p.batchId)), ...staged.positions]
-        : [];
     return validatePositions(
       staged.positions,
       { asOfDate, knownAffiliateCodes: affiliates.map((a) => a.code) },
       applicableValidationRules,
       balancePositions,
     );
-  }, [
-    staged,
-    asOfDate,
-    affiliates,
-    applicableValidationRules,
-    isPositionsDomain,
-    bookCompleteAfterCommit,
-    existingPositions,
-    otherContributorBatchIds,
-  ]);
+  }, [staged, asOfDate, affiliates, applicableValidationRules, balancePositions]);
+
+  // The book-level balance state a header/summary should actually show - distinct from `totals` below,
+  // which is this contributor's own file and is never expected to balance on its own (see its note in
+  // the JSX). Null while a Positions upload is still waiting on other departments, so a caller doesn't
+  // report a false "unbalanced" alarm for one-sided data that was never going to balance alone.
+  const balanceCheck: string | null = useMemo(() => {
+    if (!staged) return null;
+    if (isPositionsDomain && !bookCompleteAfterCommit) return null;
+    const assets = balancePositions.filter((p) => p.category === 'Asset').reduce((s, p) => s + p.amount, 0);
+    const liabilities = balancePositions.filter((p) => p.category === 'Liability').reduce((s, p) => s + p.amount, 0);
+    const capital = balancePositions.filter((p) => p.category === 'Capital').reduce((s, p) => s + p.amount, 0);
+    const difference = assets - (liabilities + capital);
+    return Math.abs(difference) < 0.01 ? 'Balances' : `Out by ${difference.toFixed(0)}`;
+  }, [staged, isPositionsDomain, bookCompleteAfterCommit, balancePositions]);
 
   const { data: orgUnits = [] } = useDimensionMembers('OrgUnit', affiliate.code);
   const { data: glAccounts = [] } = useDimensionMembers('GlAccount', affiliate.code);
@@ -524,14 +533,10 @@ export function DataLoadPanel({
       rowsStaged: staged ? staged.positions.length : null,
       parseErrors: staged ? staged.parseErrors.length : null,
       validation: validation ? (validation.blocked ? 'Blocked' : 'Passed') : null,
-      balanceCheck: totals
-        ? Math.abs(totals.difference) < 0.01
-          ? 'Balances'
-          : `Out by ${totals.difference.toFixed(0)}`
-        : null,
+      balanceCheck,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onStateChange is expected to be stable per caller; including it would re-fire on every parent render
-  }, [domain, staged, validation, totals, stagedMembers]);
+  }, [domain, staged, validation, balanceCheck, stagedMembers]);
 
   const columns: ResultColumn<Position>[] = [
     { key: 'id', header: 'ID', render: (p) => <span className="font-mono text-[11px]">{p.id}</span> },

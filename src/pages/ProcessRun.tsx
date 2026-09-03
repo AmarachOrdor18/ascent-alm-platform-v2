@@ -193,15 +193,18 @@ export function ProcessRun() {
   const selectedProductRule = productRules.find((r) => r.id === productRuleId);
   const unclassified = selectedProductRule ? unclassifiedProducts(scopedPositions, selectedProductRule.assumptions) : [];
 
-  // A Group run must be able to convert every currency it will encounter.
+  // A Group run must be able to convert every currency it will encounter - which is only ever a Live
+  // affiliate's, since only Live affiliates are pooled into positionBatches above. Checking every
+  // affiliate in the system (including ones still Onboarding/Testing/Suspended, with no data in this
+  // run at all) demanded FX coverage for currencies the run would never actually touch.
   const required = useMemo(
     () =>
       affiliateCode === 'GROUP'
-        ? Array.from(new Set(affiliates.flatMap((a) => [a.functionalCurrency, ...a.activeCurrencies])))
+        ? Array.from(new Set(liveAffiliates.flatMap((a) => [a.functionalCurrency, ...a.activeCurrencies])))
         : affiliate
           ? [affiliate.functionalCurrency, ...affiliate.activeCurrencies]
           : [],
-    [affiliateCode, affiliates, affiliate],
+    [affiliateCode, liveAffiliates, affiliate],
   );
   const reportingCurrency = affiliateCode === 'GROUP' ? 'USD' : (affiliate?.functionalCurrency ?? 'USD');
   const missingFx = missingRates(required, reportingCurrency, buildFxTable('USD', fxRates, effectiveDate));

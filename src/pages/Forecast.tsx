@@ -24,6 +24,10 @@ interface PeriodRow {
   period: number;
   asOfDate: string;
   status: string;
+  /** Why this period failed - a projected book can run down to nothing (every maturing position
+   * rolled off with no New Business rule to replace it) or hit a currency with no FX rate, the same
+   * two hard stops a real Process Run would hit. Null on a Completed period. */
+  errorMessage: string | null;
   lcrPercent: number | null;
   nsfrPercent: number | null;
   niiSensitivityPercent: number | null;
@@ -37,6 +41,7 @@ function rowFor(index: number, p: ForecastPeriod): PeriodRow {
     period: index + 1,
     asOfDate: p.asOfDate,
     status: p.outcome.run.status,
+    errorMessage: p.outcome.run.errorLog[0]?.message ?? null,
     lcrPercent: lcr?.lcrPercent ?? null,
     nsfrPercent: nsfr?.nsfrPercent ?? null,
     niiSensitivityPercent: nii?.niiSensitivityPercent ?? null,
@@ -89,6 +94,8 @@ export function Forecast() {
   }, [baseRun, inputs, rule, periodMonths, periodCount]);
 
   const rows = periods.map((p, i) => rowFor(i, p));
+  const hasFailedPeriod = rows.some((r) => r.status !== 'Completed');
+  const failedFromRunoff = hasFailedPeriod && !rule && rows.some((r) => r.errorMessage?.includes('No committed positions'));
 
   const columns: ResultColumn<PeriodRow>[] = [
     { key: 'period', header: 'Period', render: (r) => <span className="font-mono">{r.period}</span> },
@@ -96,7 +103,12 @@ export function Forecast() {
     {
       key: 'status',
       header: 'Status',
-      render: (r) => <StatusBadge status={r.status} tone={r.status === 'Completed' ? 'success' : 'danger'} />,
+      render: (r) => (
+        <>
+          <StatusBadge status={r.status} tone={r.status === 'Completed' ? 'success' : 'danger'} />
+          {r.errorMessage && <p className="mt-1 max-w-xs text-[10px] leading-snug text-danger">{r.errorMessage}</p>}
+        </>
+      ),
     },
     {
       key: 'lcr',
@@ -209,6 +221,14 @@ export function Forecast() {
               <p className="text-[12px] text-gray-500">Nothing to project yet.</p>
             ) : (
               <>
+                {failedFromRunoff && (
+                  <p className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
+                    <span className="font-bold">Some periods failed: </span>
+                    with no New Business rule selected, maturing positions simply run off with nothing
+                    replacing them - over enough periods the projected book ran down to nothing. Pick a New
+                    Business rule above to keep it populated, or shorten the horizon.
+                  </p>
+                )}
                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
                     <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">

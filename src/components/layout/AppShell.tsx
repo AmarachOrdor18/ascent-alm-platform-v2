@@ -31,6 +31,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [batches, affiliateCode]);
   const asOfDate = run?.asOfDate ?? latestBatchDate;
 
+  // Settings pages are pinned to one affiliate by their own URL (see AffiliateSettings.tsx) and aren't
+  // as-of dated - the Scope switcher and "As at" here are for the rest of the app, whose data genuinely
+  // depends on the current scope/run. Showing them here let someone switch scope out from under a
+  // Settings page without the page noticing, so its lists (e.g. Product Characteristics) would silently
+  // read a different affiliate than the one in the URL and page title.
+  const onSettingsPage = /^\/affiliates\/[^/]+\/settings/.test(location);
+
   const visibleGroups = useMemo(
     () =>
       NAV_GROUPS.map((group) => ({
@@ -300,36 +307,38 @@ export function AppShell({ children }: { children: ReactNode }) {
               Back
             </button>
             <TourLauncher className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700" />
-            <div className="ml-auto flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="scope-affiliate"
-                  className="text-[10px] font-bold uppercase tracking-wider text-gray-400"
-                >
-                  Scope
-                </label>
-                <select
-                  id="scope-affiliate"
-                  value={affiliateCode}
-                  disabled={restrictedToOwn}
-                  onChange={(e) => setAffiliateCode(e.target.value)}
-                  title={restrictedToOwn ? 'This account is scoped to one affiliate' : undefined}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50 disabled:opacity-70"
-                >
-                  {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
-                  {selectable.map((a) => (
-                    <option key={a.code} value={a.code}>
-                      {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {!onSettingsPage && (
+              <div className="ml-auto flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="scope-affiliate"
+                    className="text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                  >
+                    Scope
+                  </label>
+                  <select
+                    id="scope-affiliate"
+                    value={affiliateCode}
+                    disabled={restrictedToOwn}
+                    onChange={(e) => setAffiliateCode(e.target.value)}
+                    title={restrictedToOwn ? 'This account is scoped to one affiliate' : undefined}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50 disabled:opacity-70"
+                  >
+                    {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
+                    {selectable.map((a) => (
+                      <option key={a.code} value={a.code}>
+                        {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                <span className="font-bold uppercase tracking-wider text-gray-400">As at</span>
-                <span className="font-mono text-navy-900">{asOfDate ? formatDate(asOfDate) : 'no data loaded'}</span>
+                <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                  <span className="font-bold uppercase tracking-wider text-gray-400">As at</span>
+                  <span className="font-mono text-navy-900">{asOfDate ? formatDate(asOfDate) : 'no data loaded'}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <main className="flex-1 overflow-y-auto p-6">{children}</main>

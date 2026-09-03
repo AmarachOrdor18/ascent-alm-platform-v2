@@ -176,7 +176,7 @@ const MODULE_TAB_ROUTES: RouteEntry[] = [
   { path: '/data/operations/position-book', screenName: 'Position Book', Component: DataManagementModule, permission: 'data.view' },
   { path: '/data/structure', screenName: 'Data Structure', Component: DataManagementModule, permission: 'data.view' },
   { path: '/data/structure/counterparties', screenName: 'Counterparty Register', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/data/quality', screenName: 'Data Quality', Component: DataManagementModule, permission: 'data.view' },
+  { path: '/data/quality', screenName: 'Data Vintages & Load History', Component: DataManagementModule, permission: 'data.view' },
   { path: '/execution/history', screenName: 'Run History', Component: ExecutionModule, permission: 'risk.view' },
   { path: '/execution/scheduler', screenName: 'Batch Scheduler', Component: ExecutionModule, permission: 'risk.view' },
   { path: '/controls/remediation', screenName: 'Control Remediation', Component: ControlsModule, permission: 'risk.view' },

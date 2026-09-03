@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
-import { useUsers } from '@/lib/hooks';
+import { useUsers, useSaveUser } from '@/lib/hooks';
 import { hashPassword } from '@/lib/passwordHash';
 
 const FEATURES = [
@@ -14,6 +14,7 @@ const FEATURES = [
 export function Login() {
   const { login } = useAuth();
   const { data: users = [] } = useUsers();
+  const saveUser = useSaveUser();
   const [, navigate] = useLocation();
 
   const [email, setEmail] = useState('');
@@ -34,7 +35,12 @@ export function Login() {
         setError('Invalid email or password.');
         return;
       }
-      login({ ...account, lastLoginAt: new Date().toISOString() });
+      const signedIn = { ...account, lastLoginAt: new Date().toISOString() };
+      // Persisted, not just held in the in-memory session - Users & Roles and My Account both read
+      // this off the stored user record, which otherwise never learns a login happened at all and
+      // shows "Never" forever regardless of how many times someone actually signs in.
+      await saveUser.mutateAsync(signedIn);
+      login(signedIn);
       navigate('/dashboard');
     } finally {
       setIsSubmitting(false);

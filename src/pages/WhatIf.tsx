@@ -76,7 +76,11 @@ export function WhatIf() {
 
   const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const dates = affiliate ? availableAsOfDates(batches, affiliate.code) : [];
-  const asOfDate = dates[0] ?? '2026-07-31';
+  // No hardcoded fallback date - substituting a fixed date nobody actually loaded data for would
+  // silently query positions that don't exist there, producing the exact "no committed positions"
+  // message this screen shows when there genuinely is no data, even when real data exists under a
+  // different date. Honest "no date available" beats a fake one that happens not to match.
+  const asOfDate = dates[0] ?? '';
   const currency = affiliate?.functionalCurrency ?? 'USD';
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
   const { data: fxRates = [] } = useFxRates();

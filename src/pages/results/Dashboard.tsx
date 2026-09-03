@@ -11,7 +11,7 @@ import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE }
 import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, useYieldCurves, useEconomicIndicators, usePositions } from '@/lib/hooks';
-import { useRuns } from '@/lib/runHooks';
+import { useScopedRuns } from '@/lib/runHooks';
 import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatPct } from '@/lib/format';
@@ -78,6 +78,11 @@ const TONE_ICON_BG: Record<Tone, string> = {
   neutral: 'bg-navy-100 text-navy-700',
 };
 
+/** Whether a metric has nothing to show - the run didn't compute this element, not a broken calculation. */
+function isUncomputed(value: string): boolean {
+  return value === '-' || value === 'No run';
+}
+
 /** Change since the previous as-of date for this scope - a gap in history means no trend, not a fabricated one. */
 function trendFrom(series: KriObservation[] | undefined, higherIsGood: boolean, decimals = 1): Trend | undefined {
   if (!series || series.length < 2) return undefined;
@@ -99,7 +104,7 @@ export function Dashboard() {
 
   const currency = run?.reportingCurrency ?? 'USD';
 
-  const { data: scopedRuns = [] } = useRuns(affiliateCode);
+  const { data: scopedRuns = [] } = useScopedRuns(affiliateCode);
   const { data: trendSeries } = useKriSeries(scopedRuns, [
     'lcrPercent',
     'nsfrPercent',
@@ -293,7 +298,11 @@ export function Dashboard() {
                     </div>
                   )}
                 </div>
-                <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+                {isUncomputed(m.value) ? (
+                  <p className="mt-3 text-[12px] italic text-gray-400">Not computed by this run</p>
+                ) : (
+                  <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+                )}
                 {m.trend && (
                   <p className={`mt-2 flex items-center gap-1 text-[11px] font-bold ${m.trend.good ? 'text-success' : 'text-danger'}`}>
                     {m.trend.text.startsWith('+') ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
@@ -396,7 +405,11 @@ export function Dashboard() {
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
                     <InfoButton label={`About ${m.label}`} stopClickPropagation>{m.about}</InfoButton>
                   </span>
-                  <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+                  {isUncomputed(m.value) ? (
+                    <p className="mt-1 text-[11px] italic text-gray-400">Not computed</p>
+                  ) : (
+                    <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+                  )}
                 </Link>
               ))}
             </div>

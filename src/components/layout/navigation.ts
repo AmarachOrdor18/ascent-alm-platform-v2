@@ -161,7 +161,6 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Position Book', path: '/data/operations/position-book', permission: 'data.view', phase: 3, icon: PortfolioIcon },
   { name: 'Dimensions & Hierarchies', path: '/data/structure', permission: 'data.view', phase: 2, icon: CorporateActionsIcon },
   { name: 'Counterparty Register', path: '/data/structure/counterparties', permission: 'data.view', phase: 2, icon: ClientManagementIcon },
-  { name: 'Data Quality', path: '/data/quality', permission: 'data.view', phase: 3, icon: CheckCircleIcon },
   { name: 'Interest Rates & Curves', path: '/affiliates/GROUP/settings?section=ref-yield-curves', permission: 'group.manage', phase: 2, icon: TrendingUpIcon },
   { name: 'Currency & FX Rates', path: '/affiliates/GROUP/settings?section=ref-fx-rates', permission: 'group.manage', phase: 2, icon: NairaIcon },
   { name: 'Economic Indicators', path: '/affiliates/GROUP/settings?section=ref-economic-indicators', permission: 'group.manage', phase: 2, icon: BarChartIcon },
