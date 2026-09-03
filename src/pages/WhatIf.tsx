@@ -76,11 +76,13 @@ export function WhatIf() {
 
   const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const dates = affiliate ? availableAsOfDates(batches, affiliate.code) : [];
-  // No hardcoded fallback date - substituting a fixed date nobody actually loaded data for would
-  // silently query positions that don't exist there, producing the exact "no committed positions"
-  // message this screen shows when there genuinely is no data, even when real data exists under a
-  // different date. Honest "no date available" beats a fake one that happens not to match.
-  const asOfDate = dates[0] ?? '';
+  // Defaults to the most recent committed date, but - unlike before - that's only a default, not the
+  // only option. A user with committed data at more than one as-of date (e.g. an earlier real load
+  // sitting alongside a later one) had no way to pick anything but whichever date happened to sort
+  // last, even while every other screen with committed data (Process Run, Position Book) lets them
+  // choose.
+  const [asOfDateOverride, setAsOfDateOverride] = useState('');
+  const asOfDate = (asOfDateOverride && dates.includes(asOfDateOverride) ? asOfDateOverride : dates[0]) ?? '';
   const currency = affiliate?.functionalCurrency ?? 'USD';
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
   const { data: fxRates = [] } = useFxRates();
@@ -224,6 +226,25 @@ export function WhatIf() {
         ]}
         actions={
           <>
+            {dates.length > 1 && (
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="wi-asof" className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  As of
+                </label>
+                <select
+                  id="wi-asof"
+                  value={asOfDate}
+                  onChange={(e) => setAsOfDateOverride(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+                >
+                  {dates.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setLevers(BASE)}
