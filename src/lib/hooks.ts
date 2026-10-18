@@ -78,13 +78,17 @@ function useAuditedMutation<T>(
   return useMutation({
     mutationFn: async (value: T) => {
       await write(value);
+      // The audit entry follows the write but doesn't hold the screen: one database round trip saved on every save.
       if (user) {
         const { id, detail } = describe(value);
-        await repository.recordAuditEvent(auditEvent(user, module, action, entity, id, detail));
+        void repository
+          .recordAuditEvent(auditEvent(user, module, action, entity, id, detail))
+          .then(() => client.invalidateQueries({ queryKey: keys.audit }))
+          .catch((err: unknown) => console.error('Audit entry could not be written', err));
       }
     },
     onSuccess: () => {
-      for (const key of [...invalidate, keys.audit]) client.invalidateQueries({ queryKey: key });
+      for (const key of invalidate) client.invalidateQueries({ queryKey: key });
     },
   });
 }
@@ -342,11 +346,12 @@ export function useSaveAffiliate() {
       await repository.upsertAffiliate(affiliate);
       if (affiliate.code !== 'GROUP' && (isNew || user?.affiliateCode === 'GROUP')) {
         const existing = await repository.listDataSources(affiliate.code);
-        for (const source of defaultAffiliateSources(affiliate, user?.name ?? 'system')) {
-          if (existing.some((s) => s.id === source.id)) continue;
-          // Only Group-level managers may add sources; anyone else's save of the affiliate still succeeds.
-          await repository.upsertDataSource(source).catch(() => undefined);
-        }
+        // Only Group-level managers may add sources; anyone else's save of the affiliate still succeeds.
+        await Promise.all(
+          defaultAffiliateSources(affiliate, user?.name ?? 'system')
+            .filter((source) => !existing.some((s) => s.id === source.id))
+            .map((source) => repository.upsertDataSource(source).catch(() => undefined)),
+        );
       }
     },
     (affiliate) => ({ id: affiliate.code, detail: `${affiliate.name} (${affiliate.status})` }),

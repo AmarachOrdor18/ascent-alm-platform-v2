@@ -87,7 +87,9 @@ export function LedgerCheckPanel({ affiliate }: { affiliate: Affiliate }) {
   const signOff = async () => {
     if (!canComplete || !user) return;
     const at = new Date().toISOString();
-    for (const b of positionBatches) await saveBatch.mutateAsync({ ...b, reconciledBy: user.name, reconciledAt: at });
+    await Promise.all(
+      positionBatches.map((b) => saveBatch.mutateAsync({ ...b, reconciledBy: user.name, reconciledAt: at })),
+    );
     await sendNotification(
       {
         affiliateCode: affiliate.code,

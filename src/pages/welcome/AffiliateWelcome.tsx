@@ -185,8 +185,10 @@ export function AffiliateWelcome() {
     window.scrollTo({ top: 0 });
   };
   const onContinue = async () => {
-    await markDone(current, next);
+    // The next step shows straight away; the progress record finishes saving behind it.
+    const saving = markDone(current, next);
     if (next) move(next);
+    await saving;
   };
   const onBack = prev
     ? () => {

@@ -291,16 +291,19 @@ export function OrganisationStep({ mode, onBack, onContinue }: StepProps) {
 
   const submit = async () => {
     if (!group) throw new Error('The organisation record (GROUP) is missing - run the platform seed first.');
-    await saveAffiliate.mutateAsync({
-      ...group,
-      name: draft.name.trim(),
-      reportingCurrency: draft.reportingCurrency,
-      fiscalYearEnd: draft.fiscalYearEnd,
-    });
-    // One organisation-wide reporting cycle - affiliates never override it.
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.cycleFrequency, draft.frequency, false, who));
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.monthEndConvention, draft.monthEnd, false, who));
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.fiscalYearEnd, draft.fiscalYearEnd, false, who));
+    // The organisation row and its one organisation-wide reporting cycle (affiliates never override it),
+    // written together.
+    await Promise.all([
+      saveAffiliate.mutateAsync({
+        ...group,
+        name: draft.name.trim(),
+        reportingCurrency: draft.reportingCurrency,
+        fiscalYearEnd: draft.fiscalYearEnd,
+      }),
+      saveSetting.mutateAsync(orgSetting(ORG_SETTING.cycleFrequency, draft.frequency, false, who)),
+      saveSetting.mutateAsync(orgSetting(ORG_SETTING.monthEndConvention, draft.monthEnd, false, who)),
+      saveSetting.mutateAsync(orgSetting(ORG_SETTING.fiscalYearEnd, draft.fiscalYearEnd, false, who)),
+    ]);
     await onContinue?.();
   };
 
@@ -875,18 +878,19 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
           : Math.min(l.greenThreshold, e.amberThreshold);
       await saveLimit.mutateAsync({ ...l, ...e, greenThreshold: green });
     }
-    for (const c of currencies) {
-      const next = currencyEdits[c.code];
-      if (next !== undefined && next !== c.isActive) await saveCurrency.mutateAsync({ ...c, isActive: next });
-    }
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.ftpMethod, policy.ftpMethod, policy.ftpOverridable, who));
-    await saveSetting.mutateAsync(
-      orgSetting(ORG_SETTING.ftpLiquidityPremium, policy.ftpLiquidityPremium, policy.ftpOverridable, who),
-    );
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.marketDataLoadedBy, 'Group', false, who));
-    await saveSetting.mutateAsync(
-      orgSetting(ORG_SETTING.marketDataAffiliateOverrides, policy.marketDataOverrides, false, who),
-    );
+    await Promise.all([
+      ...currencies
+        .filter((c) => currencyEdits[c.code] !== undefined && currencyEdits[c.code] !== c.isActive)
+        .map((c) => saveCurrency.mutateAsync({ ...c, isActive: currencyEdits[c.code]! })),
+      saveSetting.mutateAsync(orgSetting(ORG_SETTING.ftpMethod, policy.ftpMethod, policy.ftpOverridable, who)),
+      saveSetting.mutateAsync(
+        orgSetting(ORG_SETTING.ftpLiquidityPremium, policy.ftpLiquidityPremium, policy.ftpOverridable, who),
+      ),
+      saveSetting.mutateAsync(orgSetting(ORG_SETTING.marketDataLoadedBy, 'Group', false, who)),
+      saveSetting.mutateAsync(
+        orgSetting(ORG_SETTING.marketDataAffiliateOverrides, policy.marketDataOverrides, false, who),
+      ),
+    ]);
     setLimitEdits({});
     setCurrencyEdits({});
     await onContinue?.();

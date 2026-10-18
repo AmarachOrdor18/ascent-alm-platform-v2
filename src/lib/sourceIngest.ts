@@ -916,8 +916,11 @@ export async function saveMarketDataRecords(
   uploadedBy: string,
 ): Promise<{ fx: number; curves: number; indicators: number }> {
   const now = new Date().toISOString();
-  for (const rate of records.fx)
-    await repository.upsertFxRate({ ...rate, source: fileName, updatedBy: uploadedBy, updatedAt: now });
+  await Promise.all(
+    records.fx.map((rate) =>
+      repository.upsertFxRate({ ...rate, source: fileName, updatedBy: uploadedBy, updatedAt: now }),
+    ),
+  );
   const curvesWritten = records.curves.length > 0 ? await writeCurves(records.curves, uploadedBy) : 0;
   const indicatorsWritten = records.indicators.length > 0 ? await writeIndicators(records.indicators, uploadedBy) : 0;
   const domains = [
@@ -1065,8 +1068,11 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
       committed = await finishCommitted();
       break;
     case 'FxRates':
-      for (const rate of input.records as StoredFxRate[])
-        await repository.upsertFxRate({ ...rate, source: source.name, updatedBy: userName, updatedAt: now });
+      await Promise.all(
+        (input.records as StoredFxRate[]).map((rate) =>
+          repository.upsertFxRate({ ...rate, source: source.name, updatedBy: userName, updatedAt: now }),
+        ),
+      );
       committed = await finishCommitted();
       await afterMarketDataLoad(
         { fileName: committed.fileName, asOfDate, fx: input.records as StoredFxRate[], curves: [], indicators: [] },
@@ -1097,8 +1103,11 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
       break;
     case 'MarketData': {
       const content = (input.records[0] ?? { fx: [], curves: [], indicators: [] }) as MarketDataRecords;
-      for (const rate of content.fx)
-        await repository.upsertFxRate({ ...rate, source: source.name, updatedBy: userName, updatedAt: now });
+      await Promise.all(
+        content.fx.map((rate) =>
+          repository.upsertFxRate({ ...rate, source: source.name, updatedBy: userName, updatedAt: now }),
+        ),
+      );
       if (content.curves.length > 0) await writeCurves(content.curves, userName);
       if (content.indicators.length > 0) await writeIndicators(content.indicators, userName);
       committed = await finishCommitted();

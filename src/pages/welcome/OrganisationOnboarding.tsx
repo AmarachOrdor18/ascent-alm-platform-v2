@@ -157,8 +157,10 @@ export function OrganisationOnboarding() {
     document.getElementById('onboarding-scroll')?.scrollTo({ top: 0 });
   };
   const onContinue = async () => {
-    await markDone(step, next);
-    if (next) await move(next);
+    // The next step shows straight away; the progress record finishes saving behind it.
+    const saving = markDone(step, next);
+    if (next) void move(next);
+    await saving;
   };
   const onBack = prev
     ? () => {
