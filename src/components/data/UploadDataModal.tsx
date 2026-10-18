@@ -86,12 +86,15 @@ export function UploadDataModal({
   sources,
   initialSourceId,
   groupView,
+  pickDate = false,
   onClose,
 }: {
   /** Sources this user may upload to (already scoped to them). */
   sources: DataSource[];
   initialSourceId?: string | null;
   groupView: boolean;
+  /** Show the As-of date picker here - in onboarding, where the header with its date picker is not shown. */
+  pickDate?: boolean;
   onClose: () => void;
 }) {
   // The working date from the header is the default as-of date; a date in the file itself wins.
@@ -307,7 +310,17 @@ export function UploadDataModal({
         <Notice tone="info">There is no data source you can upload to yet. Ask an administrator to add one.</Notice>
       ) : (
         <div className="space-y-5">
-          <AsOfDateField />
+          {pickDate ? (
+            <AsOfDateField />
+          ) : workingDate ? (
+            <Notice tone="info">
+              Every file is loaded as of {workingDate} - the As-of date at the top of the page.
+            </Notice>
+          ) : (
+            <Notice tone="warning">
+              Pick the As-of date at the top of the page first - every file is loaded as of that date.
+            </Notice>
+          )}
           <div>
             <label htmlFor="upload-source" className="mb-1 block text-[12px] font-bold text-gray-600">
               Where is this data going?

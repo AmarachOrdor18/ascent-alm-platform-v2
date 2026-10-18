@@ -1135,7 +1135,9 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
       </Card>
       <CoaMapping affiliate={affiliate} />
       <StepFooter mode="wizard" onBack={onBack} onSubmit={onContinue} submitLabel="Continue" />
-      {uploading && <UploadDataModal sources={sources} groupView={false} onClose={() => setUploading(false)} />}
+      {uploading && (
+        <UploadDataModal sources={sources} groupView={false} pickDate onClose={() => setUploading(false)} />
+      )}
       {ledgerOpen && (
         <Drawer title="Ledger check" onClose={() => setLedgerOpen(false)} wide>
           <LedgerCheckPanel affiliate={affiliate} />
