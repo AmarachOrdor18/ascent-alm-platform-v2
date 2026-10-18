@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBatches, useCurrencies, useEconomicIndicators, useFxRates, useYieldCurves } from '@/lib/hooks';
 import { afterMarketDataLoad } from '@/lib/marketDataEvents';
 import { WhoCanFix } from '@/components/readiness/WhoCanFix';
+import { AsOfDateField } from '@/components/data/AsOfDateField';
 import { marketDataStatus } from '@/lib/readiness';
 import { invalidateReadinessInputs, useMarketDataSlaDays } from '@/lib/readinessHooks';
 import { notificationKeys } from '@/lib/notificationHooks';
@@ -157,7 +158,7 @@ export function MarketDataHub() {
       return;
     }
     if (!workingDate) {
-      setError('Pick the As-of date at the top of the page first - the upload is loaded as of that date.');
+      setError('Pick the date this data is for (Data as of) first.');
       if (inputRef.current) inputRef.current.value = '';
       return;
     }
@@ -307,7 +308,8 @@ export function MarketDataHub() {
         <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">Upload market data</h2>
 
         {canUpload ? (
-          <div>
+          <div className="space-y-3">
+            <AsOfDateField id="market-asof" />
             <input
               ref={inputRef}
               id="market-hub-upload"
@@ -320,11 +322,6 @@ export function MarketDataHub() {
               }}
               className="text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[13px] file:font-bold file:text-white hover:file:bg-navy-700"
             />
-            <p className="mt-2 text-[12px] text-gray-500">
-              {workingDate
-                ? `Loaded as of ${formatDate(workingDate)} - the As-of date at the top of the page.`
-                : 'Pick the As-of date at the top of the page first - the upload is loaded as of that date.'}
-            </p>
           </div>
         ) : (
           <div className="text-[13px] text-gray-500">

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
+import { AsOfDateField } from './AsOfDateField';
 import { DownloadIcon } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
@@ -212,6 +213,15 @@ export function UploadDataModal({
   const replacesFor = (f: PickedFile): string | null =>
     f.replacesId !== undefined ? f.replacesId : (replaceOptions(f).find((b) => b.fileName === f.fileName)?.id ?? null);
 
+  useEffect(() => {
+    const open = files.filter((f) => !f.outcome && f.sourceId && !f.readError);
+    if (open.length === 0) return;
+    void Promise.all(open.map(runCheck)).then((checked) =>
+      setFiles((prev) => prev.map((f) => checked.find((c) => c.key === f.key) ?? f)),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-check only when the date changes
+  }, [workingDate]);
+
   const pending = files.filter((f) => !f.outcome || f.outcome.kind === 'error');
   const needsReason = (f: PickedFile) => !!f.check?.replaces && !f.reason.trim();
   const lobbyReady = workingDate ? pending.filter((f) => f.check && canSendToLobby(f.check)) : [];
@@ -297,15 +307,7 @@ export function UploadDataModal({
         <Notice tone="info">There is no data source you can upload to yet. Ask an administrator to add one.</Notice>
       ) : (
         <div className="space-y-5">
-          {workingDate ? (
-            <Notice tone="info">
-              Every file is loaded as of {workingDate} - the As-of date at the top of the page.
-            </Notice>
-          ) : (
-            <Notice tone="warning">
-              Pick the As-of date at the top of the page first - every file is loaded as of that date.
-            </Notice>
-          )}
+          <AsOfDateField />
           <div>
             <label htmlFor="upload-source" className="mb-1 block text-[12px] font-bold text-gray-600">
               Where is this data going?
