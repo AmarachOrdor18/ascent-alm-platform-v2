@@ -387,21 +387,65 @@ export function Approvals() {
                 : 'No requests yet.'}
         </div>
       ) : (
-        <ul className="space-y-3">
-          {rows.map((r) => (
-            <li key={r.id}>
-              <RequestCard
-                request={r}
-                affiliate={affiliateName(r.affiliateCode)}
-                allRuns={allRuns}
-                affiliates={affiliates}
-                readiness={r.status === 'Pending' ? activationReadiness(r) : null}
-                onOpen={() => setOpen(r.id)}
-                canDecide={!blockedReason(r)}
-              />
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                <th className="px-4 py-2.5">Type</th>
+                <th className="px-4 py-2.5">Item</th>
+                <th className="px-4 py-2.5">Change</th>
+                <th className="px-4 py-2.5">Scope</th>
+                <th className="px-4 py-2.5">Raised</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const canDecide = !blockedReason(r);
+                return (
+                  <tr
+                    key={r.id}
+                    onClick={() => setOpen(r.id)}
+                    className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-2.5 text-gray-500">{typeOf(r)}</td>
+                    <td className="px-4 py-2.5 font-bold text-navy-900">{r.entityLabel}</td>
+                    <td className="px-4 py-2.5">
+                      <ChangeCell request={r} readiness={r.status === 'Pending' ? activationReadiness(r) : null} />
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {r.affiliateCode && r.affiliateCode !== 'GROUP' ? r.affiliateCode : 'Group'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-gray-600">
+                      {r.requestedBy.split(' ')[0]} · {day(r.requestedAt)}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <StatusBadge status={r.status} tone={STATUS_TONE[r.status]} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(r.id);
+                        }}
+                        className={cn(
+                          'rounded-lg px-3 py-1 text-[12px] font-bold',
+                          canDecide
+                            ? 'bg-navy-900 text-white hover:bg-navy-700'
+                            : 'border border-gray-200 text-navy-900 hover:border-navy-700',
+                        )}
+                      >
+                        {canDecide ? 'Review' : 'View'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <p className="mt-6 text-[12px] text-gray-400">
@@ -441,68 +485,42 @@ export function Approvals() {
 const filterCls =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-navy-900 focus:border-navy-700 focus:outline-none';
 
-// ─── Card ──────────────────────────────────────────────────────────────────
+// ─── Table cell ────────────────────────────────────────────────────────────
 
-function RequestCard({
-  request: r,
-  affiliate,
-  allRuns,
-  affiliates,
-  readiness,
-  onOpen,
-  canDecide,
-}: {
-  request: ApprovalRequest;
-  affiliate: string;
-  allRuns: ProcessRun[];
-  affiliates: Affiliate[];
-  readiness: { issues: string[] } | null;
-  onOpen: () => void;
-  canDecide: boolean;
-}) {
-  return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">
-            {typeOf(r)} <span className="text-gray-300">·</span>{' '}
-            <span className="normal-case tracking-normal">{affiliate}</span>
-          </p>
-          <h3 className="mt-1 text-[15px] font-bold text-navy-900">{r.entityLabel}</h3>
-        </div>
-        <StatusBadge status={r.status} tone={STATUS_TONE[r.status]} />
-      </div>
-      <WhatChanges request={r} allRuns={allRuns} affiliates={affiliates} readiness={readiness} />
-      <p className="mt-2 text-[13px] text-gray-600">
-        <span className="font-bold text-navy-900">Why: </span>
-        {r.summary || '-'}
-      </p>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-50 pt-3 text-[12px] text-gray-500">
-        <span>
-          Raised by <span className="font-bold text-navy-900">{r.requestedBy}</span> on {day(r.requestedAt)}
-          {r.status !== 'Pending' && r.decidedBy && (
-            <>
-              {' '}
-              · {r.status.toLowerCase()} by <span className="font-bold text-navy-900">{r.decidedBy}</span> on{' '}
-              {day(r.decidedAt)}
-            </>
-          )}
+/** The change in a few characters - the side panel holds the full detail and the reason. */
+function ChangeCell({ request: r, readiness }: { request: ApprovalRequest; readiness: { issues: string[] } | null }) {
+  const mono = 'font-mono text-[12px] text-navy-900';
+  if (r.module === 'Business Rules') {
+    if (!r.entityVersion) return <span className="text-gray-400">-</span>;
+    return (
+      <span className={mono}>{r.entityVersion > 1 ? `v${r.entityVersion - 1} → v${r.entityVersion}` : 'New (v1)'}</span>
+    );
+  }
+  if (r.module === 'Affiliates' && r.action === 'Activate') {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="text-navy-900">Go Live</span>
+        {readiness && (
+          <StatusBadge
+            status={readiness.issues.length > 0 ? `${readiness.issues.length} issue(s)` : 'Checks pass'}
+            tone={readiness.issues.length > 0 ? 'warning' : 'success'}
+          />
+        )}
+      </span>
+    );
+  }
+  if (r.module === 'Runs' && r.action === 'SignOff') return <span className="text-navy-900">Sign off run</span>;
+  if (r.module === 'Limits') {
+    const change = parseLimitChange(r.summary);
+    if (change)
+      return (
+        <span className={mono}>
+          A {change.amber[0]}→{change.amber[1]}% · R {change.red[0]}→{change.red[1]}%
         </span>
-        <button
-          type="button"
-          onClick={onOpen}
-          className={cn(
-            'rounded-lg px-4 py-1.5 text-[13px] font-bold',
-            canDecide
-              ? 'bg-navy-900 text-white hover:bg-navy-700'
-              : 'border border-gray-200 text-navy-900 hover:border-navy-700',
-          )}
-        >
-          {canDecide ? 'Review & decide' : 'View details'}
-        </button>
-      </div>
-    </article>
-  );
+      );
+  }
+  if (r.module === 'Position Snapshot') return <span className="text-navy-900">Edited positions</span>;
+  return <span className="text-navy-900">{r.action}</span>;
 }
 
 /** One plain line (or block) saying what the request changes, by kind of request. */
