@@ -759,14 +759,46 @@ const META_KEYS = new Set([
   'updatedAt',
 ]);
 
+/** A value as a person reads it: numbers grouped, yes/no, lists joined - never "settings" or "3 items". */
 function showValue(v: unknown): string {
   if (v === null || v === undefined || v === '') return '-';
-  if (Array.isArray(v)) return `${v.length} item${v.length === 1 ? '' : 's'}`;
-  if (typeof v === 'object') return 'settings';
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  if (typeof v === 'number') return Number.isInteger(v) ? v.toLocaleString('en-GB') : String(v);
+  if (Array.isArray(v)) return v.length === 0 ? '-' : v.map((x) => showValue(x)).join(', ');
+  if (typeof v === 'object')
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, x]) => `${label(k)}: ${showValue(x)}`)
+      .join(' · ');
   return String(v);
 }
 
-/** Which settings differ between the version asked for and the one before it - top-level settings only. */
+const label = (k: string) =>
+  k
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase())
+    .replace(/\bpct\b/i, '%');
+
+const isRowList = (v: unknown): v is Record<string, unknown>[] =>
+  Array.isArray(v) && v.length > 0 && v.every((x) => x !== null && typeof x === 'object' && !Array.isArray(x));
+
+const isMap = (v: unknown): v is Record<string, unknown> =>
+  v !== null &&
+  typeof v === 'object' &&
+  !Array.isArray(v) &&
+  Object.keys(v).length > 0 &&
+  Object.values(v).every((x) => x === null || typeof x !== 'object');
+
+/** A list of rows, or a key -> value map turned into rows - whatever a rule keeps as a table. */
+function asRows(v: unknown): Record<string, unknown>[] | null {
+  if (isRowList(v)) return v;
+  if (isMap(v)) return Object.entries(v).map(([key, value]) => ({ key, value }));
+  return null;
+}
+
+/**
+ * The proposed version in full, as tables, with what differs from the previous version marked: single
+ * settings as Before / Now, and every list (cost pools, risk weights, products…) as its own table.
+ */
 function RuleVersionDiff({ ruleId, version }: { ruleId: string; version: number }) {
   const { data, isLoading } = useQuery({
     queryKey: ['ruleVersionDiff', ruleId, version],
@@ -778,51 +810,117 @@ function RuleVersionDiff({ ruleId, version }: { ruleId: string; version: number 
       return { current, previous };
     },
   });
-  if (isLoading) return <p className="mt-2 text-[12px] text-gray-400">Comparing with the previous version…</p>;
+  if (isLoading) return <p className="mt-2 text-[12px] text-gray-400">Loading the proposed settings…</p>;
   if (!data?.current) return null;
-  if (!data.previous) {
-    return version === 1 ? (
-      <p className="mt-2 text-[12px] text-gray-500">A new assumption - there is no earlier version to compare with.</p>
-    ) : null;
-  }
   const cur = data.current as unknown as Record<string, unknown>;
-  const prev = data.previous as unknown as Record<string, unknown>;
-  const changed = Array.from(new Set([...Object.keys(cur), ...Object.keys(prev)]))
-    .filter((k) => !META_KEYS.has(k))
-    .filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(prev[k]));
-  if (changed.length === 0)
-    return (
-      <p className="mt-2 text-[12px] text-gray-500">
-        No setting differs from version {version - 1} (name or description only).
-      </p>
-    );
-  const label = (k: string) => k.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  const prev = (data.previous ?? null) as unknown as Record<string, unknown> | null;
+  const keys = Object.keys(cur).filter((k) => !META_KEYS.has(k));
+  const lists = keys.filter((k) => asRows(cur[k]) !== null || asRows(prev?.[k]) !== null);
+  const singles = keys.filter((k) => !lists.includes(k));
+  const differs = (k: string) => !!prev && JSON.stringify(cur[k]) !== JSON.stringify(prev[k]);
+
   return (
-    <div className="mt-3 overflow-x-auto rounded-lg border border-gray-100">
-      <table className="w-full text-[12px]">
-        <thead className="bg-gray-50 text-left text-gray-500">
-          <tr>
-            <th className="px-3 py-2 font-bold">Setting</th>
-            <th className="px-3 py-2 font-bold">Version {version - 1}</th>
-            <th className="px-3 py-2 font-bold">Version {version}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {changed.map((k) => {
-            const a = showValue(prev[k]);
-            const b = showValue(cur[k]);
-            return (
-              <tr key={k}>
-                <td className="px-3 py-2 font-bold text-navy-900">{label(k)}</td>
-                <td className="px-3 py-2 font-mono text-gray-500">{a}</td>
-                <td className="px-3 py-2 font-mono text-navy-900">{a === b ? `${b} (contents changed)` : b}</td>
+    <div className="mt-3 space-y-4">
+      {singles.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-gray-100">
+          <table className="w-full text-[12px]">
+            <thead className="bg-gray-50 text-left text-gray-500">
+              <tr>
+                <th className="px-3 py-2 font-bold">Setting</th>
+                {prev && <th className="px-3 py-2 font-bold">Before (v{version - 1})</th>}
+                <th className="px-3 py-2 font-bold">{prev ? `Now (v${version})` : 'Value'}</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {singles.map((k) => (
+                <tr key={k} className={differs(k) ? 'bg-warning-bg/60' : undefined}>
+                  <td className="px-3 py-2 font-bold text-navy-900">{label(k)}</td>
+                  {prev && <td className="px-3 py-2 text-gray-500">{showValue(prev[k])}</td>}
+                  <td className="px-3 py-2 text-navy-900">{showValue(cur[k])}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {lists.map((k) => (
+        <RowListTable
+          key={k}
+          title={label(k)}
+          rows={asRows(cur[k]) ?? []}
+          before={prev ? (asRows(prev[k]) ?? []) : null}
+        />
+      ))}
+      {!prev && version === 1 && (
+        <p className="text-[12px] text-gray-500">A new assumption - there is no earlier version to compare with.</p>
+      )}
     </div>
   );
+}
+
+/** One list of a rule as a table: every row of the proposed version, marked New / Changed against the one before. */
+function RowListTable({
+  title,
+  rows,
+  before,
+}: {
+  title: string;
+  rows: Record<string, unknown>[];
+  before: Record<string, unknown>[] | null;
+}) {
+  const columns = Array.from(new Set(rows.flatMap((r) => Object.keys(r)))).filter((c) => c !== 'id');
+  const beforeJson = new Set((before ?? []).map((r) => JSON.stringify(r)));
+  const removed = before ? before.length - before.filter((b) => rows.some((r) => sameRow(r, b))).length : 0;
+  return (
+    <div>
+      <p className="mb-1 text-[12px] font-bold text-navy-900">
+        {title} <span className="font-normal text-gray-400">({rows.length})</span>
+        {removed > 0 && <span className="ml-2 font-normal text-danger">{removed} removed</span>}
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-gray-100">
+        <table className="w-full text-[12px]">
+          <thead className="bg-gray-50 text-left text-gray-500">
+            <tr>
+              {before && <th className="px-3 py-2" />}
+              {columns.map((c) => (
+                <th key={c} className="px-3 py-2 font-bold">
+                  {label(c)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map((r, i) => {
+              const mark = !before
+                ? null
+                : beforeJson.has(JSON.stringify(r))
+                  ? null
+                  : before.some((b) => sameRow(r, b))
+                    ? 'Changed'
+                    : 'New';
+              return (
+                <tr key={i} className={mark ? 'bg-warning-bg/60' : undefined}>
+                  {before && <td className="px-3 py-2 text-[11px] font-bold text-warning">{mark ?? ''}</td>}
+                  {columns.map((c) => (
+                    <td key={c} className="px-3 py-2 text-navy-900">
+                      {showValue(r[c])}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Same row in two versions: same id, or the same first identifying field (name, code, product…). */
+function sameRow(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  if (a.id !== undefined || b.id !== undefined) return a.id === b.id;
+  const key = Object.keys(a).find((k) => typeof a[k] === 'string');
+  return key !== undefined && a[key] === b[key];
 }
 
 // ─── Other request (free-text) ─────────────────────────────────────────────
