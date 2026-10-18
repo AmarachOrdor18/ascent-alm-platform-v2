@@ -617,6 +617,7 @@ describe('executeRun - one cashflow book behind every element', () => {
     affiliateCode: 'NG',
     reportingCurrency: 'NGN',
     timeBucketRuleId: 'TB',
+    ftpRuleId: 'FTP',
     batchIds: ['B-1'],
     createdBy: 't',
     createdAt: AS_OF,

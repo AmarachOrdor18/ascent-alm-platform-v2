@@ -129,12 +129,12 @@ describe('run - ProfitabilityLayers element', () => {
     expect(b.nodes[b.rootId]!.ftp).toBeCloseTo(a.nodes[a.rootId]!.ftp!, 2);
   });
 
-  it('fails the element - and only that element - naming every missing rule', () => {
+  it('leaves the element blank - and only that element - naming every missing rule', () => {
     const outcome = executeRun(RUN, { ...BASE_INPUTS, costAllocation: null, creditLoss: null, capital: null }, NOW);
     expect(outcome.run.status).toBe('Completed');
     expect(payload(outcome, 'ProfitabilityLayers')).toBeUndefined();
     expect(payload(outcome, 'TransferPricing')).toBeDefined();
-    const error = outcome.errors.find((e) => e.code === 'ProfitabilityLayers_FAILED')!;
+    const error = outcome.degradations!.find((d) => d.element === 'ProfitabilityLayers')!;
     expect(error.message).toContain('Cost Allocation rule');
     expect(error.message).toContain('Credit Loss rule');
     expect(error.message).toContain('Capital rule');
@@ -142,7 +142,7 @@ describe('run - ProfitabilityLayers element', () => {
 
   it('names only the rule that is missing', () => {
     const outcome = executeRun(RUN, { ...BASE_INPUTS, ...PROFITABILITY_INPUTS, capital: null }, NOW);
-    const error = outcome.errors.find((e) => e.code === 'ProfitabilityLayers_FAILED')!;
+    const error = outcome.degradations!.find((d) => d.element === 'ProfitabilityLayers')!;
     expect(error.message).toContain('Capital rule');
     expect(error.message).not.toContain('Cost Allocation rule');
   });

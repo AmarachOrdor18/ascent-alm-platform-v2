@@ -258,6 +258,7 @@ export function FxRates() {
         asOfDate={asOfDate}
         scope="Group"
         currency="USD"
+        warningLabel="Missing rates"
         staleWarning={
           missing.length > 0
             ? `No rate loaded for ${missing.join(', ')} - any Group run including these currencies will fail rather than silently omit them.`

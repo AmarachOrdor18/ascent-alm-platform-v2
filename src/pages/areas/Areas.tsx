@@ -1,6 +1,6 @@
 /**
- * The work areas - Data → Assumptions → Run & results → Approvals → Reports - plus Admin, which holds
- * Organisation setup (checklist, organisation details & defaults, affiliates, market & reference data).
+ * The work areas - Data → Assumptions → Run & results → Approvals → Reports - plus Admin (users,
+ * the organisation, notifications, audit log and reset).
  * Each area is one sidebar entry with one tab strip; screens that belong together sit one level down
  * as a secondary strip. Every screen keeps its original URL, so links, bookmarks and tours still land.
  */
@@ -12,9 +12,7 @@ const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 
 // ─── Screens ────────────────────────────────────────────────────────────────
 
-const SetupChecklist = page(() => import('@/pages/areas/SetupChecklist'), 'SetupChecklist');
 const OrganisationSetup = page(() => import('@/pages/areas/OrganisationSetup'), 'OrganisationSetup');
-const Affiliates = page(() => import('@/pages/Affiliates'), 'Affiliates');
 const YieldCurves = page(() => import('@/pages/YieldCurves'), 'YieldCurves');
 const FxRates = page(() => import('@/pages/FxRates'), 'FxRates');
 const EconomicIndicators = page(() => import('@/pages/EconomicIndicators'), 'EconomicIndicators');
@@ -22,7 +20,6 @@ const HolidayCalendar = page(() => import('@/pages/HolidayCalendar'), 'HolidayCa
 const MarketDataHub = page(() => import('@/pages/areas/MarketDataHub'), 'MarketDataHub');
 
 const DataSourcesTab = page(() => import('@/pages/data/DataSources'), 'DataSourcesTab');
-const AdminDataSources = page(() => import('@/pages/data/DataSources'), 'AdminDataSources');
 const LoadHistory = page(() => import('@/pages/data/LoadHistory'), 'LoadHistory');
 const PositionBook = page(() => import('@/pages/PositionBook'), 'PositionBook');
 const Dimensions = page(() => import('@/pages/Dimensions'), 'Dimensions');
@@ -69,30 +66,6 @@ const sub = (tabs: ModuleTab[]): ComponentType =>
     return <ModuleTabs tabs={tabs} variant="secondary" />;
   };
 
-// ─── Organisation setup (under Admin) ───────────────────────────────────────
-
-/** Organisation setup is for whoever sets the organisation or an affiliate up - nobody else sees it. */
-export const SETUP_PERMISSION = 'group.manage|affiliate.manage';
-
-export const SETUP_TABS: ModuleTab[] = [
-  { key: 'checklist', label: 'Checklist', path: '/setup', permission: SETUP_PERMISSION, Component: SetupChecklist },
-  {
-    key: 'organisation',
-    label: 'Organisation & defaults',
-    path: '/setup/organisation',
-    permission: 'group.manage',
-    Component: OrganisationSetup,
-  },
-  { key: 'affiliates', label: 'Affiliates', path: '/affiliates', permission: 'group.manage', Component: Affiliates },
-  {
-    key: 'sources',
-    label: 'Data sources',
-    path: '/setup/sources',
-    permission: 'group.manage',
-    Component: AdminDataSources,
-  },
-];
-
 // ─── Data ────────────────────────────────────────────────────────────────
 
 const STRUCTURE_TABS: ModuleTab[] = [
@@ -115,7 +88,13 @@ const STRUCTURE_TABS: ModuleTab[] = [
 // Market data (Group-wide): status and upload, then FX rates, curves, indicators and holiday calendars. It
 // lives in Data, where data arrives - not under Admin. Old /setup/reference* URLs redirect here (App.tsx).
 export const MARKET_TABS: ModuleTab[] = [
-  { key: 'status', label: 'Status & upload', path: '/data/market', permission: 'data.view', Component: MarketDataHub },
+  {
+    key: 'status',
+    label: 'Overview & upload',
+    path: '/data/market',
+    permission: 'data.view',
+    Component: MarketDataHub,
+  },
   { key: 'fx', label: 'FX rates', path: '/data/market/fx', permission: 'data.view', Component: FxRates },
   {
     key: 'curves',
@@ -381,17 +360,15 @@ export const REPORT_TABS: ModuleTab[] = [
 
 // ─── Admin ──────────────────────────────────────────────────────────────────
 
-const SETUP_TAB_PATHS = SETUP_TABS.map((t) => t.path);
-
+// One place for the organisation: details, affiliates (add / invite admin), defaults and Group assumptions.
 export const ADMIN_TABS: ModuleTab[] = [
   { key: 'users', label: 'Users & roles', path: '/admin/users', permission: 'users.manage', Component: AdminUsers },
   {
-    key: 'setup',
-    label: 'Organisation setup',
-    path: '/setup',
-    matchPaths: SETUP_TAB_PATHS,
-    permission: SETUP_PERMISSION,
-    Component: sub(SETUP_TABS),
+    key: 'organisation',
+    label: 'Organisation',
+    path: '/setup/organisation',
+    permission: 'group.manage',
+    Component: OrganisationSetup,
   },
   {
     key: 'notifications',
@@ -402,10 +379,10 @@ export const ADMIN_TABS: ModuleTab[] = [
   },
   { key: 'audit', label: 'Audit log', path: '/admin/audit', permission: 'audit.view', Component: AdminAudit },
   {
-    key: 'preferences',
-    label: 'Preferences',
+    key: 'reset',
+    label: 'Reset platform',
     path: '/admin/preferences',
-    permission: 'admin.manage',
+    permission: 'group.manage',
     Component: AdminPreferences,
   },
 ];
@@ -467,5 +444,5 @@ export const AREA_ROUTES: AreaRoute[] = [
   }),
   ...routesOf(APPROVE_TABS, ApproveArea),
   ...routesOf(REPORT_TABS, ReportsArea),
-  ...routesOf(ADMIN_TABS, AdminArea, { setup: SETUP_TABS }),
+  ...routesOf(ADMIN_TABS, AdminArea),
 ];

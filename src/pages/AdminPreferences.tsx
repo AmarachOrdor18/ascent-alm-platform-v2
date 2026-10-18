@@ -1,186 +1,87 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { ROLE_LIST, useAuth } from '@/context/AuthContext';
-import { useRoles } from '@/lib/hooks';
+import { useAuth } from '@/context/AuthContext';
 import { reseed } from '@/data/seed/bootstrap';
+import { supabase } from '@/lib/supabase';
 import { isSupabaseMode, repository } from '@/store/repositoryInstance';
 
-// No system-wide settings entity exists in this data model; this page is read-only and links out to where each setting is actually configured.
+type Mode = 'onboarding' | 'all';
+
+/** Admin → Reset platform: start organisation onboarding again, or erase everything and start afresh. */
 export function AdminPreferences() {
-  const { hasPermission } = useAuth();
-  const canReset = hasPermission('admin.manage');
-  const { data: roles } = useRoles();
-  const roleList = ROLE_LIST.map((r) => roles?.find((live) => live.code === r.code) ?? r);
+  const { user } = useAuth();
+  const isOrgAdmin = user?.role === 'ADMIN';
+  const [confirmText, setConfirmText] = useState('');
+  const [busy, setBusy] = useState<Mode | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [armed, setArmed] = useState(false);
-  const [resetting, setResetting] = useState(false);
-
-  const handleReset = async () => {
-    if (!armed) {
-      setArmed(true);
-      return;
+  const reset = async (mode: Mode) => {
+    setBusy(mode);
+    setError(null);
+    try {
+      if (isSupabaseMode) {
+        const { error: rpcError } = await supabase().rpc('reset_platform', { p_mode: mode });
+        if (rpcError) throw new Error(rpcError.message);
+      } else if (mode === 'all') {
+        await reseed(repository);
+      }
+      // Every cache, the scope and the onboarding gate must re-read the database from zero.
+      window.location.assign('/');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(null);
     }
-    setResetting(true);
-    await reseed(repository);
-    // A full reload is deliberate: every screen's React Query cache, the auth session and scope
-    // context all need to forget what they knew and re-read the freshly seeded database from zero.
-    window.location.reload();
   };
 
   return (
     <>
-      <ModuleHeader
-        title="System Preferences"
-        description="How the platform is actually configured, and where to change each thing for real."
-        asOfDate={null}
-        scope="Ecobank Group"
-      />
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-navy-900">Access &amp; roles</h3>
-          <p className="mb-4 text-[12px] text-gray-400">
-            Six roles; users move between them and permissions are editable, but not from this screen.
-          </p>
-          <dl className="space-y-3 text-[13px]">
-            {roleList.map((r) => (
-              <div
-                key={r.code}
-                className="flex items-center justify-between border-b border-gray-50 pb-2 last:border-0"
-              >
-                <dt className="text-gray-600">{r.name}</dt>
-                <dd className="font-mono text-gray-400">{r.permissions.length} permissions</dd>
-              </div>
-            ))}
-          </dl>
-          <Link href="/admin/users" className="mt-4 inline-block text-[12px] font-bold text-navy-700 hover:underline">
-            Manage users and role assignments →
-          </Link>
-        </section>
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-navy-900">Data &amp; retention</h3>
-          <p className="mb-4 text-[12px] text-gray-400">Fixed platform behaviour, not per-affiliate settings.</p>
-          <dl className="space-y-3 text-[13px]">
-            <Row label="Load batch retention" value="24 monthly as-of dates, every version" />
-            <Row label="Expired data" value="Marked and hidden, never deleted" />
-            <Row label="Audit trail" value="Append-only, every event retained" />
-            <Row label="Audit log display cap" value="Most recent 500 events" />
-          </dl>
-          <Link href="/data-vintages" className="mt-4 inline-block text-[12px] font-bold text-navy-700 hover:underline">
-            View load history and retention →
-          </Link>
-        </section>
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-navy-900">
-            Validation &amp; controls
-          </h3>
-          <p className="mb-4 text-[12px] text-gray-400">Per-rule, configured on the screen that owns it.</p>
-          <dl className="space-y-3 text-[13px]">
-            <Row label="Blocking vs advisory" value="Set per validation rule" />
-            <Row label="Reconciliation tolerance" value="Set per affiliate, amount or %" />
-            <Row label="Limit thresholds" value="Amber/Red and regulatory floor, per limit" />
-          </dl>
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
-            <Link href="/validation-rules" className="text-[12px] font-bold text-navy-700 hover:underline">
-              Validation Rules →
-            </Link>
-            <Link
-              href="/data/operations?domain=GeneralLedger"
-              className="text-[12px] font-bold text-navy-700 hover:underline"
+      <ModuleHeader title="Reset platform" asOfDate={null} />
+      {!isOrgAdmin ? (
+        <p className="text-[13px] text-gray-500">Only an Organisation Admin can reset the platform.</p>
+      ) : (
+        <div className="grid max-w-3xl grid-cols-1 gap-5">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6">
+            <h3 className="text-[14px] font-bold text-navy-900">Restart organisation onboarding</h3>
+            <p className="mt-1 text-[13px] text-gray-500">Keeps all data. The setup wizard opens again.</p>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void reset('onboarding')}
+              className="mt-4 rounded-lg border border-navy-900 px-4 py-2 text-[13px] font-bold text-navy-900 hover:bg-navy-50 disabled:opacity-40"
             >
-              GL Reconciliation →
-            </Link>
-            <Link href="/limits" className="text-[12px] font-bold text-navy-700 hover:underline">
-              Limits &amp; Breaches →
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-navy-900">
-            Notifications &amp; escalation
-          </h3>
-          <p className="mb-4 text-[12px] text-gray-400">Configured per event, not a global switch.</p>
-          <dl className="space-y-3 text-[13px]">
-            <Row label="Alert rules" value="Event, channel, recipients and minimum severity, per rule" />
-            <Row label="Escalation" value="Optional, after a set number of hours to a second recipient list" />
-          </dl>
-          <Link href="/notifications" className="mt-4 inline-block text-[12px] font-bold text-navy-700 hover:underline">
-            Manage notification rules →
-          </Link>
-        </section>
-
-        {isSupabaseMode ? (
-          <section
-            data-tour-section="Reset demo data"
-            className="rounded-2xl border border-gray-200 bg-white p-6 lg:col-span-2"
-          >
-            <h3 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-navy-900">Reset data</h3>
-            <p className="text-[12px] leading-relaxed text-navy-900">
-              Not available here. This platform runs on a shared database that every user and affiliate works from, so
-              it can&rsquo;t be wiped from a browser. Restoring the shipped starting configuration is an operations task
-              run from a workstation (scripts/seed-supabase.ts).
-            </p>
+              {busy === 'onboarding' ? 'Restarting…' : 'Restart onboarding'}
+            </button>
           </section>
-        ) : (
-          <section
-            data-tour-section="Reset demo data"
-            className="rounded-2xl border border-danger/30 bg-danger/5 p-6 lg:col-span-2"
-          >
-            <h3 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-danger">Reset demo data</h3>
-            <p className="mb-4 text-[12px] leading-relaxed text-navy-900">
-              Wipes every affiliate, position, rule, run, user and log entry in this browser&rsquo;s local database and
-              restores the platform to its original shipped state (the Group entity only, no affiliates). This cannot be
-              undone, and it signs everyone in this browser out - the page reloads to the sign-in screen once it&rsquo;s
-              done.
+
+          <section className="rounded-2xl border border-danger/30 bg-danger/5 p-6">
+            <h3 className="text-[14px] font-bold text-danger">Erase everything and start afresh</h3>
+            <p className="mt-1 text-[13px] text-navy-900">
+              Removes every affiliate, upload, rule change, run, approval, notification and added user. The seed logins
+              stay. This cannot be undone.
             </p>
-            {canReset ? (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void handleReset()}
-                  onBlur={() => setArmed(false)}
-                  disabled={resetting}
-                  className={
-                    armed
-                      ? 'rounded-lg bg-danger px-4 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-40'
-                      : 'rounded-lg border border-danger px-4 py-2 text-[13px] font-bold text-danger hover:bg-danger hover:text-white disabled:opacity-40'
-                  }
-                >
-                  {resetting
-                    ? 'Resetting…'
-                    : armed
-                      ? 'Click again to confirm - this erases everything'
-                      : 'Reset demo data'}
-                </button>
-                {armed && !resetting && (
-                  <button
-                    type="button"
-                    onClick={() => setArmed(false)}
-                    className="text-[12px] font-bold text-gray-500 hover:text-navy-900"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p className="text-[12px] font-bold text-gray-500">Only an Administrator can reset demo data.</p>
-            )}
+            <label htmlFor="reset-confirm" className="mt-4 block text-[12px] font-medium text-gray-600">
+              Type RESET to confirm
+            </label>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <input
+                id="reset-confirm"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="w-40 rounded border border-gray-300 px-2 py-1.5 text-[13px]"
+              />
+              <button
+                type="button"
+                disabled={confirmText !== 'RESET' || busy !== null}
+                onClick={() => void reset('all')}
+                className="rounded-lg bg-danger px-4 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-40"
+              >
+                {busy === 'all' ? 'Erasing…' : 'Erase everything'}
+              </button>
+            </div>
           </section>
-        )}
-      </div>
+          {error && <p className="text-[13px] font-bold text-danger">{error}</p>}
+        </div>
+      )}
     </>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-50 pb-2 last:border-0">
-      <dt className="text-gray-600">{label}</dt>
-      <dd className="text-right text-gray-400">{value}</dd>
-    </div>
   );
 }

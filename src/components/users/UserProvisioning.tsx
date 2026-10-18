@@ -269,8 +269,13 @@ export function AssignExistingUser({
   const [role, setRole] = useState<ActiveRoleCode>(roles[0]!);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const picked = candidates.find((u) => u.id === userId);
-  const sorted = useMemo(() => [...candidates].sort((a, b) => a.name.localeCompare(b.name)), [candidates]);
+  // Group users work across the organisation - they are never moved into one affiliate from here.
+  const eligible = useMemo(
+    () => candidates.filter((u) => affiliateCode === 'GROUP' || u.affiliateCode !== 'GROUP'),
+    [candidates, affiliateCode],
+  );
+  const picked = eligible.find((u) => u.id === userId);
+  const sorted = useMemo(() => [...eligible].sort((a, b) => a.name.localeCompare(b.name)), [eligible]);
 
   const assign = async () => {
     if (!picked) return;

@@ -106,6 +106,30 @@ async function main() {
     }
     counts.logins = created;
 
+    // The in-app reset (Admin > Reset platform) restores exactly these rows - keep the record current.
+    await client.query('delete from app.seed_rows');
+    const snapshot: Array<[string, Pk, object[]]> = [
+      ['affiliates', 'code', seed.affiliates],
+      ['dimension_members', 'id', seed.dimensionMembers],
+      ['currencies', 'code', seed.currencies],
+      ['limit_configs', 'id', seed.limits],
+      ['connectors', 'id', seed.connectors],
+      ['data_sources', 'id', seed.dataSources],
+      ['rules', 'id', seed.rules],
+      ['approvals', 'id', seed.approvals],
+      ['app_users', 'id', seed.users],
+    ];
+    for (const [table, pk, rows] of snapshot) {
+      for (const row of rows) {
+        const key = (row as Record<string, unknown>)[pk] as string;
+        await client.query('insert into app.seed_rows (tbl, pk, data) values ($1, $2, $3)', [
+          table,
+          key,
+          JSON.stringify(row),
+        ]);
+      }
+    }
+
     await client.query('commit');
     console.log(`Seed complete${overwrite ? ' (overwrite)' : ''} - rows written:`);
     for (const [table, n] of Object.entries(counts)) console.log(`  ${table.padEnd(18)} ${n}`);

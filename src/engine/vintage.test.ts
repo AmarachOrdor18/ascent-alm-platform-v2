@@ -205,9 +205,9 @@ describe('multi-department Position Book contribution', () => {
 
     const readiness = positionBookReadiness(affiliate(), batches, '2026-07-31');
     expect(readiness.legacyBatch?.id).toBe('B-LEGACY-1');
-    // A legacy load doesn't count toward any specific department's completeness.
+    // A legacy load doesn't count toward any specific department's completeness, but the book is not empty.
     expect(readiness.contributors.every((c) => !c.submitted)).toBe(true);
-    expect(readiness.isComplete).toBe(false);
+    expect(readiness.isComplete).toBe(true);
   });
 
   it('contributionReadiness reports per-department status against an affiliate’s required contributors', () => {

@@ -4,7 +4,8 @@
  * draft - and the wizard records progress per step on the 'AFF:<code>' onboarding record.
  */
 import { useMemo, useState } from 'react';
-import { Link } from 'wouter';
+import { Drawer } from '@/components/ui/Drawer';
+import { LedgerCheckPanel } from '@/components/data/LedgerCheckPanel';
 import { useQuery } from '@tanstack/react-query';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ROLES, canonicalRole, useAuth } from '@/context/AuthContext';
@@ -28,7 +29,7 @@ import { useLimitConfigs } from '@/lib/limitHooks';
 import { useRules } from '@/lib/ruleHooks';
 import { approvals, newApprovalRequest } from '@/lib/governanceHooks';
 import { admittedLedger } from '@/lib/sourceIngest';
-import { SOURCE_DOMAIN_LABEL } from '@/lib/dataSources';
+import { sourceKindLabel } from '@/lib/dataSources';
 import { currentBatch, positionBookReadiness } from '@/engine/vintage';
 import { deriveMembersFromFile } from '@/engine/dimensions';
 import { METRIC_LABEL, REGULATORY_MINIMA } from '@/engine/limits';
@@ -64,8 +65,8 @@ export const AFFILIATE_STEP_META: Record<AffiliateStep, StepMeta> = {
   },
   dataSources: {
     title: 'Data sources',
-    what: 'Choose how your two data sources arrive - positions (the whole balance sheet) and the general ledger - and match your file’s columns to the platform’s fields.',
-    why: 'Every calculation reads the positions; the ledger is used to check the positions add up.',
+    what: 'Choose how each data source arrives - Loans, Deposits and Treasury positions, the general ledger, and balance and account history.',
+    why: 'Every calculation reads the positions; the ledger checks they add up; the history feeds the behavioural models.',
     needed:
       'For each: file upload or a connector, who owns it, and a sample file to match columns (or skip). Market data comes from Group - nothing to do.',
     next: 'Add the people who will work on this affiliate.',
@@ -86,9 +87,10 @@ export const AFFILIATE_STEP_META: Record<AffiliateStep, StepMeta> = {
   },
   initialData: {
     title: 'Initial data',
-    what: 'Upload your first positions and general ledger files, and map your GL codes to the common chart of accounts.',
+    what: 'Upload your first Loans, Deposits, Treasury and general ledger files, and map your GL codes to the common chart of accounts.',
     why: 'Nothing can be calculated until data is loaded and checked.',
-    needed: 'A positions file and a general ledger file for the same date. The mapping is suggested for you.',
+    needed:
+      'The Loans, Deposits, Treasury and general ledger files for the same date. The mapping is suggested for you.',
     next: 'Check readiness and ask for go-live.',
   },
   readiness: {
@@ -258,8 +260,7 @@ export function DataSourcesStep({ affiliate, onBack, onContinue }: AffStepProps)
       <Card title="Your data sources">
         {sources.length === 0 ? (
           <p className="text-[13px] text-gray-500">
-            No data sources found for this affiliate. Ask your Organisation Admin to add them (Admin → Organisation
-            setup → Data sources).
+            No data sources found for this affiliate. Ask your Organisation Admin.
           </p>
         ) : (
           <ul className="divide-y divide-gray-50">
@@ -270,7 +271,7 @@ export function DataSourcesStep({ affiliate, onBack, onContinue }: AffStepProps)
                 <li key={s.id} className="grid grid-cols-1 gap-3 py-3 md:grid-cols-[1fr_1fr_1fr]">
                   <div>
                     <p className="text-[13px] font-bold text-navy-900">{s.name}</p>
-                    <p className="text-[12px] text-gray-500">{SOURCE_DOMAIN_LABEL[s.domain]}</p>
+                    <p className="text-[12px] text-gray-500">{sourceKindLabel(s)}</p>
                   </div>
                   <div>
                     <span className={label}>Arrives by</span>
@@ -329,9 +330,8 @@ export function DataSourcesStep({ affiliate, onBack, onContinue }: AffStepProps)
       </Card>
       <Card title="Column mapping">
         <p className="text-[13px] text-navy-900">
-          Nothing to do now. Your files can keep their own column names: when the first file arrives for a source, the
-          columns are matched automatically and you confirm any that don&rsquo;t match - once. Later files are read the
-          same way.
+          Your files keep their own column names. On the first upload to each source you confirm any column that
+          doesn&rsquo;t match - once.
         </p>
       </Card>
       <Card title="Market data">
@@ -892,6 +892,7 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
   const { data: batches = [] } = useBatches();
   const { data: lobby = [] } = useLobby();
   const [uploading, setUploading] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const glSource = sources.find((s) => s.domain === 'GeneralLedger');
 
   return (
@@ -902,7 +903,11 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
       >
         <ul className="divide-y divide-gray-50 text-[13px]">
           {sources.map((s) => {
-            const last = latestDate(batches, affiliate.code, s.domain);
+            const last = latestDate(
+              batches.filter((b) => !s.contributor || b.contributor === s.contributor),
+              affiliate.code,
+              s.domain,
+            );
             const waiting = lobby.filter((l) => l.sourceId === s.id).length;
             return (
               <li key={s.id} className="flex items-center justify-between py-2">
@@ -929,18 +934,20 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
             Upload files
           </button>
           {glSource && (
-            <Link
-              href={`/data/operations?source=${glSource.id}&tab=check`}
-              className="text-[12px] font-bold text-navy-700 hover:underline"
-            >
+            <button type="button" onClick={() => setLedgerOpen(true)} className={btnSecondary}>
               Open the ledger check
-            </Link>
+            </button>
           )}
         </div>
       </Card>
       <CoaMapping affiliate={affiliate} />
       <StepFooter mode="wizard" onBack={onBack} onSubmit={onContinue} submitLabel="Continue" />
       {uploading && <UploadDataModal sources={sources} groupView={false} onClose={() => setUploading(false)} />}
+      {ledgerOpen && (
+        <Drawer title="Ledger check" onClose={() => setLedgerOpen(false)} wide>
+          <LedgerCheckPanel affiliate={affiliate} />
+        </Drawer>
+      )}
     </div>
   );
 }

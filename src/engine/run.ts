@@ -631,6 +631,7 @@ export function draftRun(params: {
   createdBy: string;
   createdAt: string;
   elements?: CalculationElement[];
+  ftpRuleId?: string | null;
 }): ProcessRun {
   return {
     id: params.id,
@@ -649,7 +650,7 @@ export function draftRun(params: {
     forecastScenarioIds: [],
     newBusinessRuleId: null,
     transactionStrategyId: null,
-    ftpRuleId: null,
+    ftpRuleId: params.ftpRuleId ?? null,
     adjustmentRuleId: null,
     costAllocationRuleId: null,
     creditLossRuleId: null,

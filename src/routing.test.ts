@@ -47,10 +47,9 @@ describe('matches - the helper itself', () => {
 });
 
 describe('route order', () => {
-  it('reaches the onboarding wizard rather than the affiliate detail wildcard', () => {
-    // The regression. Before the fix this resolved to /affiliates/:code,
-    // whose handler returned null - a blank page under a working nav link.
-    expect(firstMatch('/affiliates/onboard')?.path).toBe('/affiliates/onboard');
+  it('reaches affiliate settings rather than the affiliate detail wildcard', () => {
+    // The regression: a literal path under /affiliates once resolved to /affiliates/:code - a blank page.
+    expect(firstMatch('/affiliates/NG/settings')?.path).toBe('/affiliates/:code/settings');
   });
 
   it('still reaches affiliate detail for a real affiliate code', () => {
@@ -129,8 +128,10 @@ describe('route-level permission gating', () => {
     }
   });
 
-  it('gates every /rules/* sub-editor behind rules.edit, matching the Business Rules hub itself', () => {
-    const ruleSubRoutes = ROUTES.filter((r) => r.path.startsWith('/rules/'));
+  it('gates every /rules/* sub-editor behind rules.edit, apart from the data-facing ones', () => {
+    // Validation, mappings and coverage serve data users, so they sit behind data/risk viewing instead.
+    const DATA_FACING = ['/rules/validation', '/rules/field-mappings', '/rules/code-mappings', '/rules/coverage'];
+    const ruleSubRoutes = ROUTES.filter((r) => r.path.startsWith('/rules/') && !DATA_FACING.includes(r.path));
     expect(ruleSubRoutes.length).toBeGreaterThan(0);
     expect(ruleSubRoutes.every((r) => r.permission === 'rules.edit')).toBe(true);
   });

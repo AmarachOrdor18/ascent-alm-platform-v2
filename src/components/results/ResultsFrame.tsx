@@ -105,13 +105,12 @@ export function ResultsFrame({
 
   if (!run) {
     // A run needs a Live affiliate with data behind it - until one exists, "Run now" is a dead end, so
-    // point a first-time user at the Setup checklist instead.
+    // point a first-time user at Readiness instead.
     const hasLiveAffiliate = affiliates.some((a) => a.code !== 'GROUP' && a.status === 'Live');
     if (!hasLiveAffiliate) {
       return (
-        <EmptyState title="Nothing is set up yet" cta={{ label: 'Open the Setup checklist', href: '/setup' }}>
-          Results are read from a completed run, and a run needs a Live affiliate with positions loaded. The Setup
-          checklist walks through onboarding an affiliate, reference data and the first data load, in order.
+        <EmptyState title="Nothing is set up yet" cta={{ label: 'Open Readiness', href: '/execution/readiness' }}>
+          Results need a run, and a run needs a Live affiliate with positions loaded. Readiness shows what is missing.
         </EmptyState>
       );
     }

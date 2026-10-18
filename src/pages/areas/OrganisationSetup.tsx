@@ -32,8 +32,8 @@ export function OrganisationSetup() {
   return (
     <>
       <ModuleHeader
-        title="Organisation & defaults"
-        description="The organisation’s details, affiliates, defaults and access - editable at any time."
+        title="Organisation"
+        description="The organisation’s details, affiliates, defaults and Group assumptions - editable at any time."
         asOfDate={null}
         metrics={[
           {
@@ -90,9 +90,6 @@ export function OrganisationSetup() {
           </div>
         </nav>
         <div>
-          <p className="mb-4 text-[13px] leading-relaxed text-gray-500">
-            {ORG_STEP_META[step].what} {ORG_STEP_META[step].why}
-          </p>
           {step === 'organisation' && <OrganisationStep {...props} />}
           {step === 'affiliates' && <AffiliatesStep {...props} />}
           {step === 'settings' && <DefaultsStep {...props} />}{' '}

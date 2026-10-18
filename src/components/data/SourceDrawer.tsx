@@ -9,7 +9,7 @@ import { downloadBlob } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates, useBatches } from '@/lib/hooks';
 import { useConnectors } from '@/lib/connectorHooks';
-import { CONNECTOR_TYPE_LABEL, SOURCE_DOMAIN_LABEL, SOURCE_USED_BY, sourceTemplateCsv } from '@/lib/dataSources';
+import { CONNECTOR_TYPE_LABEL, SOURCE_USED_BY, sourceKindLabel, sourceTemplateCsv } from '@/lib/dataSources';
 import {
   loadStage,
   sourceForLoad,
@@ -95,7 +95,7 @@ export function SourceDrawer({
   return (
     <Drawer
       title={source.name}
-      description={`${source.affiliateCode === 'GROUP' ? 'Group' : (affiliate?.name ?? source.affiliateCode)} · ${SOURCE_DOMAIN_LABEL[source.domain]}${source.contributor ? ` · ${source.contributor}` : ''}`}
+      description={`${source.affiliateCode === 'GROUP' ? 'Group' : (affiliate?.name ?? source.affiliateCode)} · ${sourceKindLabel(source)}`}
       onClose={onClose}
       wide
     >
@@ -242,7 +242,7 @@ function OverviewTab({
       <Section title="Configuration">
         <KeyValueGrid
           items={[
-            { label: 'Data', value: SOURCE_DOMAIN_LABEL[source.domain] },
+            { label: 'Data', value: sourceKindLabel(source) },
             {
               label: 'Belongs to',
               value:

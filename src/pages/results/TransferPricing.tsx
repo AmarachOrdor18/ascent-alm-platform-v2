@@ -326,6 +326,7 @@ export function TransferPricing() {
       <ModuleHeader
         title="Funds Transfer Pricing"
         description="Margin attributed to the desk that earned it, with the transfer rate decomposed into curve plus named add-ons."
+        about={ftp?.methodology}
         asOfDate={run?.asOfDate ?? null}
         scope={affiliate?.name ?? affiliateCode}
         currency={currency}
@@ -408,10 +409,6 @@ export function TransferPricing() {
                   ))}
                 </nav>
               </div>
-              <p className="mb-4 text-[12px] text-gray-500">
-                Assets are charged the transfer rate and keep the excess of their external rate; liabilities are
-                credited it and keep the difference against their external cost.
-              </p>
               {level ? (
                 <ResultTable
                   rows={rollUpRows}
@@ -496,11 +493,13 @@ export function TransferPricing() {
 
             {adjustments && adjustments.byType.length > 0 && (
               <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                <h2 className="mb-1 text-[13px] font-bold uppercase tracking-widest text-navy-900">Adjustment stack</h2>
-                <p className="mb-4 text-[12px] leading-relaxed text-gray-500">
-                  Each add-on is a separate, named component rather than one opaque spread, so treasury can see what the
-                  liquidity premium, currency basis or index basis costs the lending desk.
-                </p>
+                <h2 className="mb-4 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
+                  Adjustment stack
+                  <InfoButton label="About the adjustment stack">
+                    Each add-on is a separate, named component, so treasury can see what the liquidity premium, currency
+                    basis or index basis costs the lending desk. {methodologyOf(results, 'TpAdjustments')}
+                  </InfoButton>
+                </h2>
                 <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {adjustments.byType.map((a) => (
                     <div key={a.type} className="rounded-lg bg-gray-50 p-4">
@@ -514,9 +513,6 @@ export function TransferPricing() {
                     </div>
                   ))}
                 </dl>
-                <p className="mt-4 border-t border-gray-50 pt-3 text-[12px] leading-relaxed text-gray-500">
-                  {methodologyOf(results, 'TpAdjustments')}
-                </p>
               </section>
             )}
 
@@ -567,8 +563,6 @@ export function TransferPricing() {
                 onPageChange={lineControls.setPage}
               />
             </section>
-
-            <p className="mt-4 text-[12px] leading-relaxed text-gray-500">{ftp.methodology}</p>
           </>
         )}
       </ResultsFrame>

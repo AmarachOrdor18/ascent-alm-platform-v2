@@ -46,9 +46,6 @@ const AffiliateDetail = lazy(() => import('@/pages/AffiliateDetail').then((m) =>
 const AffiliateSettings = lazy(() =>
   import('@/pages/AffiliateSettings').then((m) => ({ default: m.AffiliateSettings })),
 );
-const OnboardAffiliateResume = lazy(() =>
-  import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate })),
-);
 const OrganisationOnboarding = lazy(() =>
   import('@/pages/welcome/OrganisationOnboarding').then((m) => ({ default: m.OrganisationOnboarding })),
 );
@@ -121,12 +118,6 @@ const BUILT: Record<string, ComponentType> = {
   '/rules/code-mappings': lazy(() => import('@/pages/rules/CodeMappings').then((m) => ({ default: m.CodeMappings }))),
   '/rules/coverage': lazy(() =>
     import('@/pages/rules/ModelsAssumptions').then((m) => ({ default: m.ModelsAssumptions })),
-  ),
-
-  // Setup and onboarding - untouched by the navigation redesign.
-  '/affiliates/onboard': lazy(() => import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate }))),
-  '/affiliates/bulk-onboard': lazy(() =>
-    import('@/pages/BulkOnboardAffiliates').then((m) => ({ default: m.BulkOnboardAffiliates })),
   ),
 };
 
@@ -224,6 +215,12 @@ const LEGACY_REDIRECTS: Array<{ from: string; to: string }> = [
   { from: '/remediation', to: '/controls/remediation' },
   { from: '/admin/notifications', to: '/admin' },
   { from: '/notifications', to: '/admin' },
+  // Organisation setup is one page now: Admin → Organisation (details, affiliates, defaults, assumptions).
+  { from: '/setup/sources', to: '/setup/organisation' },
+  { from: '/setup', to: '/setup/organisation' },
+  { from: '/affiliates/onboard', to: '/setup/organisation' },
+  { from: '/affiliates/bulk-onboard', to: '/setup/organisation' },
+  { from: '/affiliates', to: '/setup/organisation' },
 ];
 
 export interface RouteEntry {
@@ -270,8 +267,6 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/field-mappings', screenName: 'Field Mappings' },
   { path: '/rules/code-mappings', screenName: 'Code Mappings' },
   { path: '/rules/coverage', screenName: 'Rule Coverage' },
-  { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
-  { path: '/affiliates/bulk-onboard', screenName: 'Bulk Onboard Affiliates' },
   { path: '/account', screenName: 'My Account' },
 ];
 
@@ -281,8 +276,6 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
  * permission, since it's reached by clicking through it.
  */
 const UNLISTED_PERMISSION: Record<string, string> = {
-  '/affiliates/onboard': 'group.manage',
-  '/affiliates/bulk-onboard': 'group.manage',
   '/rules/validation': 'data.view',
   '/rules/field-mappings': 'data.view',
   '/rules/code-mappings': 'data.view',
@@ -351,12 +344,6 @@ export const buildRouteOrder = (): RouteEntry[] => {
     }));
 
   const parameterised: RouteEntry[] = [
-    {
-      path: '/affiliates/onboard/:code',
-      screenName: 'Resume Onboarding',
-      Component: OnboardAffiliateResume,
-      permission: 'group.manage',
-    },
     {
       path: '/affiliates/:code/settings',
       screenName: 'Affiliate Settings',

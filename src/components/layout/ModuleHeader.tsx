@@ -16,7 +16,7 @@ export interface HeaderMetric {
 
 interface ModuleHeaderProps {
   title: React.ReactNode;
-  description: string;
+  description?: string;
   /** Extra explanation kept out of the header line - shown behind an ⓘ next to the description. */
   about?: string;
   /** `null` is legitimate only on configuration screens, which are not as-of dated. */
@@ -24,6 +24,8 @@ interface ModuleHeaderProps {
   currency?: CurrencyCode;
   scope?: string;
   staleWarning?: string | null;
+  /** Badge on the warning strip - defaults to 'Stale data'. */
+  warningLabel?: string;
   metrics?: HeaderMetric[];
   actions?: ReactNode;
 }
@@ -43,6 +45,7 @@ export function ModuleHeader({
   currency,
   scope,
   staleWarning,
+  warningLabel = 'Stale data',
   metrics,
   actions,
 }: ModuleHeaderProps) {
@@ -50,13 +53,17 @@ export function ModuleHeader({
     <header data-tour="page-header" className="mb-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[20px] font-bold text-navy-900">{title}</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] leading-relaxed text-gray-500">
-            <span className="max-w-3xl">{description}</span>
-            {about && (
-              <InfoButton label={`About ${typeof title === 'string' ? title : 'this screen'}`}>{about}</InfoButton>
+          {/* The explanation sits behind the ⓘ - the screen itself stays uncluttered. */}
+          <h1 className="flex items-center gap-2 text-[20px] font-bold text-navy-900">
+            {title}
+            {(description || about) && (
+              <InfoButton label={`About ${typeof title === 'string' ? title : 'this screen'}`}>
+                {description}
+                {description && about && ' '}
+                {about}
+              </InfoButton>
             )}
-          </p>
+          </h1>
 
           {(asOfDate || scope || currency) && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-500">
@@ -87,7 +94,7 @@ export function ModuleHeader({
 
       {staleWarning && (
         <div role="status" className="mb-4 rounded-lg bg-warning-bg px-4 py-2.5 text-[13px] text-warning">
-          <StatusBadge status="Stale data" tone="warning" className="mr-2" />
+          <StatusBadge status={warningLabel} tone="warning" className="mr-2" />
           {staleWarning}
         </div>
       )}

@@ -8,7 +8,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { DownloadIcon } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
-import { fileHeaders, normHeader, routeFile, SOURCE_DOMAIN_LABEL } from '@/lib/dataSources';
+import { fileHeaders, normHeader, routeFile, sourceKindLabel } from '@/lib/dataSources';
 import {
   blockingCount,
   canAdmitNow,
@@ -379,6 +379,8 @@ function FileCard({
   const blocking = c ? blockingCount(c) : 0;
   const creatable = c?.unmapped ?? [];
   const [showIssues, setShowIssues] = useState(false);
+  // One date for the platform: the file's own date (or the header As-of date). The picker only opens on request.
+  const [editDate, setEditDate] = useState(false);
   const canMap = useCanMapColumns(c?.source.affiliateCode);
   const mapping = !!c && !f.checking && needsMapping(c);
   const matchedColumns = c ? c.headers.length - c.ignoredColumns.length : 0;
@@ -388,7 +390,7 @@ function FileCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-[14px] font-bold text-navy-900">{f.fileName}</p>
-          {c && <p className="text-[12px] text-gray-500">{SOURCE_DOMAIN_LABEL[c.source.domain]}</p>}
+          {c && <p className="text-[12px] text-gray-500">{sourceKindLabel(c.source)}</p>}
         </div>
         {!f.outcome && (
           <button type="button" className={btn.link} onClick={onRemove}>
@@ -455,21 +457,36 @@ function FileCard({
               >
                 Data as of
               </label>
-              <input
-                id={`date-${f.key}`}
-                type="date"
-                className={inputCls}
-                value={f.asOfOverride || c?.asOfDate || ''}
-                onChange={(e) => onChangeDate(e.target.value)}
-                disabled={!c}
-              />
+              {editDate || f.asOfOverride ? (
+                <input
+                  id={`date-${f.key}`}
+                  type="date"
+                  className={inputCls}
+                  value={f.asOfOverride || c?.asOfDate || ''}
+                  onChange={(e) => onChangeDate(e.target.value)}
+                  disabled={!c}
+                />
+              ) : (
+                <p id={`date-${f.key}`} className="py-1.5 text-[13px] font-bold text-navy-900">
+                  {c?.asOfDate ?? '-'}
+                </p>
+              )}
               {c && (
                 <p className="mt-0.5 text-[11px] text-gray-500">
                   {c.fileDate
                     ? c.fileDate === c.asOfDate
                       ? 'Read from the file.'
                       : `The file says ${c.fileDate}.`
-                    : 'The file has no date column - check this is right.'}
+                    : 'No date in the file - the As-of date in the header is used.'}{' '}
+                  {!editDate && !f.asOfOverride && (
+                    <button
+                      type="button"
+                      onClick={() => setEditDate(true)}
+                      className="font-bold text-navy-700 hover:underline"
+                    >
+                      Change
+                    </button>
+                  )}
                 </p>
               )}
             </div>

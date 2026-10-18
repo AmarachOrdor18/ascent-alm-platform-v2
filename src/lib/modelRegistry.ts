@@ -71,9 +71,9 @@ export const SEGMENT_DIMENSION_LABEL: Record<SegmentDimension, string> = {
   affiliateCode: 'Affiliate',
 };
 
-/** Plain-language segment name: "Product SAV-RET · Currency NGN". */
+/** Plain segment name - the values only: "DDA · Retail · NGN". */
 export function segmentLabel(key: SegmentKey): string {
-  const parts = (Object.keys(key) as SegmentDimension[]).map((d) => `${SEGMENT_DIMENSION_LABEL[d]} ${key[d]}`);
+  const parts = (Object.keys(key) as SegmentDimension[]).map((d) => String(key[d]));
   return parts.length === 0 ? 'Whole book' : parts.join(' · ');
 }
 

@@ -27,7 +27,6 @@ import {
   ClientManagementIcon,
   SettingsIcon,
   CheckCircleIcon,
-  BriefcaseIcon,
   AuthorizationQueueIcon,
   BellIcon,
   UsersIcon,
@@ -160,14 +159,7 @@ export const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 export const SEARCH_INDEX: NavItem[] = [
   { name: 'Home', path: '/dashboard', permission: 'dashboard.view', phase: 6, icon: DashboardIcon },
   {
-    name: 'Organisation setup',
-    path: '/setup',
-    permission: 'group.manage|affiliate.manage',
-    phase: 3,
-    icon: CheckCircleIcon,
-  },
-  {
-    name: 'Organisation details & defaults',
+    name: 'Organisation, affiliates & defaults',
     path: '/setup/organisation',
     permission: 'group.manage',
     phase: 3,
@@ -298,19 +290,11 @@ export const SEARCH_INDEX: NavItem[] = [
   { name: 'Rules & Scenarios', path: '/assumptions/rules', permission: 'risk.view', phase: 4, icon: SettingsIcon },
   { name: 'Validation Rules', path: '/rules/validation', permission: 'data.view', phase: 3, icon: CheckCircleIcon },
 
-  {
-    name: 'Group & Affiliate Management',
-    path: '/affiliates',
-    permission: 'group.manage',
-    phase: 3,
-    icon: BriefcaseIcon,
-  },
-
   { name: 'Approvals', path: '/controls', permission: 'risk.view', phase: 7, icon: AuthorizationQueueIcon },
   { name: 'Control Remediation', path: '/controls/remediation', permission: 'risk.view', phase: 7, icon: AlertIcon },
   { name: 'Notifications', path: '/admin', permission: 'dashboard.view', phase: 7, icon: BellIcon },
   { name: 'Users, Roles & Permissions', path: '/admin/users', permission: 'users.manage', phase: 8, icon: UsersIcon },
-  { name: 'System Preferences', path: '/admin/preferences', permission: 'admin.manage', phase: 8, icon: SettingsIcon },
+  { name: 'Reset platform', path: '/admin/preferences', permission: 'group.manage', phase: 8, icon: SettingsIcon },
   { name: 'Audit Log', path: '/admin/audit', permission: 'audit.view', phase: 8, icon: AuditIcon },
 
   { name: 'My Account', path: '/account', permission: 'dashboard.view', phase: 8, icon: UsersIcon },

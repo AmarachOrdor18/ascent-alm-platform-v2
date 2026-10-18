@@ -796,35 +796,11 @@ const REMEDIATION: Step[] = [
 ];
 
 const AFFILIATES: Step[] = [
-  s('/affiliates', TABLE, 'Affiliates', 'Every affiliate with its status, data freshness, last run and risk rating.', {
-    permission: 'group.manage',
-  }),
-  s('/affiliates', FIRST_ROW, 'Open an affiliate', 'Next shows how each of its data domains is fed.', {
-    permission: 'group.manage',
-    clickOnNext: true,
-  }),
-  s('', ROW_DETAIL, 'Feeds by domain', 'Connector or file for each domain, its SLA, and when it last loaded.', {
-    permission: 'group.manage',
-  }),
   s(
-    '/affiliates',
-    'button:Bulk onboard',
-    'Onboard many at once',
-    'Fill in one Excel template to create several affiliates.',
-    { permission: 'group.manage' },
-  ),
-  s(
-    '/affiliates/onboard',
-    'nav[aria-label="Onboarding steps"]',
-    'Onboard an affiliate',
-    'Six steps: profile, currencies, data sources, chart of accounts, rule inheritance and limits.',
-    { permission: 'group.manage' },
-  ),
-  s(
-    '',
-    'button:Next Step',
-    'Submit for activation',
-    'Finishing the wizard sends the affiliate to Approvals; a second administrator makes it Live.',
+    '/setup/organisation',
+    'nav[aria-label="Organisation setup steps"]',
+    'Your organisation',
+    'Organisation details, affiliates (add one, invite its admin), defaults and Group assumptions - all in one place.',
     { permission: 'group.manage' },
   ),
 ];
@@ -920,16 +896,6 @@ const AUDIT: Step[] = [
 
 const ACCOUNT: Step[] = [
   s('/account', 'heading:Password', 'Your account', 'Update your name and email, and change your password here.'),
-];
-
-const SETUP_CHECKLIST: Step[] = [
-  s(
-    '/setup',
-    sel.tour('setup-checklist'),
-    'Your setup checklist',
-    'Everything the platform needs before its numbers mean anything, in order. Each step ticks itself off from live data, and the highlighted one is next.',
-    { permission: 'group.manage|affiliate.manage' },
-  ),
 ];
 
 const HISTORY: Step[] = [
@@ -1060,9 +1026,9 @@ const GETTING_STARTED: Step[] = [
 const MODULES: { id: string; title: string; description: string; steps: Step[] }[] = [
   {
     id: 'setup',
-    title: 'Organisation setup',
-    description: 'Checklist, affiliates and onboarding, organisation record',
-    steps: [...SETUP_CHECKLIST, ...AFFILIATES, ...GROUP_SETTINGS],
+    title: 'Organisation',
+    description: 'Organisation details, affiliates, defaults and Group assumptions',
+    steps: [...AFFILIATES, ...GROUP_SETTINGS],
   },
   {
     id: 'data',

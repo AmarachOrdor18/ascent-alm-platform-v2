@@ -768,6 +768,7 @@ describe('run orchestrator', () => {
     affiliateCode: 'NG',
     reportingCurrency: 'NGN',
     timeBucketRuleId: 'TB-1',
+    ftpRuleId: 'FTP-1',
     batchIds: [NIGERIA_BATCH_ID],
     createdBy: 'chinwe',
     createdAt: '2026-08-01T09:00:00Z',

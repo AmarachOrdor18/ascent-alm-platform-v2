@@ -10,7 +10,6 @@ import { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
-import { InfoButton } from '@/components/ui/InfoButton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { useCurrencies, useEconomicIndicators, useFxRates, useYieldCurves } from '@/lib/hooks';
@@ -47,7 +46,7 @@ export function MarketDataHub() {
   const { user, hasPermission } = useAuth();
   const qc = useQueryClient();
   const { data: currencies = [] } = useCurrencies();
-  const { data: fxRates = [], isLoading: fxLoading } = useFxRates();
+  const { data: fxRates = [] } = useFxRates();
   const { data: curves = [] } = useYieldCurves();
   const { data: indicators = [] } = useEconomicIndicators();
   // Market data is Group's: uploading it needs upload rights at Group level.
@@ -56,14 +55,16 @@ export function MarketDataHub() {
     (user?.affiliateCode === 'GROUP' || hasPermission('group.manage'));
   const slaDays = useMarketDataSlaDays();
   const { asOfDate: workingDate } = useScope();
-  const statusRef = workingDate ?? today();
+  const newestLoaded = [...fxRates.map((r) => r.asOfDate), ...curves.map((c) => c.asOfDate)].sort().at(-1) ?? today();
+  // Age is judged against the date being worked on (header As-of date), not today's calendar date.
+  const statusRef = workingDate ?? newestLoaded;
   const status = useMemo(
     () => marketDataStatus(fxRates, curves, indicators, slaDays, statusRef),
     [fxRates, curves, indicators, slaDays, statusRef],
   );
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const [asOfDate, setAsOfDate] = useState(today());
+  const asOfDate = workingDate ?? today();
   const [stage, setStage] = useState<Stage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -86,7 +87,6 @@ export function MarketDataHub() {
     () => missingRates(Array.from(new Set(currencies.filter((c) => c.isActive).map((c) => c.code))), 'USD', table),
     [currencies, table],
   );
-  const curveCurrencies = Array.from(new Set(curves.map((c) => c.currency)));
   const curvesByCurrency = useMemo(() => {
     const by = new Map<string, { latest: string; versions: number }>();
     for (const c of curves) {
@@ -196,115 +196,89 @@ export function MarketDataHub() {
     ? stage.records.fx.length + stage.records.curves.length + stage.records.indicators.length
     : 0;
   const asOfBadges = [lastFx, lastCurve, lastIndicator].filter((x): x is string => !!x);
+  const DETAIL_TAB: Record<string, { href: string; extra: string | null }> = {
+    'FX rates': {
+      href: '/data/market/fx',
+      extra: missing.length > 0 ? `No rate yet for ${missing.join(', ')}` : null,
+    },
+    'Yield curves': {
+      href: '/data/market/curves',
+      extra: curvesByCurrency.length > 0 ? curvesByCurrency.map(([ccy]) => ccy).join(', ') : null,
+    },
+    Indicators: {
+      href: '/data/market/indicators',
+      extra: seriesPreview.length > 0 ? seriesPreview.map((x) => x.name).join(', ') : null,
+    },
+  };
 
   return (
     <>
       <ModuleHeader
         title="Market data"
-        description="Load the market data every calculation reads - rates, curves and macro drivers - from one file."
-        about={`Loaded by Group and used by every affiliate. Data older than ${slaDays} days is flagged as stale.`}
+        description="FX rates, yield curves and economic indicators - loaded once by Group from one file and used by every affiliate."
+        about={`Data older than ${slaDays} days before the As-of date in the header is flagged as stale. Each row (or workbook sheet) is recognised by its columns: base/quote/rate for FX, currency/curveCode/tenorDays/ratePercent for curves, indicatorCode/asOfDate/value for indicators.`}
         asOfDate={asOfBadges.length > 0 ? asOfBadges.sort().at(-1)! : null}
         scope="Group"
-        metrics={[
-          {
-            label: 'FX rates',
-            value: fxLoading ? '…' : String(fxRates.length),
-            tone: fxRates.length === 0 ? 'warning' : 'neutral',
-            about:
-              'Exchange-rate rows on file. Conversions go through USD; a currency missing a rate fails any run that touches it.',
-          },
-          {
-            label: 'Curves',
-            value: `${curveCurrencies.length} ccy · ${curves.length} version${curves.length === 1 ? '' : 's'}`,
-            tone: curves.length === 0 ? 'warning' : 'neutral',
-            about:
-              'Currencies with a curve defined, and dated curve versions on file. FTP base rates and shock scenarios read these.',
-          },
-          {
-            label: 'Indicator series',
-            value: String(indicators.length),
-            tone: indicators.length === 0 ? 'warning' : 'neutral',
-            about:
-              'Macro series on file (policy rates, inflation, oil price...) driving behavioural assumptions and scenarios.',
-          },
-        ]}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        {status.map((k) => (
-          <section key={k.kind} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h3 className="flex items-center justify-between gap-2 text-[13px] font-bold text-navy-900">
-              {k.kind}
-              <StatusBadge
-                status={k.lastDate === null ? 'Not loaded' : k.stale ? `Stale - ${k.ageDays} days` : 'Current'}
-                tone={k.lastDate === null ? 'danger' : k.stale ? 'warning' : 'success'}
-              />
-            </h3>
-            <div className="mt-2 space-y-0.5">
-              <Line2 label="Latest data" value={k.lastDate ? formatDate(k.lastDate) : 'Never'} />
-              <Line2
-                label="Last updated"
-                value={
-                  k.lastUpdatedAt
-                    ? `${formatDate(k.lastUpdatedAt.slice(0, 10))}${k.lastUpdatedBy ? ` by ${k.lastUpdatedBy}` : ''}`
-                    : '-'
-                }
-              />
-              <Line2 label="Covers" value={k.coverage} />
-              {k.kind !== 'Indicators' && k.ageDays !== null && (
-                <Line2 label="Age" value={`${k.ageDays} day${k.ageDays === 1 ? '' : 's'} (limit ${slaDays})`} />
+        {status.map((k) => {
+          const detail = DETAIL_TAB[k.kind];
+          return (
+            <section key={k.kind} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <h3 className="flex items-center justify-between gap-2 text-[13px] font-bold text-navy-900">
+                {k.kind}
+                <StatusBadge
+                  status={k.lastDate === null ? 'Not loaded' : k.stale ? `Stale - ${k.ageDays} days` : 'Current'}
+                  tone={k.lastDate === null ? 'danger' : k.stale ? 'warning' : 'success'}
+                />
+              </h3>
+              <div className="mt-2 space-y-0.5">
+                <Line2 label="Latest data" value={k.lastDate ? formatDate(k.lastDate) : 'Never'} />
+                <Line2
+                  label="Loaded"
+                  value={
+                    k.lastUpdatedAt
+                      ? `${formatDate(k.lastUpdatedAt.slice(0, 10))}${k.lastUpdatedBy ? ` by ${k.lastUpdatedBy}` : ''}`
+                      : '-'
+                  }
+                />
+                <Line2 label="Covers" value={k.coverage} />
+                {detail?.extra && <p className="text-[12px] text-gray-500">{detail.extra}</p>}
+              </div>
+              {detail && (
+                <Link
+                  href={detail.href}
+                  className="mt-3 inline-block text-[12px] font-bold text-navy-700 hover:underline"
+                >
+                  Open {k.kind.toLowerCase()} →
+                </Link>
               )}
-            </div>
-          </section>
-        ))}
+            </section>
+          );
+        })}
       </div>
 
       <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-1 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
-          One upload, every market dataset
-          <InfoButton label="How one import fills all three">
-            Each row (or workbook sheet) is recognised by its columns or its dataType: an FX rate row carries
-            base/quote/rate; a curve row carries currency, curveCode, tenorDays and ratePercent; an indicator row
-            carries indicatorCode, asOfDate and value. Rows that fit none of them are listed as errors and skipped; the
-            rest are saved straight to the domain each belongs to, and the load is recorded per domain in Data →
-            History.
-          </InfoButton>
-        </h2>
-        <p className="mb-4 text-[13px] leading-relaxed text-gray-500">
-          One file per load date. FX rates, yield curves and policy/macro series can sit on separate sheets of the same
-          Excel workbook - they are read together and each lands on its own page below.
-        </p>
+        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">Upload market data</h2>
 
         {canUpload ? (
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label htmlFor="market-hub-asof" className="mb-1 block text-[12px] text-gray-600">
-                As of date (fallback)
-              </label>
-              <input
-                id="market-hub-asof"
-                type="date"
-                value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
-                className="rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-              />
-            </div>
-            <div>
-              <label htmlFor="market-hub-upload" className="mb-1 block text-[12px] text-gray-600">
-                Market data file (CSV, Excel, JSON or XML)
-              </label>
-              <input
-                ref={inputRef}
-                id="market-hub-upload"
-                type="file"
-                accept={UPLOAD_ACCEPT}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleFile(file);
-                }}
-                className="text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[13px] file:font-bold file:text-white hover:file:bg-navy-700"
-              />
-            </div>
+          <div>
+            <input
+              ref={inputRef}
+              id="market-hub-upload"
+              type="file"
+              aria-label="Market data file"
+              accept={UPLOAD_ACCEPT}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleFile(file);
+              }}
+              className="text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[13px] file:font-bold file:text-white hover:file:bg-navy-700"
+            />
+            <p className="mt-2 text-[12px] text-gray-500">
+              Dates come from the file. Rows without one use {formatDate(asOfDate)} (the As-of date in the header).
+            </p>
           </div>
         ) : (
           <div className="text-[13px] text-gray-500">
@@ -386,109 +360,7 @@ export function MarketDataHub() {
           </div>
         )}
       </section>
-
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <HubCard
-          title="Currency & FX rates"
-          href="/data/market/fx"
-          linkLabel="Open currencies & FX rates"
-          badge={
-            missing.length === 0
-              ? { status: 'Complete', tone: 'success' }
-              : { status: `${missing.length} missing`, tone: 'danger' }
-          }
-          detail={
-            <>
-              <Line2 label="Rows on file" value={String(fxRates.length)} />
-              <Line2 label="Latest rate date" value={lastFx ? formatDate(lastFx) : 'Never'} />
-              {missing.length > 0 && (
-                <p className="mt-2 text-[12px] text-danger">No rate yet for: {missing.join(', ')}.</p>
-              )}
-            </>
-          }
-        />
-        <HubCard
-          title="Interest rates & yield curves"
-          href="/data/market/curves"
-          linkLabel="Open curves"
-          badge={curves.length === 0 ? { status: 'None yet', tone: 'neutral' } : null}
-          detail={
-            <>
-              <Line2
-                label="Currencies covered"
-                value={curveCurrencies.length > 0 ? curveCurrencies.join(', ') : 'None yet'}
-              />
-              <Line2 label="Latest curve date" value={lastCurve ? formatDate(lastCurve) : 'Never'} />
-              {curvesByCurrency.slice(0, 4).map(([ccy, s]) => (
-                <p key={ccy} className="text-[12px] text-gray-500">
-                  <span className="font-mono font-bold text-navy-900">{ccy}</span> · {s.versions} version
-                  {s.versions === 1 ? '' : 's'} · latest {formatDate(s.latest)}
-                </p>
-              ))}
-            </>
-          }
-        />
-        <HubCard
-          title="Economic indicators"
-          href="/data/market/indicators"
-          linkLabel="Open economic indicators"
-          badge={indicators.length === 0 ? { status: 'None yet', tone: 'neutral' } : null}
-          detail={
-            <>
-              <Line2 label="Series" value={String(indicators.length)} />
-              <Line2 label="Latest observation" value={lastIndicator ? formatDate(lastIndicator) : 'Never'} />
-              {seriesPreview.map((s) => (
-                <p key={s.code} className="text-[12px] text-gray-500">
-                  <span className="font-bold text-navy-900">{s.name}</span>
-                  {s.latest && (
-                    <>
-                      {' '}
-                      · latest {s.latest.value}
-                      {s.unit ? ` ${s.unit}` : ''} ({formatDate(s.latest.asOfDate)})
-                    </>
-                  )}
-                </p>
-              ))}
-            </>
-          }
-        />
-      </div>
-
-      <p className="mt-6 text-[12px] leading-relaxed text-gray-500">
-        Holiday calendars sit on{' '}
-        <Link href="/data/market/calendars" className="font-bold text-navy-700 hover:underline">
-          their own tab
-        </Link>{' '}
-        - each affiliate is assigned one on its Profile settings.
-      </p>
     </>
-  );
-}
-
-function HubCard({
-  title,
-  href,
-  linkLabel,
-  badge,
-  detail,
-}: {
-  title: string;
-  href: string;
-  linkLabel: string;
-  badge: { status: string; tone: 'success' | 'danger' | 'neutral' } | null;
-  detail: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <h3 className="flex items-center gap-2 text-[13px] font-bold text-navy-900">
-        {title}
-        {badge && <StatusBadge status={badge.status} tone={badge.tone} />}
-      </h3>
-      <div className="mt-3 space-y-1">{detail}</div>
-      <Link href={href} className="mt-4 inline-block text-[12px] font-bold text-navy-700 hover:underline">
-        {linkLabel} →
-      </Link>
-    </section>
   );
 }
 

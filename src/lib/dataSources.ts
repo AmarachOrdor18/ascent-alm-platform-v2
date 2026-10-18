@@ -33,6 +33,11 @@ export const SOURCE_DOMAIN_LABEL: Record<DataSourceDomain, string> = {
   MarketData: 'Market data (FX, curves, rates)',
 };
 
+/** What a source carries, in plain words - a position source names its contributor ("Loans positions"). */
+export function sourceKindLabel(source: { domain: DataSourceDomain; contributor?: string | null }): string {
+  return source.contributor ? `${source.contributor} positions` : SOURCE_DOMAIN_LABEL[source.domain];
+}
+
 export const ALL_SOURCE_DOMAINS: DataSourceDomain[] = [
   'Positions',
   'GeneralLedger',

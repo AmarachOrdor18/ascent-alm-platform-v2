@@ -1,5 +1,5 @@
 // The one place a brand-new affiliate record is shaped - shared by the onboarding wizard
-// (pages/OnboardAffiliate.tsx) and organisation onboarding's short "Add affiliate" form.
+// and organisation onboarding's short "Add affiliate" form.
 import { AFFILIATE_FEED_DOMAINS } from '@/components/connectors/connectorConstants';
 import type { Affiliate, FeedMode } from '@/engine/types';
 

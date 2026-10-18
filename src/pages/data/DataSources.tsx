@@ -9,7 +9,7 @@ import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAffiliates, useBatches } from '@/lib/hooks';
-import { CONNECTOR_TYPE_LABEL, SOURCE_DOMAIN_LABEL } from '@/lib/dataSources';
+import { CONNECTOR_TYPE_LABEL, sourceKindLabel } from '@/lib/dataSources';
 import {
   loadStage,
   sourceForLoad,
@@ -41,11 +41,6 @@ export function DataSourcesTab() {
     );
   }
   return <DataSources />;
-}
-
-/** Admin -> Organisation setup -> Data sources: the same list, plus "Add data source" (Organisation Admin only). */
-export function AdminDataSources() {
-  return <DataSources adminView />;
 }
 
 export function DataSources({ adminView = false }: { adminView?: boolean }) {
@@ -306,7 +301,7 @@ function SourceRow({
         </button>
         {!s.isActive && <span className="ml-2 text-[11px] text-gray-400">off</span>}
       </td>
-      <td className="px-4 py-2.5 text-gray-600">{SOURCE_DOMAIN_LABEL[s.domain]}</td>
+      <td className="px-4 py-2.5 text-gray-600">{sourceKindLabel(s)}</td>
       <td className="px-4 py-2.5 text-gray-600">{s.contributor ?? <span className="text-gray-300">-</span>}</td>
       <td className="px-4 py-2.5 text-gray-600">{CONNECTOR_TYPE_LABEL[s.connectorType]}</td>
       <td className="px-4 py-2.5">

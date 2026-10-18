@@ -162,6 +162,7 @@ describe('run orchestrator - transfer pricing elements', () => {
     affiliateCode: 'NG',
     reportingCurrency: 'NGN',
     timeBucketRuleId: 'TB-1',
+    ftpRuleId: 'FTP-1',
     batchIds: [NIGERIA_BATCH_ID],
     createdBy: 'tester',
     createdAt: '2026-08-01T09:00:00Z',
