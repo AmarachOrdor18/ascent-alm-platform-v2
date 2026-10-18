@@ -1,10 +1,11 @@
 // Data → Sources: every feed of data, who it belongs to, how it arrives, what came last and what is
-// waiting in its lobby. Affiliate users see only their own affiliate's sources (no affiliate picker);
-// Group users see every source grouped by affiliate, with a filter. The open source lives in the URL
+// waiting in its lobby. The header Scope decides what is shown: one affiliate lists its sources as rows;
+// Group shows one row per affiliate and one column per standard source, so 30+ affiliates stay readable. The open source lives in the URL
 // (?source=<id>&tab=<tab>) so it can be linked to; ?upload=1 opens Upload data; ?domain=<Domain> opens
 // the first source of that kind (old links to GL reconciliation land on the general-ledger source).
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { useScope } from '@/context/ScopeContext';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -56,7 +57,10 @@ export function DataSources({ adminView = false }: { adminView?: boolean }) {
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
   const { data: lobby = [] } = useLobby();
-  const [affiliateFilter, setAffiliateFilter] = useState('ALL');
+  const { affiliateCode: scopeCode } = useScope();
+  const affiliateFilter = restrictedOrScope(scopeCode);
+  const [gridSearch, setGridSearch] = useState('');
+  const [gapsOnly, setGapsOnly] = useState(false);
   const [showUpload, setShowUpload] = useState<{ sourceId: string | null } | null>(
     params.get('upload') === '1' ? { sourceId: selectedId } : null,
   );
@@ -168,35 +172,22 @@ export function DataSources({ adminView = false }: { adminView?: boolean }) {
         }
       />
 
-      {!restricted && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <label htmlFor="src-affiliate" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-            Affiliate
-          </label>
-          <select
-            id="src-affiliate"
-            className={`${inputCls} w-auto`}
-            value={affiliateFilter}
-            onChange={(e) => setAffiliateFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            {[...new Set(sources.map((s) => s.affiliateCode))].map((c) => (
-              <option key={c} value={c}>
-                {affName(c)}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {!isLoading && sources.length === 0 ? (
         <EmptyState title="No data sources yet">
-          Every affiliate gets two sources when it is created: positions and the general ledger. Group has one
-          market-data source.
-          {canConfigure
-            ? ' You can also add one with “Add data source”.'
-            : ' The Organisation Admin can add more under Admin → Organisation setup → Data sources.'}
+          Every affiliate gets six sources when it is created: Loans, Deposits, Treasury, General ledger, Balance
+          history and Account history. Group has one market-data source.
         </EmptyState>
+      ) : !restricted && affiliateFilter === 'ALL' ? (
+        <SourceGrid
+          sources={listed}
+          affiliates={affiliates}
+          stats={stats}
+          search={gridSearch}
+          onSearch={setGridSearch}
+          gapsOnly={gapsOnly}
+          onGapsOnly={setGapsOnly}
+          onOpen={(id, t) => setParams({ source: id, tab: t ?? null })}
+        />
       ) : (
         <div
           className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm"
@@ -332,5 +323,172 @@ function SourceRow({
       </td>
       <td className="px-4 py-2.5 text-gray-600">{s.owner || '-'}</td>
     </tr>
+  );
+}
+
+/** Header Scope → which affiliate's sources to list ('ALL' at Group). */
+function restrictedOrScope(scopeCode: string): string {
+  return scopeCode === 'GROUP' ? 'ALL' : scopeCode;
+}
+
+/** The standard source columns, in the order data arrives. */
+const GRID_COLUMNS: Array<{ key: string; label: string }> = [
+  { key: 'Loans', label: 'Loans' },
+  { key: 'Deposits', label: 'Deposits' },
+  { key: 'Treasury', label: 'Treasury' },
+  { key: 'GeneralLedger', label: 'General ledger' },
+  { key: 'BalanceHistory', label: 'Balance history' },
+  { key: 'AccountHistory', label: 'Account history' },
+];
+const columnOf = (s: DataSource) => s.contributor ?? s.domain;
+
+/** Group view: one row per affiliate, one column per standard source; a cell is the latest load (or Never). */
+function SourceGrid({
+  sources,
+  affiliates,
+  stats,
+  search,
+  onSearch,
+  gapsOnly,
+  onGapsOnly,
+  onOpen,
+}: {
+  sources: DataSource[];
+  affiliates: Array<{ code: string; name: string; status: string }>;
+  stats: { lastLoad: Map<string, LoadBatch>; inLobby: Map<string, number> };
+  search: string;
+  onSearch: (v: string) => void;
+  gapsOnly: boolean;
+  onGapsOnly: (v: boolean) => void;
+  onOpen: (sourceId: string, tab?: SourceTab) => void;
+}) {
+  const market = sources.find((s) => s.affiliateCode === 'GROUP');
+  const rows = affiliates
+    .filter((a) => a.code !== 'GROUP')
+    .map((a) => {
+      const own = sources.filter((s) => s.affiliateCode === a.code);
+      const cells = GRID_COLUMNS.map((c) => own.find((s) => columnOf(s) === c.key) ?? null);
+      const loaded = cells.filter((c) => c && stats.lastLoad.has(c.id)).length;
+      const waiting = own.reduce((n, s) => n + (stats.inLobby.get(s.id) ?? 0), 0);
+      const extra = own.filter((s) => !GRID_COLUMNS.some((c) => c.key === columnOf(s)));
+      return { a, cells, loaded, total: cells.filter(Boolean).length, waiting, extra };
+    })
+    .filter((r) => {
+      const t = search.trim().toLowerCase();
+      if (t && !r.a.name.toLowerCase().includes(t) && !r.a.code.toLowerCase().includes(t)) return false;
+      return !gapsOnly || r.loaded < r.total || r.waiting > 0;
+    })
+    .sort((x, y) => x.a.name.localeCompare(y.a.name));
+
+  return (
+    <div className="space-y-4">
+      {market && (
+        <button
+          type="button"
+          onClick={() => onOpen(market.id)}
+          className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 text-left text-[13px] shadow-sm hover:border-navy-700"
+        >
+          <span className="font-bold text-navy-900">Market data</span>
+          <span className="text-gray-500">Group · used by every affiliate</span>
+          <GridCell last={stats.lastLoad.get(market.id) ?? null} waiting={stats.inLobby.get(market.id) ?? 0} />
+        </button>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          aria-label="Find an affiliate"
+          placeholder="Find an affiliate…"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          className={`${inputCls} w-64`}
+        />
+        <label className="flex items-center gap-2 text-[13px] text-gray-600">
+          <input type="checkbox" checked={gapsOnly} onChange={(e) => onGapsOnly(e.target.checked)} />
+          Only affiliates with missing loads or files waiting
+        </label>
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm" data-tour="sources-table">
+        <table className="w-full text-[13px]">
+          <thead className="border-b border-gray-100 text-left text-[11px] uppercase tracking-wider text-gray-400">
+            <tr>
+              <th className="px-4 py-2.5 font-bold">Affiliate</th>
+              <th className="px-4 py-2.5 font-bold">Loaded</th>
+              {GRID_COLUMNS.map((c) => (
+                <th key={c.key} className="px-3 py-2.5 font-bold">
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={GRID_COLUMNS.length + 2} className="px-4 py-6 text-center text-gray-400">
+                  {gapsOnly || search ? 'No affiliate matches.' : 'No affiliates yet.'}
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.a.code}>
+                  <td className="px-4 py-2">
+                    <span className="font-bold text-navy-900">{r.a.name}</span>{' '}
+                    <span className="font-mono text-[11px] text-gray-400">{r.a.code}</span>
+                    {r.extra.length > 0 && (
+                      <span className="ml-2 text-[11px] text-gray-400">+{r.extra.length} other</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <StatusBadge
+                      status={`${r.loaded}/${r.total}`}
+                      tone={r.loaded === r.total ? 'success' : r.loaded === 0 ? 'neutral' : 'warning'}
+                    />
+                  </td>
+                  {r.cells.map((cell, i) =>
+                    cell ? (
+                      <td key={i} className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpen(cell.id, (stats.inLobby.get(cell.id) ?? 0) > 0 ? 'lobby' : undefined)}
+                          className="rounded px-1 py-0.5 hover:bg-navy-50"
+                          title={`${cell.name} - open`}
+                        >
+                          <GridCell
+                            last={stats.lastLoad.get(cell.id) ?? null}
+                            waiting={stats.inLobby.get(cell.id) ?? 0}
+                          />
+                        </button>
+                      </td>
+                    ) : (
+                      <td key={i} className="px-3 py-2 text-gray-300">
+                        -
+                      </td>
+                    ),
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function GridCell({ last, waiting }: { last: LoadBatch | null; waiting: number }) {
+  const stage = last ? loadStage(last) : null;
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      {last && stage ? (
+        <span className={`font-mono text-[12px] ${stage === 'Admitted' ? 'text-success' : 'text-gray-600'}`}>
+          {formatDate(last.asOfDate)}
+        </span>
+      ) : (
+        <span className="text-[12px] text-gray-400">Never</span>
+      )}
+      {waiting > 0 && (
+        <span className="rounded-full bg-warning-bg px-1.5 text-[11px] font-bold text-warning">{waiting} waiting</span>
+      )}
+    </span>
   );
 }
