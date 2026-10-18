@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
@@ -7,6 +7,8 @@ import { useAuth } from '@/context/AuthContext';
 import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { useHolidayCalendars, useSaveHolidayCalendar } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
+import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
+import { mergeCalendar, parseHolidayFile } from '@/lib/holidayImport';
 import { addDays } from '@/engine/dates';
 import type { HolidayCalendar as Calendar } from '@/engine/types';
 
@@ -36,6 +38,44 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
   const [probe, setProbe] = useState('2026-12-25');
   const [creating, setCreating] = useState(false);
   const [newCalendar, setNewCalendar] = useState({ countryCode: '', name: '', weekendDays: [0, 6] as number[] });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [upload, setUpload] = useState<{ tone: 'success' | 'danger'; text: string; problems: string[] } | null>(null);
+
+  // Upload: one row per holiday (countryCode, date, holidayName; optional calendarName and weekendDays).
+  const handleUpload = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const parsed = parseHolidayFile(await readUploadAsCsvText(file));
+      const problems = parsed.errors.slice(0, 8).map((e) => `Line ${e.line}: ${e.message}`);
+      if (parsed.calendars.length === 0) {
+        setUpload({ tone: 'danger', text: `${file.name}: nothing loaded.`, problems });
+        return;
+      }
+      const saved = parsed.calendars.map((c) =>
+        mergeCalendar(
+          calendars.find((x) => x.countryCode === c.countryCode),
+          c,
+          user?.name ?? 'unknown',
+        ),
+      );
+      await Promise.all(saved.map((c) => save.mutateAsync(c)));
+      setActiveId(saved[0]!.id);
+      const count = parsed.calendars.reduce((n, c) => n + c.holidays.length, 0);
+      setUpload({
+        tone: 'success',
+        text: `${file.name}: ${count} holiday(s) loaded into ${saved.map((c) => c.name).join(', ')}.${parsed.errors.length > 0 ? ` ${parsed.errors.length} row(s) skipped.` : ''}`,
+        problems,
+      });
+    } catch (err) {
+      setUpload({
+        tone: 'danger',
+        text: err instanceof Error ? err.message : 'The file could not be read.',
+        problems: [],
+      });
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     if (!activeId && calendars.length > 0) setActiveId(calendars[0]!.id);
@@ -126,6 +166,27 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
         />
       )}
 
+      {upload && (
+        <div
+          role="status"
+          className={`mb-4 rounded-lg px-4 py-2.5 text-[13px] ${upload.tone === 'success' ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`}
+        >
+          <p className="flex items-start justify-between gap-3">
+            <span>{upload.text}</span>
+            <button type="button" aria-label="Dismiss" onClick={() => setUpload(null)} className="font-bold">
+              ×
+            </button>
+          </p>
+          {upload.problems.length > 0 && (
+            <ul className="mt-1 list-disc pl-5 text-[12px]">
+              {upload.problems.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <div className="mb-6 flex items-center gap-3">
         <label htmlFor="calendar-picker" className="text-[12px] font-bold uppercase tracking-wider text-gray-400">
           Calendar
@@ -143,6 +204,27 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
           ))}
         </select>
         {isLoading && <span className="text-[13px] text-gray-400">Loading…</span>}
+        {canEdit && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={UPLOAD_ACCEPT}
+              aria-label="Holiday calendar file"
+              className="hidden"
+              onChange={(e) => void handleUpload(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={save.isPending}
+              title="CSV or Excel: countryCode, date, holidayName (optional calendarName, weekendDays). One file can cover several countries."
+              className="rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            >
+              Upload calendar
+            </button>
+          </>
+        )}
         {canEdit && !creating && (
           <button
             type="button"
