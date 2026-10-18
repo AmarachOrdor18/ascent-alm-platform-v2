@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
 import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import {
   useCurrencies,
@@ -62,7 +62,10 @@ export function FxRates() {
     );
 
   const [edits, setEdits] = useState<Record<string, number>>({});
-  const [newRate, setNewRate] = useState({ code: '', rate: '', asOfDate: new Date().toISOString().slice(0, 10) });
+  const { asOfDate: workingDate } = useScope();
+  const [showAdd, setShowAdd] = useState(false);
+  const [newRate, setNewRate] = useState({ code: '', rate: '' });
+  const rateDate = workingDate ?? new Date().toISOString().slice(0, 10);
   const [newCurrency, setNewCurrency] = useState({ code: '', name: '', symbol: '' });
 
   const handleAddCurrency = () => {
@@ -87,7 +90,7 @@ export function FxRates() {
   const ratelessCurrencies = currencies.filter((c) => c.code !== 'USD');
 
   const addRate = () => {
-    if (!newRate.code || newRate.rate === '' || !newRate.asOfDate) return;
+    if (!newRate.code || newRate.rate === '') return;
     const value = Number(newRate.rate);
     if (Number.isNaN(value) || value <= 0) return;
     saveRate.mutate(
@@ -95,26 +98,26 @@ export function FxRates() {
         // Dated, not just keyed by pair - adding a rate for a new date adds a row alongside whatever
         // that currency already has on file rather than overwriting it. Re-adding the same date instead
         // corrects that day's rate in place, same as editing it inline in the table below would.
-        id: `FX-${newRate.code}-USD-${newRate.asOfDate}`,
-        base: newRate.code,
-        quote: 'USD',
+        id: `FX-USD-${newRate.code}-${rateDate}`,
+        base: 'USD',
+        quote: newRate.code,
         rate: value,
-        asOfDate: newRate.asOfDate,
+        asOfDate: rateDate,
         source: 'Manual entry',
         updatedBy: user?.name ?? 'unknown',
         updatedAt: new Date().toISOString(),
       },
       {
         onSuccess: () => {
-          recordFxLoad(`Manual entry - ${newRate.code}`, newRate.asOfDate, 1);
+          recordFxLoad(`Manual entry - ${newRate.code}`, rateDate, 1);
           marketDataSaved({
             fileName: 'Manual entry (FX rates)',
-            asOfDate: newRate.asOfDate,
-            fx: [{ base: newRate.code, quote: 'USD' }],
+            asOfDate: rateDate,
+            fx: [{ base: 'USD', quote: newRate.code }],
             curves: [],
             indicators: [],
           });
-          setNewRate({ code: '', rate: '', asOfDate: newRate.asOfDate });
+          setNewRate({ code: '', rate: '' });
         },
       },
     );
@@ -221,12 +224,6 @@ export function FxRates() {
           <span className="font-mono">{r.rate.toPrecision(6)}</span>
         ),
     },
-    {
-      key: 'inverse',
-      header: 'Units per USD',
-      align: 'right',
-      render: (r) => <span className="font-mono text-gray-600">{(1 / (edits[r.id] ?? r.rate)).toFixed(2)}</span>,
-    },
     { key: 'source', header: 'Source', render: (r) => <span className="text-gray-500">{r.source}</span> },
     {
       key: 'asOf',
@@ -264,27 +261,6 @@ export function FxRates() {
             ? `No rate loaded for ${missing.join(', ')} - any Group run including these currencies will fail rather than silently omit them.`
             : null
         }
-        metrics={[
-          {
-            label: 'Active currencies',
-            value: String(currencies.filter((c) => c.isActive).length),
-            about: 'Currencies available for positions and rules to reference.',
-          },
-          { label: 'Rates loaded', value: String(rates.length), about: 'Exchange rate pairs currently on file.' },
-          {
-            label: 'Pivot currency',
-            value: 'USD',
-            about:
-              'Every rate converts through this currency - a NGN/GHS conversion, for example, goes via their respective USD rates.',
-          },
-          {
-            label: 'Coverage',
-            value: missing.length === 0 ? 'Complete' : `${missing.length} missing`,
-            tone: missing.length === 0 ? 'success' : 'danger',
-            about:
-              'Whether every currency an affiliate actually transacts in has a loaded rate. A gap here fails any run touching that currency rather than silently omitting it.',
-          },
-        ]}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -297,7 +273,17 @@ export function FxRates() {
               touches it, rather than silently being converted at 1.0.
             </InfoButton>
           </h2>
-          {canEdit && (
+          {canEdit && !showAdd && (
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              disabled={ratelessCurrencies.length === 0}
+              className="mb-4 text-[12px] font-bold text-navy-700 hover:underline disabled:opacity-40"
+            >
+              + Add a rate by hand
+            </button>
+          )}
+          {canEdit && showAdd && (
             <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
               <div>
                 <label htmlFor="new-rate-currency" className="mb-1 block text-[12px] text-gray-600">
@@ -307,10 +293,9 @@ export function FxRates() {
                   id="new-rate-currency"
                   value={newRate.code}
                   onChange={(e) => setNewRate({ ...newRate, code: e.target.value })}
-                  disabled={ratelessCurrencies.length === 0}
                   className="w-40 rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 >
-                  <option value="">{ratelessCurrencies.length === 0 ? 'No other currencies' : 'Select…'}</option>
+                  <option value="">Select…</option>
                   {ratelessCurrencies.map((c) => (
                     <option key={c.code} value={c.code}>
                       {c.code} - {c.name}
@@ -320,7 +305,7 @@ export function FxRates() {
               </div>
               <div>
                 <label htmlFor="new-rate-value" className="mb-1 block text-[12px] text-gray-600">
-                  USD per 1 {newRate.code || 'unit'}
+                  {newRate.code || 'Units'} per 1 USD
                 </label>
                 <input
                   id="new-rate-value"
@@ -330,51 +315,26 @@ export function FxRates() {
                   onChange={(e) => setNewRate({ ...newRate, rate: e.target.value })}
                   className="w-32 rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 />
-                {/* The quote is USD per one unit of the currency (e.g. NGN 0.000651), not the market's usual
-                    units-per-USD - echo the inverse so a rate keyed the wrong way round is obvious before saving. */}
-                {Number(newRate.rate) > 0 && (
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    = {(1 / Number(newRate.rate)).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                    {newRate.code || 'units'} per USD
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="new-rate-asof" className="mb-1 block text-[12px] text-gray-600">
-                  As of date
-                </label>
-                <input
-                  id="new-rate-asof"
-                  type="date"
-                  value={newRate.asOfDate}
-                  onChange={(e) => setNewRate({ ...newRate, asOfDate: e.target.value })}
-                  className="rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                />
               </div>
               <button
                 type="button"
-                onClick={addRate}
-                disabled={saveRate.isPending || !newRate.code || newRate.rate === '' || !newRate.asOfDate}
+                onClick={() => {
+                  addRate();
+                  setShowAdd(false);
+                }}
+                disabled={saveRate.isPending || !newRate.code || newRate.rate === ''}
                 className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
-                {saveRate.isPending ? 'Saving…' : 'Add rate'}
+                {saveRate.isPending ? 'Saving…' : `Save for ${formatDate(rateDate)}`}
               </button>
-              <p className="w-full text-[12px] text-gray-500">
-                A rate is a dated series, like a yield curve - adding one for a date that currency already has corrects
-                that day's rate in place (same as editing it inline in the table below); a new date adds a new row
-                alongside its history. Runs use whichever dated rate is most recent as of their own date.
-              </p>
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
+                className="text-[12px] font-bold text-gray-500 hover:text-navy-900"
+              >
+                Cancel
+              </button>
             </div>
-          )}{' '}
-          {canEdit && (
-            <p className="mb-4 rounded-lg bg-gray-50 px-4 py-2.5 text-[12px] leading-relaxed text-gray-500">
-              Bulk rates load through the combined market-data upload (
-              <Link href="/data/market" className="font-bold text-navy-700 hover:underline">
-                Data → Market data
-              </Link>
-              ) or Data → Sources - rates load there together with curves and macro series. This screen keeps
-              single-rate entry and corrections.
-            </p>
           )}
           <TableToolbar
             searchValue={ratesControls.search}
@@ -414,155 +374,142 @@ export function FxRates() {
           />
         </section>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
-            Currency roles
+        <details className="self-start rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <summary className="flex cursor-pointer items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
+            Currencies ({currencies.length})
             <InfoButton label="What a role controls">
-              Functional is the Group's own primary currency, fixed once and never changed. Reporting currencies
-              consolidate other currencies on their way to it. Active currencies are transacted in but never
-              consolidated through. See the definitions below for the full detail.
+              {ROLES.map((r) => `${r}: ${ROLE_EXPLANATION[r]}`).join(' ')}
             </InfoButton>
-          </h2>
+          </summary>
+          <div className="mt-3">
+            {canEdit && (
+              <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg bg-gray-50 p-3">
+                <div>
+                  <label htmlFor="new-ccy-code" className="mb-1 block text-[12px] text-gray-600">
+                    Code
+                  </label>
+                  <input
+                    id="new-ccy-code"
+                    value={newCurrency.code}
+                    onChange={(e) => setNewCurrency({ ...newCurrency, code: e.target.value })}
+                    placeholder="KES"
+                    maxLength={3}
+                    className="w-20 rounded border border-gray-200 px-2 py-1 font-mono text-[13px] uppercase focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-ccy-name" className="mb-1 block text-[12px] text-gray-600">
+                    Name
+                  </label>
+                  <input
+                    id="new-ccy-name"
+                    value={newCurrency.name}
+                    onChange={(e) => setNewCurrency({ ...newCurrency, name: e.target.value })}
+                    placeholder="Kenyan Shilling"
+                    className="w-40 rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-ccy-symbol" className="mb-1 block text-[12px] text-gray-600">
+                    Symbol
+                  </label>
+                  <input
+                    id="new-ccy-symbol"
+                    value={newCurrency.symbol}
+                    onChange={(e) => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
+                    placeholder="KSh"
+                    className="w-20 rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddCurrency}
+                  disabled={saveCurrency.isPending || !newCurrency.code.trim() || !newCurrency.name.trim()}
+                  className="rounded-lg bg-navy-900 px-3 py-1.5 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                >
+                  {saveCurrency.isPending ? 'Adding…' : 'New currency'}
+                </button>
+              </div>
+            )}
 
-          {canEdit && (
-            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg bg-gray-50 p-3">
-              <div>
-                <label htmlFor="new-ccy-code" className="mb-1 block text-[12px] text-gray-600">
-                  Code
-                </label>
-                <input
-                  id="new-ccy-code"
-                  value={newCurrency.code}
-                  onChange={(e) => setNewCurrency({ ...newCurrency, code: e.target.value })}
-                  placeholder="KES"
-                  maxLength={3}
-                  className="w-20 rounded border border-gray-200 px-2 py-1 font-mono text-[13px] uppercase focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                />
-              </div>
-              <div>
-                <label htmlFor="new-ccy-name" className="mb-1 block text-[12px] text-gray-600">
-                  Name
-                </label>
-                <input
-                  id="new-ccy-name"
-                  value={newCurrency.name}
-                  onChange={(e) => setNewCurrency({ ...newCurrency, name: e.target.value })}
-                  placeholder="Kenyan Shilling"
-                  className="w-40 rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                />
-              </div>
-              <div>
-                <label htmlFor="new-ccy-symbol" className="mb-1 block text-[12px] text-gray-600">
-                  Symbol
-                </label>
-                <input
-                  id="new-ccy-symbol"
-                  value={newCurrency.symbol}
-                  onChange={(e) => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
-                  placeholder="KSh"
-                  className="w-20 rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleAddCurrency}
-                disabled={saveCurrency.isPending || !newCurrency.code.trim() || !newCurrency.name.trim()}
-                className="rounded-lg bg-navy-900 px-3 py-1.5 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
-              >
-                {saveCurrency.isPending ? 'Adding…' : 'New currency'}
-              </button>
-              <p className="w-full text-[12px] text-gray-500">
-                Registers with an Active role and no rate yet - add its rate above once it exists here.
-              </p>
-            </div>
-          )}
-
-          <TableToolbar
-            searchValue={rolesControls.search}
-            onSearchChange={rolesControls.setSearch}
-            exportData={() => currencies}
-            exportFilename="currency-roles"
-            density={rolesControls.density}
-            onDensityChange={rolesControls.setDensity}
-          />
-          <ResultTable
-            rows={rolesControls.paged}
-            rowKey={(c) => c.code}
-            emptyMessage="No currencies."
-            columns={[
-              {
-                key: 'currency',
-                header: 'Currency',
-                render: (c) => (
-                  <span>
-                    <span className="font-mono text-[13px] font-bold text-navy-900">
-                      {c.symbol} {c.code}
+            <TableToolbar
+              searchValue={rolesControls.search}
+              onSearchChange={rolesControls.setSearch}
+              exportData={() => currencies}
+              exportFilename="currency-roles"
+              density={rolesControls.density}
+              onDensityChange={rolesControls.setDensity}
+            />
+            <ResultTable
+              rows={rolesControls.paged}
+              rowKey={(c) => c.code}
+              emptyMessage="No currencies."
+              columns={[
+                {
+                  key: 'currency',
+                  header: 'Currency',
+                  render: (c) => (
+                    <span>
+                      <span className="font-mono text-[13px] font-bold text-navy-900">
+                        {c.symbol} {c.code}
+                      </span>
+                      <span className="block text-[12px] text-gray-500">{c.name}</span>
                     </span>
-                    <span className="block text-[12px] text-gray-500">{c.name}</span>
-                  </span>
-                ),
-              },
-              {
-                key: 'role',
-                header: 'Role',
-                render: (c) =>
-                  canEdit && c.role !== 'Functional' ? (
-                    <>
-                      <label htmlFor={`role-${c.code}`} className="sr-only">
-                        {c.code} role
-                      </label>
-                      <select
-                        id={`role-${c.code}`}
-                        value={c.role}
-                        onChange={(e) =>
-                          saveCurrency.mutate({ ...c, role: e.target.value as CurrencyRole } satisfies StoredCurrency)
-                        }
-                        className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                      >
-                        {ROLES.filter((r) => r !== 'Functional').map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </>
-                  ) : (
-                    <StatusBadge status={c.role} tone={c.role === 'Functional' ? 'info' : 'neutral'} />
                   ),
-              },
-              {
-                key: 'actions',
-                header: '',
-                align: 'right',
-                render: (c) =>
-                  canEdit && c.role !== 'Functional' ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCurrency(c)}
-                      className="text-[12px] font-bold text-danger hover:underline"
-                    >
-                      Delete
-                    </button>
-                  ) : null,
-              },
-            ]}
-          />
-          <TablePagination
-            currentPage={rolesControls.page}
-            totalItems={rolesControls.totalItems}
-            pageSize={rolesControls.pageSize}
-            onPageChange={rolesControls.setPage}
-          />
-
-          <dl className="mt-5 space-y-2 border-t border-gray-100 pt-4">
-            {ROLES.map((r) => (
-              <div key={r}>
-                <dt className="text-[12px] font-bold text-navy-900">{r}</dt>
-                <dd className="text-[12px] leading-relaxed text-gray-500">{ROLE_EXPLANATION[r]}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+                },
+                {
+                  key: 'role',
+                  header: 'Role',
+                  render: (c) =>
+                    canEdit && c.role !== 'Functional' ? (
+                      <>
+                        <label htmlFor={`role-${c.code}`} className="sr-only">
+                          {c.code} role
+                        </label>
+                        <select
+                          id={`role-${c.code}`}
+                          value={c.role}
+                          onChange={(e) =>
+                            saveCurrency.mutate({ ...c, role: e.target.value as CurrencyRole } satisfies StoredCurrency)
+                          }
+                          className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                        >
+                          {ROLES.filter((r) => r !== 'Functional').map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    ) : (
+                      <StatusBadge status={c.role} tone={c.role === 'Functional' ? 'info' : 'neutral'} />
+                    ),
+                },
+                {
+                  key: 'actions',
+                  header: '',
+                  align: 'right',
+                  render: (c) =>
+                    canEdit && c.role !== 'Functional' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCurrency(c)}
+                        className="text-[12px] font-bold text-danger hover:underline"
+                      >
+                        Delete
+                      </button>
+                    ) : null,
+                },
+              ]}
+            />
+            <TablePagination
+              currentPage={rolesControls.page}
+              totalItems={rolesControls.totalItems}
+              pageSize={rolesControls.pageSize}
+              onPageChange={rolesControls.setPage}
+            />
+          </div>
+        </details>
       </div>
     </>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'wouter';
+import { useScope } from '@/context/ScopeContext';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -50,7 +50,10 @@ export function EconomicIndicators() {
     );
 
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [newObs, setNewObs] = useState({ asOfDate: '', value: '' });
+  const { asOfDate: workingDate } = useScope();
+  const obsDate = workingDate ?? new Date().toISOString().slice(0, 10);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newObs, setNewObs] = useState({ value: '' });
   const [creatingSeries, setCreatingSeries] = useState(false);
   const [seriesDraft, setSeriesDraft] = useState(emptySeriesDraft());
 
@@ -90,30 +93,25 @@ export function EconomicIndicators() {
   const active = indicators.find((i) => i.id === activeId) ?? null;
 
   const handleAddObservation = () => {
-    if (!active || !newObs.asOfDate || newObs.value === '') return;
+    if (!active || newObs.value === '') return;
     const value = Number(newObs.value);
     if (Number.isNaN(value)) return;
 
     // Re-observing the same date replaces it rather than duplicating (agencies revise history).
-    const observations = [
-      ...active.observations.filter((o) => o.asOfDate !== newObs.asOfDate),
-      { asOfDate: newObs.asOfDate, value },
-    ];
+    const observations = [...active.observations.filter((o) => o.asOfDate !== obsDate), { asOfDate: obsDate, value }];
     save.mutate(
       { ...active, observations, updatedBy: 'current-user', updatedAt: new Date().toISOString() },
       {
         onSuccess: () => {
-          recordIndicatorLoad(`${active.code} - manual observation`, newObs.asOfDate, 1);
-          setNewObs({ asOfDate: '', value: '' });
+          recordIndicatorLoad(`${active.code} - manual observation`, obsDate, 1);
+          setNewObs({ value: '' });
+          setShowAdd(false);
         },
       },
     );
   };
 
   const latest = active?.observations[active.observations.length - 1] ?? null;
-  const previous =
-    active && active.observations.length > 1 ? active.observations[active.observations.length - 2]! : null;
-  const change = latest && previous ? latest.value - previous.value : null;
 
   return (
     <>
@@ -123,30 +121,6 @@ export function EconomicIndicators() {
         about="Covers inflation, policy rates, and for Nigeria the oil price its fiscal position tracks."
         asOfDate={latest?.asOfDate ?? null}
         scope="Group"
-        metrics={[
-          {
-            label: 'Series',
-            value: String(indicators.length),
-            about:
-              'Macro series on file - inflation, policy rates and similar drivers of behavioural and scenario assumptions.',
-          },
-          {
-            label: 'Countries',
-            value: String(new Set(indicators.map((i) => i.countryCode)).size),
-            about: 'Distinct countries with at least one series tracked.',
-          },
-          {
-            label: 'Latest value',
-            value: latest ? `${latest.value} ${active?.unit ?? ''}` : '-',
-            about: 'The most recent observation on the selected series.',
-          },
-          {
-            label: 'Period change',
-            value: change === null ? '-' : `${change > 0 ? '+' : ''}${change.toFixed(2)}`,
-            tone: change === null ? 'neutral' : change > 0 ? 'warning' : 'success',
-            about: 'Move from the prior observation to the latest one on the selected series.',
-          },
-        ]}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -371,57 +345,46 @@ export function EconomicIndicators() {
                 </InfoButton>
               </h2>
 
-              {canEdit && (
+              {canEdit && !showAdd && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdd(true)}
+                  className="mb-4 text-[12px] font-bold text-navy-700 hover:underline"
+                >
+                  + Record a value for {formatDate(obsDate)}
+                </button>
+              )}
+              {canEdit && showAdd && (
                 <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
                   <div>
-                    <label htmlFor="obs-date" className="mb-1 block text-[12px] text-gray-600">
-                      As-of date
-                    </label>
-                    <input
-                      id="obs-date"
-                      type="date"
-                      value={newObs.asOfDate}
-                      onChange={(e) => setNewObs({ ...newObs, asOfDate: e.target.value })}
-                      className="rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-                    />
-                  </div>
-                  <div>
                     <label htmlFor="obs-value" className="mb-1 block text-[12px] text-gray-600">
-                      Value ({active.unit})
+                      Value ({active.unit}) for {formatDate(obsDate)}
                     </label>
                     <input
                       id="obs-value"
                       type="number"
                       step="any"
                       value={newObs.value}
-                      onChange={(e) => setNewObs({ ...newObs, value: e.target.value })}
+                      onChange={(e) => setNewObs({ value: e.target.value })}
                       className="w-32 rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleAddObservation}
-                    disabled={save.isPending || !newObs.asOfDate || newObs.value === ''}
+                    disabled={save.isPending || newObs.value === ''}
                     className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                   >
-                    {save.isPending ? 'Saving…' : 'Record observation'}
+                    {save.isPending ? 'Saving…' : 'Save'}
                   </button>
-                  <p className="w-full text-[12px] text-gray-500">
-                    Re-recording an existing date replaces that observation - agencies revise, and a series cannot carry
-                    two values for one period.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdd(false)}
+                    className="text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                  >
+                    Cancel
+                  </button>
                 </div>
-              )}
-
-              {canEdit && (
-                <p className="mb-4 rounded-lg bg-gray-50 px-4 py-2.5 text-[12px] leading-relaxed text-gray-500">
-                  A full observation history loads through the combined market-data upload on{' '}
-                  <Link href="/data/market" className="font-bold text-navy-700 hover:underline">
-                    Data → Market data
-                  </Link>{' '}
-                  - one file covers FX rates, curves and indicator series together. This screen keeps single
-                  observations and corrections.
-                </p>
               )}
 
               <ResultTable
