@@ -1,3 +1,4 @@
+import { SEED_AUTHOR } from '@/lib/ruleApproval';
 // Approvals (/controls): three plain lists - what is waiting for me, what I raised, and everything decided -
 // each request a card saying WHAT changes and WHY. Clicking one opens a side panel (?request=<id>) with the
 // details, Approve, and Reject (a reason is required). Maker-checker stays a property of the decision itself:
@@ -72,7 +73,8 @@ export function Approvals() {
   const canDecide = hasPermission('approvals.approve');
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
-  const { data: requests = [], isLoading } = approvals.useList();
+  const { data: allRequests = [], isLoading } = approvals.useList();
+  const requests = useMemo(() => allRequests.filter((r) => r.requestedBy !== SEED_AUTHOR), [allRequests]);
   const save = approvals.useSave();
   const queryClient = useQueryClient();
   const commitSnapshot = useCommitSnapshot();
@@ -299,13 +301,13 @@ export function Approvals() {
       </div>
 
       <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             aria-label="Search requests"
             placeholder="Search…"
             value={filters.text}
             onChange={(e) => setFilters((f) => ({ ...f, text: e.target.value }))}
-            className={cn(filterCls, 'lg:col-span-2')}
+            className={cn(filterCls, 'min-w-[160px] flex-1')}
           />
           <select
             aria-label="Type"
@@ -348,7 +350,7 @@ export function Approvals() {
               type="date"
               value={filters.from}
               onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
-              className={filterCls}
+              className={cn(filterCls, 'w-[140px]')}
             />
             <span className="text-gray-400">–</span>
             <input
@@ -356,7 +358,7 @@ export function Approvals() {
               type="date"
               value={filters.to}
               onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
-              className={filterCls}
+              className={cn(filterCls, 'w-[140px]')}
             />
           </div>
         </div>
@@ -483,7 +485,7 @@ export function Approvals() {
 }
 
 const filterCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-navy-900 focus:border-navy-700 focus:outline-none';
+  'w-auto max-w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-navy-900 focus:border-navy-700 focus:outline-none';
 
 // ─── Table cell ────────────────────────────────────────────────────────────
 
