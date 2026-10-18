@@ -6,7 +6,7 @@
  * splitMarketData reads each row kind, and each workbook sheet is read together - so the three detail
  * pages no longer need bulk imports of their own. They keep their manual entry, corrections and conventions.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -89,6 +89,12 @@ export function MarketDataHub() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  // The confirmation clears itself - the status cards above already show what was loaded.
+  useEffect(() => {
+    if (!saved) return;
+    const t = window.setTimeout(() => setSaved(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [saved]);
 
   const lastFx = fxRates.reduce<string | null>((m, r) => (!m || r.asOfDate > m ? r.asOfDate : m), null);
   const lastCurve = curves.reduce<string | null>((m, c) => (!m || c.asOfDate > m ? c.asOfDate : m), null);
@@ -343,8 +349,16 @@ export function MarketDataHub() {
           </p>
         )}
         {saved && (
-          <p role="status" className="mt-3 text-[12px] text-success">
-            {saved}
+          <p role="status" className="mt-3 flex items-start gap-2 text-[12px] text-success">
+            <span>{saved}</span>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setSaved(null)}
+              className="font-bold text-gray-400 hover:text-navy-900"
+            >
+              ×
+            </button>
           </p>
         )}
 
