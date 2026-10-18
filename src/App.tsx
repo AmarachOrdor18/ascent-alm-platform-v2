@@ -12,15 +12,33 @@
  */
 
 import { Suspense, lazy, useEffect, useState, type ComponentType } from 'react';
-import { Link, Redirect, Route, Switch, useParams } from 'wouter';
+import { Link, Redirect, Route, Switch, useLocation, useParams } from 'wouter';
 import { AppShell } from '@/components/layout/AppShell';
 import { ALL_NAV_ITEMS } from '@/components/layout/navigation';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useAuth } from '@/context/AuthContext';
 import { GROUP_CODE, useScope } from '@/context/ScopeContext';
-import { repository } from '@/store/localRepository';
+import { isSupabaseMode, repository } from '@/store/repositoryInstance';
 import { ensureSeeded } from '@/data/seed/bootstrap';
 import { useAffiliates } from '@/lib/hooks';
+import { PreparingWorkspace } from '@/pages/welcome/WelcomeIntro';
+import {
+  AREA_ROUTES,
+  AdminArea,
+  ApproveArea,
+  AssumptionsArea,
+  DataArea,
+  ReportsArea,
+  ResultsArea,
+} from '@/pages/areas/Areas';
+import { useOnboardingRecord } from '@/lib/onboardingHooks';
+import {
+  ORG_ONBOARDING_ID,
+  affiliateOnboardingId,
+  onboardingHandledKey,
+  onboardingRedirect,
+  resolveLanding,
+} from '@/lib/onboarding';
 
 const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login })));
 const Placeholder = lazy(() => import('@/pages/Placeholder').then((m) => ({ default: m.Placeholder })));
@@ -30,6 +48,12 @@ const AffiliateSettings = lazy(() =>
 );
 const OnboardAffiliateResume = lazy(() =>
   import('@/pages/OnboardAffiliate').then((m) => ({ default: m.OnboardAffiliate })),
+);
+const OrganisationOnboarding = lazy(() =>
+  import('@/pages/welcome/OrganisationOnboarding').then((m) => ({ default: m.OrganisationOnboarding })),
+);
+const AffiliateWelcome = lazy(() =>
+  import('@/pages/welcome/AffiliateWelcome').then((m) => ({ default: m.AffiliateWelcome })),
 );
 const MyAccount = lazy(() => import('@/pages/MyAccount').then((m) => ({ default: m.MyAccount })));
 const SnapshotWorkbench = lazy(() =>
@@ -78,9 +102,25 @@ const BUILT: Record<string, ComponentType> = {
   '/rules/adjustments': lazy(() =>
     import('@/pages/rules/FtpAndAdjustments').then((m) => ({ default: m.AdjustmentRules })),
   ),
+  '/rules/cost-allocation': lazy(() =>
+    import('@/pages/rules/ProfitabilityRules').then((m) => ({ default: m.CostAllocationRules })),
+  ),
+  '/rules/credit-loss': lazy(() =>
+    import('@/pages/rules/ProfitabilityRules').then((m) => ({ default: m.CreditLossRules })),
+  ),
+  '/rules/capital': lazy(() => import('@/pages/rules/ProfitabilityRules').then((m) => ({ default: m.CapitalRules }))),
   '/rules/filters': lazy(() => import('@/pages/rules/SimpleRules').then((m) => ({ default: m.Filters }))),
   '/rules/custom-metrics': lazy(() =>
     import('@/pages/rules/CustomMetrics').then((m) => ({ default: m.CustomMetrics })),
+  ),
+  // Data-quality rules and the rule-coverage register - formerly sections of the Group's settings page.
+  '/rules/validation': lazy(() => import('@/pages/ValidationRules').then((m) => ({ default: m.ValidationRules }))),
+  '/rules/field-mappings': lazy(() =>
+    import('@/pages/rules/FieldMappings').then((m) => ({ default: m.FieldMappings })),
+  ),
+  '/rules/code-mappings': lazy(() => import('@/pages/rules/CodeMappings').then((m) => ({ default: m.CodeMappings }))),
+  '/rules/coverage': lazy(() =>
+    import('@/pages/rules/ModelsAssumptions').then((m) => ({ default: m.ModelsAssumptions })),
   ),
 
   // Setup and onboarding - untouched by the navigation redesign.
@@ -90,64 +130,15 @@ const BUILT: Record<string, ComponentType> = {
   ),
 };
 
-/**
- * Module wrappers - one lazy-loaded component per module, reused across
- * every one of that module's tab paths (see `MODULE_TAB_ROUTES` below).
- * Each wrapper does its own internal lazy-loading of the individual screens
- * it groups, so per-tab code-splitting is unchanged from before the
- * redesign - see `src/pages/modules/*`.
- */
-const LiquidityRiskModule = lazy(() =>
-  import('@/pages/modules/LiquidityRiskModule').then((m) => ({ default: m.LiquidityRiskModule })),
-);
-const IrrbbModule = lazy(() => import('@/pages/modules/IrrbbModule').then((m) => ({ default: m.IrrbbModule })));
-const StressTestingModule = lazy(() =>
-  import('@/pages/modules/StressTestingModule').then((m) => ({ default: m.StressTestingModule })),
-);
-const ConcentrationModule = lazy(() =>
-  import('@/pages/modules/ConcentrationModule').then((m) => ({ default: m.ConcentrationModule })),
-);
-const FtpProfitabilityModule = lazy(() =>
-  import('@/pages/modules/FtpProfitabilityModule').then((m) => ({ default: m.FtpProfitabilityModule })),
-);
-const BalanceSheetTreasuryModule = lazy(() =>
-  import('@/pages/modules/BalanceSheetTreasuryModule').then((m) => ({ default: m.BalanceSheetTreasuryModule })),
-);
-const ReportingModule = lazy(() =>
-  import('@/pages/modules/ReportingModule').then((m) => ({ default: m.ReportingModule })),
-);
-const DataManagementModule = lazy(() =>
-  import('@/pages/modules/DataManagementModule').then((m) => ({ default: m.DataManagementModule })),
-);
-const ExecutionModule = lazy(() =>
-  import('@/pages/modules/ExecutionModule').then((m) => ({ default: m.ExecutionModule })),
-);
-const AdministrationModule = lazy(() =>
-  import('@/pages/modules/AdministrationModule').then((m) => ({ default: m.AdministrationModule })),
-);
-const GroupAffiliateModule = lazy(() =>
-  import('@/pages/modules/GroupAffiliateModule').then((m) => ({ default: m.GroupAffiliateModule })),
-);
-const MonitoringModule = lazy(() =>
-  import('@/pages/modules/MonitoringModule').then((m) => ({ default: m.MonitoringModule })),
-);
-const ControlsModule = lazy(() =>
-  import('@/pages/modules/ControlsModule').then((m) => ({ default: m.ControlsModule })),
-);
-
-BUILT['/risk/liquidity'] = LiquidityRiskModule;
-BUILT['/risk/irrbb'] = IrrbbModule;
-BUILT['/risk/stress-testing'] = StressTestingModule;
-BUILT['/risk/concentration'] = ConcentrationModule;
-BUILT['/treasury/ftp'] = FtpProfitabilityModule;
-BUILT['/treasury/balance-sheet'] = BalanceSheetTreasuryModule;
-BUILT['/reporting'] = ReportingModule;
-BUILT['/data/operations'] = DataManagementModule;
-BUILT['/execution'] = ExecutionModule;
-BUILT['/admin'] = AdministrationModule;
-BUILT['/affiliates'] = GroupAffiliateModule;
-BUILT['/monitoring'] = MonitoringModule;
-BUILT['/controls'] = ControlsModule;
+// The work areas plus Admin, each keyed once under its sidebar path; every other URL an area answers to
+// (Organisation setup's /setup and /affiliates among them, under Admin; Market data under Data) is declared
+// in AREA_ROUTES (src/pages/areas/Areas.tsx) and routed below.
+BUILT['/data/operations'] = DataArea;
+BUILT['/assumptions'] = AssumptionsArea;
+BUILT['/risk/liquidity'] = ResultsArea;
+BUILT['/controls'] = ApproveArea;
+BUILT['/reporting'] = ReportsArea;
+BUILT['/admin'] = AdminArea;
 BUILT['/account'] = MyAccount;
 
 /**
@@ -160,30 +151,7 @@ BUILT['/account'] = MyAccount;
  * check `ModuleTabs` applies internally; see each module file's header
  * comment for why that permission was chosen.
  */
-const MODULE_TAB_ROUTES: RouteEntry[] = [
-  { path: '/risk/liquidity/gap-analysis', screenName: 'Maturity & Repricing Gap', Component: LiquidityRiskModule, permission: 'risk.view' },
-  { path: '/risk/irrbb/behavioural-analysis', screenName: 'Behavioural Analysis', Component: IrrbbModule, permission: 'risk.view' },
-  { path: '/risk/stress-testing/what-if', screenName: 'What-If Builder', Component: StressTestingModule, permission: 'risk.view' },
-  { path: '/risk/stress-testing/forecast', screenName: 'Forecast', Component: StressTestingModule, permission: 'risk.view' },
-  { path: '/monitoring/kri', screenName: 'Key Risk Indicators', Component: MonitoringModule, permission: 'risk.view' },
-  { path: '/monitoring/risk-map', screenName: 'Liquidity Risk Map', Component: MonitoringModule, permission: 'risk.view' },
-  { path: '/treasury/ftp/profitability', screenName: 'Profitability Ratios', Component: FtpProfitabilityModule, permission: 'risk.view' },
-  { path: '/treasury/balance-sheet/fx-position', screenName: 'FX Position', Component: BalanceSheetTreasuryModule, permission: 'treasury.view' },
-  { path: '/reporting/regulatory', screenName: 'Regulatory Reporting', Component: ReportingModule, permission: 'reporting.view' },
-  { path: '/reporting/ad-hoc', screenName: 'Ad-Hoc Analysis', Component: ReportingModule, permission: 'reporting.view' },
-  { path: '/data/operations/gl-reconciliation', screenName: 'GL Reconciliation', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/data/operations/vintages', screenName: 'Data Vintages & Load History', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/data/operations/position-book', screenName: 'Position Book', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/data/structure', screenName: 'Data Structure', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/data/structure/counterparties', screenName: 'Counterparty Register', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/data/quality', screenName: 'Data Vintages & Load History', Component: DataManagementModule, permission: 'data.view' },
-  { path: '/execution/history', screenName: 'Run History', Component: ExecutionModule, permission: 'risk.view' },
-  { path: '/execution/scheduler', screenName: 'Batch Scheduler', Component: ExecutionModule, permission: 'risk.view' },
-  { path: '/controls/remediation', screenName: 'Control Remediation', Component: ControlsModule, permission: 'risk.view' },
-  { path: '/admin/users', screenName: 'Users, Roles & Permissions', Component: AdministrationModule, permission: 'dashboard.view' },
-  { path: '/admin/preferences', screenName: 'System Preferences', Component: AdministrationModule, permission: 'dashboard.view' },
-  { path: '/admin/audit', screenName: 'Audit Log', Component: AdministrationModule, permission: 'dashboard.view' },
-];
+const MODULE_TAB_ROUTES: RouteEntry[] = AREA_ROUTES.filter((r) => !(r.path in BUILT));
 
 /**
  * Old flat URLs, preserved as redirects to their new hierarchical home
@@ -216,29 +184,39 @@ const LEGACY_REDIRECTS: Array<{ from: string; to: string }> = [
   { from: '/ad-hoc', to: '/reporting/ad-hoc' },
   { from: '/data', to: '/data/operations' },
   { from: '/data-upload', to: '/data/operations' },
-  { from: '/gl-reconciliation', to: '/data/operations/gl-reconciliation' },
-  { from: '/data-vintages', to: '/data/operations/vintages' },
+  // Phase 4: GL reconciliation lives on the general-ledger source; load history is Data → History.
+  { from: '/gl-reconciliation', to: '/data/operations?domain=GeneralLedger' },
+  { from: '/data/operations/gl-reconciliation', to: '/data/operations?domain=GeneralLedger' },
+  { from: '/data-vintages', to: '/data/loads' },
+  { from: '/data/operations/vintages', to: '/data/loads' },
+  { from: '/data/quality', to: '/data/loads' },
   { from: '/dimensions', to: '/data/structure' },
   { from: '/counterparties', to: '/data/structure/counterparties' },
   // Connectors and reference data are Group-wide/shared - no affiliate field on either - so they now
   // live as categories on the Group row's own Settings rather than as Data Management module tabs.
-  { from: '/connectors', to: '/affiliates/GROUP/settings?section=data-sources' },
-  { from: '/data/reference-data', to: '/affiliates/GROUP/settings?section=ref-yield-curves' },
-  { from: '/data/reference-data/fx-rates', to: '/affiliates/GROUP/settings?section=ref-fx-rates' },
-  { from: '/data/reference-data/economic-indicators', to: '/affiliates/GROUP/settings?section=ref-economic-indicators' },
-  { from: '/data/reference-data/holiday-calendar', to: '/affiliates/GROUP/settings?section=ref-holiday-calendar' },
-  { from: '/yield-curves', to: '/affiliates/GROUP/settings?section=ref-yield-curves' },
-  { from: '/fx-rates', to: '/affiliates/GROUP/settings?section=ref-fx-rates' },
-  { from: '/economic-indicators', to: '/affiliates/GROUP/settings?section=ref-economic-indicators' },
-  { from: '/holiday-calendar', to: '/affiliates/GROUP/settings?section=ref-holiday-calendar' },
+  { from: '/connectors', to: '/data/operations' },
+  // Market data moved from Admin → Organisation setup to Data → Market data.
+  { from: '/setup/reference/market', to: '/data/market' },
+  { from: '/setup/reference/fx', to: '/data/market/fx' },
+  { from: '/setup/reference/indicators', to: '/data/market/indicators' },
+  { from: '/setup/reference/calendars', to: '/data/market/calendars' },
+  { from: '/setup/reference', to: '/data/market/curves' },
+  { from: '/data/reference-data', to: '/data/market/curves' },
+  { from: '/data/reference-data/fx-rates', to: '/data/market/fx' },
+  { from: '/data/reference-data/economic-indicators', to: '/data/market/indicators' },
+  { from: '/data/reference-data/holiday-calendar', to: '/data/market/calendars' },
+  { from: '/yield-curves', to: '/data/market/curves' },
+  { from: '/fx-rates', to: '/data/market/fx' },
+  { from: '/economic-indicators', to: '/data/market/indicators' },
+  { from: '/holiday-calendar', to: '/data/market/calendars' },
   { from: '/runs/new', to: '/execution' },
   { from: '/runs', to: '/execution/history' },
   { from: '/scheduler', to: '/execution/scheduler' },
   // Configuration folded into the Group's own Settings - Business Rules is no longer a standalone module.
-  { from: '/rules', to: '/affiliates/GROUP/settings?section=rule-coverage' },
-  { from: '/configuration', to: '/affiliates/GROUP/settings?section=rule-coverage' },
-  { from: '/validation-rules', to: '/affiliates/GROUP/settings?section=rule-ValidationRule' },
-  { from: '/configuration/validation-rules', to: '/affiliates/GROUP/settings?section=rule-ValidationRule' },
+  { from: '/rules', to: '/assumptions/rules' },
+  { from: '/configuration', to: '/assumptions/rules' },
+  { from: '/validation-rules', to: '/rules/validation' },
+  { from: '/configuration/validation-rules', to: '/rules/validation' },
   // Approvals and Control Remediation moved out of Administration into their own Controls pillar;
   // Notifications took over Approvals' old default path as Administration's own default tab.
   { from: '/approvals', to: '/controls' },
@@ -285,9 +263,15 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
   { path: '/rules/custom-metrics', screenName: 'Custom Metrics' },
   { path: '/rules/ftp', screenName: 'FTP Rules' },
   { path: '/rules/adjustments', screenName: 'Adjustment Rules' },
+  { path: '/rules/cost-allocation', screenName: 'Operating Cost Allocation' },
+  { path: '/rules/credit-loss', screenName: 'Expected Credit Loss' },
+  { path: '/rules/capital', screenName: 'Capital Charge' },
+  { path: '/rules/validation', screenName: 'Validation Rules' },
+  { path: '/rules/field-mappings', screenName: 'Field Mappings' },
+  { path: '/rules/code-mappings', screenName: 'Code Mappings' },
+  { path: '/rules/coverage', screenName: 'Rule Coverage' },
   { path: '/affiliates/onboard', screenName: 'Onboard Affiliate' },
   { path: '/affiliates/bulk-onboard', screenName: 'Bulk Onboard Affiliates' },
-  { path: '/data/operations', screenName: 'Data Operations' },
   { path: '/account', screenName: 'My Account' },
 ];
 
@@ -299,7 +283,10 @@ const UNLISTED_SCREENS: Array<{ path: string; screenName: string }> = [
 const UNLISTED_PERMISSION: Record<string, string> = {
   '/affiliates/onboard': 'group.manage',
   '/affiliates/bulk-onboard': 'group.manage',
-  '/data/operations': 'data.view',
+  '/rules/validation': 'data.view',
+  '/rules/field-mappings': 'data.view',
+  '/rules/code-mappings': 'data.view',
+  '/rules/coverage': 'risk.view',
 };
 
 function permissionForUnlisted(path: string): string {
@@ -309,12 +296,15 @@ function permissionForUnlisted(path: string): string {
 }
 
 // Risk, Monitoring, Treasury, Reporting and Execution all assume the scoped affiliate's data has
-// been signed off - a Process Run, a limit breach or a regulatory return computed against an
+// been signed off - a run, a limit breach or a regulatory return computed against an
 // Onboarding/Testing/Suspended affiliate's unproven data would look indistinguishable from a real
 // one. Data Management, Group & Affiliate Management, Administration and Controls stay open
 // regardless, since finishing onboarding (and approving the Live transition) happens there.
 const LIVE_REQUIRED_PREFIXES = ['/risk', '/monitoring', '/treasury', '/reporting', '/execution'];
+// Readiness is how a not-yet-Live affiliate sees what stands between it and its first run - never gated.
+const LIVE_EXEMPT_PATHS = ['/execution/readiness'];
 function requiresLiveAffiliate(path: string): boolean {
+  if (LIVE_EXEMPT_PATHS.includes(path)) return false;
   return LIVE_REQUIRED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
@@ -361,14 +351,36 @@ export const buildRouteOrder = (): RouteEntry[] => {
     }));
 
   const parameterised: RouteEntry[] = [
-    { path: '/affiliates/onboard/:code', screenName: 'Resume Onboarding', Component: OnboardAffiliateResume, permission: 'group.manage' },
-    { path: '/affiliates/:code/settings', screenName: 'Affiliate Settings', Component: AffiliateSettings, permission: 'group.manage', ownAffiliateException: true },
-    { path: '/affiliates/:code', screenName: 'Affiliate Detail', Component: AffiliateDetail, permission: 'group.manage', ownAffiliateException: true },
-    { path: '/position-book/snapshot/:id', screenName: 'Editable Snapshot', Component: SnapshotWorkbench, permission: 'data.view' },
+    {
+      path: '/affiliates/onboard/:code',
+      screenName: 'Resume Onboarding',
+      Component: OnboardAffiliateResume,
+      permission: 'group.manage',
+    },
+    {
+      path: '/affiliates/:code/settings',
+      screenName: 'Affiliate Settings',
+      Component: AffiliateSettings,
+      permission: 'group.manage',
+      ownAffiliateException: true,
+    },
+    {
+      path: '/affiliates/:code',
+      screenName: 'Affiliate Detail',
+      Component: AffiliateDetail,
+      permission: 'group.manage',
+      ownAffiliateException: true,
+    },
+    {
+      path: '/position-book/snapshot/:id',
+      screenName: 'Editable Snapshot',
+      Component: SnapshotWorkbench,
+      permission: 'data.view',
+    },
   ];
 
   return [...navLiteral, ...unlisted, ...MODULE_TAB_ROUTES, ...parameterised];
-}
+};
 /* eslint-enable react-refresh/only-export-components */
 
 const ROUTE_ORDER = buildRouteOrder();
@@ -376,7 +388,7 @@ const ROUTE_ORDER = buildRouteOrder();
 function ScreenFallback() {
   return (
     <div className="flex items-center justify-center p-12" role="status" aria-live="polite">
-      <span className="text-[12px] text-gray-400">Loading…</span>
+      <span className="text-[13px] text-gray-400">Loading…</span>
     </div>
   );
 }
@@ -402,8 +414,18 @@ function ScopeSync() {
  * is broad by design, edit access is what's actually restricted.
  */
 export function RouteGate({
-  path, permission, screenName, ownAffiliateException, children,
-}: { path: string; permission: string; screenName?: string; ownAffiliateException?: boolean; children: React.ReactNode }) {
+  path,
+  permission,
+  screenName,
+  ownAffiliateException,
+  children,
+}: {
+  path: string;
+  permission: string;
+  screenName?: string;
+  ownAffiliateException?: boolean;
+  children: React.ReactNode;
+}) {
   const { user, hasPermission } = useAuth();
   const { affiliateCode, affiliates } = useScope();
   const params = useParams<{ code?: string }>();
@@ -412,8 +434,8 @@ export function RouteGate({
   if (!hasPermission(permission) && !ownAffiliate) {
     return (
       <div role="alert" className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-[13px] font-bold text-navy-900">Access restricted</p>
-        <p className="mt-1 text-[12px] text-gray-500">
+        <p className="text-[14px] font-bold text-navy-900">Access restricted</p>
+        <p className="mt-1 text-[13px] text-gray-500">
           Your role doesn&rsquo;t have access to {screenName ?? 'this screen'}.
         </p>
       </div>
@@ -424,15 +446,15 @@ export function RouteGate({
   if (activeAffiliate && activeAffiliate.status !== 'Live' && requiresLiveAffiliate(path)) {
     return (
       <div role="alert" className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-        <p className="text-[13px] font-bold text-navy-900">{activeAffiliate.name} isn&rsquo;t Live yet</p>
-        <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-500">
-          {screenName ?? 'This screen'} reads from data an affiliate has signed off as ready - {activeAffiliate.name}
-          {' '}is still <span className="font-bold">{activeAffiliate.status}</span>. Finish loading and reconciling
-          its data in Data Management, then complete the Live approval, before working with it here.
+        <p className="text-[14px] font-bold text-navy-900">{activeAffiliate.name} isn&rsquo;t Live yet</p>
+        <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-gray-500">
+          {screenName ?? 'This screen'} reads from data an affiliate has signed off as ready - {activeAffiliate.name} is
+          still <span className="font-bold">{activeAffiliate.status}</span>. Finish loading and reconciling its data in
+          Data Management, then complete the Live approval, before working with it here.
         </p>
         <Link
           href="/data/operations"
-          className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+          className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
         >
           Go to Data Management →
         </Link>
@@ -441,6 +463,83 @@ export function RouteGate({
   }
 
   return <>{children}</>;
+}
+
+function readHandled(userId: string | undefined): boolean {
+  if (!userId) return true;
+  try {
+    return sessionStorage.getItem(onboardingHandledKey(userId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sends a user who still needs onboarding from Home to their welcome route - once per session (a fresh
+ * sign-in starts a new one; "Finish later" uses it up). Users who don't need onboarding never see it.
+ */
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const [location, navigate] = useLocation();
+  const { user, hasPermission } = useAuth();
+  const { data: affiliates } = useAffiliates();
+  const handled = readHandled(user?.id);
+  const onHome = location === '/dashboard' || location === '/';
+  const active = onHome && !handled && !!user;
+  const isOrgManager = hasPermission('group.manage');
+  const isAffManager = !isOrgManager && hasPermission('affiliate.manage') && user?.affiliateCode !== GROUP_CODE;
+  const org = useOnboardingRecord(active && isOrgManager ? ORG_ONBOARDING_ID : null);
+  const aff = useOnboardingRecord(active && isAffManager && user ? affiliateOnboardingId(user.affiliateCode) : null);
+  const loading =
+    (active && isOrgManager && org.isLoading) || (active && isAffManager && (aff.isLoading || !affiliates));
+  const landing =
+    active && !loading
+      ? resolveLanding(
+          user,
+          hasPermission,
+          org.data,
+          aff.data,
+          affiliates?.find((a) => a.code === user?.affiliateCode) ?? null,
+        )
+      : '/dashboard';
+  const target = active && !loading ? onboardingRedirect(location, landing, handled) : null;
+
+  useEffect(() => {
+    if (!target || !user) return;
+    try {
+      sessionStorage.setItem(onboardingHandledKey(user.id), '1');
+    } catch {
+      /* storage unavailable */
+    }
+    navigate(target, { replace: true });
+  }, [target, user, navigate]);
+
+  if (loading || target) return <PreparingWorkspace />;
+  return <>{children}</>;
+}
+
+/** Onboarding screens: full page, outside the app shell. */
+function WelcomeRoutes() {
+  return (
+    <ErrorBoundary screenName="Onboarding">
+      <Suspense fallback={<ScreenFallback />}>
+        <Switch>
+          <Route path="/welcome/organisation">
+            <RouteGate path="/welcome/organisation" permission="group.manage" screenName="Organisation setup">
+              <OrganisationOnboarding />
+            </RouteGate>
+          </Route>
+          <Route path="/welcome/affiliate">
+            <RouteGate path="/welcome/affiliate" permission="affiliate.manage" screenName="Affiliate setup">
+              <AffiliateWelcome />
+            </RouteGate>
+          </Route>
+          <Route>
+            <Redirect to="/dashboard" />
+          </Route>
+        </Switch>
+      </Suspense>
+    </ErrorBoundary>
+  );
 }
 
 /** ErrorBoundary re-keyed by scope, so a caught error resets when the affiliate or as-of date it was caught under changes, instead of requiring a full remount. */
@@ -454,11 +553,14 @@ function ScopedErrorBoundary({ screenName, children }: { screenName?: string; ch
 }
 
 export function App() {
-  const { isAuthenticated } = useAuth();
-  const [seeded, setSeeded] = useState(false);
+  const { isAuthenticated, isRestoring, restoreError } = useAuth();
+  const [location] = useLocation();
+  // The shared Supabase database is seeded by scripts/seed-supabase.ts, never from a browser.
+  const [seeded, setSeeded] = useState(isSupabaseMode);
   const [seedError, setSeedError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isSupabaseMode) return;
     ensureSeeded(repository)
       .then(() => setSeeded(true))
       .catch((err: unknown) => setSeedError(err instanceof Error ? err.message : String(err)));
@@ -467,13 +569,33 @@ export function App() {
   if (seedError) {
     return (
       <div role="alert" className="m-6 rounded-2xl border border-danger/20 bg-danger-bg p-6">
-        <h1 className="mb-1 text-[14px] font-bold text-navy-900">The local database could not be opened</h1>
-        <p className="text-[12px] text-gray-600">{seedError}</p>
+        <h1 className="mb-1 text-[15px] font-bold text-navy-900">The local database could not be opened</h1>
+        <p className="text-[13px] text-gray-600">{seedError}</p>
       </div>
     );
   }
 
-  if (!seeded) return <ScreenFallback />;
+  if (restoreError) {
+    return (
+      <div role="alert" className="m-6 rounded-2xl border border-danger/20 bg-danger-bg p-6">
+        <h1 className="mb-1 text-[15px] font-bold text-navy-900">The Ascent database could not be reached</h1>
+        <p className="text-[13px] text-gray-600">
+          The platform's shared database (Supabase) did not respond, so nothing can be loaded or saved. Check your
+          network connection and try again.
+        </p>
+        <p className="mt-2 font-mono text-[12px] text-gray-500">{restoreError}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!seeded || isRestoring) return <ScreenFallback />;
 
   if (!isAuthenticated) {
     return (
@@ -483,45 +605,61 @@ export function App() {
     );
   }
 
+  if (location.startsWith('/welcome/')) {
+    return (
+      <>
+        <ScopeSync />
+        <WelcomeRoutes />
+      </>
+    );
+  }
+
   return (
-    <AppShell>
-      <ScopeSync />
-      <Switch>
-        <Route path="/">
-          <Redirect to="/dashboard" />
-        </Route>
-
-        {LEGACY_REDIRECTS.map(({ from, to }) => (
-          <Route key={from} path={from}>
-            <Redirect to={to} />
+    <OnboardingGate>
+      <AppShell>
+        <ScopeSync />
+        <Switch>
+          <Route path="/">
+            <Redirect to="/dashboard" />
           </Route>
-        ))}
 
-        {ROUTE_ORDER.map(({ path, screenName, Component, permission, ownAffiliateException }) => (
-          <Route key={path} path={path}>
-            {/* Keyed by scope: a transient render error caught here otherwise
+          {LEGACY_REDIRECTS.map(({ from, to }) => (
+            <Route key={from} path={from}>
+              <Redirect to={to} />
+            </Route>
+          ))}
+
+          {ROUTE_ORDER.map(({ path, screenName, Component, permission, ownAffiliateException }) => (
+            <Route key={path} path={path}>
+              {/* Keyed by scope: a transient render error caught here otherwise
                 latches until the whole app remounts (only logout did that),
                 even after the affiliate/date that triggered it has changed.
                 Re-keying on scope gives the screen a fresh mount attempt
                 exactly when the user's next action already changes the
                 inputs it will render with. */}
-            <ScopedErrorBoundary screenName={screenName}>
-              <Suspense fallback={<ScreenFallback />}>
-                <RouteGate path={path} permission={permission} screenName={screenName} ownAffiliateException={ownAffiliateException}>
-                  <Component />
-                </RouteGate>
-              </Suspense>
-            </ScopedErrorBoundary>
-          </Route>
-        ))}
+              <ScopedErrorBoundary screenName={screenName}>
+                <Suspense fallback={<ScreenFallback />}>
+                  <RouteGate
+                    path={path}
+                    permission={permission}
+                    screenName={screenName}
+                    ownAffiliateException={ownAffiliateException}
+                  >
+                    <Component />
+                  </RouteGate>
+                </Suspense>
+              </ScopedErrorBoundary>
+            </Route>
+          ))}
 
-        <Route>
-          <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-            <p className="text-[13px] font-bold text-navy-900">Screen not found</p>
-            <p className="mt-1 text-[12px] text-gray-500">That address does not match any screen in the platform.</p>
-          </div>
-        </Route>
-      </Switch>
-    </AppShell>
+          <Route>
+            <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
+              <p className="text-[14px] font-bold text-navy-900">Screen not found</p>
+              <p className="mt-1 text-[13px] text-gray-500">That address does not match any screen in the platform.</p>
+            </div>
+          </Route>
+        </Switch>
+      </AppShell>
+    </OnboardingGate>
   );
 }

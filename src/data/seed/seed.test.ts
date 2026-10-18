@@ -81,7 +81,7 @@ describe('no affiliate ships pre-onboarded', () => {
     for (const a of affiliates) expect(a.feeds).toHaveLength(0);
   });
 
-  it('seeds no FX rate, yield curve, holiday calendar or economic indicator - that is Treasury/Risk\'s own setup', async () => {
+  it("seeds no FX rate, yield curve, holiday calendar or economic indicator - that is Treasury/Risk's own setup", async () => {
     await ensureSeeded(repo);
     expect(await repo.listFxRates()).toHaveLength(0);
     expect(await repo.listYieldCurves()).toHaveLength(0);

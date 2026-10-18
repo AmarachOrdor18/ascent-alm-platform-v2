@@ -1,16 +1,26 @@
 import { useState } from 'react';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useAuth } from '@/context/AuthContext';
+import { canonicalRole, useAuth } from '@/context/AuthContext';
 import { useRoles, useSaveUser } from '@/lib/hooks';
 import { hashPassword } from '@/lib/passwordHash';
+import { isSupabaseMode } from '@/lib/supabase';
+import { changeOwnPassword, verifyPassword } from '@/lib/supabaseAuth';
 import { formatDate } from '@/lib/format';
 
-function SettingsCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function SettingsCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">{title}</h2>
-      {description && <p className="mt-1 text-[11px] text-gray-500">{description}</p>}
+      <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">{title}</h2>
+      {description && <p className="mt-1 text-[12px] text-gray-500">{description}</p>}
       <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
@@ -19,14 +29,14 @@ function SettingsCard({ title, description, children }: { title: string; descrip
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-medium text-gray-600">{label}</label>
+      <label className="mb-1 block text-[12px] font-medium text-gray-600">{label}</label>
       {children}
     </div>
   );
 }
 
 const inputClass =
-  'w-full max-w-sm rounded border border-gray-200 px-3 py-2 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700';
+  'w-full max-w-sm rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700';
 
 export function MyAccount() {
   const { user, role, login } = useAuth();
@@ -42,6 +52,7 @@ export function MyAccount() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   if (!user) return null;
 
@@ -54,6 +65,36 @@ export function MyAccount() {
 
   const handleChangePassword = async () => {
     setPasswordError(null);
+    if (isSupabaseMode) {
+      if (newPassword.trim().length < 8) {
+        setPasswordError('New password must be at least 8 characters.');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setPasswordError('New password and confirmation do not match.');
+        return;
+      }
+      setChangingPassword(true);
+      try {
+        // Re-verify the current password against Supabase Auth before changing it.
+        if (!(await verifyPassword(user.email, currentPassword))) {
+          setPasswordError('Current password is incorrect.');
+          return;
+        }
+        await changeOwnPassword(newPassword);
+      } catch (err) {
+        setPasswordError(err instanceof Error ? err.message : 'The password could not be changed.');
+        return;
+      } finally {
+        setChangingPassword(false);
+      }
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSaved(true);
+      window.setTimeout(() => setPasswordSaved(false), 2500);
+      return;
+    }
     const currentHash = await hashPassword(currentPassword);
     if (currentHash !== user.passwordHash) {
       setPasswordError('Current password is incorrect.');
@@ -92,18 +133,25 @@ export function MyAccount() {
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
           </Field>
           <Field label="Email">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              readOnly={isSupabaseMode}
+              title={isSupabaseMode ? 'Your sign-in email is managed by an administrator' : undefined}
+              className={`${inputClass} read-only:bg-gray-50 read-only:text-gray-500`}
+            />
           </Field>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => void handleSaveProfile()}
               disabled={save.isPending || name.trim() === '' || email.trim() === ''}
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
               {save.isPending ? 'Saving…' : 'Save profile'}
             </button>
-            {profileSaved && <span className="text-[11px] font-bold text-success">Saved ✓</span>}
+            {profileSaved && <span className="text-[12px] font-bold text-success">Saved ✓</span>}
           </div>
         </SettingsCard>
 
@@ -132,17 +180,17 @@ export function MyAccount() {
               className={inputClass}
             />
           </Field>
-          {passwordError && <p className="text-[11px] text-danger">{passwordError}</p>}
+          {passwordError && <p className="text-[12px] text-danger">{passwordError}</p>}
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => void handleChangePassword()}
-              disabled={save.isPending || !currentPassword || !newPassword || !confirmPassword}
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              disabled={save.isPending || changingPassword || !currentPassword || !newPassword || !confirmPassword}
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
-              {save.isPending ? 'Saving…' : 'Change password'}
+              {save.isPending || changingPassword ? 'Saving…' : 'Change password'}
             </button>
-            {passwordSaved && <span className="text-[11px] font-bold text-success">Saved ✓</span>}
+            {passwordSaved && <span className="text-[12px] font-bold text-success">Saved ✓</span>}
           </div>
         </SettingsCard>
 
@@ -159,10 +207,12 @@ export function MyAccount() {
         </SettingsCard>
 
         <SettingsCard title="Account details">
-          <dl className="space-y-2 text-[12px]">
+          <dl className="space-y-2 text-[13px]">
             <div className="flex justify-between">
               <dt className="text-gray-500">Role</dt>
-              <dd className="font-medium text-navy-900">{roles.find((r) => r.code === user.role)?.name ?? user.role}</dd>
+              <dd className="font-medium text-navy-900">
+                {roles.find((r) => r.code === canonicalRole(user.role))?.name ?? user.role}
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-gray-500">Affiliate</dt>

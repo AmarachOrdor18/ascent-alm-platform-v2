@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
 import type {
   AlcoMeeting,
@@ -175,23 +175,72 @@ export function useRequestApproval() {
   const save = approvals.useSave();
   const { user } = useAuth();
 
-  return (input: Omit<ApprovalRequest, 'id' | 'status' | 'requestedBy' | 'requestedAt' | 'decidedBy' | 'decidedAt' | 'decisionNote'>) =>
-    save.mutateAsync({
-      ...input,
-      id: newId('APR'),
-      status: 'Pending',
-      requestedBy: user?.name ?? 'unknown',
-      requestedAt: new Date().toISOString(),
-      decidedBy: null,
-      decidedAt: null,
-      decisionNote: null,
-    });
+  return (
+    input: Omit<
+      ApprovalRequest,
+      | 'id'
+      | 'status'
+      | 'requestedBy'
+      | 'requestedById'
+      | 'requestedAt'
+      | 'decidedBy'
+      | 'decidedById'
+      | 'decidedAt'
+      | 'decisionNote'
+    >,
+  ) => {
+    if (!user) return Promise.reject(new Error('Not signed in.'));
+    return save.mutateAsync(newApprovalRequest(input, user));
+  };
 }
 
-export function approvalBlockedReason(request: ApprovalRequest, userName: string | undefined): string | null {
+type ApprovalInput = Omit<
+  ApprovalRequest,
+  | 'id'
+  | 'status'
+  | 'requestedBy'
+  | 'requestedById'
+  | 'requestedAt'
+  | 'decidedBy'
+  | 'decidedById'
+  | 'decidedAt'
+  | 'decisionNote'
+> & { id?: string };
+
+/** A Pending request raised by `requester` - the single place requester name and id are stamped. */
+export function newApprovalRequest(
+  input: ApprovalInput,
+  requester: { id: string; name: string },
+  now = new Date().toISOString(),
+): ApprovalRequest {
+  return {
+    ...input,
+    id: input.id ?? newId('APR'),
+    status: 'Pending',
+    requestedBy: requester.name,
+    requestedById: requester.id,
+    requestedAt: now,
+    decidedBy: null,
+    decidedById: null,
+    decidedAt: null,
+    decisionNote: null,
+  };
+}
+
+/** True when `user` raised `request` - by id; by name only for an older request that carries no id. */
+export function isRequester(request: ApprovalRequest, user: { id: string; name: string } | null | undefined): boolean {
+  if (!user) return false;
+  if (request.requestedById) return request.requestedById === user.id;
+  return request.requestedBy === user.name;
+}
+
+export function approvalBlockedReason(
+  request: ApprovalRequest,
+  user: { id: string; name: string } | null | undefined,
+): string | null {
   if (request.status !== 'Pending') return `Already ${request.status.toLowerCase()}.`;
-  if (!userName) return 'Not signed in.';
-  if (request.requestedBy === userName) {
+  if (!user) return 'Not signed in.';
+  if (isRequester(request, user)) {
     return 'You raised this request. Segregation of duties means a maker cannot be their own checker.';
   }
   return null;

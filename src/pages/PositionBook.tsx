@@ -87,16 +87,16 @@ export function PositionBook() {
   };
 
   const columns: ResultColumn<Position>[] = [
-    { key: 'id', header: 'Position', render: (p) => <span className="font-mono text-[11px]">{p.id}</span> },
+    { key: 'id', header: 'Position', render: (p) => <span className="font-mono text-[12px]">{p.id}</span> },
     {
       key: 'account',
       header: 'Account',
-      render: (p) => <span className="font-mono text-[11px] text-gray-600">{p.accountNumber}</span>,
+      render: (p) => <span className="font-mono text-[12px] text-gray-600">{p.accountNumber}</span>,
     },
     {
       key: 'affiliate',
       header: 'Affiliate',
-      render: (p) => <span className="font-mono text-[11px]">{p.affiliateCode}</span>,
+      render: (p) => <span className="font-mono text-[12px]">{p.affiliateCode}</span>,
     },
     { key: 'product', header: 'Product', render: (p) => <span className="text-navy-900">{p.productClass}</span> },
     {
@@ -114,7 +114,7 @@ export function PositionBook() {
       key: 'maturity',
       header: 'Maturity',
       render: (p) => (
-        <span className="text-[11px] text-gray-500">{p.maturityDate ? formatDate(p.maturityDate) : '-'}</span>
+        <span className="text-[12px] text-gray-500">{p.maturityDate ? formatDate(p.maturityDate) : '-'}</span>
       ),
     },
     {
@@ -130,7 +130,7 @@ export function PositionBook() {
     {
       key: 'batch',
       header: 'Batch',
-      render: (p) => <span className="font-mono text-[10px] text-gray-400">{p.batchId}</span>,
+      render: (p) => <span className="font-mono text-[11px] text-gray-400">{p.batchId}</span>,
     },
   ];
 
@@ -138,7 +138,8 @@ export function PositionBook() {
     <>
       <ModuleHeader
         title="Position Book"
-        description="The canonical, normalized position layer every ALM calculation reads from. Every row traces back to the batch and run that admitted it."
+        description="The canonical position layer every ALM calculation reads from."
+        about="The book is normalized on load, and every row traces back to the batch and run that admitted it."
         asOfDate={null}
         scope={
           affiliateFilter === 'ALL' ? (affiliateCode === 'GROUP' ? 'All affiliates' : affiliateCode) : affiliateFilter
@@ -158,7 +159,7 @@ export function PositionBook() {
             label: 'Filtered by',
             value: filterBatch ? `Batch ${filterBatch.id}` : filterRun ? `Run ${filterRun.name}` : 'Nothing',
             about:
-              'Position Book can be opened pre-filtered from a batch (Data Vintages) or a run (Run History) to show exactly what fed it.',
+              'Position Book can be opened pre-filtered from a batch (Data Vintages) or a run (Runs) to show exactly what fed it.',
           },
         ]}
       />
@@ -173,7 +174,7 @@ export function PositionBook() {
           onDensityChange={setDensity}
         >
           {(filterBatch || filterRun) && (
-            <span className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-[11px] font-bold text-navy-900">
+            <span className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-[12px] font-bold text-navy-900">
               {filterBatch ? `Batch: ${filterBatch.id}` : `Run: ${filterRun!.name}`}
               <InfoButton label="Filter detail" stopClickPropagation>
                 {filterBatch && (
@@ -215,7 +216,7 @@ export function PositionBook() {
               setPage(1);
             }}
             aria-label="Filter by affiliate"
-            className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+            className="rounded-lg border border-gray-200 bg-gray-50 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
           >
             <option value="ALL">All affiliates</option>
             {affiliates
@@ -233,7 +234,7 @@ export function PositionBook() {
               setPage(1);
             }}
             aria-label="Filter by category"
-            className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+            className="rounded-lg border border-gray-200 bg-gray-50 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
           >
             <option value="ALL">All categories</option>
             <option value="Asset">Asset</option>
@@ -244,14 +245,14 @@ export function PositionBook() {
       </section>
 
       {filterBatch && filterBatch.domain === 'Positions' && !filterBatch.reconciledAt && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[13px] leading-relaxed text-navy-900">
           <span>
             <span className="font-bold">Not yet reconciled to GL.</span> This batch hasn&rsquo;t been checked against a
             trial balance - the figures here are unverified against the ledger.
           </span>
           <Link
-            href="/data/operations/gl-reconciliation"
-            className="shrink-0 text-[11px] font-bold text-navy-700 hover:underline"
+            href="/data/operations?domain=GeneralLedger"
+            className="shrink-0 text-[12px] font-bold text-navy-700 hover:underline"
           >
             Reconcile now →
           </Link>
@@ -261,7 +262,7 @@ export function PositionBook() {
       {filterBatch && canSnapshot && (
         <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4">
           <div className="mb-2 flex items-center gap-1.5">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-navy-900">Editable snapshot</h3>
+            <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Editable snapshot</h3>
             <InfoButton label="What an editable snapshot is">
               A snapshot is an editable copy of this batch's positions - it never changes {filterBatch.id}. Edit it,
               recalculate to see the impact on LCR/NSFR/IRRBB, then submit for maker-checker approval to commit it as a
@@ -274,7 +275,7 @@ export function PositionBook() {
                 <li key={s.id}>
                   <Link
                     href={`/position-book/snapshot/${s.id}`}
-                    className="text-[11px] font-bold text-navy-700 hover:underline"
+                    className="text-[12px] font-bold text-navy-700 hover:underline"
                   >
                     Resume {s.name} - {s.status} ({s.changes.length} change{s.changes.length === 1 ? '' : 's'})
                   </Link>
@@ -285,7 +286,7 @@ export function PositionBook() {
           {snapshotBatch === filterBatch.id ? (
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[280px] flex-1">
-                <label htmlFor="snap-reason" className="mb-1 block text-[11px] text-gray-600">
+                <label htmlFor="snap-reason" className="mb-1 block text-[12px] text-gray-600">
                   Reason for the snapshot
                 </label>
                 <input
@@ -293,21 +294,21 @@ export function PositionBook() {
                   value={snapshotReason}
                   onChange={(e) => setSnapshotReason(e.target.value)}
                   placeholder="Investigating a maturity-date data-entry error on the July book"
-                  className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => void handleCreateSnapshot(filterBatch.id)}
                 disabled={!snapshotReason.trim() || createSnapshot.isPending}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
                 {createSnapshot.isPending ? 'Creating…' : 'Create snapshot'}
               </button>
               <button
                 type="button"
                 onClick={() => setSnapshotBatch(null)}
-                className="text-[11px] font-bold text-gray-500 hover:text-navy-900"
+                className="text-[12px] font-bold text-gray-500 hover:text-navy-900"
               >
                 Cancel
               </button>
@@ -316,7 +317,7 @@ export function PositionBook() {
             <button
               type="button"
               onClick={() => setSnapshotBatch(filterBatch.id)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
             >
               Create editable snapshot from this batch
             </button>
@@ -373,7 +374,7 @@ function PositionDetail({
   ];
 
   return (
-    <div className="space-y-3 text-[11px]">
+    <div className="space-y-3 text-[12px]">
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {fields.map(([label, value]) => (
           <div key={label}>

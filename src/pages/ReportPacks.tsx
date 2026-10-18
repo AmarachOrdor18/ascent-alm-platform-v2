@@ -61,8 +61,8 @@ export function ReportPacks({ initialTab }: { initialTab?: 'ALCO' | 'Management'
             onClick={() => setTab(t.key)}
             className={
               tab === t.key
-                ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-white'
-                : 'rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
+                ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white'
+                : 'rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
             }
           >
             {t.label}
@@ -70,7 +70,12 @@ export function ReportPacks({ initialTab }: { initialTab?: 'ALCO' | 'Management'
         ))}
       </div>
 
-      <ReportPackScreen kind={active.key} title={active.title} description={active.description} candidates={active.candidates} />
+      <ReportPackScreen
+        kind={active.key}
+        title={active.title}
+        description={active.description}
+        candidates={active.candidates}
+      />
     </>
   );
 }

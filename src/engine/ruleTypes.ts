@@ -1,7 +1,16 @@
-import type { BehaviouralTag, DataDomain, DimensionType, IsoDate, LcrCashflowRole, RuleMeta, TimeBucketRule } from './types';
+import type {
+  BehaviouralTag,
+  DataDomain,
+  DimensionType,
+  IsoDate,
+  LcrCashflowRole,
+  RuleMeta,
+  TimeBucketRule,
+} from './types';
 import type { BehaviourPattern } from './behavioural';
-import type { AdjustmentType, TpMethod } from './ftp';
+import type { AdjustmentMethod, AdjustmentType, FtpPool, SpreadPoint, TpMethod } from './ftp';
 import type { ValidationRule } from './validation';
+import type { CapitalConfig, CostPool, CreditLossConfig } from './profitabilityLayers';
 
 export type { TimeBucketRule };
 
@@ -9,7 +18,11 @@ export type { TimeBucketRule };
 // Product characteristics (screen 17)
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Per-product, per-currency assumptions. */
+/**
+ * Per-product, per-currency assumptions. A row may instead be keyed by a common account (commonCoaCode set,
+ * productCode empty): it then applies to every position on that common account whose product has no row of
+ * its own - for that currency, or for any currency when currency is "" or "*".
+ */
 export interface ProductAssumption {
   productCode: string;
   currency: string;
@@ -22,6 +35,8 @@ export interface ProductAssumption {
   hqlaHaircutPct: number;
   approxDurationYears: number | null;
   isRateSensitive: boolean;
+  /** Common chart-of-accounts code - set on a common-account (fallback) row instead of a product. */
+  commonCoaCode?: string;
 }
 
 export interface ProductCharacteristicRule extends RuleMeta {
@@ -38,6 +53,15 @@ export interface BehaviourPatternRule extends RuleMeta {
   patterns: BehaviourPattern[];
   /** Deposit pass-through by behavioural tag, 0–1. */
   betas: Array<{ behaviouralTag: BehaviouralTag; beta: number }>;
+  /**
+   * How much harsher than these patterns the severe liquidity run is - see stress.ts deriveSevereRun.
+   * Absent on rules saved before it existed, which use DEFAULT_STRESS_SEVERITY.
+   */
+  stressSeverityMultiplier?: number;
+  /** Fitted term-deposit renewal / early-withdrawal rates per product - proposed from the behavioural-model workbench. */
+  termDepositBehaviour?: TermDepositBehaviourAssumption[];
+  /** Model-register runs (StoredModelRun ids) this rule's fitted content came from - lineage. */
+  sourceModelRunIds?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -81,6 +105,8 @@ export interface PrepaymentAssumption {
 export interface PrepaymentRule extends RuleMeta {
   kind: 'Prepayment';
   assumptions: PrepaymentAssumption[];
+  /** Model-register runs (StoredModelRun ids) this rule's fitted CPRs came from - lineage. */
+  sourceModelRunIds?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -186,17 +212,28 @@ export interface FtpAssignment {
 export interface FtpRule extends RuleMeta {
   kind: 'FtpRule';
   assignments: FtpAssignment[];
+  /** Method for positions no assignment covers. Absent on rules saved before it existed - priced as repricing term. */
+  defaultMethod?: TpMethod;
+  /** Funding pools by currency and tenor band, for the Pooled method. */
+  pools?: FtpPool[];
 }
 
 export interface AdjustmentLine {
   id: string;
   type: AdjustmentType;
   commonCoaCode: string | null;
-  method: 'FixedRate' | 'LcrDriven';
+  /** 'FixedRate' | 'LcrDriven' on every rule saved before currency/basis adjustments; see ftp.ts AdjustmentMethod. */
+  method: AdjustmentMethod;
   fixedBps: number;
   lcrThresholdPercent: number;
   lcrMultiplier: number;
   lcrCapBps: number;
+  /** CurrencyBasis: the position currency priced against the reporting currency; null = every foreign currency. */
+  currency?: string | null;
+  /** TenorSpread method: basis points by tenor. */
+  spreadCurve?: SpreadPoint[];
+  /** BasisSpread: the position rate index this applies to; null = whatever index the position carries. */
+  indexCode?: string | null;
 }
 
 export interface AdjustmentRuleDef extends RuleMeta {
@@ -292,6 +329,30 @@ export interface CodeMappingRule extends RuleMeta {
   mappings: CodeMappingEntry[];
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Multi-layer profitability - cost allocation, credit loss and capital (engine/profitabilityLayers.ts)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Operating-expense cost pools, plus the headcount the Headcount driver allocates by. */
+export interface CostAllocationRuleDef extends RuleMeta {
+  kind: 'CostAllocation';
+  /** Currency every pool amount is entered in - must be the reporting currency of a run that uses the rule. */
+  currency: string;
+  pools: CostPool[];
+  /** Staff count per org-unit code - read by any pool whose driver is Headcount. */
+  headcountByOrgUnit: Record<string, number>;
+}
+
+/** Expected credit loss basis. Prior-period provisions are not stored on the rule. */
+export interface CreditLossRuleDef extends RuleMeta, Omit<CreditLossConfig, 'priorProvisionByPositionId'> {
+  kind: 'CreditLoss';
+}
+
+/** Risk weights, capital ratio, cost of capital and tax rate for the capital charge and RAROC. */
+export interface CapitalAllocationRuleDef extends RuleMeta, CapitalConfig {
+  kind: 'CapitalAllocation';
+}
+
 /** Every stored rule shape, for narrowing after a `getRule` call. */
 export type AnyRule =
   | TimeBucketRule
@@ -309,7 +370,10 @@ export type AnyRule =
   | CustomMetricRule
   | ValidationRuleSet
   | FieldMappingRule
-  | CodeMappingRule;
+  | CodeMappingRule
+  | CostAllocationRuleDef
+  | CreditLossRuleDef
+  | CapitalAllocationRuleDef;
 
 /**
  * A maturity-mix or behaviour-pattern allocation must total 100%.
@@ -321,4 +385,12 @@ export function allocationError(allocation: Record<string, number> | number[]): 
   const total = values.reduce((s, v) => s + v, 0);
   if (Math.abs(total - 100) < 0.0001) return null;
   return `Allocation totals ${total.toFixed(2)}% - it must total 100%`;
+}
+
+/** A fitted term-deposit behaviour assumption (BehaviourPatternRule.termDepositBehaviour). Rates are 0-1. */
+export interface TermDepositBehaviourAssumption {
+  productCode: string;
+  currency: string;
+  renewalRate: number;
+  earlyWithdrawalRate: number;
 }

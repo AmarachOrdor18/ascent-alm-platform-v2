@@ -1,7 +1,21 @@
 import type { DimensionMember } from '@/engine/types';
 
-function node(affiliateCode: string, code: string, name: string, parentCode: string | null, isLeaf: boolean): DimensionMember {
-  return { id: `Product:${affiliateCode}:${code}`, dimension: 'Product', affiliateCode, code, name, parentCode, isLeaf };
+function node(
+  affiliateCode: string,
+  code: string,
+  name: string,
+  parentCode: string | null,
+  isLeaf: boolean,
+): DimensionMember {
+  return {
+    id: `Product:${affiliateCode}:${code}`,
+    dimension: 'Product',
+    affiliateCode,
+    code,
+    name,
+    parentCode,
+    isLeaf,
+  };
 }
 
 function leaf(affiliateCode: string, code: string, name: string, parentCode: string): DimensionMember {

@@ -70,10 +70,11 @@ export function BucketTimeline({ buckets, onChangeBoundary, readOnly }: BucketTi
               key={`${b.label}-${i}`}
               style={{ left: `${left}%`, width: `${width}%` }}
               className={cn(
-                'absolute top-0 flex h-full items-center justify-center text-[10px] font-bold text-white',
+                'absolute top-0 flex h-full items-center justify-center text-[11px] font-bold text-white',
                 TONE_CLASS[paletteTone(i)],
                 i > 0 && 'border-l border-white/30',
-                isOpen && 'bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.15)_0px,rgba(255,255,255,0.15)_6px,transparent_6px,transparent_12px)]',
+                isOpen &&
+                  'bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.15)_0px,rgba(255,255,255,0.15)_6px,transparent_6px,transparent_12px)]',
               )}
               title={isOpen ? `${b.label}: open-ended` : `${b.label}: up to ${b.upperBoundDays}d`}
             >
@@ -83,25 +84,27 @@ export function BucketTimeline({ buckets, onChangeBoundary, readOnly }: BucketTi
         })}
 
         {!readOnly &&
-          buckets.slice(0, -1).map((b, i) => (
-            <button
-              key={`handle-${i}`}
-              type="button"
-              aria-label={`Drag ${b.label} boundary`}
-              onPointerDown={handlePointerDown(i)}
-              onPointerMove={handlePointerMove(i)}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              style={{ left: `${toFraction(boundaries[i]!) * 100}%` }}
-              className={cn(
-                'absolute top-0 h-full w-2 -translate-x-1/2 cursor-col-resize touch-none',
-                'after:absolute after:left-1/2 after:top-1/2 after:h-5 after:w-1 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-white/70',
-                dragging === i && 'after:bg-white',
-              )}
-            />
-          ))}
+          buckets
+            .slice(0, -1)
+            .map((b, i) => (
+              <button
+                key={`handle-${i}`}
+                type="button"
+                aria-label={`Drag ${b.label} boundary`}
+                onPointerDown={handlePointerDown(i)}
+                onPointerMove={handlePointerMove(i)}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                style={{ left: `${toFraction(boundaries[i]!) * 100}%` }}
+                className={cn(
+                  'absolute top-0 h-full w-2 -translate-x-1/2 cursor-col-resize touch-none',
+                  'after:absolute after:left-1/2 after:top-1/2 after:h-5 after:w-1 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-white/70',
+                  dragging === i && 'after:bg-white',
+                )}
+              />
+            ))}
       </div>
-      <p className="mt-1.5 text-[10px] text-gray-400">
+      <p className="mt-1.5 text-[11px] text-gray-400">
         Drag a boundary to move the cutoff between two buckets · plotted on a log scale
       </p>
     </div>

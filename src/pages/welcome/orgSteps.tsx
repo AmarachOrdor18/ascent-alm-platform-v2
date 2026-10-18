@@ -2,10 +2,11 @@
  * The organisation set-up steps, shared by the guided onboarding (/welcome/organisation, mode 'wizard')
  * and Admin → Organisation setup → Organisation & defaults (mode 'page'). The wizard runs four steps -
  * people are managed on the affiliates step itself; assumptions ship pre-set as Group defaults, so they
- * stay an Admin-page section only (ORG_SETUP_STEPS).			
+ * stay an Admin-page section only (ORG_SETUP_STEPS).
  * Each step saves straight to the real tables - the GROUP affiliate row, public.settings ('GROUP:<key>'),
  * limit_configs, currencies, affiliates and app_users - never to a draft copy.
  */
+import { GroupAssumptionsUpload } from '@/components/rules/GroupAssumptionsUpload';
 import { Suspense, lazy, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Drawer } from '@/components/ui/Drawer';
 import { Modal } from '@/components/ui/Modal';
@@ -13,13 +14,7 @@ import { InfoButton } from '@/components/ui/InfoButton';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { canonicalRole, useAuth } from '@/context/AuthContext';
-import {
-  useAffiliates,
-  useCurrencies,
-  useSaveAffiliate,
-  useSaveCurrency,
-  useUsers,
-} from '@/lib/hooks';
+import { useAffiliates, useCurrencies, useSaveAffiliate, useSaveCurrency, useUsers } from '@/lib/hooks';
 import { useLimitConfigs, useSaveLimitConfig } from '@/lib/limitHooks';
 import { useSaveSetting, useSettings } from '@/lib/onboardingHooks';
 import {
@@ -32,14 +27,27 @@ import {
   type OrgStep,
 } from '@/lib/onboarding';
 import { newAffiliateErrors, newAffiliateRecord } from '@/lib/affiliateFactory';
-import { BulkUserUpload, CreatedLoginsNotice, InviteUserForm, type CreatedLogin } from '@/components/users/UserProvisioning';
+import {
+  BulkUserUpload,
+  CreatedLoginsNotice,
+  InviteUserForm,
+  type CreatedLogin,
+} from '@/components/users/UserProvisioning';
 import { COUNTRIES } from '@/lib/countries';
 import { REGULATORY_MINIMA, type LimitConfig } from '@/engine/limits';
 import { CORE_TP_METHODS, TP_METHOD_LABELS } from '@/engine/ftp';
 import { useRules } from '@/lib/ruleHooks';
 import { approvals } from '@/lib/governanceHooks';
 import { SEED_AUTHOR, isApprovalGated, isRuleApproved } from '@/lib/ruleApproval';
-import type { ActiveRoleCode, Affiliate, OnboardingRecord, RuleKind, RuleMeta, SettingRecord, StoredCurrency } from '@/engine/types';
+import type {
+  ActiveRoleCode,
+  Affiliate,
+  OnboardingRecord,
+  RuleKind,
+  RuleMeta,
+  SettingRecord,
+  StoredCurrency,
+} from '@/engine/types';
 
 // ─── Step copy: what / why / what's needed / what next ──────────────────────
 
@@ -58,11 +66,13 @@ export const ORG_STEP_META: Record<OrgStep, StepMeta> = {
     why: 'Every affiliate consolidates into this currency, and every reporting cycle follows this calendar.',
     needed: 'The organisation name, reporting currency, cycle frequency, month-end convention and fiscal year end.',
     next: 'Add the affiliates that report into the organisation.',
-  },    affiliates: {
+  },
+  affiliates: {
     title: 'Affiliates & people',
     what: 'Add the affiliates that report into the organisation, then bring their people in: give each affiliate its Affiliate Admin and add the rest of the team.',
     why: 'Data, runs, limits and reports are all kept per affiliate and rolled up to the organisation. The Affiliate Admin sets their affiliate up; roles decide what each person can see and do.',
-    needed: 'For each affiliate: a short code, name, country, regulator and functional currency. Then a users file - name, work email, role and affiliate - checked row by row before anything is created, or people invited one at a time.',
+    needed:
+      'For each affiliate: a short code, name, country, regulator and functional currency. Then a users file - name, work email, role and affiliate - checked row by row before anything is created, or people invited one at a time.',
     next: 'Next, confirm the organisation defaults every affiliate inherits.',
   },
   settings: {
@@ -106,7 +116,15 @@ export const btnPrimary =
 export const btnSecondary =
   'rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40';
 
-export function Card({ title, description, children }: { title: string; description?: ReactNode; children: ReactNode }) {
+export function Card({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <h3 className="flex items-center gap-1.5 text-[14px] font-bold text-navy-900">
@@ -118,10 +136,26 @@ export function Card({ title, description, children }: { title: string; descript
   );
 }
 
-function Toggle({ id, checked, onChange, children }: { id: string; checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
+function Toggle({
+  id,
+  checked,
+  onChange,
+  children,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  children: ReactNode;
+}) {
   return (
     <label htmlFor={id} className="flex cursor-pointer items-start gap-2 text-[13px] text-navy-900">
-      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 accent-gold-500" />
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 accent-gold-500"
+      />
       <span>{children}</span>
     </label>
   );
@@ -170,7 +204,12 @@ export function StepFooter({
           Back
         </button>
       )}
-      <button type="button" onClick={() => void run()} disabled={busy || disabled} className={cn(btnPrimary, mode === 'wizard' && 'ml-auto')}>
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={busy || disabled}
+        className={cn(btnPrimary, mode === 'wizard' && 'ml-auto')}
+      >
         {busy ? 'Saving…' : (submitLabel ?? (mode === 'wizard' ? 'Save & continue' : 'Save'))}
       </button>
       {saved && <StatusBadge status="Saved" tone="success" />}
@@ -184,9 +223,18 @@ export function StepFooter({
 }
 
 const MONTH_ENDS: Array<{ value: string; label: string }> = [
-  ['01-31', '31 January'], ['02-28', '28 February'], ['03-31', '31 March'], ['04-30', '30 April'],
-  ['05-31', '31 May'], ['06-30', '30 June'], ['07-31', '31 July'], ['08-31', '31 August'],
-  ['09-30', '30 September'], ['10-31', '31 October'], ['11-30', '30 November'], ['12-31', '31 December'],
+  ['01-31', '31 January'],
+  ['02-28', '28 February'],
+  ['03-31', '31 March'],
+  ['04-30', '30 April'],
+  ['05-31', '31 May'],
+  ['06-30', '30 June'],
+  ['07-31', '31 July'],
+  ['08-31', '31 August'],
+  ['09-30', '30 September'],
+  ['10-31', '31 October'],
+  ['11-30', '30 November'],
+  ['12-31', '31 December'],
 ].map(([value, l]) => ({ value: value!, label: l! }));
 
 function findSetting(settings: SettingRecord[], key: string): SettingRecord | undefined {
@@ -230,7 +278,10 @@ export function OrganisationStep({ mode, onBack, onContinue }: StepProps) {
       reportingCurrency: group?.reportingCurrency || 'USD',
       frequency: orgValue<CycleFrequency>(settings, 'cycle.frequency'),
       monthEnd: orgValue<MonthEndConvention>(settings, 'cycle.monthEndConvention'),
-      fiscalYearEnd: findSetting(settings, ORG_SETTING.fiscalYearEnd)?.value as string | undefined ?? group?.fiscalYearEnd ?? '12-31',
+      fiscalYearEnd:
+        (findSetting(settings, ORG_SETTING.fiscalYearEnd)?.value as string | undefined) ??
+        group?.fiscalYearEnd ??
+        '12-31',
     });
   }, [draft, isLoading, settingsLoading, group, settings]);
 
@@ -258,15 +309,30 @@ export function OrganisationStep({ mode, onBack, onContinue }: StepProps) {
       <Card title="Organisation details">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="org-name" className={label}>Organisation name</label>
+            <label htmlFor="org-name" className={label}>
+              Organisation name
+            </label>
             <input id="org-name" value={draft.name} onChange={(e) => set({ name: e.target.value })} className={input} />
           </div>
           <div>
-            <label htmlFor="org-currency" className={label}>Reporting currency</label>
-            <select id="org-currency" value={draft.reportingCurrency} onChange={(e) => set({ reportingCurrency: e.target.value })} className={input}>
-              {currencyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+            <label htmlFor="org-currency" className={label}>
+              Reporting currency
+            </label>
+            <select
+              id="org-currency"
+              value={draft.reportingCurrency}
+              onChange={(e) => set({ reportingCurrency: e.target.value })}
+              className={input}
+            >
+              {currencyCodes.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
-            <p className="mt-1 text-[11px] text-gray-500">Every affiliate’s results are converted into this currency for the organisation view.</p>
+            <p className="mt-1 text-[11px] text-gray-500">
+              Every affiliate’s results are converted into this currency for the organisation view.
+            </p>
           </div>
         </div>
       </Card>
@@ -280,22 +346,47 @@ export function OrganisationStep({ mode, onBack, onContinue }: StepProps) {
             <legend className={label}>Cycle frequency</legend>
             {(['Monthly', 'Daily'] as const).map((f) => (
               <label key={f} className="flex items-center gap-2 py-0.5 text-[13px] text-navy-900">
-                <input type="radio" name="cycle-frequency" checked={draft.frequency === f} onChange={() => set({ frequency: f })} className="accent-gold-500" />
-                {f}{f === 'Monthly' && <span className="text-[11px] text-gray-400">(recommended)</span>}
+                <input
+                  type="radio"
+                  name="cycle-frequency"
+                  checked={draft.frequency === f}
+                  onChange={() => set({ frequency: f })}
+                  className="accent-gold-500"
+                />
+                {f}
+                {f === 'Monthly' && <span className="text-[11px] text-gray-400">(recommended)</span>}
               </label>
             ))}
           </fieldset>
           <div>
-            <label htmlFor="org-monthend" className={label}>Month-end convention</label>
-            <select id="org-monthend" value={draft.monthEnd} onChange={(e) => set({ monthEnd: e.target.value as MonthEndConvention })} className={input}>
+            <label htmlFor="org-monthend" className={label}>
+              Month-end convention
+            </label>
+            <select
+              id="org-monthend"
+              value={draft.monthEnd}
+              onChange={(e) => set({ monthEnd: e.target.value as MonthEndConvention })}
+              className={input}
+            >
               <option value="LastBusinessDay">Last business day of the month</option>
               <option value="LastCalendarDay">Last calendar day of the month</option>
             </select>
           </div>
           <div>
-            <label htmlFor="org-fye" className={label}>Fiscal year end</label>
-            <select id="org-fye" value={draft.fiscalYearEnd} onChange={(e) => set({ fiscalYearEnd: e.target.value })} className={input}>
-              {MONTH_ENDS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            <label htmlFor="org-fye" className={label}>
+              Fiscal year end
+            </label>
+            <select
+              id="org-fye"
+              value={draft.fiscalYearEnd}
+              onChange={(e) => set({ fiscalYearEnd: e.target.value })}
+              className={input}
+            >
+              {MONTH_ENDS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -340,8 +431,13 @@ function AffiliateForm({
   const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<AffiliateDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const errors = existing
-    ? [!draft.name.trim() && 'Name is required.', !draft.country.trim() && 'Country is required.'].filter(Boolean) as string[]
-    : newAffiliateErrors(draft, affiliates.map((a) => a.code));
+    ? ([!draft.name.trim() && 'Name is required.', !draft.country.trim() && 'Country is required.'].filter(
+        Boolean,
+      ) as string[])
+    : newAffiliateErrors(
+        draft,
+        affiliates.map((a) => a.code),
+      );
   // The functional currency is fixed once the affiliate has moved past onboarding.
   const currencyLocked = !!existing && existing.status !== 'Onboarding' && !!existing.functionalCurrency;
 
@@ -362,42 +458,102 @@ function AffiliateForm({
       <p className="mb-3 text-[13px] font-bold text-navy-900">{existing ? `Edit ${existing.name}` : 'Add affiliate'}</p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
         <div>
-          <label htmlFor="aff-code" className={label}>Code</label>
-          <input id="aff-code" value={draft.code} disabled={!!existing} maxLength={6} placeholder="e.g. GH" onChange={(e) => set({ code: e.target.value.toUpperCase() })} className={input} />
+          <label htmlFor="aff-code" className={label}>
+            Code
+          </label>
+          <input
+            id="aff-code"
+            value={draft.code}
+            disabled={!!existing}
+            maxLength={6}
+            placeholder="e.g. GH"
+            onChange={(e) => set({ code: e.target.value.toUpperCase() })}
+            className={input}
+          />
         </div>
         <div className="md:col-span-2">
-          <label htmlFor="aff-name" className={label}>Name</label>
-          <input id="aff-name" value={draft.name} placeholder="e.g. Ecobank Ghana" onChange={(e) => set({ name: e.target.value })} className={input} />
+          <label htmlFor="aff-name" className={label}>
+            Name
+          </label>
+          <input
+            id="aff-name"
+            value={draft.name}
+            placeholder="e.g. Ecobank Ghana"
+            onChange={(e) => set({ name: e.target.value })}
+            className={input}
+          />
         </div>
         <div>
-          <label htmlFor="aff-country" className={label}>Country</label>
-          <select id="aff-country" value={draft.country} onChange={(e) => set({ country: e.target.value })} className={input}>
+          <label htmlFor="aff-country" className={label}>
+            Country
+          </label>
+          <select
+            id="aff-country"
+            value={draft.country}
+            onChange={(e) => set({ country: e.target.value })}
+            className={input}
+          >
             <option value="">Select…</option>
-            {COUNTRIES.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.name}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label htmlFor="aff-regulator" className={label}>Regulator</label>
-          <select id="aff-regulator" value={draft.regulator} onChange={(e) => set({ regulator: e.target.value })} className={input}>
+          <label htmlFor="aff-regulator" className={label}>
+            Regulator
+          </label>
+          <select
+            id="aff-regulator"
+            value={draft.regulator}
+            onChange={(e) => set({ regulator: e.target.value })}
+            className={input}
+          >
             <option value="">Select…</option>
-            {REGULATORS.map((r) => <option key={r} value={r}>{r}</option>)}
+            {REGULATORS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label htmlFor="aff-ccy" className={label}>Functional currency</label>
-          <select id="aff-ccy" value={draft.functionalCurrency} disabled={currencyLocked} onChange={(e) => set({ functionalCurrency: e.target.value })} className={input}>
+          <label htmlFor="aff-ccy" className={label}>
+            Functional currency
+          </label>
+          <select
+            id="aff-ccy"
+            value={draft.functionalCurrency}
+            disabled={currencyLocked}
+            onChange={(e) => set({ functionalCurrency: e.target.value })}
+            className={input}
+          >
             <option value="">Select…</option>
-            {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
+            {currencies.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code} - {c.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
       {errors.length > 0 && draft !== initial && <p className="mt-2 text-[12px] text-danger">{errors.join(' ')}</p>}
-      {error && <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-[12px] text-danger">
+          {error}
+        </p>
+      )}
       <div className="mt-3 flex gap-2">
         <button type="button" onClick={() => void save()} disabled={busy || errors.length > 0} className={btnPrimary}>
           {busy ? 'Saving…' : existing ? 'Save changes' : 'Add affiliate'}
         </button>
-        <button type="button" onClick={onCancel} className="rounded-lg px-3 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg px-3 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
+        >
           Cancel
         </button>
       </div>
@@ -425,12 +581,19 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
   const [bulk, setBulk] = useState(false);
   const [created, setCreated] = useState<CreatedLogin[]>([]);
   const emails = users.map((u) => u.email.toLowerCase());
-  const bulkAffiliates = [{ code: 'GROUP', name: 'Group (all affiliates)' }, ...real.map((a) => ({ code: a.code, name: a.name }))];
+  const bulkAffiliates = [
+    { code: 'GROUP', name: 'Group (all affiliates)' },
+    ...real.map((a) => ({ code: a.code, name: a.name })),
+  ];
 
   const saveNew = async (d: AffiliateDraft) => {
     const country = COUNTRIES.find((c) => c.name === d.country);
     await saveAffiliate.mutateAsync(
-      newAffiliateRecord({ ...d, region: country?.region ?? '', reportingCurrency: affiliates.find((a) => a.code === 'GROUP')?.reportingCurrency ?? 'USD' }),
+      newAffiliateRecord({
+        ...d,
+        region: country?.region ?? '',
+        reportingCurrency: affiliates.find((a) => a.code === 'GROUP')?.reportingCurrency ?? 'USD',
+      }),
     );
     setEditing(null);
   };
@@ -480,9 +643,15 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
                   <td className="py-2 pr-3">{a.country || '-'}</td>
                   <td className="py-2 pr-3">{a.regulator || '-'}</td>
                   <td className="py-2 pr-3 font-mono">{a.functionalCurrency || '-'}</td>
-                  <td className="py-2 pr-3"><StatusBadge status={a.status} /></td>
+                  <td className="py-2 pr-3">
+                    <StatusBadge status={a.status} />
+                  </td>
                   <td className="py-2 text-right">
-                    <button type="button" onClick={() => setEditing(a)} className="text-[12px] font-bold text-navy-700 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(a)}
+                      className="text-[12px] font-bold text-navy-700 hover:underline"
+                    >
                       Edit
                     </button>
                   </td>
@@ -498,12 +667,24 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
           </button>
         )}
         {editing === 'new' && (
-          <AffiliateForm initial={EMPTY_AFFILIATE} existing={null} currencies={activeCurrencies} onCancel={() => setEditing(null)} onSave={saveNew} />
+          <AffiliateForm
+            initial={EMPTY_AFFILIATE}
+            existing={null}
+            currencies={activeCurrencies}
+            onCancel={() => setEditing(null)}
+            onSave={saveNew}
+          />
         )}
         {editing && editing !== 'new' && (
           <AffiliateForm
             key={editing.code}
-            initial={{ code: editing.code, name: editing.name, country: editing.country, regulator: editing.regulator, functionalCurrency: editing.functionalCurrency }}
+            initial={{
+              code: editing.code,
+              name: editing.name,
+              country: editing.country,
+              regulator: editing.regulator,
+              functionalCurrency: editing.functionalCurrency,
+            }}
             existing={editing}
             currencies={activeCurrencies}
             onCancel={() => setEditing(null)}
@@ -520,7 +701,9 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
         {isLoading ? (
           <p className="text-[13px] text-gray-400">Loading…</p>
         ) : real.length === 0 ? (
-          <p className="text-[13px] text-gray-500">No affiliates yet - add the first one above, then bring their people in here.</p>
+          <p className="text-[13px] text-gray-500">
+            No affiliates yet - add the first one above, then bring their people in here.
+          </p>
         ) : (
           <>
             {withoutAdmin.length > 0 && (
@@ -593,7 +776,10 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
             <InviteUserForm
               title={`Invite the Affiliate Admin for ${affiliates.find((a) => a.code === invite.code)?.name ?? invite.code}`}
               affiliateCode={invite.code}
-              roles={adminsOf(invite.code).length > 0 ? ALL_ORG_ROLES.filter((r) => r !== 'AFFILIATE_ADMIN') : ['AFFILIATE_ADMIN']}
+              // The Organisation Admin may appoint an Affiliate Admin at any time - including a second
+              // one - so the role stays on the list even when the affiliate already has one. Only the
+              // no-summary fast path keeps the single-role picker hidden (defaults to Affiliate Admin).
+              roles={adminsOf(invite.code).length > 0 ? ALL_ORG_ROLES : ['AFFILIATE_ADMIN']}
               existingEmails={emails}
               onCancel={() => setInvite(null)}
               onCreated={(c) => {
@@ -607,7 +793,14 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
 
       <CreatedLoginsNotice created={created} onDone={() => setCreated([])} />
 
-      <StepFooter mode={mode} onBack={onBack} onSubmit={async () => { await onContinue?.(); }} submitLabel={mode === 'wizard' ? 'Continue' : 'Mark reviewed'} />
+      <StepFooter
+        mode={mode}
+        onBack={onBack}
+        onSubmit={async () => {
+          await onContinue?.();
+        }}
+        submitLabel={mode === 'wizard' ? 'Continue' : 'Mark reviewed'}
+      />
     </div>
   );
 }
@@ -656,7 +849,11 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
   if (!policy || limitsLoading) return <p className="text-[13px] text-gray-400">Loading…</p>;
 
   const limitValue = (l: LimitConfig): LimitEdit =>
-    limitEdits[l.id] ?? { amberThreshold: l.amberThreshold, redThreshold: l.redThreshold, regulatoryMinimum: l.regulatoryMinimum };
+    limitEdits[l.id] ?? {
+      amberThreshold: l.amberThreshold,
+      redThreshold: l.redThreshold,
+      regulatoryMinimum: l.regulatoryMinimum,
+    };
   const editLimit = (l: LimitConfig, patch: Partial<LimitEdit>) =>
     setLimitEdits((prev) => ({ ...prev, [l.id]: { ...limitValue(l), ...patch } }));
   const limitErrors = groupLimits.map((l) => limitError(l, limitValue(l))).filter(Boolean);
@@ -666,9 +863,16 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
     for (const l of groupLimits) {
       const e = limitEdits[l.id];
       if (!e) continue;
-      if (e.amberThreshold === l.amberThreshold && e.redThreshold === l.redThreshold && e.regulatoryMinimum === l.regulatoryMinimum) continue;
+      if (
+        e.amberThreshold === l.amberThreshold &&
+        e.redThreshold === l.redThreshold &&
+        e.regulatoryMinimum === l.regulatoryMinimum
+      )
+        continue;
       const green =
-        l.direction === 'higher-is-better' ? Math.max(l.greenThreshold, e.amberThreshold) : Math.min(l.greenThreshold, e.amberThreshold);
+        l.direction === 'higher-is-better'
+          ? Math.max(l.greenThreshold, e.amberThreshold)
+          : Math.min(l.greenThreshold, e.amberThreshold);
       await saveLimit.mutateAsync({ ...l, ...e, greenThreshold: green });
     }
     for (const c of currencies) {
@@ -676,9 +880,13 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
       if (next !== undefined && next !== c.isActive) await saveCurrency.mutateAsync({ ...c, isActive: next });
     }
     await saveSetting.mutateAsync(orgSetting(ORG_SETTING.ftpMethod, policy.ftpMethod, policy.ftpOverridable, who));
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.ftpLiquidityPremium, policy.ftpLiquidityPremium, policy.ftpOverridable, who));
+    await saveSetting.mutateAsync(
+      orgSetting(ORG_SETTING.ftpLiquidityPremium, policy.ftpLiquidityPremium, policy.ftpOverridable, who),
+    );
     await saveSetting.mutateAsync(orgSetting(ORG_SETTING.marketDataLoadedBy, 'Group', false, who));
-    await saveSetting.mutateAsync(orgSetting(ORG_SETTING.marketDataAffiliateOverrides, policy.marketDataOverrides, false, who));
+    await saveSetting.mutateAsync(
+      orgSetting(ORG_SETTING.marketDataAffiliateOverrides, policy.marketDataOverrides, false, who),
+    );
     setLimitEdits({});
     setCurrencyEdits({});
     await onContinue?.();
@@ -686,6 +894,8 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
 
   return (
     <div className="space-y-4">
+      {/* Optional (teardown phase 1.2): load the Group assumptions file now, or set them up later. */}
+      {mode === 'wizard' && <GroupAssumptionsUpload />}
       <p className="rounded-lg bg-navy-50 px-4 py-2.5 text-[13px] text-navy-900">
         Affiliates inherit these unless you allow an override.
       </p>
@@ -695,7 +905,9 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
         description="Risk-appetite thresholds every affiliate is measured against. An affiliate may tighten them with its own thresholds during its setup."
       >
         {groupLimits.length === 0 ? (
-          <p className="text-[13px] text-gray-500">No organisation-wide limits are configured. Add them from Run &amp; results → Limits.</p>
+          <p className="text-[13px] text-gray-500">
+            No organisation-wide limits are configured. Add them from Run &amp; results → Limits.
+          </p>
         ) : (
           <table className="w-full text-left text-[13px]">
             <thead>
@@ -717,12 +929,26 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
                       {l.label}
                       {err && <span className="block text-[11px] text-danger">{err}</span>}
                     </td>
-                    <td className="py-1.5 pr-3 text-gray-500">{l.direction === 'higher-is-better' ? 'Higher' : 'Lower'}</td>
-                    <td className="py-1.5 pr-3">
-                      <input aria-label={`${l.label} amber`} type="number" value={v.amberThreshold} onChange={(e) => editLimit(l, { amberThreshold: Number(e.target.value) })} className={cn(input, 'w-24 py-1')} />
+                    <td className="py-1.5 pr-3 text-gray-500">
+                      {l.direction === 'higher-is-better' ? 'Higher' : 'Lower'}
                     </td>
                     <td className="py-1.5 pr-3">
-                      <input aria-label={`${l.label} red`} type="number" value={v.redThreshold} onChange={(e) => editLimit(l, { redThreshold: Number(e.target.value) })} className={cn(input, 'w-24 py-1')} />
+                      <input
+                        aria-label={`${l.label} amber`}
+                        type="number"
+                        value={v.amberThreshold}
+                        onChange={(e) => editLimit(l, { amberThreshold: Number(e.target.value) })}
+                        className={cn(input, 'w-24 py-1')}
+                      />
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <input
+                        aria-label={`${l.label} red`}
+                        type="number"
+                        value={v.redThreshold}
+                        onChange={(e) => editLimit(l, { redThreshold: Number(e.target.value) })}
+                        className={cn(input, 'w-24 py-1')}
+                      />
                     </td>
                     <td className="py-1.5 pr-3">
                       <input
@@ -730,7 +956,9 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
                         type="number"
                         value={v.regulatoryMinimum ?? ''}
                         placeholder="None"
-                        onChange={(e) => editLimit(l, { regulatoryMinimum: e.target.value === '' ? null : Number(e.target.value) })}
+                        onChange={(e) =>
+                          editLimit(l, { regulatoryMinimum: e.target.value === '' ? null : Number(e.target.value) })
+                        }
                         className={cn(input, 'w-24 py-1')}
                       />
                     </td>
@@ -745,29 +973,58 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
       <Card title="Funds transfer pricing" description="The method every affiliate’s FTP rules start from.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="ftp-method" className={label}>Default method</label>
-            <select id="ftp-method" value={policy.ftpMethod} onChange={(e) => setPolicy({ ...policy, ftpMethod: e.target.value })} className={input}>
-              {CORE_TP_METHODS.map((m) => <option key={m} value={m}>{TP_METHOD_LABELS[m]}</option>)}
+            <label htmlFor="ftp-method" className={label}>
+              Default method
+            </label>
+            <select
+              id="ftp-method"
+              value={policy.ftpMethod}
+              onChange={(e) => setPolicy({ ...policy, ftpMethod: e.target.value })}
+              className={input}
+            >
+              {CORE_TP_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {TP_METHOD_LABELS[m]}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2 pt-5">
-            <Toggle id="ftp-lp" checked={policy.ftpLiquidityPremium} onChange={(v) => setPolicy({ ...policy, ftpLiquidityPremium: v })}>
+            <Toggle
+              id="ftp-lp"
+              checked={policy.ftpLiquidityPremium}
+              onChange={(v) => setPolicy({ ...policy, ftpLiquidityPremium: v })}
+            >
               Apply a liquidity premium
             </Toggle>
-            <Toggle id="ftp-override" checked={policy.ftpOverridable} onChange={(v) => setPolicy({ ...policy, ftpOverridable: v })}>
+            <Toggle
+              id="ftp-override"
+              checked={policy.ftpOverridable}
+              onChange={(v) => setPolicy({ ...policy, ftpOverridable: v })}
+            >
               Affiliates may override
             </Toggle>
           </div>
         </div>
       </Card>
 
-      <Card title="Currencies" description="The currencies available to affiliates. Untick one the organisation no longer uses.">
+      <Card
+        title="Currencies"
+        description="The currencies available to affiliates. Untick one the organisation no longer uses."
+      >
         {currencies.length === 0 ? (
-          <p className="text-[13px] text-gray-500">No currencies defined yet - add them under Market &amp; reference data → FX rates.</p>
+          <p className="text-[13px] text-gray-500">
+            No currencies defined yet - add them under Market &amp; reference data → FX rates.
+          </p>
         ) : (
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {currencies.map((c) => (
-              <Toggle key={c.code} id={`ccy-${c.code}`} checked={currencyActive(c)} onChange={(v) => setCurrencyEdits((p) => ({ ...p, [c.code]: v }))}>
+              <Toggle
+                key={c.code}
+                id={`ccy-${c.code}`}
+                checked={currencyActive(c)}
+                onChange={(v) => setCurrencyEdits((p) => ({ ...p, [c.code]: v }))}
+              >
                 <span className="font-mono">{c.code}</span> <span className="text-gray-500">{c.name}</span>
               </Toggle>
             ))}
@@ -777,7 +1034,8 @@ export function DefaultsStep({ mode, onBack, onContinue }: StepProps) {
 
       <Card title="Market data" description="Yield curves, FX rates and indicators for each cycle.">
         <p className="mb-3 text-[13px] text-navy-900">
-          Loaded by: <span className="font-bold">Group</span> - the organisation loads market data centrally for every affiliate.
+          Loaded by: <span className="font-bold">Group</span> - the organisation loads market data centrally for every
+          affiliate.
         </p>
       </Card>
 
@@ -824,7 +1082,8 @@ export const GROUP_ASSUMPTIONS: AssumptionDef[] = [
     need: 'Optional',
     title: 'Transfer pricing method & curve',
     what: 'How each product is charged or credited for funding.',
-    ifMissing: 'Every product is priced on its currency\u2019s yield curve using the default method you chose in Organisation defaults. Set this to choose a method or curve per product.',
+    ifMissing:
+      'Every product is priced on its currency\u2019s yield curve using the default method you chose in Organisation defaults. Set this to choose a method or curve per product.',
     path: '/rules/ftp',
   },
   {
@@ -864,23 +1123,30 @@ export const GROUP_ASSUMPTIONS: AssumptionDef[] = [
     need: 'Optional',
     title: 'Product characteristics',
     what: 'How each product is treated for liquidity (liquid asset level, outflow and funding factors).',
-    ifMissing: 'Each position\u2019s liquidity treatment is taken from its uploaded file (liquid-asset level, cash-flow role).',
+    ifMissing:
+      'Each position\u2019s liquidity treatment is taken from its uploaded file (liquid-asset level, cash-flow role).',
     path: '/rules/product-characteristics',
-    needsData: 'This list is keyed on each product\u2019s code, which only exists once an affiliate uploads its own position files - so it is normally set after affiliates bring their data in.',
+    needsData:
+      'This list is keyed on each product\u2019s code, which only exists once an affiliate uploads its own position files - so it is normally set after affiliates bring their data in.',
   },
   {
     kind: 'BehaviourPattern',
     need: 'Optional',
     title: 'Deposit behaviour',
     what: 'How long deposits without a maturity really stay (stable and volatile parts).',
-    ifMissing: 'A standard deposit pattern ships with the platform and is used until you replace it - for example with a fitted model.',
+    ifMissing:
+      'A standard deposit pattern ships with the platform and is used until you replace it - for example with a fitted model.',
     path: '/rules/behaviour-patterns',
-    needsData: 'The shipped pattern works from day one. Replacing it with customer behaviour fitted to your history needs the balance/account history an affiliate uploads - via Assumptions → Behavioural models.',
+    needsData:
+      'The shipped pattern works from day one. Replacing it with customer behaviour fitted to your history needs the balance/account history an affiliate uploads - via Assumptions → Behavioural models.',
   },
 ];
 
 /** Status of each Group-default assumption, from the rules table and the approval queue. */
-export function useGroupAssumptions(): { items: Array<AssumptionDef & { status: AssumptionStatus; ruleName: string | null }>; loading: boolean } {
+export function useGroupAssumptions(): {
+  items: Array<AssumptionDef & { status: AssumptionStatus; ruleName: string | null }>;
+  loading: boolean;
+} {
   const ftp = useRules('FtpRule');
   const adj = useRules('AdjustmentRule');
   const cost = useRules('CostAllocation');
@@ -927,6 +1193,7 @@ export function AssumptionsStep({ mode, onBack, onContinue }: StepProps) {
   const Editor = openKind ? EDITORS[openKind] : undefined;
   return (
     <div className="space-y-4">
+      <GroupAssumptionsUpload />
       <Card
         title="Group-default assumptions"
         description="Every affiliate inherits these unless it sets its own. All ship with industry-standard baselines - figures such as the cost budget, default rates and risk weights are illustrative and meant to be replaced with yours. Set up opens the editor here; close it to come back to this list."
@@ -940,7 +1207,12 @@ export function AssumptionsStep({ mode, onBack, onContinue }: StepProps) {
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-navy-900">
                     {i.title} <StatusBadge status={i.status} tone={ASSUMPTION_TONE[i.status]} />
-                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', i.need === 'Optional' ? 'bg-gray-100 text-gray-500' : 'bg-navy-50 text-navy-700')}>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                        i.need === 'Optional' ? 'bg-gray-100 text-gray-500' : 'bg-navy-50 text-navy-700',
+                      )}
+                    >
                       {i.need}
                     </span>
                   </p>
@@ -950,7 +1222,9 @@ export function AssumptionsStep({ mode, onBack, onContinue }: StepProps) {
                   </p>
                   {i.needsData && (
                     <p className="mt-1 flex items-start gap-1.5 text-[12px] text-gray-500">
-                      <span className="shrink-0 rounded-full bg-gold-500/10 px-2 py-0.5 text-[11px] font-semibold text-navy-700">Needs affiliate data</span>
+                      <span className="shrink-0 rounded-full bg-gold-500/10 px-2 py-0.5 text-[11px] font-semibold text-navy-700">
+                        Needs affiliate data
+                      </span>
                       <span>{i.needsData}</span>
                     </p>
                   )}
@@ -976,7 +1250,15 @@ export function AssumptionsStep({ mode, onBack, onContinue }: StepProps) {
         onSubmit={async () => {
           await onContinue?.();
         }}
-        submitLabel={missing > 0 ? (mode === 'wizard' ? 'Do this later & continue' : 'Do this later') : mode === 'wizard' ? 'Continue' : 'Mark as reviewed'}
+        submitLabel={
+          missing > 0
+            ? mode === 'wizard'
+              ? 'Do this later & continue'
+              : 'Do this later'
+            : mode === 'wizard'
+              ? 'Continue'
+              : 'Mark as reviewed'
+        }
       />
     </div>
   );
@@ -1004,7 +1286,10 @@ export function useOrgReview(): { items: ReviewItem[]; loading: boolean } {
   const ftp = findSetting(settings, ORG_SETTING.ftpMethod);
   const md = findSetting(settings, ORG_SETTING.marketDataLoadedBy);
   const withoutAdmin = real.filter(
-    (x) => !users.some((usr) => usr.affiliateCode === x.code && canonicalRole(usr.role) === 'AFFILIATE_ADMIN' && usr.isActive),
+    (x) =>
+      !users.some(
+        (usr) => usr.affiliateCode === x.code && canonicalRole(usr.role) === 'AFFILIATE_ADMIN' && usr.isActive,
+      ),
   );
   const groupLimits = limits.filter((l) => l.affiliateCode === null);
   const items: ReviewItem[] = [
@@ -1077,7 +1362,11 @@ export function ReviewStep({
                   </p>
                   <p className="text-[12px] text-gray-500">{i.detail}</p>
                 </div>
-                <button type="button" onClick={() => onGoTo(i.step)} className="text-[12px] font-bold text-navy-700 hover:underline">
+                <button
+                  type="button"
+                  onClick={() => onGoTo(i.step)}
+                  className="text-[12px] font-bold text-navy-700 hover:underline"
+                >
                   Edit
                 </button>
               </li>

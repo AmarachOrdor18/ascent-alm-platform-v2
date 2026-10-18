@@ -78,7 +78,15 @@ export function RatioChart({
     <>
       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--gray-200))" vertical={false} />
       <XAxis dataKey="label" tick={AXIS} axisLine={false} tickLine={false} />
-      <YAxis domain={[min - pad, max + pad]} tick={AXIS} axisLine={false} tickLine={false} unit="%" width={52} />
+      <YAxis
+        domain={[min - pad, max + pad]}
+        tick={AXIS}
+        axisLine={false}
+        tickLine={false}
+        unit="%"
+        width={52}
+        tickFormatter={(v: number) => String(Math.round(v * 10) / 10)}
+      />
       <Tooltip
         formatter={(v: number) => formatPct(v)}
         contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid hsl(var(--gray-200))' }}
@@ -124,7 +132,7 @@ export function RatioChart({
           </LineChart>
         )}
       </ResponsiveContainer>
-      <p className="mt-1 text-[10px] text-gray-400">
+      <p className="mt-1 text-[11px] text-gray-400">
         {direction === 'higher' ? 'Higher is better' : 'Lower is better'} · solid red = regulatory minimum · dashed
         amber = internal trigger
       </p>

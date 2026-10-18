@@ -3,8 +3,18 @@ import { tableToCsv } from '@/lib/fileImport';
 import type { FieldMappingRule } from '@/engine/ruleTypes';
 
 const MONTHS: Record<string, string> = {
-  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  jan: '01',
+  feb: '02',
+  mar: '03',
+  apr: '04',
+  may: '05',
+  jun: '06',
+  jul: '07',
+  aug: '08',
+  sep: '09',
+  oct: '10',
+  nov: '11',
+  dec: '12',
 };
 
 /**
@@ -36,7 +46,10 @@ function normalizeDate(raw: string): string {
 
 /** Strips thousands separators and common currency symbols/prefixes, leaving a bare numeric string. */
 function normalizeNumber(raw: string): string {
-  return raw.trim().replace(/[,\s]/g, '').replace(/^[A-Za-z]{0,4}\$?/, '');
+  return raw
+    .trim()
+    .replace(/[,\s]/g, '')
+    .replace(/^[A-Za-z]{0,4}\$?/, '');
 }
 
 /** Strips a trailing "%" — the app's *Pct fields are whole-number percent (15, not 0.15). */

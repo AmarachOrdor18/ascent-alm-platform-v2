@@ -1,18 +1,33 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
-import { executeRun, type RunInputs } from '@/engine/run';
+import { executeRun, type RunInputs, type RunOutcome } from '@/engine/run';
 import { buildFxTable } from '@/engine/fx';
 import { defaultLadder } from '@/engine/buckets';
-import { DEFAULT_PATTERNS } from '@/engine/behavioural';
-import type { ProcessRun, RunResult } from '@/engine/types';
-import type { YieldCurve } from '@/engine/ftp';
+import { DEFAULT_BETAS } from '@/engine/behavioural';
+import { unapprovedRules } from '@/lib/ruleApproval';
+import type { ProcessRun, RunResult, User } from '@/engine/types';
+import { newApprovalRequest } from './governanceHooks';
+import {
+  buildSeries,
+  nextVersion,
+  seriesKeyFor,
+  seriesKeyOf,
+  seriesLockReason,
+  signOffStatusOf,
+  versionOf,
+} from './runSeries';
+import { engineCurvesAsOf } from '@/engine/ftp';
 import type {
   AdjustmentRuleDef,
   BehaviourPatternRule,
+  CapitalAllocationRuleDef,
+  CostAllocationRuleDef,
+  CreditLossRuleDef,
   FtpRule,
   ForecastScenarioRule,
+  PrepaymentRule,
   ProductCharacteristicRule,
   TimeBucketRule,
 } from '@/engine/ruleTypes';
@@ -31,7 +46,7 @@ export function useRuns(affiliateCode?: string) {
 
 /**
  * Runs actually computed for this exact scope. `useRuns('GROUP')` deliberately returns every
- * affiliate's runs (Run History browses across affiliates when scoped to Group), but a consumer
+ * affiliate's runs (the Runs page browses across affiliates when scoped to Group), but a consumer
  * that means "the run(s) belonging to the scope I'm currently on" - the selected run behind
  * Dashboard/every results screen, KRI trend series, limit-breach transition detection, the batch
  * scheduler's own history - needs the narrower answer: only runs whose own `affiliateCode` is this
@@ -41,10 +56,7 @@ export function useRuns(affiliateCode?: string) {
  */
 export function useScopedRuns(affiliateCode: string) {
   const query = useRuns(affiliateCode);
-  const data = useMemo(
-    () => query.data?.filter((r) => r.affiliateCode === affiliateCode),
-    [query.data, affiliateCode],
-  );
+  const data = useMemo(() => query.data?.filter((r) => r.affiliateCode === affiliateCode), [query.data, affiliateCode]);
   return { ...query, data };
 }
 
@@ -84,6 +96,14 @@ export async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
   const productRule = run.productCharacteristicRuleId
     ? await repository.getRule<ProductCharacteristicRule>(run.productCharacteristicRuleId)
     : null;
+  const prepaymentRule = run.prepaymentRuleId ? await repository.getRule<PrepaymentRule>(run.prepaymentRuleId) : null;
+  const costRule = run.costAllocationRuleId
+    ? await repository.getRule<CostAllocationRuleDef>(run.costAllocationRuleId)
+    : null;
+  const creditLossRule = run.creditLossRuleId
+    ? await repository.getRule<CreditLossRuleDef>(run.creditLossRuleId)
+    : null;
+  const capitalRule = run.capitalRuleId ? await repository.getRule<CapitalAllocationRuleDef>(run.capitalRuleId) : null;
 
   // The engine's NII/EVE sensitivity takes one shock magnitude, not a full
   // per-bucket curve, so the scenario's bucket shocks are averaged here.
@@ -92,44 +112,67 @@ export async function assembleInputs(run: ProcessRun): Promise<RunInputs> {
       (Object.values(scenarioRule.shockByBucket).length || 1)
     : undefined;
 
-  const liquidityLadder =
-    bucketRule?.ladders.find((l) => l.kind === 'LiquidityGap') ?? defaultLadder('LiquidityGap');
-  const repricingLadder =
-    bucketRule?.ladders.find((l) => l.kind === 'RepricingGap') ?? defaultLadder('RepricingGap');
+  const liquidityLadder = bucketRule?.ladders.find((l) => l.kind === 'LiquidityGap') ?? defaultLadder('LiquidityGap');
+  const repricingLadder = bucketRule?.ladders.find((l) => l.kind === 'RepricingGap') ?? defaultLadder('RepricingGap');
 
   // A currency/index can carry several dated curves on file, same as an FX rate - only the most recent
   // one struck on or before the run date applies; a curve published later did not exist when these
   // balances were struck, and an older one has since been superseded. ftp.ts's own curve lookup
   // (curves.find) takes the first match per currency/indexCode, so this dedupe is what makes that
   // unambiguous rather than dependent on array order.
-  const latestCurveByKey = new Map<string, (typeof storedCurves)[number]>();
-  for (const c of storedCurves) {
-    if (!c.isActive || c.asOfDate > run.asOfDate) continue;
-    const key = `${c.currency}|${c.code}`;
-    const current = latestCurveByKey.get(key);
-    if (!current || c.asOfDate > current.asOfDate) latestCurveByKey.set(key, c);
-  }
-  const yieldCurves: YieldCurve[] = Array.from(latestCurveByKey.values()).map((c) => ({
-    currency: c.currency,
-    indexCode: c.code,
-    points: c.terms.map((t) => ({ tenorDays: t.tenorDays, ratePercent: t.ratePercent })),
-    asOfDate: c.asOfDate,
-  }));
+  const yieldCurves = engineCurvesAsOf(storedCurves, run.asOfDate);
 
   return {
     positions,
     fx: buildFxTable('USD', fxRates, run.asOfDate),
     liquidityLadder,
     repricingLadder,
-    behaviourPatterns: behaviourRule?.patterns ?? DEFAULT_PATTERNS,
+    // No behaviour pattern rule: contractual timing (no run-off overlay) - the run names this as a degradation.
+    behaviourPatterns: behaviourRule?.patterns ?? [],
+    // Betas and stress severity come from the same rule as the patterns, so one behavioural basis drives
+    // the liquidity gap, NII and the severe run alike - with no rule, the same engine defaults throughout.
+    depositBetas: behaviourRule?.betas ?? DEFAULT_BETAS,
+    stressSeverityMultiplier: behaviourRule?.stressSeverityMultiplier,
+    prepaymentRules: (prepaymentRule?.assumptions ?? [])
+      .filter((a) => a.method !== 'None')
+      .map((a) => ({ commonCoaCode: a.commonCoaCode, cpr: a.cpr })),
+    // Fitted term-deposit early withdrawal / roll-over from the same behaviour rule - shapes the cashflow book.
+    termDepositBehaviour: behaviourRule?.termDepositBehaviour ?? [],
     orgUnitMembers,
     productMembers,
     tier1Capital: null,
     yieldCurves,
     adjustmentRules: adjustmentRule?.adjustments ?? [],
     ftpAssignments: ftpRule?.assignments ?? [],
+    ftpMethod: ftpRule?.defaultMethod,
+    ftpPools: ftpRule?.pools ?? [],
     shockBps: scenarioShockBps,
+    // The scenario's shape, so cash-flow EVE shocks each tenor by its own bucket's amount (NII keeps the average).
+    shockByBucket: scenarioRule?.shockByBucket,
     productAssumptions: productRule?.assumptions ?? [],
+    // Multi-layer profitability: null when the run selected no such rule - the layers are then left blank and named.
+    costAllocation: costRule
+      ? { currency: costRule.currency, pools: costRule.pools, headcountByOrgUnit: costRule.headcountByOrgUnit ?? {} }
+      : null,
+    creditLoss: creditLossRule
+      ? {
+          method: creditLossRule.method,
+          pdByProduct: creditLossRule.pdByProduct,
+          lgdByProduct: creditLossRule.lgdByProduct,
+          defaultPdPct: creditLossRule.defaultPdPct,
+          defaultLgdPct: creditLossRule.defaultLgdPct,
+          useProvisionAmount: creditLossRule.useProvisionAmount,
+        }
+      : null,
+    capital: capitalRule
+      ? {
+          riskWeightByProductClass: capitalRule.riskWeightByProductClass,
+          defaultRiskWeightPct: capitalRule.defaultRiskWeightPct,
+          capitalRatioPct: capitalRule.capitalRatioPct,
+          costOfCapitalPct: capitalRule.costOfCapitalPct,
+          taxRatePct: capitalRule.taxRatePct,
+        }
+      : null,
   };
 }
 
@@ -142,10 +185,14 @@ async function collectRuleVersionsUsed(run: ProcessRun): Promise<Record<string, 
     run.timeBucketRuleId,
     run.productCharacteristicRuleId,
     run.behaviourPatternRuleId,
+    run.prepaymentRuleId,
     run.newBusinessRuleId,
     run.transactionStrategyId,
     run.ftpRuleId,
     run.adjustmentRuleId,
+    run.costAllocationRuleId,
+    run.creditLossRuleId,
+    run.capitalRuleId,
     ...run.forecastScenarioIds,
   ].filter((id): id is string => !!id);
 
@@ -164,22 +211,80 @@ export function useExecuteRun() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (run: ProcessRun) => {
+    mutationFn: async (requested: ProcessRun) => {
+      // Every execution is a new version of its series (scope + as-of date). Whatever lifecycle fields a
+      // template carried (a re-run, a schedule's clone) are reset - the new version starts Open.
+      const scopeRuns = await repository.listRuns(requested.affiliateCode);
+      const seriesKey = seriesKeyFor(requested.affiliateCode, requested.asOfDate);
+      const seriesRuns = scopeRuns.filter((r) => seriesKeyOf(r) === seriesKey);
+      const series = buildSeries(seriesRuns)[0] ?? null;
+      const locked = seriesLockReason(series, scopeRuns);
+      if (locked) throw new Error(locked);
+      const { signOff: _signOff, supersededByRunId: _superseded, ...rest } = requested;
+      const run: ProcessRun = {
+        ...rest,
+        seriesKey,
+        version: nextVersion(seriesRuns, scopeRuns),
+        createdById: user?.id ?? requested.createdById,
+        signOff: { status: 'Open' },
+      };
+
+      // The screen already hides unapproved rules; this is the same gate where the run is actually
+      // executed, so nothing that calls the hook (a re-run, the batch scheduler) can consume a rule no
+      // checker has signed off. Recorded as a failed run, same as a missing FX rate, rather than thrown.
+      const gated = await Promise.all(
+        [
+          run.productCharacteristicRuleId,
+          run.behaviourPatternRuleId,
+          run.prepaymentRuleId,
+          run.costAllocationRuleId,
+          run.creditLossRuleId,
+          run.capitalRuleId,
+        ].map((id) => (id ? repository.getRule(id) : Promise.resolve(null))),
+      );
+      const blocked = unapprovedRules(gated, await repository.listApprovalRequests());
+
       const queued: ProcessRun = { ...run, status: 'Running' };
       await repository.upsertRun(queued);
 
-      const [inputs, ruleVersionsUsed] = await Promise.all([assembleInputs(run), collectRuleVersionsUsed(run)]);
-      const outcome = executeRun({ ...queued, ruleVersionsUsed }, inputs, new Date().toISOString());
+      let outcome: RunOutcome;
+      if (blocked.length > 0) {
+        outcome = {
+          run: {
+            ...run,
+            status: 'Failed',
+            completedAt: new Date().toISOString(),
+            errorLog: [
+              {
+                positionId: null,
+                code: 'RULE_NOT_APPROVED',
+                message: `Not yet approved, so not usable in a run: ${blocked.join(', ')}. See Approvals.`,
+              },
+            ],
+          },
+          results: [],
+          errors: [],
+        };
+      } else {
+        const [inputs, ruleVersionsUsed] = await Promise.all([assembleInputs(run), collectRuleVersionsUsed(run)]);
+        outcome = executeRun({ ...queued, ruleVersionsUsed }, inputs, new Date().toISOString());
+      }
 
       await repository.upsertRun(outcome.run);
       if (outcome.results.length > 0) await repository.insertRunResults(outcome.results);
+
+      // The version this one replaces (the series' previous latest) records its successor.
+      const previous = series?.latest;
+      if (outcome.run.status === 'Completed' && previous && !previous.supersededByRunId) {
+        await repository.upsertRun({ ...previous, supersededByRunId: outcome.run.id });
+      }
 
       if (user) {
         await repository.recordAuditEvent({
           id: `AE-RUN-${Date.now()}`,
           module: 'Execution',
           action: 'Execute',
-          entity: 'Process Run',
+          entity: 'Run',
           entityId: run.id,
           userId: user.id,
           userName: user.name,
@@ -187,7 +292,7 @@ export function useExecuteRun() {
           outcome: outcome.run.status === 'Completed' ? 'Success' : 'Failure',
           detail:
             outcome.run.status === 'Completed'
-              ? `${outcome.results.length} element(s) computed for ${run.affiliateCode} as at ${run.asOfDate}`
+              ? `v${run.version} - ${outcome.results.length} element(s) computed for ${run.affiliateCode} as at ${run.asOfDate}`
               : (outcome.run.errorLog[0]?.message ?? 'Run failed'),
           recordedAt: new Date().toISOString(),
         });
@@ -201,6 +306,150 @@ export function useExecuteRun() {
       client.invalidateQueries({ queryKey: ['auditEvents'] });
     },
   });
+}
+
+function recordRunEvent(
+  user: Pick<User, 'id' | 'name' | 'role'> | null,
+  action: string,
+  run: ProcessRun,
+  detail: string,
+) {
+  if (!user) return Promise.resolve();
+  return repository.recordAuditEvent({
+    id: `AE-RUN-${action}-${Date.now()}`,
+    module: 'Execution',
+    action,
+    entity: 'Run',
+    entityId: run.id,
+    userId: user.id,
+    userName: user.name,
+    role: user.role,
+    outcome: 'Success',
+    detail,
+    recordedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Raise a Runs/SignOff approval request for one version and mark it PendingSignOff. The approval is
+ * what signs it off - a database trigger on Supabase (the repository itself locally) moves the run to
+ * SignedOff when a different user approves, or back to Open when the request is rejected or withdrawn.
+ */
+export function useRequestRunSignOff() {
+  const client = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({
+      run,
+      allRuns,
+      affiliateName,
+      note,
+    }: {
+      run: ProcessRun;
+      allRuns: ProcessRun[];
+      affiliateName?: string;
+      note?: string;
+    }) => {
+      if (!user) throw new Error('Not signed in.');
+      if (run.status !== 'Completed') throw new Error('Only a completed run can be signed off.');
+      if (signOffStatusOf(run) !== 'Open') throw new Error('This version is not open for sign-off.');
+      const v = versionOf(run, allRuns);
+      const request = newApprovalRequest(
+        {
+          module: 'Runs',
+          entityType: 'Run',
+          entityId: run.id,
+          entityVersion: v,
+          entityLabel: `${affiliateName ?? run.affiliateCode} · ${run.asOfDate} · v${v}`,
+          action: 'SignOff',
+          summary: note?.trim()
+            ? note.trim()
+            : `Sign off v${v} of the ${run.asOfDate} run as the official figures for ${affiliateName ?? run.affiliateCode}.`,
+          affiliateCode: run.affiliateCode === 'GROUP' ? null : run.affiliateCode,
+        },
+        user,
+      );
+      await repository.upsertApprovalRequest(request);
+      const now = new Date().toISOString();
+      await repository.upsertRun({
+        ...run,
+        seriesKey: seriesKeyOf(run),
+        version: v,
+        signOff: {
+          ...(run.signOff ?? {}),
+          status: 'PendingSignOff',
+          approvalId: request.id,
+          requestedAt: now,
+          requestedBy: user.name,
+          requestedById: user.id,
+        },
+      });
+      await recordRunEvent(
+        user,
+        'RequestSignOff',
+        run,
+        `Sign-off requested for v${v} (${run.affiliateCode}, ${run.asOfDate})`,
+      );
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: runKeys.all });
+      client.invalidateQueries({ queryKey: ['approvals'] });
+      client.invalidateQueries({ queryKey: ['auditEvents'] });
+    },
+  });
+}
+
+/**
+ * Reopen a signed-off version: it becomes Reopened - still frozen and read-only, never the official
+ * figures again - and the series' next execution creates a new version. Needs a reason; no approval.
+ */
+export function useReopenRun() {
+  const client = useQueryClient();
+  const { user, hasPermission } = useAuth();
+  return useMutation({
+    mutationFn: async ({ run, reason, allRuns }: { run: ProcessRun; reason: string; allRuns: ProcessRun[] }) => {
+      if (!user) throw new Error('Not signed in.');
+      if (!hasPermission('run.execute')) throw new Error('Reopening a run needs the run.execute permission.');
+      if (signOffStatusOf(run) !== 'SignedOff') throw new Error('Only a signed-off version can be reopened.');
+      if (!reason.trim()) throw new Error('Give a reason for reopening.');
+      const v = versionOf(run, allRuns);
+      await repository.upsertRun({
+        ...run,
+        signOff: {
+          ...(run.signOff ?? { status: 'SignedOff' }),
+          status: 'Reopened',
+          reopenedAt: new Date().toISOString(),
+          reopenedBy: user.name,
+          reopenedById: user.id,
+          reopenReason: reason.trim(),
+        },
+      });
+      await recordRunEvent(
+        user,
+        'Reopen',
+        run,
+        `Reopened v${v} (${run.affiliateCode}, ${run.asOfDate}): ${reason.trim()}`,
+      );
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: runKeys.all });
+      client.invalidateQueries({ queryKey: ['auditEvents'] });
+    },
+  });
+}
+
+/** A fresh copy of `run` ready to execute as its series' next version (Re-run). */
+export function rerunOf(run: ProcessRun, createdBy: string): ProcessRun {
+  const { signOff: _s, supersededByRunId: _x, version: _v, ...rest } = run;
+  return {
+    ...rest,
+    id: `RUN-${Date.now().toString(36).toUpperCase()}`,
+    status: 'Draft',
+    createdBy,
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    errorLog: [],
+  };
 }
 
 export function useSaveRun() {
@@ -221,7 +470,7 @@ export function methodologyOf(results: RunResult[], element: string): string | n
   return results.find((r) => r.element === element)?.methodology ?? null;
 }
 
-/** Headline figures pulled from a result set - shared by Run History's A/B compare and the snapshot workbench's Original vs Snapshot compare. */
+/** Headline figures pulled from a result set - shared by the Runs page's version compare and the snapshot workbench's Original vs Snapshot compare. */
 export interface RunHeadline {
   label: string;
   value: number | null;
@@ -243,7 +492,12 @@ export function runHeadlines(results: RunResult[]): RunHeadline[] {
     { label: 'NSFR', value: nsfr?.nsfrPercent ?? null, unit: 'percent', higherIsBetter: true },
     { label: 'Loan-to-deposit', value: ldr?.ratioPercent ?? null, unit: 'percent', higherIsBetter: false },
     { label: 'NII sensitivity', value: nii?.niiSensitivityPercent ?? null, unit: 'percent', higherIsBetter: true },
-    { label: 'EVE sensitivity', value: eve?.eveSensitivityPercentOfEquity ?? null, unit: 'percent', higherIsBetter: true },
+    {
+      label: 'EVE sensitivity',
+      value: eve?.eveSensitivityPercentOfEquity ?? null,
+      unit: 'percent',
+      higherIsBetter: true,
+    },
     { label: 'Survival horizon', value: survival?.survivalHorizonDays ?? null, unit: 'days', higherIsBetter: true },
     { label: 'Largest depositor', value: conc?.largestSharePercent ?? null, unit: 'percent', higherIsBetter: false },
   ];

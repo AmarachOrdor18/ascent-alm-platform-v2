@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
 import { useExecuteRun } from './runHooks';
 import type { IsoDate, ProcessRun, RunSchedule } from '@/engine/types';

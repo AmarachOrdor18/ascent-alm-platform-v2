@@ -47,7 +47,8 @@ export function BatchScheduler() {
     id: `SCH-${Date.now().toString(36).toUpperCase()}`,
     name: 'New schedule',
     templateRunId: completedRuns[0]?.id ?? '',
-    affiliateCode: affiliateCode === 'GROUP' ? (affiliates.find((a) => a.code !== 'GROUP')?.code ?? 'GROUP') : affiliateCode,
+    affiliateCode:
+      affiliateCode === 'GROUP' ? (affiliates.find((a) => a.code !== 'GROUP')?.code ?? 'GROUP') : affiliateCode,
     frequency: 'Monthly',
     dayOfMonth: 'last',
     dayOfWeek: 1,
@@ -83,13 +84,23 @@ export function BatchScheduler() {
         asOfDate={null}
         scope={affiliates.find((a) => a.code === affiliateCode)?.name ?? 'All affiliates'}
         metrics={[
-          { label: 'Schedules', value: String(schedules.length), about: 'Recurring run definitions configured for this scope.' },
-          { label: 'Active', value: String(schedules.filter((s) => s.isActive).length), about: 'Schedules currently live - a paused schedule stops producing new occurrences without being deleted.' },
+          {
+            label: 'Schedules',
+            value: String(schedules.length),
+            about: 'Recurring run definitions configured for this scope.',
+          },
+          {
+            label: 'Active',
+            value: String(schedules.filter((s) => s.isActive).length),
+            about:
+              'Schedules currently live - a paused schedule stops producing new occurrences without being deleted.',
+          },
           {
             label: 'Occurrences overdue',
             value: String(totalOverdue),
             tone: totalOverdue > 0 ? 'warning' : 'success',
-            about: 'Reporting dates a schedule should have produced by now but has not - each is a separate date, not collapsed into the next run.',
+            about:
+              'Reporting dates a schedule should have produced by now but has not - each is a separate date, not collapsed into the next run.',
           },
         ]}
         actions={
@@ -98,7 +109,7 @@ export function BatchScheduler() {
             onClick={() => setEditing(blankSchedule())}
             disabled={!canEdit || completedRuns.length === 0}
             title={completedRuns.length === 0 ? 'A schedule needs a completed run to use as its template' : undefined}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
           >
             New schedule
           </button>
@@ -106,18 +117,18 @@ export function BatchScheduler() {
       />
 
       {error && (
-        <div className="mb-6 rounded-lg border border-danger/30 bg-danger/5 p-4 text-[12px] text-danger">{error}</div>
+        <div className="mb-6 rounded-lg border border-danger/30 bg-danger/5 p-4 text-[13px] text-danger">{error}</div>
       )}
 
       {completedRuns.length === 0 && (
-        <EmptyState cta={{ label: 'Go to Process Run', href: '/runs/new' }} className="mb-6">
-          A schedule repeats an existing run. Compose and execute one on the Process Run screen first, then come back
-          and put it on a cycle.
+        <EmptyState cta={{ label: 'Go to Run now', href: '/execution' }} className="mb-6">
+          A schedule repeats an existing run. Compose and execute one on the Run now screen first, then come back and
+          put it on a cycle.
         </EmptyState>
       )}
 
       {isLoading ? (
-        <p className="text-[12px] text-gray-500">Loading schedules…</p>
+        <p className="text-[13px] text-gray-500">Loading schedules…</p>
       ) : schedules.length === 0 ? (
         completedRuns.length > 0 && <EmptyState>No schedules yet.</EmptyState>
       ) : (
@@ -131,23 +142,23 @@ export function BatchScheduler() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-[14px] font-bold text-navy-900">{schedule.name}</h2>
+                      <h2 className="text-[15px] font-bold text-navy-900">{schedule.name}</h2>
                       <StatusBadge
                         status={schedule.isActive ? 'Active' : 'Paused'}
                         tone={schedule.isActive ? 'success' : 'neutral'}
                       />
-                      {backlog.isOverdue && (
-                        <StatusBadge status={`${backlog.overdue.length} overdue`} tone="warning" />
-                      )}
+                      {backlog.isOverdue && <StatusBadge status={`${backlog.overdue.length} overdue`} tone="warning" />}
                     </div>
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    <p className="mt-1 text-[12px] text-gray-500">
                       {describeFrequency(schedule)} · {schedule.affiliateCode} ·{' '}
-                      {template ? `repeats “${template.name}”` : (
+                      {template ? (
+                        `repeats “${template.name}”`
+                      ) : (
                         <span className="text-danger">template run missing</span>
                       )}
                       {calendar && ` · ${calendar.name} calendar`}
                     </p>
-                    <p className="mt-1 text-[11px] text-gray-400">
+                    <p className="mt-1 text-[12px] text-gray-400">
                       {schedule.lastRunDate ? `Last produced ${schedule.lastRunDate}` : 'Never produced'}
                       {backlog.nextDue && ` · next due ${backlog.nextDue}`}
                       {!backlog.nextDue && schedule.isActive && ' · no further occurrences'}
@@ -159,7 +170,7 @@ export function BatchScheduler() {
                       type="button"
                       onClick={() => void save.mutateAsync({ ...schedule, isActive: !schedule.isActive })}
                       disabled={!canEdit}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
                     >
                       {schedule.isActive ? 'Pause' : 'Resume'}
                     </button>
@@ -167,7 +178,7 @@ export function BatchScheduler() {
                       type="button"
                       onClick={() => setEditing(schedule)}
                       disabled={!canEdit}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
                     >
                       Edit
                     </button>
@@ -175,7 +186,7 @@ export function BatchScheduler() {
                       type="button"
                       onClick={() => void remove.mutateAsync(schedule.id)}
                       disabled={!canEdit}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-danger hover:border-danger disabled:opacity-40"
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-bold text-danger hover:border-danger disabled:opacity-40"
                     >
                       Delete
                     </button>
@@ -184,10 +195,10 @@ export function BatchScheduler() {
 
                 {backlog.overdue.length > 0 && (
                   <div className="mt-4 rounded-lg bg-warning/5 p-4">
-                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-warning">
+                    <p className="mb-3 text-[12px] font-bold uppercase tracking-wider text-warning">
                       Missed occurrences
                     </p>
-                    <p className="mb-3 text-[11px] leading-relaxed text-gray-600">
+                    <p className="mb-3 text-[12px] leading-relaxed text-gray-600">
                       Each of these is a separate reporting date. They do not collapse into one - June&apos;s pack is
                       not satisfied by August&apos;s.
                     </p>
@@ -198,7 +209,7 @@ export function BatchScheduler() {
                           type="button"
                           onClick={() => void handleFire(schedule, date)}
                           disabled={!canEdit || fire.isPending || !template}
-                          className="rounded-lg border border-warning/40 bg-white px-3 py-1.5 font-mono text-[11px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
+                          className="rounded-lg border border-warning/40 bg-white px-3 py-1.5 font-mono text-[12px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
                         >
                           Run {date}
                         </button>
@@ -261,16 +272,11 @@ function ScheduleForm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
       <div className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-[14px] font-bold text-navy-900">Schedule</h2>
+        <h2 className="mb-4 text-[15px] font-bold text-navy-900">Schedule</h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field id="sch-name" label="Name">
-            <input
-              id="sch-name"
-              value={draft.name}
-              onChange={(e) => set({ name: e.target.value })}
-              className={INPUT}
-            />
+            <input id="sch-name" value={draft.name} onChange={(e) => set({ name: e.target.value })} className={INPUT} />
           </Field>
 
           <Field id="sch-template" label="Repeats this run">
@@ -392,19 +398,19 @@ function ScheduleForm({
         </div>
 
         <div className="mt-4 rounded-lg bg-gray-50 p-4">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Next occurrences</p>
-          <p className="font-mono text-[12px] text-navy-900">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Next occurrences</p>
+          <p className="font-mono text-[13px] text-navy-900">
             {preview.length > 0 ? preview.join(' · ') : 'None - check the start and end dates.'}
           </p>
         </div>
 
-        {invalid && <p className="mt-3 text-[11px] font-bold text-danger">{invalid}</p>}
+        {invalid && <p className="mt-3 text-[12px] font-bold text-danger">{invalid}</p>}
 
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+            className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
           >
             Cancel
           </button>
@@ -412,7 +418,7 @@ function ScheduleForm({
             type="button"
             disabled={invalid !== null}
             onClick={() => void onSave(draft)}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
           >
             Save schedule
           </button>
@@ -436,12 +442,12 @@ function dueOccurrencesPreview(schedule: RunSchedule): string[] {
 }
 
 const INPUT =
-  'w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700';
+  'w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700';
 
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-[11px] font-medium text-gray-600">
+      <label htmlFor={id} className="mb-1 block text-[12px] font-medium text-gray-600">
         {label}
       </label>
       {children}

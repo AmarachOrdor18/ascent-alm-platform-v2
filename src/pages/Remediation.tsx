@@ -1,57 +1,464 @@
+// Control issues (/controls/remediation): a board of every control issue, grouped Open → In progress →
+// Verified → Closed. The six underlying stages are kept (Open covers Identified, Assessed and Planned) and
+// shown on each card. Clicking a card opens a side panel (?issue=<id>) with its timeline and the one next
+// action. Closing is maker-checker: the issue's owner can never close it.
 import { useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { InfoButton } from '@/components/ui/InfoButton';
-import { ChevronRightIcon } from '@/components/icons/Icons';
-import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
+import { Drawer } from '@/components/ui/Drawer';
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates } from '@/lib/hooks';
 import { remediation, newId } from '@/lib/governanceHooks';
+import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/cn';
 import type { RemediationIssue, RemediationStage, Severity } from '@/engine/types';
 
 const STAGES: RemediationStage[] = ['Identified', 'Assessed', 'Planned', 'In Progress', 'Verified', 'Closed'];
 const SEVERITIES: Severity[] = ['Low', 'Medium', 'High', 'Critical'];
 
-const SEVERITY_TONE: Record<Severity, 'success' | 'warning' | 'danger'> = {
-  Low: 'success',
+const SEVERITY_TONE: Record<Severity, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  Low: 'neutral',
   Medium: 'warning',
   High: 'danger',
   Critical: 'danger',
 };
 
-const STAGE_TONE: Record<RemediationStage, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  Identified: 'danger',
-  Assessed: 'warning',
-  Planned: 'warning',
-  'In Progress': 'warning',
-  Verified: 'success',
-  Closed: 'neutral',
+/** The board's four columns and the stages each one holds. */
+const COLUMNS: Array<{ key: string; title: string; hint: string; stages: RemediationStage[] }> = [
+  {
+    key: 'open',
+    title: 'Open',
+    hint: 'Logged, being assessed or planned',
+    stages: ['Identified', 'Assessed', 'Planned'],
+  },
+  { key: 'progress', title: 'In progress', hint: 'The fix is being worked on', stages: ['In Progress'] },
+  { key: 'verified', title: 'Verified', hint: 'Fix checked - waiting to be closed', stages: ['Verified'] },
+  { key: 'closed', title: 'Closed', hint: 'Closed by someone other than the owner', stages: ['Closed'] },
+];
+
+// What "moving to this stage" means - shown on the next-action button so the click's effect is plain.
+const STAGE_MEANING: Record<RemediationStage, string> = {
+  Identified: 'The issue has been logged. No investigation yet.',
+  Assessed: 'The cause and impact are understood.',
+  Planned: 'A fix and an owner are agreed.',
+  'In Progress': 'Work on the fix has started.',
+  Verified: 'The fix has been checked and works.',
+  Closed: 'Confirmed resolved by someone other than the owner.',
 };
 
-// What "moving to this stage" actually means - shown next to the Advance button so the next click's
-// effect is stated plainly, not left to guessing from the stage name alone.
-const STAGE_MEANING: Record<RemediationStage, string> = {
-  Identified: 'The issue has been logged. No investigation has happened yet.',
-  Assessed: 'Someone has looked into it and understands the root cause and impact.',
-  Planned: 'A remediation plan and owner are in place.',
-  'In Progress': 'Work on the fix has actually started.',
-  Verified: 'The fix has been checked and confirmed to work.',
-  Closed: 'Confirmed resolved by someone other than the owner - the final, checker-approved state.',
-};
+const TODAY = new Date().toISOString().slice(0, 10);
+const isOverdue = (c: RemediationIssue) => c.stage !== 'Closed' && !!c.dueDate && c.dueDate < TODAY;
+const when = (iso: string) => new Date(iso).toLocaleString();
+
+/** Where the issue came from, as a link when the platform knows the source record. */
+function sourceLink(c: RemediationIssue): { label: string; href: string } | null {
+  if (c.linkedLimitId) return { label: 'Open the limit breach in Limits & breaches', href: '/monitoring' };
+  if (c.linkedBatchId)
+    return { label: `Open the rejected upload (${c.linkedBatchId}) in Data → History`, href: '/data/loads' };
+  return null;
+}
 
 export function Remediation() {
   const { user, hasPermission } = useAuth();
-  // Nobody at all was gated on a role before - any signed-in user, including a read-only viewer, could
-  // raise, advance and even close a control issue. Control Tester and Risk Analyst are the roles actually
-  // meant to run this workflow, so gate writes on the permissions those two (and Administrator) hold.
+  // ALM Analysts, Affiliate Admins and the Organisation Admin run this workflow; viewers and approvers read it.
   const canEdit = hasPermission('data.configure') || hasPermission('risk.configure');
   const { data: affiliates = [] } = useAffiliates();
   const { data: issues = [], isLoading } = remediation.useList();
   const save = remediation.useSave();
-
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [location, navigate] = useLocation();
+  const search = useSearch();
+  const openId = new URLSearchParams(search).get('issue');
+  const [text, setText] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  const [showAllClosed, setShowAllClosed] = useState(false);
+
+  const setOpen = (id: string | null) => {
+    const p = new URLSearchParams(search);
+    if (id) p.set('issue', id);
+    else p.delete('issue');
+    const q = p.toString();
+    navigate(`${location}${q ? `?${q}` : ''}`, { replace: true });
+  };
+
+  const openCount = issues.filter((c) => c.stage !== 'Closed').length;
+  const overdueCount = issues.filter(isOverdue).length;
+  const closedCount = issues.filter((c) => c.stage === 'Closed').length;
+
+  const closeBlockedReason = (issue: RemediationIssue): string | null => {
+    if (!user) return 'Not signed in.';
+    if (issue.owner === user.name)
+      return 'You own this issue. The owner cannot close it - someone else must confirm the fix.';
+    return null;
+  };
+
+  const advance = async (issue: RemediationIssue, stage: RemediationStage, note: string) => {
+    if (!user || !canEdit) return;
+    if (stage === 'Closed' && closeBlockedReason(issue)) return;
+    const now = new Date().toISOString();
+    await save.mutateAsync({
+      ...issue,
+      stage,
+      closedAt: stage === 'Closed' ? now : issue.closedAt,
+      closureApprovedBy: stage === 'Closed' ? user.name : issue.closureApprovedBy,
+      updates: [...issue.updates, { at: now, by: user.name, stage, note: note.trim() || `Moved to ${stage}.` }],
+    });
+  };
+
+  const t = text.trim().toLowerCase();
+  const visible = issues.filter(
+    (c) => !t || [c.title, c.owner, c.source, c.description].some((v) => v.toLowerCase().includes(t)),
+  );
+  const open = openId ? (issues.find((c) => c.id === openId) ?? null) : null;
+  const affiliateName = (code: string | null) =>
+    !code ? 'Group-wide' : (affiliates.find((a) => a.code === code)?.name ?? code);
+
+  return (
+    <>
+      <ModuleHeader
+        title="Control issues"
+        description="Every control weakness, from first logged to closed."
+        about="The owner fixes it; someone else closes it."
+        asOfDate={null}
+        metrics={[
+          {
+            label: 'Not closed',
+            value: String(openCount),
+            tone: openCount > 0 ? 'warning' : 'success',
+            about: 'Issues at any stage short of Closed.',
+          },
+          {
+            label: 'Overdue',
+            value: String(overdueCount),
+            tone: overdueCount > 0 ? 'danger' : 'neutral',
+            about: 'Issues past their due date that are not closed.',
+          },
+          {
+            label: 'Closed',
+            value: String(closedCount),
+            tone: 'success',
+            about: 'Closed by someone other than the owner.',
+          },
+        ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => setNewOpen(true)}
+            disabled={!canEdit}
+            title={canEdit ? undefined : 'Only an ALM Analyst, Affiliate Admin or Organisation Admin can log an issue'}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            New issue
+          </button>
+        }
+      />
+
+      {save.error && (
+        <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-3 text-[13px] text-danger">
+          {save.error instanceof Error ? save.error.message : String(save.error)}
+        </div>
+      )}
+
+      {isLoading ? (
+        <p className="text-[13px] text-gray-400">Loading…</p>
+      ) : issues.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center text-[13px] text-gray-500">
+          No control issues yet. Log one with New issue, or raise one from a breach on Limits &amp; breaches or a
+          rejected upload.
+        </div>
+      ) : (
+        <>
+          <div className="mb-5 max-w-sm">
+            <input
+              aria-label="Search issues"
+              placeholder="Search by title, owner or source…"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {COLUMNS.map((col) => {
+              const all = visible
+                .filter((c) => col.stages.includes(c.stage))
+                .sort((a, b) => (b.raisedAt ?? '').localeCompare(a.raisedAt ?? ''));
+              const cards = col.key === 'closed' && !showAllClosed ? all.slice(0, 8) : all;
+              return (
+                <section key={col.key} aria-label={col.title} className="flex flex-col rounded-2xl bg-gray-50 p-3">
+                  <header className="mb-3 px-1">
+                    <h3 className="flex items-center gap-2 text-[13px] font-bold text-navy-900">
+                      {col.title}
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-gray-500">{all.length}</span>
+                    </h3>
+                    <p className="text-[12px] text-gray-500">{col.hint}</p>
+                  </header>
+                  <ul className="space-y-2">
+                    {cards.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => setOpen(c.id)}
+                          className={cn(
+                            'w-full rounded-xl border bg-white p-3 text-left shadow-sm transition-colors hover:border-navy-700',
+                            isOverdue(c) ? 'border-danger/40' : 'border-gray-100',
+                          )}
+                        >
+                          <p className="text-[13px] font-bold leading-snug text-navy-900">{c.title}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <StatusBadge status={c.severity} tone={SEVERITY_TONE[c.severity]} />
+                            {col.stages.length > 1 && <StatusBadge status={c.stage} tone="info" />}
+                          </div>
+                          <p className="mt-2 text-[12px] text-gray-500">Owner: {c.owner}</p>
+                          {c.stage !== 'Closed' && (
+                            <p className={cn('text-[12px]', isOverdue(c) ? 'font-bold text-danger' : 'text-gray-500')}>
+                              {c.dueDate
+                                ? `${isOverdue(c) ? '⚠ Overdue - was due' : 'Due'} ${formatDate(c.dueDate)}`
+                                : 'No due date'}
+                            </p>
+                          )}
+                          {c.stage === 'Closed' && c.closureApprovedBy && (
+                            <p className="text-[12px] text-gray-500">Closed by {c.closureApprovedBy}</p>
+                          )}
+                          {(c.linkedLimitId || c.linkedBatchId) && (
+                            <p className="mt-1 text-[11px] text-gray-400">
+                              From {c.linkedLimitId ? 'a limit breach' : 'a rejected upload'}
+                            </p>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                    {all.length === 0 && (
+                      <li className="px-1 py-4 text-center text-[12px] text-gray-400">Nothing here.</li>
+                    )}
+                  </ul>
+                  {col.key === 'closed' && all.length > 8 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllClosed((v) => !v)}
+                      className="mt-2 text-[12px] font-bold text-navy-700 hover:underline"
+                    >
+                      {showAllClosed ? 'Show fewer' : `Show all ${all.length}`}
+                    </button>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {open && (
+        <IssueDrawer
+          issue={open}
+          affiliate={affiliateName(open.affiliateCode)}
+          canEdit={canEdit}
+          closeBlocked={closeBlockedReason(open)}
+          busy={save.isPending}
+          onClose={() => setOpen(null)}
+          onAdvance={(stage, note) => advance(open, stage, note)}
+        />
+      )}
+      {!open && openId && !isLoading && (
+        <Drawer title="Issue not found" onClose={() => setOpen(null)}>
+          <p className="text-[13px] text-gray-500">This issue does not exist or is outside your scope.</p>
+        </Drawer>
+      )}
+
+      {newOpen && (
+        <NewIssueForm
+          affiliates={affiliates}
+          canEdit={canEdit}
+          onClose={() => setNewOpen(false)}
+          onCreated={(id) => {
+            setNewOpen(false);
+            setOpen(id);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Side panel ────────────────────────────────────────────────────────────
+
+function StageTracker({ stage }: { stage: RemediationStage }) {
+  const idx = STAGES.indexOf(stage);
+  return (
+    <ol className="flex flex-wrap gap-1">
+      {STAGES.map((s, i) => (
+        <li
+          key={s}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-[11px] font-bold',
+            i < idx ? 'bg-success-bg text-success' : i === idx ? 'bg-navy-900 text-white' : 'bg-gray-100 text-gray-400',
+          )}
+        >
+          {i < idx ? '✓ ' : ''}
+          {s}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function IssueDrawer({
+  issue,
+  affiliate,
+  canEdit,
+  closeBlocked,
+  busy,
+  onClose,
+  onAdvance,
+}: {
+  issue: RemediationIssue;
+  affiliate: string;
+  canEdit: boolean;
+  closeBlocked: string | null;
+  busy: boolean;
+  onClose: () => void;
+  onAdvance: (stage: RemediationStage, note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState('');
+  const idx = STAGES.indexOf(issue.stage);
+  const next = idx >= 0 && idx < STAGES.length - 1 ? STAGES[idx + 1]! : null;
+  const blocked = !canEdit
+    ? 'Only an ALM Analyst, Affiliate Admin or Organisation Admin can move an issue on.'
+    : next === 'Closed'
+      ? closeBlocked
+      : null;
+  const link = sourceLink(issue);
+  const facts: Array<[string, string]> = [
+    ['Severity', issue.severity],
+    ['Owner', issue.owner],
+    ['Affiliate', affiliate],
+    ['Due', issue.dueDate ? formatDate(issue.dueDate) : 'No due date'],
+    ['Raised by', issue.raisedBy],
+    ['Raised on', formatDate(issue.raisedAt.slice(0, 10))],
+    ...(issue.stage === 'Closed' ? ([['Closed by', issue.closureApprovedBy ?? '-']] as Array<[string, string]>) : []),
+  ];
+  return (
+    <Drawer
+      title={issue.title}
+      description={`${issue.id} · ${issue.source}`}
+      onClose={onClose}
+      wide
+      footer={
+        next ? (
+          <div className="space-y-3">
+            {blocked ? (
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+                <span className="font-bold text-navy-900">You can&rsquo;t move this on: </span>
+                {blocked}
+              </p>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="issue-note" className="mb-1 block text-[12px] font-bold text-navy-900">
+                    Note for the timeline (optional)
+                  </label>
+                  <input
+                    id="issue-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={next === 'Closed' ? 'How you confirmed the fix' : 'What was done'}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[12px] text-gray-500">{STAGE_MEANING[next]}</p>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onAdvance(next, note).then(() => setNote(''))}
+                    className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                  >
+                    {busy ? 'Saving…' : `Advance to ${next}`}
+                  </button>
+                </div>
+              </>
+            )}
+            {next === 'Closed' && !blocked && (
+              <p className="text-[12px] text-gray-400">
+                The owner ({issue.owner}) cannot close this - that is why you can.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-[13px] text-success">
+            Closed{issue.closureApprovedBy ? ` by ${issue.closureApprovedBy}` : ''}. Nothing more to do.
+          </p>
+        )
+      }
+    >
+      <div className="space-y-6">
+        <section className="space-y-2">
+          <StageTracker stage={issue.stage} />
+          <p className="text-[13px] text-gray-600">{STAGE_MEANING[issue.stage]}</p>
+          {isOverdue(issue) && (
+            <p className="text-[13px] font-bold text-danger">⚠ Overdue - it was due {formatDate(issue.dueDate)}.</p>
+          )}
+        </section>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-gray-50 p-4">
+          {facts.map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{k}</dt>
+              <dd className="mt-0.5 text-[13px] text-navy-900">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <section>
+          <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">What is wrong</h3>
+          <p className="mt-2 text-[13px] leading-relaxed text-gray-600">
+            {issue.description || 'No description recorded.'}
+          </p>
+          {link && (
+            <Link href={link.href} className="mt-2 inline-block text-[13px] font-bold text-navy-700 hover:underline">
+              {link.label} →
+            </Link>
+          )}
+        </section>
+        <section>
+          <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Timeline</h3>
+          {issue.updates.length === 0 ? (
+            <p className="mt-2 text-[13px] text-gray-400">No history recorded.</p>
+          ) : (
+            <ol className="mt-3 space-y-3 border-l-2 border-gray-100 pl-4">
+              {[...issue.updates].reverse().map((u, i) => (
+                <li key={i} className="relative">
+                  <span
+                    className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-navy-700"
+                    aria-hidden="true"
+                  />
+                  <p className="text-[13px] text-navy-900">
+                    <span className="font-bold">{u.stage}</span> · {u.by}
+                  </p>
+                  <p className="text-[12px] text-gray-500">{u.note}</p>
+                  <p className="text-[11px] text-gray-400">{when(u.at)}</p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      </div>
+    </Drawer>
+  );
+}
+
+// ─── New issue ─────────────────────────────────────────────────────────────
+
+function NewIssueForm({
+  affiliates,
+  canEdit,
+  onClose,
+  onCreated,
+}: {
+  affiliates: Array<{ code: string; name: string }>;
+  canEdit: boolean;
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const { user } = useAuth();
+  const save = remediation.useSave();
   const [draft, setDraft] = useState({
     title: '',
     description: '',
@@ -61,414 +468,165 @@ export function Remediation() {
     affiliateCode: '',
     dueDate: '',
   });
-
-  const effectiveId = selectedId ?? issues[0]?.id ?? null;
-  const selected = issues.find((c) => c.id === effectiveId) ?? null;
-
-  const openCount = issues.filter((c) => c.stage !== 'Closed').length;
-  const closedCount = issues.filter((c) => c.stage === 'Closed').length;
-  const overdueCount = issues.filter(
-    (c) => c.stage !== 'Closed' && c.dueDate && c.dueDate < new Date().toISOString().slice(0, 10),
-  ).length;
-
-  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
-    issues,
-    10,
-    ['title', 'source', 'owner'],
-  );
-
-  const currentIndex = selected ? STAGES.indexOf(selected.stage) : -1;
-  const nextStage = currentIndex >= 0 && currentIndex < STAGES.length - 1 ? STAGES[currentIndex + 1] : null;
-
-  const closeBlockedReason = (issue: RemediationIssue): string | null => {
-    if (!user) return 'Not signed in.';
-    if (issue.owner === user.name) {
-      return 'You own this issue. Segregation of duties means the owner cannot also verify its closure.';
-    }
-    return null;
-  };
-
-  const advance = async (issue: RemediationIssue, stage: RemediationStage) => {
-    if (!user || !canEdit) return;
-    if (stage === 'Closed') {
-      const blocked = closeBlockedReason(issue);
-      if (blocked) return;
-    }
+  const field =
+    'w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none';
+  const label = 'mb-1 block text-[12px] font-bold text-navy-900';
+  const create = async () => {
+    if (!user || !canEdit || !draft.title.trim() || !draft.owner.trim()) return;
+    const now = new Date().toISOString();
+    const id = newId('CR');
     await save.mutateAsync({
-      ...issue,
-      stage,
-      closedAt: stage === 'Closed' ? new Date().toISOString() : issue.closedAt,
-      closureApprovedBy: stage === 'Closed' ? user.name : issue.closureApprovedBy,
-      updates: [...issue.updates, { at: new Date().toISOString(), by: user.name, stage, note: `Advanced to ${stage}.` }],
-    });
-  };
-
-  const handleCreate = async () => {
-    if (!user || !canEdit || !draft.title || !draft.owner) return;
-    await save.mutateAsync({
-      id: newId('CR'),
-      title: draft.title,
-      description: draft.description,
-      source: draft.source || 'Manual entry',
+      id,
+      title: draft.title.trim(),
+      description: draft.description.trim(),
+      source: draft.source.trim() || 'Manual entry',
       linkedLimitId: null,
       linkedBatchId: null,
       severity: draft.severity,
       stage: 'Identified',
-      owner: draft.owner,
+      owner: draft.owner.trim(),
       affiliateCode: draft.affiliateCode || null,
       raisedBy: user.name,
-      raisedAt: new Date().toISOString(),
+      raisedAt: now,
       dueDate: draft.dueDate || null,
       closedAt: null,
       closureApprovedBy: null,
-      updates: [{ at: new Date().toISOString(), by: user.name, stage: 'Identified', note: 'Issue raised.' }],
+      updates: [{ at: now, by: user.name, stage: 'Identified', note: 'Issue logged.' }],
     });
-    setNewOpen(false);
-    setDraft({ title: '', description: '', source: '', severity: 'Medium', owner: '', affiliateCode: '', dueDate: '' });
+    onCreated(id);
   };
-
-  function StageTracker({ stage }: { stage: RemediationStage }) {
-    const idx = STAGES.indexOf(stage);
-    return (
-      <div className="flex w-full items-start">
-        {STAGES.map((s, i) => {
-          const done = i < idx;
-          const active = i === idx;
-          return (
-            <div key={s} className="flex items-center">
-              <div className="flex min-w-[64px] flex-col items-center px-1">
-                <div
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold ${
-                    done ? 'border-success bg-success text-white' : active ? 'border-navy-900 bg-navy-900 text-white' : 'border-gray-200 bg-white text-gray-400'
-                  }`}
-                >
-                  {done ? String.fromCharCode(10003) : i + 1}
-                </div>
-                <span
-                  className={`mt-1.5 text-center text-[9px] font-bold uppercase leading-tight tracking-tight ${active ? 'text-navy-900' : done ? 'text-success' : 'text-gray-400'}`}
-                >
-                  {s}
-                </span>
-              </div>
-              {i < STAGES.length - 1 && (
-                <div className={`h-0.5 w-4 shrink-0 sm:w-8 ${done ? 'bg-success' : 'bg-gray-200'}`} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
-    <>
-      <ModuleHeader
-        title={
-          <span className="inline-flex items-center gap-1.5">
-            Control Remediation
-            <InfoButton label="How this workflow works">
-              Every control weakness moves through the same six stages, left to right: Identified (logged) →
-              Assessed (root cause understood) → Planned (a fix and owner are set) → In Progress (work has
-              started) → Verified (the fix was checked) → Closed. Closing an issue always needs someone other
-              than the owner - the same maker-checker rule used everywhere else in this platform.
-            </InfoButton>
-          </span>
-        }
-        description="Every issue tracked from identification to a checker-verified close."
-        asOfDate={null}
-        scope="Ecobank Group"
-        metrics={[
-          { label: 'Open', value: String(openCount), tone: openCount > 0 ? 'warning' : 'success', about: 'Issues anywhere in the lifecycle short of Closed.' },
-          { label: 'Overdue', value: String(overdueCount), tone: overdueCount > 0 ? 'danger' : 'neutral', about: 'Open issues past their due date.' },
-          { label: 'Closed', value: String(closedCount), tone: 'success', about: 'Issues verified and closed - closure requires someone other than the owner to approve it.' },
-          { label: 'Total tracked', value: String(issues.length), about: 'Every control issue ever raised, at any stage.' },
-        ]}
-        actions={
+    <Drawer
+      title="New control issue"
+      description="It starts as Open. The owner fixes it; someone else closes it."
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => setNewOpen(true)}
-            disabled={!canEdit}
-            title={canEdit ? undefined : 'Only Risk Analyst, Control Tester or Administrator can raise an issue'}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
           >
-            New issue
+            Cancel
           </button>
-        }
-      />
-
-      {isLoading && <p className="text-[12px] text-gray-400">Loading.</p>}
-
-      {!isLoading && issues.length === 0 && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-sm text-gray-400 shadow-sm">
-          No remediation issues yet. Click "New issue" to log one, or raise one from a breach on Limits and Breaches.
+          <button
+            type="button"
+            onClick={() => void create()}
+            disabled={!canEdit || !draft.title.trim() || !draft.owner.trim() || save.isPending}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Log issue
+          </button>
         </div>
-      )}
-
-      {!isLoading && selected && (
-        <>
-          <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">{selected.title}</h3>
-                <p className="mt-1 text-[11px] font-medium text-gray-400">
-                  {selected.id}. {selected.source}. Owned by {selected.owner}
-                </p>
-                {selected.linkedBatchId && (
-                  <Link
-                    href="/data/operations/vintages"
-                    className="mt-1 inline-block text-[11px] font-bold text-navy-700 hover:underline"
-                  >
-                    View batch {selected.linkedBatchId} in Load History →
-                  </Link>
-                )}
-              </div>
-              {nextStage && (
-                <div className="shrink-0 text-right">
-                  <button
-                    type="button"
-                    disabled={!canEdit || (nextStage === 'Closed' && !!closeBlockedReason(selected))}
-                    onClick={() => void advance(selected, nextStage)}
-                    className="rounded-lg bg-navy-900 px-3.5 py-2 text-[12px] font-bold text-white shadow-sm transition-colors hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Advance to {nextStage}
-                  </button>
-                  <p className="mt-1.5 max-w-[220px] text-[10px] leading-snug text-gray-400">
-                    {!canEdit
-                      ? 'Only Risk Analyst, Control Tester or Administrator can advance an issue.'
-                      : nextStage === 'Closed' && closeBlockedReason(selected)
-                        ? closeBlockedReason(selected)
-                        : STAGE_MEANING[nextStage]}
-                  </p>
-                </div>
-              )}
-            </div>
-            <StageTracker stage={selected.stage} />
-            <p className="mt-2 text-[11px] leading-relaxed text-gray-500">{STAGE_MEANING[selected.stage]}</p>
-            <div className="mt-6 grid grid-cols-1 gap-4 border-t border-gray-50 pt-5 md:grid-cols-4">
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Raised</p>
-                <p className="mt-0.5 text-[13px] font-bold text-navy-900">{new Date(selected.raisedAt).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Severity</p>
-                <p className="mt-0.5"><StatusBadge status={selected.severity} tone={SEVERITY_TONE[selected.severity]} /></p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Due</p>
-                <p className="mt-0.5 text-[13px] font-bold text-navy-900">{selected.dueDate ? new Date(selected.dueDate).toLocaleDateString() : 'None set'}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Closed by</p>
-                <p className="mt-0.5 text-[13px] font-bold text-navy-900">{selected.closureApprovedBy ?? 'Not closed'}</p>
-              </div>
-            </div>
-            <div className="mt-4 border-t border-gray-50 pt-4">
-              <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">Description</p>
-              <p className="text-[12px] leading-relaxed text-gray-600">{selected.description || 'No description recorded.'}</p>
-            </div>
-            {selected.updates.length > 0 && (
-              <div className="mt-4 border-t border-gray-50 pt-4">
-                <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-gray-400">History</p>
-                <ul className="space-y-1.5">
-                  {selected.updates.map((u, i) => (
-                    <li key={i} className="text-[11px] text-gray-500">
-                      <span className="font-mono text-gray-400">{new Date(u.at).toLocaleString()}</span>. {u.by} moved this to {u.stage}. {u.note}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="rem-title" className={label}>
+            What is wrong?
+          </label>
+          <input
+            id="rem-title"
+            value={draft.title}
+            placeholder="e.g. FX rates uploaded without a date"
+            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+            className={field}
+          />
+        </div>
+        <div>
+          <label htmlFor="rem-desc" className={label}>
+            Details (optional)
+          </label>
+          <textarea
+            id="rem-desc"
+            rows={3}
+            value={draft.description}
+            placeholder="How it was found and what it affects."
+            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            className={field}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="rem-owner" className={label}>
+              Who will fix it?
+            </label>
+            <input
+              id="rem-owner"
+              value={draft.owner}
+              placeholder="Full name"
+              onChange={(e) => setDraft((d) => ({ ...d, owner: e.target.value }))}
+              className={field}
+            />
           </div>
-
-          <div className="table-datagrid-container">
-            <div className="border-b border-gray-100 bg-white/50 p-5">
-              <div className="mb-3">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-navy-900">All control issues</h3>
-                <p className="text-[11px] font-medium text-gray-400">Select a row to view its full lifecycle above.</p>
-              </div>
-              <TableToolbar
-                searchValue={search}
-                onSearchChange={setSearch}
-                exportData={() => issues}
-                exportFilename="remediation-issues"
-                density={density}
-                onDensityChange={setDensity}
-              />
-            </div>
-            <div className="overflow-x-auto">
-              <table className="table-datagrid">
-                <thead>
-                  <tr>
-                    <th className="w-8" />
-                    <th>Issue</th>
-                    <th>Source</th>
-                    <th>Owner</th>
-                    <th>Stage</th>
-                    <th>Raised</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.map((c) => (
-                    <tr key={c.id} onClick={() => setSelectedId(c.id)} className={c.id === effectiveId ? 'is-selected cursor-pointer' : 'cursor-pointer'}>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setSelectedId(c.id); }}
-                          aria-label={`View ${c.title}`}
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-navy-700 hover:text-navy-700"
-                        >
-                          <ChevronRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </td>
-                      <td>
-                        <p className="font-bold text-navy-900">{c.title}</p>
-                        <p className="mt-0.5 text-[11px] font-medium text-gray-400">{c.id}</p>
-                      </td>
-                      <td>{c.source}</td>
-                      <td>{c.owner}</td>
-                      <td>
-                        <StatusBadge status={c.stage} tone={STAGE_TONE[c.stage]} />
-                      </td>
-                      <td>{new Date(c.raisedAt).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
-          </div>
-        </>
-      )}
-
-      {newOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-[13px] font-bold uppercase tracking-wider text-navy-900">New remediation issue</h3>
-            <p className="mb-4 mt-1 text-[11px] leading-relaxed text-gray-500">
-              This creates an issue at the Identified stage. It will need an owner other than whoever closes it.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="rem-title" className="mb-1 block text-[11px] text-gray-600">
-                  Title
-                </label>
-                <input
-                  id="rem-title"
-                  value={draft.title}
-                  placeholder="e.g. FX rate uploaded without an as-of date"
-                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label htmlFor="rem-desc" className="mb-1 block text-[11px] text-gray-600">
-                  Description
-                </label>
-                <textarea
-                  id="rem-desc"
-                  value={draft.description}
-                  placeholder="What's wrong, and how it was found."
-                  onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-                  rows={3}
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label htmlFor="rem-source" className="mb-1 block text-[11px] text-gray-600">
-                  Source
-                </label>
-                <input
-                  id="rem-source"
-                  value={draft.source}
-                  placeholder="e.g. Data Upload, Limits and Breaches, an external audit"
-                  onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value }))}
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="rem-severity" className="mb-1 block text-[11px] text-gray-600">
-                    Severity
-                  </label>
-                  <select
-                    id="rem-severity"
-                    value={draft.severity}
-                    onChange={(e) => setDraft((d) => ({ ...d, severity: e.target.value as Severity }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                  >
-                    {SEVERITIES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="rem-owner" className="mb-1 block text-[11px] text-gray-600">
-                    Owner
-                  </label>
-                  <input
-                    id="rem-owner"
-                    value={draft.owner}
-                    onChange={(e) => setDraft((d) => ({ ...d, owner: e.target.value }))}
-                    placeholder="Name responsible for fixing this - not for closing it"
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="rem-affiliate" className="mb-1 block text-[11px] text-gray-600">
-                    Affiliate
-                  </label>
-                  <select
-                    id="rem-affiliate"
-                    value={draft.affiliateCode}
-                    onChange={(e) => setDraft((d) => ({ ...d, affiliateCode: e.target.value }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                  >
-                    <option value="">Group-wide</option>
-                    {affiliates.map((a) => (
-                      <option key={a.code} value={a.code}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="rem-due" className="mb-1 block text-[11px] text-gray-600">
-                    Due date
-                  </label>
-                  <input
-                    id="rem-due"
-                    type="date"
-                    value={draft.dueDate}
-                    onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setNewOpen(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                disabled={!canEdit || !draft.title || !draft.owner}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Raise issue
-              </button>
-            </div>
+          <div>
+            <label htmlFor="rem-due" className={label}>
+              Due date
+            </label>
+            <input
+              id="rem-due"
+              type="date"
+              value={draft.dueDate}
+              onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))}
+              className={field}
+            />
           </div>
         </div>
-      )}
-    </>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="rem-severity" className={label}>
+              How serious?
+            </label>
+            <select
+              id="rem-severity"
+              value={draft.severity}
+              onChange={(e) => setDraft((d) => ({ ...d, severity: e.target.value as Severity }))}
+              className={field}
+            >
+              {SEVERITIES.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="rem-affiliate" className={label}>
+              Affiliate
+            </label>
+            <select
+              id="rem-affiliate"
+              value={draft.affiliateCode}
+              onChange={(e) => setDraft((d) => ({ ...d, affiliateCode: e.target.value }))}
+              className={field}
+            >
+              <option value="">Group-wide</option>
+              {affiliates
+                .filter((a) => a.code !== 'GROUP')
+                .map((a) => (
+                  <option key={a.code} value={a.code}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label htmlFor="rem-source" className={label}>
+            Where was it found? (optional)
+          </label>
+          <input
+            id="rem-source"
+            value={draft.source}
+            placeholder="e.g. data upload, audit, limit review"
+            onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value }))}
+            className={field}
+          />
+        </div>
+        {save.error && (
+          <p role="alert" className="text-[12px] text-danger">
+            {save.error instanceof Error ? save.error.message : String(save.error)}
+          </p>
+        )}
+      </div>
+    </Drawer>
   );
 }

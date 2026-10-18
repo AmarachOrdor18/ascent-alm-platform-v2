@@ -30,7 +30,7 @@ export function TimeBucketRules() {
   return (
     <RuleEditor<TimeBucketRule>
       title="Time Bucket Rules"
-      description="The ladders results are bucketed into. Three independent sets, because liquidity and repricing are different questions. Selected on Process Run's Rules panel; left unselected, the engine default ladder applies and the result discloses which basis it used."
+      description="The ladders results are bucketed into. Three independent sets, because liquidity and repricing are different questions. Selected on Run now's Rules panel; left unselected, the engine default ladder applies and the result discloses which basis it used."
       noun="bucket rule"
       rules={rules}
       isLoading={isLoading}
@@ -74,8 +74,8 @@ export function TimeBucketRules() {
               <div key={ladder.kind} className="rounded-lg border border-gray-200 p-4">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-[12px] font-bold text-navy-900">{definition?.label ?? ladder.kind}</h3>
-                    <p className="text-[11px] text-gray-500">{definition?.purpose}</p>
+                    <h3 className="text-[13px] font-bold text-navy-900">{definition?.label ?? ladder.kind}</h3>
+                    <p className="text-[12px] text-gray-500">{definition?.purpose}</p>
                   </div>
                   {ladder.kind === 'RepricingGap' && (
                     <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ export function TimeBucketRules() {
                         onChange={(e) => setLadder({ includeNonRateSensitive: e.target.checked })}
                         className="accent-gold-500"
                       />
-                      <label htmlFor={`nrs-${ladderIndex}`} className="cursor-pointer text-[11px] text-gray-600">
+                      <label htmlFor={`nrs-${ladderIndex}`} className="cursor-pointer text-[12px] text-gray-600">
                         Non-rate-sensitive bucket
                       </label>
                     </div>
@@ -146,7 +146,7 @@ export function TimeBucketRules() {
                         align: 'right',
                         render: (bucket, update, disabled) =>
                           bucket.upperBoundDays === null ? (
-                            <span className="block py-1 text-right text-[11px] italic text-gray-400">open-ended</span>
+                            <span className="block py-1 text-right text-[12px] italic text-gray-400">open-ended</span>
                           ) : (
                             <RowInput
                               id={`ub-${ladderIndex}-${ladder.buckets.indexOf(bucket)}`}
@@ -169,7 +169,7 @@ export function TimeBucketRules() {
             label="Maximum buckets"
             hint="Oracle allows up to 240 per ladder. Beyond a few dozen, reporting becomes harder to read than the risk it describes."
           >
-            <p className="text-[12px] text-gray-500">
+            <p className="text-[13px] text-gray-500">
               {rule.ladders.reduce((s, l) => s + l.buckets.length, 0)} buckets defined across {rule.ladders.length}{' '}
               ladders.
             </p>

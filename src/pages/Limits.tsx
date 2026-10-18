@@ -24,7 +24,10 @@ import { remediation, newId } from '@/lib/governanceHooks';
 import type { LimitConfig } from '@/engine/limits';
 
 const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  Green: 'success', Amber: 'warning', Red: 'danger', 'No data': 'neutral',
+  Green: 'success',
+  Amber: 'warning',
+  Red: 'danger',
+  'No data': 'neutral',
 };
 
 export function Limits() {
@@ -102,8 +105,7 @@ export function Limits() {
     return map;
   }, [evaluations, priorEvaluations]);
 
-  const hasOpenIssue = (limitId: string) =>
-    openIssues.some((i) => i.linkedLimitId === limitId && i.stage !== 'Closed');
+  const hasOpenIssue = (limitId: string) => openIssues.some((i) => i.linkedLimitId === limitId && i.stage !== 'Closed');
 
   const autoRaised = useRef(new Set<string>());
   useEffect(() => {
@@ -132,7 +134,12 @@ export function Limits() {
         closedAt: null,
         closureApprovedBy: null,
         updates: [
-          { at: now, by: 'System (auto-escalation)', stage: 'Identified', note: 'Auto-raised on a new breach transition.' },
+          {
+            at: now,
+            by: 'System (auto-escalation)',
+            stage: 'Identified',
+            note: 'Auto-raised on a new breach transition.',
+          },
         ],
       });
     }
@@ -152,7 +159,9 @@ export function Limits() {
       header: 'Current',
       align: 'right',
       render: (e) => (
-        <span className={`font-mono font-bold ${e.status === 'Red' ? 'text-danger' : e.status === 'Amber' ? 'text-warning' : ''}`}>
+        <span
+          className={`font-mono font-bold ${e.status === 'Red' ? 'text-danger' : e.status === 'Amber' ? 'text-warning' : ''}`}
+        >
           {formatMetric(e.value, e.metricKey)}
         </span>
       ),
@@ -163,9 +172,13 @@ export function Limits() {
       header: 'Amber / Red',
       align: 'right',
       render: (e) => (
-        <span className="font-mono text-[11px] text-gray-500">
+        <span className="font-mono text-[12px] text-gray-500">
           {formatMetric(e.appliedAmberThreshold, e.metricKey)} / {formatMetric(e.appliedRedThreshold, e.metricKey)}
-          {e.temporaryLimitId && <span className="ml-1 text-warning" title="Temporary limit applied">*</span>}
+          {e.temporaryLimitId && (
+            <span className="ml-1 text-warning" title="Temporary limit applied">
+              *
+            </span>
+          )}
         </span>
       ),
     },
@@ -198,7 +211,7 @@ export function Limits() {
                 style={{ width: `${Math.min(100, Math.max(0, e.utilisationPercent))}%` }}
               />
             </div>
-            <span className="font-mono text-[11px]">{e.utilisationPercent.toFixed(0)}%</span>
+            <span className="font-mono text-[12px]">{e.utilisationPercent.toFixed(0)}%</span>
           </div>
         ),
     },
@@ -208,7 +221,7 @@ export function Limits() {
       header: 'Regulatory',
       render: (e) =>
         e.config.regulatoryMinimum === null ? (
-          <span className="text-[11px] text-gray-400">internal only</span>
+          <span className="text-[12px] text-gray-400">internal only</span>
         ) : e.breachesRegulatoryMinimum ? (
           <StatusBadge status="Below minimum" tone="danger" />
         ) : (
@@ -225,20 +238,35 @@ export function Limits() {
         asOfDate={run?.asOfDate ?? null}
         scope={affiliateCode}
         metrics={[
-          { label: 'Limits monitored', value: String(evaluations.length), about: 'Limit configurations active for this scope, evaluated automatically against the selected run.' },
-          { label: 'In breach', value: String(red.length), tone: red.length > 0 ? 'danger' : 'success', about: 'Limits currently graded Red - inside or beyond the most severe internal threshold.' },
-          { label: 'On watch', value: String(amber.length), tone: amber.length > 0 ? 'warning' : 'success', about: 'Limits currently graded Amber - inside appetite but past the early-warning threshold.' },
+          {
+            label: 'Limits monitored',
+            value: String(evaluations.length),
+            about: 'Limit configurations active for this scope, evaluated automatically against the selected run.',
+          },
+          {
+            label: 'In breach',
+            value: String(red.length),
+            tone: red.length > 0 ? 'danger' : 'success',
+            about: 'Limits currently graded Red - inside or beyond the most severe internal threshold.',
+          },
+          {
+            label: 'On watch',
+            value: String(amber.length),
+            tone: amber.length > 0 ? 'warning' : 'success',
+            about: 'Limits currently graded Amber - inside appetite but past the early-warning threshold.',
+          },
           {
             label: 'Below regulatory minimum',
             value: String(regBreaches.length),
             tone: regBreaches.length > 0 ? 'danger' : 'success',
-            about: "Limits breaching the regulator's own floor, not just an internal one - the most serious category, distinct from a Red internal grading.",
+            about:
+              "Limits breaching the regulator's own floor, not just an internal one - the most serious category, distinct from a Red internal grading.",
           },
         ]}
         actions={
           <Link
             href="/kri"
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
           >
             See the trend
           </Link>
@@ -251,7 +279,7 @@ export function Limits() {
             <div className="mb-2 flex items-center gap-2">
               <StatusBadge status={`${regBreaches.length} below regulatory minimum`} tone="danger" />
             </div>
-            <ul className="space-y-1 text-[11px] text-gray-700">
+            <ul className="space-y-1 text-[12px] text-gray-700">
               {regBreaches.map((e) => (
                 <li key={e.limitId}>
                   <span className="font-bold text-navy-900">{e.label}</span> at{' '}
@@ -264,7 +292,7 @@ export function Limits() {
         )}
 
         {expiring.length > 0 && (
-          <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
+          <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
             <span className="font-bold">
               {expiring.length} temporary limit{expiring.length === 1 ? '' : 's'} expiring within 14 days.
             </span>{' '}
@@ -274,7 +302,7 @@ export function Limits() {
         )}
 
         {noData.length > 0 && (
-          <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
+          <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[12px] leading-relaxed text-gray-600">
             <span className="font-bold text-navy-900">
               {noData.length} limit{noData.length === 1 ? '' : 's'} could not be evaluated:
             </span>{' '}
@@ -286,13 +314,13 @@ export function Limits() {
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Limit framework</h2>
+              <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">Limit framework</h2>
               <InfoButton label="About these thresholds">
-                Thresholds shipped with the platform are illustrative starting points, not Ecobank&apos;s risk
-                appetite. Expand any row to edit them; changes are stamped with who made them and when.
+                Thresholds shipped with the platform are illustrative starting points, not Ecobank&apos;s risk appetite.
+                Expand any row to edit them; changes are stamped with who made them and when.
               </InfoButton>
             </div>
-            <span className="text-[11px] text-gray-500">
+            <span className="text-[12px] text-gray-500">
               {configs.filter((c) => c.affiliateCode !== null).length} affiliate-specific,{' '}
               {configs.filter((c) => c.affiliateCode === null).length} Group-wide
             </span>
@@ -338,6 +366,7 @@ export function Limits() {
             await saveNote.mutateAsync({
               id: `BN-${Date.now().toString(36).toUpperCase()}`,
               breachId: noteFor.limitId,
+              affiliateCode: affiliateCode === 'GROUP' ? (noteFor.config.affiliateCode ?? null) : affiliateCode,
               cause,
               resolutionAction: action,
               targetResolutionDate: target || null,
@@ -362,7 +391,14 @@ function LimitDetail({
   onRaiseIssue,
 }: {
   evaluation: EvaluatedLimit;
-  notes: Array<{ id: string; cause: string; resolutionAction: string; authorName: string; recordedAt: string; targetResolutionDate: string | null }>;
+  notes: Array<{
+    id: string;
+    cause: string;
+    resolutionAction: string;
+    authorName: string;
+    recordedAt: string;
+    targetResolutionDate: string | null;
+  }>;
   canEdit: boolean;
   alreadyEscalated: boolean;
   onEdit: () => void;
@@ -372,12 +408,16 @@ function LimitDetail({
   const isBreached = evaluation.status === 'Red' || evaluation.status === 'Amber';
   const c = evaluation.config;
   return (
-    <div className="space-y-3 text-[11px]">
+    <div className="space-y-3 text-[12px]">
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <D label="Metric key" value={c.metricKey} mono />
         <D label="Direction" value={c.direction} />
         <D label="Green" value={formatMetric(c.greenThreshold, c.metricKey)} mono />
-        <D label="Regulatory floor" value={c.regulatoryMinimum === null ? 'none' : formatMetric(c.regulatoryMinimum, c.metricKey)} mono />
+        <D
+          label="Regulatory floor"
+          value={c.regulatoryMinimum === null ? 'none' : formatMetric(c.regulatoryMinimum, c.metricKey)}
+          mono
+        />
         <D label="Scope" value={c.affiliateCode ?? 'Group-wide'} />
         <D label="Severity" value={evaluation.severity ?? '-'} />
         <D label="Last updated by" value={c.updatedBy} />
@@ -386,10 +426,9 @@ function LimitDetail({
 
       {evaluation.temporaryLimitId && (
         <p className="rounded bg-warning/5 px-3 py-2 leading-relaxed text-navy-900">
-          A temporary limit is in force until{' '}
-          <span className="font-mono">{evaluation.temporaryLimitExpiresOn}</span>. The thresholds shown in the table
-          are the relaxed ones; the underlying appetite is {formatMetric(c.amberThreshold, c.metricKey)} /{' '}
-          {formatMetric(c.redThreshold, c.metricKey)}.
+          A temporary limit is in force until <span className="font-mono">{evaluation.temporaryLimitExpiresOn}</span>.
+          The thresholds shown in the table are the relaxed ones; the underlying appetite is{' '}
+          {formatMetric(c.amberThreshold, c.metricKey)} / {formatMetric(c.redThreshold, c.metricKey)}.
         </p>
       )}
 
@@ -473,8 +512,8 @@ function LimitEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="mb-1 text-[14px] font-bold text-navy-900">{draft.label}</h2>
-        <p className="mb-4 text-[11px] text-gray-500">
+        <h2 className="mb-1 text-[15px] font-bold text-navy-900">{draft.label}</h2>
+        <p className="mb-4 text-[12px] text-gray-500">
           {draft.direction === 'higher-is-better'
             ? 'Higher is better, so thresholds must descend: green ≥ amber ≥ red.'
             : 'Lower is better, so thresholds must ascend: green ≤ amber ≤ red.'}
@@ -483,7 +522,7 @@ function LimitEditor({
         <div className="grid grid-cols-3 gap-3">
           {(['greenThreshold', 'amberThreshold', 'redThreshold'] as const).map((k) => (
             <div key={k}>
-              <label htmlFor={k} className="mb-1 block text-[11px] font-medium capitalize text-gray-600">
+              <label htmlFor={k} className="mb-1 block text-[12px] font-medium capitalize text-gray-600">
                 {k.replace('Threshold', '')}
               </label>
               <input
@@ -492,27 +531,31 @@ function LimitEditor({
                 step="0.01"
                 value={draft[k]}
                 onChange={(e) => set({ [k]: Number(e.target.value) } as Partial<LimitConfig>)}
-                className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+                className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
               />
             </div>
           ))}
         </div>
 
         {!ordered && (
-          <p className="mt-3 text-[11px] font-bold text-danger">
+          <p className="mt-3 text-[12px] font-bold text-danger">
             Thresholds are out of order - as written, a worse figure would grade better than a good one.
           </p>
         )}
 
         <div className="mt-6 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
+          >
             Cancel
           </button>
           <button
             type="button"
             disabled={!ordered}
             onClick={() => void onSave(draft)}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
           >
             Save thresholds
           </button>
@@ -538,13 +581,13 @@ function NoteEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-6">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="mb-1 text-[14px] font-bold text-navy-900">Breach note - {evaluation.label}</h2>
-        <p className="mb-4 text-[11px] text-gray-500">
+        <h2 className="mb-1 text-[15px] font-bold text-navy-900">Breach note - {evaluation.label}</h2>
+        <p className="mb-4 text-[12px] text-gray-500">
           Currently {formatMetric(evaluation.value, evaluation.metricKey)} against a red threshold of{' '}
           {formatMetric(evaluation.appliedRedThreshold, evaluation.metricKey)}.
         </p>
 
-        <label htmlFor="cause" className="mb-1 block text-[11px] font-medium text-gray-600">
+        <label htmlFor="cause" className="mb-1 block text-[12px] font-medium text-gray-600">
           Cause
         </label>
         <textarea
@@ -552,10 +595,10 @@ function NoteEditor({
           rows={2}
           value={cause}
           onChange={(e) => setCause(e.target.value)}
-          className="mb-3 w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+          className="mb-3 w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
         />
 
-        <label htmlFor="action" className="mb-1 block text-[11px] font-medium text-gray-600">
+        <label htmlFor="action" className="mb-1 block text-[12px] font-medium text-gray-600">
           Resolution action
         </label>
         <textarea
@@ -563,10 +606,10 @@ function NoteEditor({
           rows={2}
           value={action}
           onChange={(e) => setAction(e.target.value)}
-          className="mb-3 w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+          className="mb-3 w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
         />
 
-        <label htmlFor="target" className="mb-1 block text-[11px] font-medium text-gray-600">
+        <label htmlFor="target" className="mb-1 block text-[12px] font-medium text-gray-600">
           Target resolution date
         </label>
         <input
@@ -574,18 +617,22 @@ function NoteEditor({
           type="date"
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+          className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
         />
 
         <div className="mt-6 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
+          >
             Cancel
           </button>
           <button
             type="button"
             disabled={cause.trim() === '' || action.trim() === ''}
             onClick={() => void onSave(cause, action, target)}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
           >
             Record note
           </button>

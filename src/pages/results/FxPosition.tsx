@@ -24,7 +24,9 @@ export function FxPosition() {
   const breaches = useMemo(
     () =>
       (fx?.lines ?? []).filter(
-        (l) => l.netOpenPositionPercentOfCapital !== null && Math.abs(l.netOpenPositionPercentOfCapital) > SINGLE_CURRENCY_LIMIT_PCT,
+        (l) =>
+          l.netOpenPositionPercentOfCapital !== null &&
+          Math.abs(l.netOpenPositionPercentOfCapital) > SINGLE_CURRENCY_LIMIT_PCT,
       ),
     [fx],
   );
@@ -40,7 +42,7 @@ export function FxPosition() {
       render: (l) => (
         <span className="font-mono font-bold">
           {l.currency}
-          {l.currency === currency && <span className="ml-2 text-[10px] font-normal text-gray-400">functional</span>}
+          {l.currency === currency && <span className="ml-2 text-[11px] font-normal text-gray-400">functional</span>}
         </span>
       ),
     },
@@ -100,8 +102,11 @@ export function FxPosition() {
         metrics={[
           {
             label: 'Aggregate NOP',
-            value: fx ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(fx.aggregateNetOpenPosition) : '-',
-            about: 'Aggregate Net Open Position: the sum of absolute net positions across every non-reporting currency - the conservative measure, not long netted against short.',
+            value: fx
+              ? new Intl.NumberFormat(undefined, { notation: 'compact' }).format(fx.aggregateNetOpenPosition)
+              : '-',
+            about:
+              'Aggregate Net Open Position: the sum of absolute net positions across every non-reporting currency - the conservative measure, not long netted against short.',
           },
           {
             label: 'Aggregate % of capital',
@@ -112,7 +117,8 @@ export function FxPosition() {
                 : Math.abs(fx.aggregatePercentOfCapital) > AGGREGATE_LIMIT_PCT
                   ? 'danger'
                   : 'success',
-            about: 'The aggregate net open position expressed as a share of capital - the standard way FX exposure is sized against the balance sheet that has to absorb it.',
+            about:
+              'The aggregate net open position expressed as a share of capital - the standard way FX exposure is sized against the balance sheet that has to absorb it.',
           },
           {
             label: 'Currencies held',
@@ -139,16 +145,16 @@ export function FxPosition() {
               <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-5">
                 <div className="mb-2 flex items-center gap-2">
                   <StatusBadge status={`${breaches.length} above limit`} tone="danger" />
-                  <span className="text-[12px] font-bold text-navy-900">
+                  <span className="text-[13px] font-bold text-navy-900">
                     Single-currency exposure above {SINGLE_CURRENCY_LIMIT_PCT}% of capital
                   </span>
                   <InfoButton label="Where these limits come from">
-                    The {SINGLE_CURRENCY_LIMIT_PCT}% and {AGGREGATE_LIMIT_PCT}% figures are the common supervisory
-                    shape across the footprint, not a limit configured for this affiliate. Set the real ones on
-                    Limits & Breaches once that screen is built, and this will compare against those instead.
+                    The {SINGLE_CURRENCY_LIMIT_PCT}% and {AGGREGATE_LIMIT_PCT}% figures are the common supervisory shape
+                    across the footprint, not a limit configured for this affiliate. Set the real ones on Limits &
+                    Breaches once that screen is built, and this will compare against those instead.
                   </InfoButton>
                 </div>
-                <ul className="space-y-1 text-[11px] text-gray-700">
+                <ul className="space-y-1 text-[12px] text-gray-700">
                   {breaches.map((b) => (
                     <li key={b.currency}>
                       <span className="font-mono font-bold">{b.currency}</span> at{' '}
@@ -163,7 +169,7 @@ export function FxPosition() {
 
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center gap-1.5">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">
                   Net open position by currency
                 </h2>
                 <InfoButton label="Methodology">{methodologyOf(results, 'FxPosition')}</InfoButton>
@@ -178,17 +184,17 @@ export function FxPosition() {
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center gap-1.5">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">
                   Cross-currency funding
                 </h2>
                 <InfoButton label="Why this matters">
                   How much of the balance sheet sits in a currency other than {currency}. An affiliate that funds in
-                  dollars and lends locally carries the mismatch even when its net open position looks modest,
-                  because the funding can be withdrawn in a currency it does not generate.
+                  dollars and lends locally carries the mismatch even when its net open position looks modest, because
+                  the funding can be withdrawn in a currency it does not generate.
                 </InfoButton>
               </div>
 
-              <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
+              <dl className="grid grid-cols-2 gap-4 text-[13px] md:grid-cols-4">
                 <Stat label="Foreign-currency assets" value={<Amount value={foreignAssets} currency={currency} />} />
                 <Stat
                   label="Foreign-currency liabilities"
@@ -200,9 +206,7 @@ export function FxPosition() {
                     <span className="font-mono font-bold">
                       {foreignAssets + foreignLiabilities > 0
                         ? formatPct(
-                            (foreignLiabilities /
-                              (fx.lines.reduce((s, l) => s + l.liabilities, 0) || 1)) *
-                              100,
+                            (foreignLiabilities / (fx.lines.reduce((s, l) => s + l.liabilities, 0) || 1)) * 100,
                             1,
                           )
                         : '-'}
@@ -216,7 +220,7 @@ export function FxPosition() {
               </dl>
 
               {foreignLiabilities > foreignAssets && (
-                <p className="mt-4 rounded border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] leading-relaxed text-navy-900">
+                <p className="mt-4 rounded border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-relaxed text-navy-900">
                   Foreign-currency liabilities exceed foreign-currency assets by{' '}
                   <Amount value={foreignLiabilities - foreignAssets} currency={currency} />. That surplus is funding
                   local-currency lending, so a depreciation raises the cost of the funding without raising what the
@@ -234,7 +238,7 @@ export function FxPosition() {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
+      <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
       <dd className="mt-0.5">{value}</dd>
     </div>
   );

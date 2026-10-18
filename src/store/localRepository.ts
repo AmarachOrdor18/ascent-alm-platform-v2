@@ -1,16 +1,32 @@
 import { db, AscentDb } from './db';
-import type { Dependency, PositionQuery, Repository, RuleQuery, StagedBatch } from './repository';
+import { isFrozen, runUpdateRefusal, signOffStatusOf } from '@/lib/runSeries';
+import { usersWhoCanFix } from '@/lib/whoCanFixCore';
+import type {
+  Dependency,
+  Fixer,
+  NotificationInput,
+  PositionQuery,
+  Repository,
+  RuleQuery,
+  StagedBatch,
+  StoredAccountObservation,
+  StoredBalanceObservation,
+  StoredModelRun,
+} from './repository';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
 import type {
   Affiliate,
+  AppNotification,
   AuditEvent,
   DataDomain,
+  DataSource,
   DimensionMember,
   DimensionType,
   EconomicIndicator,
   HolidayCalendar,
   IsoDate,
   LoadBatch,
+  OnboardingRecord,
   Position,
   PositionContributor,
   PositionSnapshot,
@@ -20,6 +36,7 @@ import type {
   RuleVersionSnapshot,
   RunResult,
   RunSchedule,
+  SettingRecord,
   Connector,
   ApprovalRequest,
   RemediationIssue,
@@ -57,7 +74,10 @@ export class LocalRepository implements Repository {
   // ── Dimensions ────────────────────────────────────────────────────────
   listDimensionMembers(dimension: DimensionType, affiliateCode?: string): Promise<DimensionMember[]> {
     if (affiliateCode) {
-      return this.database.dimensionMembers.where('[dimension+affiliateCode]').equals([dimension, affiliateCode]).toArray();
+      return this.database.dimensionMembers
+        .where('[dimension+affiliateCode]')
+        .equals([dimension, affiliateCode])
+        .toArray();
     }
     return this.database.dimensionMembers.where('dimension').equals(dimension).toArray();
   }
@@ -150,7 +170,11 @@ export class LocalRepository implements Repository {
       .toArray();
     // Outside the Positions domain there is exactly one submitter, so any match is unambiguous; inside it,
     // matching on contributor keeps one department's in-progress draft from resuming into another's session.
-    return candidates.find((c) => domain !== 'Positions' || c.batch.contributor === (contributor ?? null)) ?? null;
+    return (
+      candidates
+        .filter((c) => !c.admitted)
+        .find((c) => domain !== 'Positions' || c.batch.contributor === (contributor ?? null)) ?? null
+    );
   }
 
   async upsertStagedBatch(staged: StagedBatch): Promise<void> {
@@ -242,8 +266,14 @@ export class LocalRepository implements Repository {
         run.timeBucketRuleId === id ||
         run.productCharacteristicRuleId === id ||
         run.behaviourPatternRuleId === id ||
+        run.prepaymentRuleId === id ||
         run.newBusinessRuleId === id ||
         run.transactionStrategyId === id ||
+        run.ftpRuleId === id ||
+        run.adjustmentRuleId === id ||
+        run.costAllocationRuleId === id ||
+        run.creditLossRuleId === id ||
+        run.capitalRuleId === id ||
         run.forecastScenarioIds.includes(id) ||
         run.filterId === id;
       if (referenced) {
@@ -272,7 +302,13 @@ export class LocalRepository implements Repository {
   }
 
   async upsertRun(run: ProcessRun): Promise<void> {
-    await this.database.runs.put(run);
+    // Mirrors the runs guard trigger on Supabase: signed-off and reopened versions are frozen, and only
+    // an approved sign-off request (upsertApprovalRequest below) signs a run off.
+    await this.database.transaction('rw', this.database.runs, async () => {
+      const refusal = runUpdateRefusal(await this.database.runs.get(run.id), run);
+      if (refusal) throw new Error(refusal);
+      await this.database.runs.put(run);
+    });
   }
 
   listRunResults(runId: string): Promise<RunResult[]> {
@@ -280,6 +316,12 @@ export class LocalRepository implements Repository {
   }
 
   async insertRunResults(results: RunResult[]): Promise<void> {
+    // A signed-off or reopened version's results are as immutable as the run itself.
+    const runIds = Array.from(new Set(results.map((r) => r.runId)));
+    for (const id of runIds) {
+      const run = await this.database.runs.get(id);
+      if (run && isFrozen(run)) throw new Error(`Run ${id} is signed off or reopened - its results cannot change.`);
+    }
     await this.database.runResults.bulkPut(results);
   }
 
@@ -315,7 +357,63 @@ export class LocalRepository implements Repository {
   }
 
   async upsertApprovalRequest(row: ApprovalRequest): Promise<void> {
-    await this.database.approvals.put(row);
+    // Mirrors the database trigger on Supabase: approving an Affiliates/Activate request is what moves the
+    // affiliate Live (from Testing, or back from Suspended) - no screen writes that status directly.
+    // Likewise a Runs/SignOff decision: approved -> the run is SignedOff (never by whoever executed it);
+    // rejected or withdrawn -> back to Open, with the reason kept on the run.
+    await this.database.transaction(
+      'rw',
+      [this.database.approvals, this.database.affiliates, this.database.runs],
+      async () => {
+        const previous = await this.database.approvals.get(row.id);
+        if (
+          row.module === 'Runs' &&
+          row.action === 'SignOff' &&
+          previous?.status === 'Pending' &&
+          row.status !== 'Pending'
+        ) {
+          const run = await this.database.runs.get(row.entityId);
+          if (run && signOffStatusOf(run) === 'PendingSignOff') {
+            const now = row.decidedAt ?? new Date().toISOString();
+            if (row.status === 'Approved') {
+              if (run.createdById && run.createdById === row.decidedById) {
+                throw new Error('Segregation of duties: whoever executed a run cannot also sign it off.');
+              }
+              await this.database.runs.put({
+                ...run,
+                signOff: {
+                  ...(run.signOff ?? { status: 'PendingSignOff' }),
+                  status: 'SignedOff',
+                  approvalId: row.id,
+                  signedOffAt: now,
+                  signedOffBy: row.decidedBy,
+                  signedOffById: row.decidedById ?? null,
+                },
+              });
+            } else {
+              await this.database.runs.put({
+                ...run,
+                signOff: {
+                  ...(run.signOff ?? { status: 'PendingSignOff' }),
+                  status: 'Open',
+                  rejectedAt: now,
+                  rejectedBy: row.decidedBy ?? row.requestedBy,
+                  rejectReason: row.decisionNote ?? (row.status === 'Withdrawn' ? 'Request withdrawn' : null),
+                },
+              });
+            }
+          }
+        }
+        await this.database.approvals.put(row);
+        const becameApproved = row.status === 'Approved' && previous?.status !== 'Approved';
+        if (becameApproved && row.module === 'Affiliates' && row.action === 'Activate') {
+          const affiliate = await this.database.affiliates.get(row.entityId);
+          if (affiliate && (affiliate.status === 'Testing' || affiliate.status === 'Suspended')) {
+            await this.database.affiliates.put({ ...affiliate, status: 'Live' });
+          }
+        }
+      },
+    );
   }
 
   async deleteApprovalRequest(id: string): Promise<void> {
@@ -393,6 +491,26 @@ export class LocalRepository implements Repository {
   async deleteReportPack(id: string): Promise<void> {
     await this.database.reportPacks.delete(id);
   }
+  // ── Data sources ──────────────────────────────────────────────────────
+  async listDataSources(affiliateCode?: string): Promise<DataSource[]> {
+    const rows = affiliateCode
+      ? await this.database.dataSources.where('affiliateCode').equals(affiliateCode).toArray()
+      : await this.database.dataSources.toArray();
+    return rows.sort((a, b) => a.affiliateCode.localeCompare(b.affiliateCode) || a.name.localeCompare(b.name));
+  }
+
+  async getDataSource(id: string): Promise<DataSource | null> {
+    return (await this.database.dataSources.get(id)) ?? null;
+  }
+
+  async upsertDataSource(source: DataSource): Promise<void> {
+    await this.database.dataSources.put(source);
+  }
+
+  async deleteDataSource(id: string): Promise<void> {
+    await this.database.dataSources.delete(id);
+  }
+
   // ── Connectors ────────────────────────────────────────────────────────
   async listConnectors(): Promise<Connector[]> {
     const rows = await this.database.connectors.toArray();
@@ -492,6 +610,10 @@ export class LocalRepository implements Repository {
     await this.database.roles.put(role);
   }
 
+  async deleteRole(code: string): Promise<void> {
+    await this.database.roles.delete(code as Role['code']);
+  }
+
   // ── Reference data ────────────────────────────────────────────────────
   listYieldCurves(currency?: string): Promise<StoredYieldCurve[]> {
     return currency
@@ -582,6 +704,126 @@ export class LocalRepository implements Repository {
     await this.database.holidayCalendars.delete(id);
   }
 
+  // ── Behavioural-model history and register ────────────────────────────
+  async insertBalanceHistory(rows: StoredBalanceObservation[]): Promise<void> {
+    await this.database.balanceHistory.bulkPut(rows);
+  }
+
+  listBalanceHistory(affiliateCode: string): Promise<StoredBalanceObservation[]> {
+    return this.database.balanceHistory.where('affiliateCode').equals(affiliateCode).toArray();
+  }
+
+  deleteBalanceHistory(affiliateCode: string, uploadId?: string): Promise<number> {
+    return uploadId
+      ? this.database.balanceHistory.where('[affiliateCode+uploadId]').equals([affiliateCode, uploadId]).delete()
+      : this.database.balanceHistory.where('affiliateCode').equals(affiliateCode).delete();
+  }
+
+  async insertAccountHistory(rows: StoredAccountObservation[]): Promise<void> {
+    await this.database.accountHistory.bulkPut(rows);
+  }
+
+  listAccountHistory(affiliateCode: string): Promise<StoredAccountObservation[]> {
+    return this.database.accountHistory.where('affiliateCode').equals(affiliateCode).toArray();
+  }
+
+  deleteAccountHistory(affiliateCode: string, uploadId?: string): Promise<number> {
+    return uploadId
+      ? this.database.accountHistory.where('[affiliateCode+uploadId]').equals([affiliateCode, uploadId]).delete()
+      : this.database.accountHistory.where('affiliateCode').equals(affiliateCode).delete();
+  }
+
+  async listModelRuns(affiliateCode?: string): Promise<StoredModelRun[]> {
+    const rows = affiliateCode
+      ? await this.database.modelRuns.where('affiliateCode').equals(affiliateCode).toArray()
+      : await this.database.modelRuns.toArray();
+    return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async getModelRun(id: string): Promise<StoredModelRun | null> {
+    return (await this.database.modelRuns.get(id)) ?? null;
+  }
+
+  async upsertModelRun(run: StoredModelRun): Promise<void> {
+    await this.database.modelRuns.put(run);
+  }
+
+  // ── Onboarding state and scoped settings ──────────────────────────────
+  async getOnboarding(id: string): Promise<OnboardingRecord | null> {
+    return (await this.database.onboarding.get(id)) ?? null;
+  }
+
+  listOnboarding(): Promise<OnboardingRecord[]> {
+    return this.database.onboarding.toArray();
+  }
+
+  async upsertOnboarding(record: OnboardingRecord): Promise<void> {
+    await this.database.onboarding.put(record);
+  }
+
+  async listSettings(affiliateCode?: string): Promise<SettingRecord[]> {
+    const rows = await this.database.settings.toArray();
+    const scoped =
+      !affiliateCode || affiliateCode === 'GROUP'
+        ? rows.filter((r) => !affiliateCode || r.affiliateCode === 'GROUP')
+        : rows.filter((r) => r.affiliateCode === 'GROUP' || r.affiliateCode === affiliateCode);
+    return scoped.sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  async upsertSetting(setting: SettingRecord): Promise<void> {
+    await this.database.settings.put(setting);
+  }
+
+  async deleteSetting(id: string): Promise<void> {
+    await this.database.settings.delete(id);
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────
+  async listNotifications(userId: string): Promise<AppNotification[]> {
+    const rows = await this.database.notifications.where('userId').equals(userId).toArray();
+    return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async markNotificationsRead(ids: string[]): Promise<void> {
+    for (const id of ids) {
+      const row = await this.database.notifications.get(id);
+      if (row && !row.read) await this.database.notifications.put({ ...row, read: true });
+    }
+  }
+
+  async sendNotification(input: NotificationInput, sender: { id: string } | null): Promise<void> {
+    const [users, roles] = await Promise.all([this.database.users.toArray(), this.database.roles.toArray()]);
+    const groupLevel = (u: User) =>
+      u.affiliateCode === 'GROUP' || (roles.find((r) => r.code === u.role)?.permissions ?? []).includes('group.manage');
+    const now = new Date().toISOString();
+    const rows: AppNotification[] = users
+      .filter((u) => u.isActive && u.id !== sender?.id)
+      .filter((u) =>
+        input.affiliateCode === null
+          ? true
+          : input.affiliateCode === 'GROUP'
+            ? groupLevel(u)
+            : u.affiliateCode === input.affiliateCode || ((input.groupUsers ?? true) && groupLevel(u)),
+      )
+      .map((u, i) => ({
+        id: `NT-${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+        userId: u.id,
+        affiliateCode: input.affiliateCode,
+        kind: input.kind,
+        title: input.title,
+        body: input.body,
+        link: input.link,
+        read: false,
+        createdAt: now,
+      }));
+    if (rows.length > 0) await this.database.notifications.bulkPut(rows);
+  }
+
+  async listWhoCanFix(permission: string, affiliateCode: string | null): Promise<Fixer[]> {
+    const [users, roles] = await Promise.all([this.database.users.toArray(), this.database.roles.toArray()]);
+    return usersWhoCanFix(permission, affiliateCode, users, roles);
+  }
+
   // ── Audit ─────────────────────────────────────────────────────────────
   async listAuditEvents(limit = 200): Promise<AuditEvent[]> {
     return this.database.auditEvents.orderBy('recordedAt').reverse().limit(limit).toArray();
@@ -624,6 +866,12 @@ export class LocalRepository implements Repository {
         this.database.economicIndicators,
         this.database.holidayCalendars,
         this.database.snapshots,
+        this.database.balanceHistory,
+        this.database.accountHistory,
+        this.database.modelRuns,
+        this.database.onboarding,
+        this.database.settings,
+        this.database.dataSources,
       ],
       async () => {
         await Promise.all([
@@ -655,6 +903,12 @@ export class LocalRepository implements Repository {
           this.database.economicIndicators.clear(),
           this.database.holidayCalendars.clear(),
           this.database.snapshots.clear(),
+          this.database.balanceHistory.clear(),
+          this.database.accountHistory.clear(),
+          this.database.modelRuns.clear(),
+          this.database.onboarding.clear(),
+          this.database.settings.clear(),
+          this.database.dataSources.clear(),
         ]);
       },
     );
@@ -662,7 +916,7 @@ export class LocalRepository implements Repository {
 }
 
 /** Rule bodies vary by kind; gather any `*RuleId`/`*Ids` fields generically. */
-function collectRuleReferences(rule: RuleMeta): string[] {
+export function collectRuleReferences(rule: RuleMeta): string[] {
   const out: string[] = [];
   for (const [key, value] of Object.entries(rule)) {
     if (!/Id$|Ids$/.test(key)) continue;

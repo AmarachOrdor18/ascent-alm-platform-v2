@@ -1,4 +1,4 @@
-import type { Affiliate, DataDomain, IsoDate, LoadBatch, PositionContributor } from './types';
+import type { Affiliate, DataDomain, DataSourceDomain, IsoDate, LoadBatch, PositionContributor } from './types';
 import { daysBetween } from './dates';
 
 /** Every department the platform currently recognises as a Positions contributor. */
@@ -105,7 +105,7 @@ export function worstFreshness(checks: FreshnessCheck[]): FreshnessStatus {
 export function currentBatch(
   batches: LoadBatch[],
   affiliateCode: string,
-  domain: DataDomain,
+  domain: DataSourceDomain,
   asOfDate: IsoDate,
   contributor?: PositionContributor,
 ): LoadBatch | null {
@@ -163,12 +163,18 @@ export interface PositionBookReadiness {
   isComplete: boolean;
 }
 
-export function positionBookReadiness(affiliate: Affiliate, batches: LoadBatch[], asOfDate: IsoDate): PositionBookReadiness {
+export function positionBookReadiness(
+  affiliate: Affiliate,
+  batches: LoadBatch[],
+  asOfDate: IsoDate,
+): PositionBookReadiness {
   const contributors = contributionReadiness(affiliate, batches, asOfDate);
+  const legacyBatch = currentBatch(batches, affiliate.code, 'Positions', asOfDate);
   return {
     contributors,
-    legacyBatch: currentBatch(batches, affiliate.code, 'Positions', asOfDate),
-    isComplete: contributors.every((c) => c.submitted),
+    legacyBatch,
+    // One positions file for the whole book (the single Positions source, no department) completes it on its own.
+    isComplete: legacyBatch !== null || contributors.every((c) => c.submitted),
   };
 }
 
@@ -200,7 +206,7 @@ export interface SupersedeOutcome {
 export function planSupersede(
   batches: LoadBatch[],
   affiliateCode: string,
-  domain: DataDomain,
+  domain: DataSourceDomain,
   asOfDate: IsoDate,
   contributor?: PositionContributor,
 ): SupersedeOutcome {

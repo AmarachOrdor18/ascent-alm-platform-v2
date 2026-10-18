@@ -401,8 +401,24 @@ describe('staged batches', () => {
 describe('dimension members are affiliate-owned', () => {
   it('two affiliates can use the same bare code without colliding, and neither list leaks into the other', async () => {
     await repo.upsertDimensionMembers([
-      { id: 'GlAccount:NG:2001', dimension: 'GlAccount', affiliateCode: 'NG', code: '2001', name: 'Cash and Balances (Nigeria)', parentCode: null, isLeaf: true },
-      { id: 'GlAccount:GH:2001', dimension: 'GlAccount', affiliateCode: 'GH', code: '2001', name: 'Something entirely different (Ghana)', parentCode: null, isLeaf: true },
+      {
+        id: 'GlAccount:NG:2001',
+        dimension: 'GlAccount',
+        affiliateCode: 'NG',
+        code: '2001',
+        name: 'Cash and Balances (Nigeria)',
+        parentCode: null,
+        isLeaf: true,
+      },
+      {
+        id: 'GlAccount:GH:2001',
+        dimension: 'GlAccount',
+        affiliateCode: 'GH',
+        code: '2001',
+        name: 'Something entirely different (Ghana)',
+        parentCode: null,
+        isLeaf: true,
+      },
     ]);
 
     const ng = await repo.listDimensionMembers('GlAccount', 'NG');
@@ -417,9 +433,17 @@ describe('dimension members are affiliate-owned', () => {
     expect(await repo.listDimensionMembers('GlAccount')).toHaveLength(2);
   });
 
-  it('an affiliate with no entries of a dimension gets an empty list, not another affiliate\'s', async () => {
+  it("an affiliate with no entries of a dimension gets an empty list, not another affiliate's", async () => {
     await repo.upsertDimensionMembers([
-      { id: 'Product:NG:P-LOANS', dimension: 'Product', affiliateCode: 'NG', code: 'P-LOANS', name: 'Loans', parentCode: null, isLeaf: true },
+      {
+        id: 'Product:NG:P-LOANS',
+        dimension: 'Product',
+        affiliateCode: 'NG',
+        code: 'P-LOANS',
+        name: 'Loans',
+        parentCode: null,
+        isLeaf: true,
+      },
     ]);
 
     expect(await repo.listDimensionMembers('Product', 'CI')).toEqual([]);
@@ -437,11 +461,29 @@ describe('reset', () => {
       domain: 'Positions',
       asOfDate: '2026-07-31',
       batch: {
-        id: 'B-1', affiliateCode: 'NG', domain: 'Positions', contributor: null, asOfDate: '2026-07-31', version: 1,
-        fileName: 'f.csv', fileHash: 'h', rowCount: 1, rowsAccepted: 1, rowsRejected: 0, status: 'Staged',
-        supersedesBatchId: null, supersededReason: null, uploadedBy: 't', uploadedAt: '2026-08-01T00:00:00Z',
-        committedBy: null, committedAt: null, reconciledBy: null, reconciledAt: null,
-        rejectedBy: null, rejectedAt: null, rejectedReason: null,
+        id: 'B-1',
+        affiliateCode: 'NG',
+        domain: 'Positions',
+        contributor: null,
+        asOfDate: '2026-07-31',
+        version: 1,
+        fileName: 'f.csv',
+        fileHash: 'h',
+        rowCount: 1,
+        rowsAccepted: 1,
+        rowsRejected: 0,
+        status: 'Staged',
+        supersedesBatchId: null,
+        supersededReason: null,
+        uploadedBy: 't',
+        uploadedAt: '2026-08-01T00:00:00Z',
+        committedBy: null,
+        committedAt: null,
+        reconciledBy: null,
+        reconciledAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
+        rejectedReason: null,
       },
       positions: [position('P-2')],
       savedAt: '2026-08-01T00:00:00Z',
@@ -453,5 +495,41 @@ describe('reset', () => {
     expect(await repo.queryPositions({})).toEqual([]);
     expect(await repo.listRules({})).toEqual([]);
     expect(await repo.listStagedBatches()).toEqual([]);
+  });
+});
+
+describe('affiliate activation through approval', () => {
+  it('moves the affiliate Live only when its Activate request is approved', async () => {
+    await repo.upsertAffiliate(affiliate('GH', { status: 'Testing' }));
+    const request = {
+      id: 'APR-1',
+      module: 'Affiliates',
+      entityType: 'Affiliate',
+      entityId: 'GH',
+      entityLabel: 'Ecobank GH',
+      action: 'Activate' as const,
+      summary: 'go live',
+      affiliateCode: 'GH',
+      status: 'Pending' as const,
+      requestedBy: 'Maker',
+      requestedById: 'U-1',
+      requestedAt: '2026-10-01T00:00:00Z',
+      decidedBy: null,
+      decidedById: null,
+      decidedAt: null,
+      decisionNote: null,
+    };
+    await repo.upsertApprovalRequest(request);
+    expect((await repo.getAffiliate('GH'))?.status).toBe('Testing');
+    await repo.upsertApprovalRequest({ ...request, status: 'Rejected', decidedBy: 'Checker', decidedById: 'U-2' });
+    expect((await repo.getAffiliate('GH'))?.status).toBe('Testing');
+    await repo.upsertApprovalRequest({
+      ...request,
+      id: 'APR-2',
+      status: 'Approved',
+      decidedBy: 'Checker',
+      decidedById: 'U-2',
+    });
+    expect((await repo.getAffiliate('GH'))?.status).toBe('Live');
   });
 });

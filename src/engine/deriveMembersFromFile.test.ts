@@ -55,7 +55,15 @@ describe('deriveMembersFromFile', () => {
     const positions = [position({ id: 'P1', orgUnitCode: 'OU-RW-CIB' })];
     const members = deriveMembersFromFile('OrgUnit', ['OU-RW-CIB'], positions, 'RW', 'Ecobank Rwanda');
     expect(members).toEqual([
-      { id: 'OrgUnit:RW:OU-RW-CIB', dimension: 'OrgUnit', affiliateCode: 'RW', code: 'OU-RW-CIB', name: 'OU-RW-CIB', parentCode: null, isLeaf: true },
+      {
+        id: 'OrgUnit:RW:OU-RW-CIB',
+        dimension: 'OrgUnit',
+        affiliateCode: 'RW',
+        code: 'OU-RW-CIB',
+        name: 'OU-RW-CIB',
+        parentCode: null,
+        isLeaf: true,
+      },
     ]);
   });
 

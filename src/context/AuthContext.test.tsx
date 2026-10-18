@@ -98,7 +98,14 @@ describe('AuthContext permission enforcement', () => {
       code: 'EXECUTIVE_VIEWER',
       name: 'Executive Viewer',
       description: 'Group-wide read-only view for senior leadership and ALCO.',
-      permissions: ['dashboard.view', 'risk.view', 'treasury.view', 'reporting.view', 'commentary.review', 'admin.manage'],
+      permissions: [
+        'dashboard.view',
+        'risk.view',
+        'treasury.view',
+        'reporting.view',
+        'commentary.review',
+        'admin.manage',
+      ],
     });
 
     renderProbe();

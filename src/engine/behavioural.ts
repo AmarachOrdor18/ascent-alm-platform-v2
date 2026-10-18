@@ -1,5 +1,5 @@
 import type { BehaviouralTag, IsoDate, Position } from './types';
-import { addDays } from './dates';
+import { addDays, daysBetween } from './dates';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Behaviour patterns
@@ -266,7 +266,16 @@ export interface BetaAdjustedNii {
   methodology: string;
 }
 
+/** Pass-through for one deposit type. A tag with no beta configured passes the full move through. */
+export function betaFor(tag: BehaviouralTag, betas: DepositBeta[]): number {
+  const beta = betas.find((b) => b.behaviouralTag === tag)?.beta ?? 1;
+  return Math.min(1, Math.max(0, beta));
+}
+
 // Only the liability leg is damped: assets reprice contractually, deposits reprice at management's discretion.
+// Single-currency and horizon-blind - computeNiiSensitivity in irrbb.ts applies betas inside the
+// gap itself (horizon- and FX-aware) when given an IrrbbContext.depositBetas; this stays for
+// the stand-alone what-if comparison.
 export function applyDepositBetas(
   positions: Position[],
   shockBps: number,
@@ -346,4 +355,63 @@ export function computePrepayment(positions: Position[], rules: PrepaymentRule[]
       'over and above contractual amortisation. A rate-dependent or fitted prepayment model requires ' +
       'contract-level history and is out of scope. Assets with no matching rule are reported as unmodelled.',
   };
+}
+
+/** Longest run of annual prepayment slices projected for one asset. */
+export const PREPAYMENT_MAX_YEARS = 30;
+
+// Re-dates the principal a constant prepayment rate brings back early, so a cash-flow or repricing
+// view sees it when it actually returns rather than at contractual maturity. Each prepaying asset
+// becomes one synthetic position per year of remaining life (dated mid-year, the average point at
+// which a year's prepayments land) plus the surviving balance at its contractual dates; the balance
+// total is unchanged. A prepaid slice reprices when the cash comes back, unless the contract already
+// reprices sooner. Open-ended assets are projected over 12 months, matching computePrepayment.
+export function applyPrepayment(positions: Position[], asOfDate: IsoDate, rules: PrepaymentRule[]): Position[] {
+  if (rules.length === 0) return positions;
+  const out: Position[] = [];
+
+  for (const p of positions) {
+    const rule =
+      p.category === 'Asset' && !p.isOffBalanceSheet ? rules.find((r) => r.commonCoaCode === p.commonCoaCode) : null;
+    const cpr = rule ? Math.min(1, Math.max(0, rule.cpr)) : 0;
+    const remainingDays = p.maturityDate ? daysBetween(asOfDate, p.maturityDate) : null;
+    if (cpr === 0 || p.amount === 0 || (remainingDays !== null && remainingDays <= 0)) {
+      out.push(p);
+      continue;
+    }
+
+    const years = remainingDays === null ? 1 : Math.min(PREPAYMENT_MAX_YEARS, Math.ceil(remainingDays / 365));
+    let surviving = 1;
+    let slices = 0;
+    for (let year = 1; year <= years; year += 1) {
+      const sliceDays = Math.round(365 * (year - 0.5));
+      // Principal still outstanding at maturity is repaid then anyway - prepayment only moves it earlier.
+      if (remainingDays !== null && sliceDays >= remainingDays) break;
+      const prepaid = surviving * cpr;
+      surviving -= prepaid;
+      slices += 1;
+      const date = addDays(asOfDate, sliceDays);
+      out.push({
+        ...p,
+        id: `${p.id}#PRE${slices}`,
+        amount: p.amount * prepaid,
+        maturityDate: date,
+        nextRepricingDate: p.nextRepricingDate && p.nextRepricingDate < date ? p.nextRepricingDate : date,
+        notes: `Prepayment slice ${slices} - ${(prepaid * 100).toFixed(2)}% of balance repaid early around day ${sliceDays} at ${(cpr * 100).toFixed(1)}% CPR`,
+      });
+    }
+
+    if (slices === 0) {
+      out.push(p);
+      continue;
+    }
+    out.push({
+      ...p,
+      id: `${p.id}#PRE-REMAINING`,
+      amount: p.amount * surviving,
+      notes: `Balance surviving prepayment (${(surviving * 100).toFixed(2)}%) at contractual dates`,
+    });
+  }
+
+  return out;
 }

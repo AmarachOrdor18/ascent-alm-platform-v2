@@ -34,21 +34,21 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     return (
       <div role="alert" className="m-6 rounded-2xl border border-danger/20 bg-danger-bg p-6">
-        <h2 className="mb-1 text-[14px] font-bold text-navy-900">
+        <h2 className="mb-1 text-[15px] font-bold text-navy-900">
           {this.props.screenName
             ? `${this.props.screenName} could not be displayed`
             : 'This screen could not be displayed'}
         </h2>
-        <p className="mb-4 text-[12px] leading-relaxed text-gray-600">
+        <p className="mb-4 text-[13px] leading-relaxed text-gray-600">
           The rest of the application is unaffected - you can navigate elsewhere, or try this screen again.
         </p>
-        <pre className="mb-4 max-h-40 overflow-auto rounded-lg bg-white/60 p-3 font-mono text-[11px] text-gray-700">
+        <pre className="mb-4 max-h-40 overflow-auto rounded-lg bg-white/60 p-3 font-mono text-[12px] text-gray-700">
           {error.message}
         </pre>
         <button
           type="button"
           onClick={this.handleReset}
-          className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+          className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
         >
           Try again
         </button>

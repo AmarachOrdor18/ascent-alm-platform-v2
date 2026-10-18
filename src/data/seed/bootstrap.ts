@@ -2,15 +2,19 @@
 
 import type { Repository } from '@/store/repository';
 import type { DataDomain, Role, User } from '@/engine/types';
-import { ROLES } from '@/context/AuthContext';
+import { RETIRED_ROLE_MAP, ROLES, isActiveRole } from '@/context/AuthContext';
 import { SEED_CONNECTORS } from './connectors';
 import { SEED_LIMITS } from './limits';
 import { AFFILIATES, ALL_DIMENSION_MEMBERS, CURRENCIES } from './reference';
 import { SEED_DEFAULT_RULES, SEED_FORECAST_SCENARIO_APPROVAL } from './defaultRules';
 import { referenceLoadBatch } from '@/lib/referenceBatch';
+import { defaultAffiliateSources, defaultGroupSources } from '@/lib/dataSources';
+
+/** GROUP's market-data sources (FX rates, yield curves, economic indicators) - configuration, not data. */
+export const SEED_DATA_SOURCES = defaultGroupSources('SEED', '2026-01-01T00:00:00.000Z');
 
 /** The permission sets a fresh database starts with - editable afterward via Users & Roles. */
-const SEED_ROLES: Role[] = Object.values(ROLES);
+export const SEED_ROLES: Role[] = Object.values(ROLES);
 
 // SHA-256 of 'Ecobank@2026' - every seed/demo account shares this password (see src/lib/passwordHash.ts).
 const SEED_PASSWORD_HASH = '9a3931b8a44194a83d4ca4ebb8275eb4f3566694e43f600f2befc3831fc4c05c';
@@ -18,7 +22,7 @@ const SEED_PASSWORD_HASH = '9a3931b8a44194a83d4ca4ebb8275eb4f3566694e43f600f2bef
 // Every seed login is Group-scoped, since no affiliate ships pre-onboarded for one to be confined to -
 // AFFILIATE_ADMIN is the exception: it's meaningless without a specific affiliate, so it isn't seeded at
 // all until a real one exists to assign it to.
-const SEED_USERS: User[] = [
+export const SEED_USERS: User[] = [
   {
     id: 'U-001',
     name: 'Adaeze Okonkwo',
@@ -48,7 +52,7 @@ const SEED_USERS: User[] = [
     name: 'Aminata Traoré',
     email: 'aminata.traore@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
-    role: 'TREASURY_USER',
+    role: 'RISK_ANALYST',
     affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
@@ -72,7 +76,7 @@ const SEED_USERS: User[] = [
     name: 'Fatima Bello',
     email: 'fatima.bello@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
-    role: 'CONTROL_TESTER',
+    role: 'APPROVER',
     affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
@@ -84,7 +88,7 @@ const SEED_USERS: User[] = [
     name: 'Samuel Owusu',
     email: 'samuel.owusu@ecobank.com',
     passwordHash: SEED_PASSWORD_HASH,
-    role: 'REPORTING_USER',
+    role: 'EXECUTIVE_VIEWER',
     affiliateCode: 'GROUP',
     isActive: true,
     mfaEnrolled: true,
@@ -106,13 +110,27 @@ const SEED_USERS: User[] = [
     createdAt: '2026-01-01T00:00:00Z',
     lastLoginAt: null,
   },
+  // Dedicated checker: decides maker-checker requests (affiliate activation, rule versions, snapshots)
+  // without holding any administrative or configuration permission of their own.
+  {
+    id: 'U-008',
+    name: 'Kofi Mensah',
+    email: 'kofi.mensah@ecobank.com',
+    passwordHash: SEED_PASSWORD_HASH,
+    role: 'APPROVER',
+    affiliateCode: 'GROUP',
+    isActive: true,
+    mfaEnrolled: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    lastLoginAt: null,
+  },
 ];
 
 // Country-specific org units, legal entities, counterparties, GL accounts and product catalogues
 // (dimensions.ts, products.ts, affiliateReference.ts) are demo/engine-test fixtures, not written into a
 // fresh platform's database - only the Group-owned members (the consolidation root, the Group chart of
 // accounts, financial elements) ship, since there's no affiliate yet for the rest to belong to.
-const GROUP_DIMENSION_MEMBERS = ALL_DIMENSION_MEMBERS.filter((m) => m.affiliateCode === 'GROUP');
+export const GROUP_DIMENSION_MEMBERS = ALL_DIMENSION_MEMBERS.filter((m) => m.affiliateCode === 'GROUP');
 
 // Currency *definitions* ship (so onboarding's functional-currency dropdown has something to pick from),
 // but FX rates, yield curves, holiday calendars and economic indicator series do not - those are what an
@@ -125,6 +143,25 @@ const GROUP_DIMENSION_MEMBERS = ALL_DIMENSION_MEMBERS.filter((m) => m.affiliateC
 // ALL_AFFILIATE_REFERENCE, never imported here). Onboarding a country whose currency isn't listed yet
 // registers it from Reference Data - Currency & FX Rates' own "New currency" control, the same manual
 // step Kenya's rate already demonstrates.
+/**
+ * The shipped starting configuration, record by record - what writeSeed puts in a fresh local database
+ * and what scripts/seed-supabase.ts upserts into the shared one (it creates real sign-ins for SEED_USERS).
+ */
+export function shippedConfiguration() {
+  return {
+    affiliates: AFFILIATES,
+    dimensionMembers: GROUP_DIMENSION_MEMBERS,
+    currencies: CURRENCIES,
+    roles: SEED_ROLES,
+    users: SEED_USERS,
+    limits: SEED_LIMITS,
+    connectors: SEED_CONNECTORS,
+    rules: SEED_DEFAULT_RULES,
+    approvals: [SEED_FORECAST_SCENARIO_APPROVAL],
+    dataSources: SEED_DATA_SOURCES,
+  };
+}
+
 async function writeSeed(repo: Repository): Promise<void> {
   for (const affiliate of AFFILIATES) await repo.upsertAffiliate(affiliate);
   await repo.upsertDimensionMembers(GROUP_DIMENSION_MEMBERS);
@@ -133,6 +170,7 @@ async function writeSeed(repo: Repository): Promise<void> {
   for (const user of SEED_USERS) await repo.upsertUser(user);
   for (const limit of SEED_LIMITS) await repo.upsertLimitConfig(limit);
   for (const connector of SEED_CONNECTORS) await repo.upsertConnector(connector);
+  for (const source of SEED_DATA_SOURCES) await repo.upsertDataSource(source);
   for (const rule of SEED_DEFAULT_RULES) await repo.upsertRule(rule);
   // Without this, the seeded Forecast Scenario ships permanently stuck on "Pending approval" - no
   // request was ever raised for it (it wasn't saved through WhatIf.tsx's own submit-on-save flow), so
@@ -141,16 +179,21 @@ async function writeSeed(repo: Repository): Promise<void> {
 }
 
 const DIMENSION_TYPES = [
-  'LegalEntity', 'OrgUnit', 'Product', 'GlAccount', 'CommonCoa', 'FinancialElement', 'Counterparty', 'Country',
+  'LegalEntity',
+  'OrgUnit',
+  'Product',
+  'GlAccount',
+  'CommonCoa',
+  'FinancialElement',
+  'Counterparty',
+  'Country',
 ] as const;
 
 // Brings an existing database up to date with reference data a later build added. Add-only: a record
 // already present - including one a user has since edited - is left alone; only what's missing is inserted.
 async function refreshReferenceData(repo: Repository): Promise<void> {
   const existingMemberIds = new Set(
-    (await Promise.all(DIMENSION_TYPES.map((d) => repo.listDimensionMembers(d))))
-      .flat()
-      .map((m) => m.id),
+    (await Promise.all(DIMENSION_TYPES.map((d) => repo.listDimensionMembers(d)))).flat().map((m) => m.id),
   );
   const missingMembers = GROUP_DIMENSION_MEMBERS.filter((m) => !existingMemberIds.has(m.id));
   if (missingMembers.length > 0) await repo.upsertDimensionMembers(missingMembers);
@@ -170,6 +213,18 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
     if (!existingConnectorIds.has(connector.id)) await repo.upsertConnector(connector);
   }
 
+  // Data sources (Phase 4): GROUP's market-data sources, and default sources for any affiliate onboarded
+  // before sources existed - same backfill as supabase/migrations/20261020000000_data_sources.sql.
+  const existingSources = await repo.listDataSources();
+  const existingSourceIds = new Set(existingSources.map((s) => s.id));
+  for (const source of SEED_DATA_SOURCES) {
+    if (!existingSourceIds.has(source.id)) await repo.upsertDataSource(source);
+  }
+  for (const affiliate of await repo.listAffiliates()) {
+    if (affiliate.code === 'GROUP' || existingSources.some((s) => s.affiliateCode === affiliate.code)) continue;
+    for (const source of defaultAffiliateSources(affiliate, 'system-backfill')) await repo.upsertDataSource(source);
+  }
+
   // Also patches (never overwrites other fields on) an existing seed user missing passwordHash -
   // added after some databases were already seeded, so a plain "insert if missing" top-up would
   // leave those accounts permanently unable to log in.
@@ -182,12 +237,45 @@ async function refreshReferenceData(repo: Repository): Promise<void> {
       await repo.upsertUser({ ...existing, passwordHash: seedUser.passwordHash });
     }
   }
+  // 8 → 5 role simplification (mirrors supabase/migrations/20261019000000_roles_onboarding.sql): users on a
+  // retired role move to the role that replaced it.
+  for (const existing of existingUserById.values()) {
+    const mapped = (RETIRED_ROLE_MAP as Record<string, User['role']>)[existing.role];
+    if (mapped) await repo.upsertUser({ ...existing, role: mapped });
+  }
 
   // Existing databases have zero rows in Roles (it used to be a hardcoded object), so this is a
   // real top-up, not a defensive no-op - it's how a role like Affiliate Administrator reaches them.
-  const existingRoleCodes = new Set((await repo.listRoles()).map((r) => r.code));
+  const existingRoles = await repo.listRoles();
+  const existingRoleCodes = new Set(existingRoles.map((r) => r.code));
   for (const seedRole of SEED_ROLES) {
     if (!existingRoleCodes.has(seedRole.code)) await repo.upsertRole(seedRole);
+  }
+  // One-off role patches a later build introduced (the Supabase migration applies the same ones):
+  // affiliate.manage for the two administrator roles, and the ALM Analyst display name.
+  for (const role of existingRoles) {
+    let patched = role;
+    if ((role.code === 'ADMIN' || role.code === 'AFFILIATE_ADMIN') && !role.permissions.includes('affiliate.manage')) {
+      patched = { ...patched, permissions: [...patched.permissions, 'affiliate.manage'] };
+    }
+    if (role.code === 'RISK_ANALYST' && role.name === 'Risk Analyst') patched = { ...patched, name: 'ALM Analyst' };
+    // 8 → 5 roles: the shipped names/descriptions, plus any permission the shipped set now carries.
+    if (isActiveRole(role.code)) {
+      const shipped = ROLES[role.code];
+      const missing = shipped.permissions.filter((p) => !patched.permissions.includes(p));
+      if (patched.name !== shipped.name || patched.description !== shipped.description || missing.length > 0) {
+        patched = {
+          ...patched,
+          name: shipped.name,
+          description: shipped.description,
+          permissions: [...patched.permissions, ...missing],
+        };
+      }
+    }
+    if (patched !== role) await repo.upsertRole(patched);
+  }
+  for (const role of existingRoles) {
+    if (!isActiveRole(role.code)) await repo.deleteRole(role.code);
   }
 
   const existingRuleIds = new Set((await repo.listRules({})).map((r) => r.id));

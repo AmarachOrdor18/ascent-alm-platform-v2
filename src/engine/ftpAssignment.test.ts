@@ -69,9 +69,7 @@ describe('computeFtp - per-COA assignments', () => {
 
     // The T-bill curve sits ten points below interbank at every tenor, so the
     // two cannot be confused for one another.
-    expect(assigned.lines[0]!.baseTransferRatePercent).toBeLessThan(
-      unassigned.lines[0]!.baseTransferRatePercent!,
-    );
+    expect(assigned.lines[0]!.baseTransferRatePercent).toBeLessThan(unassigned.lines[0]!.baseTransferRatePercent!);
     expect(assigned.lines[0]!.method).toBe('RedemptionCurve');
     expect(unassigned.lines[0]!.method).toBe('SpreadFromInterestRateCode');
   });

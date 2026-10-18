@@ -11,16 +11,20 @@ import {
   useSaveDimensionMembers,
 } from '@/lib/hooks';
 import { useConnectors } from '@/lib/connectorHooks';
-import {
-  generateAffiliateTemplate,
-  parseAffiliateWorkbook,
-  type BulkAffiliateRow,
-} from '@/lib/affiliateWorkbook';
+import { generateAffiliateTemplate, parseAffiliateWorkbook, type BulkAffiliateRow } from '@/lib/affiliateWorkbook';
 import { REGULATORY_MINIMA } from '@/engine/limits';
 import type { Affiliate, DataDomain, DimensionMember } from '@/engine/types';
 
 const REGULATORS = Object.keys(REGULATORY_MINIMA);
-const REGIONS = ['West Africa', 'Anglophone West Africa', 'UEMOA', 'Central Africa', 'East Africa', 'Southern Africa', 'Nigeria'];
+const REGIONS = [
+  'West Africa',
+  'Anglophone West Africa',
+  'UEMOA',
+  'Central Africa',
+  'East Africa',
+  'Southern Africa',
+  'Nigeria',
+];
 const SEGMENTS = [
   { suffix: 'RET', name: 'Retail Banking' },
   { suffix: 'COR', name: 'Corporate & Investment Banking' },
@@ -135,7 +139,15 @@ export function BulkOnboardAffiliates() {
         if (row.coaMappings.length > 0) {
           const rootCode = `GL-${row.code}`;
           const members: DimensionMember[] = [
-            { id: `GlAccount:${row.code}:${rootCode}`, dimension: 'GlAccount' as const, affiliateCode: row.code, code: rootCode, name: `${row.name} - Local Chart`, parentCode: null, isLeaf: false },
+            {
+              id: `GlAccount:${row.code}:${rootCode}`,
+              dimension: 'GlAccount' as const,
+              affiliateCode: row.code,
+              code: rootCode,
+              name: `${row.name} - Local Chart`,
+              parentCode: null,
+              isLeaf: false,
+            },
             ...row.coaMappings.map((m) => ({
               id: `GlAccount:${row.code}:${m.localCode}`,
               dimension: 'GlAccount' as const,
@@ -153,7 +165,15 @@ export function BulkOnboardAffiliates() {
         if (row.createOrgTemplate) {
           const orgRootCode = `OU-${row.code}`;
           await saveOrgUnits.mutateAsync([
-            { id: `OrgUnit:${row.code}:${orgRootCode}`, dimension: 'OrgUnit', affiliateCode: row.code, code: orgRootCode, name: row.name, parentCode: 'OU-GROUP', isLeaf: false },
+            {
+              id: `OrgUnit:${row.code}:${orgRootCode}`,
+              dimension: 'OrgUnit',
+              affiliateCode: row.code,
+              code: orgRootCode,
+              name: row.name,
+              parentCode: 'OU-GROUP',
+              isLeaf: false,
+            },
             ...SEGMENTS.map((s) => ({
               id: `OrgUnit:${row.code}:${orgRootCode}-${s.suffix}`,
               dimension: 'OrgUnit' as const,
@@ -179,63 +199,116 @@ export function BulkOnboardAffiliates() {
     <>
       <ModuleHeader
         title="Bulk Onboard Affiliates"
-        description="Upload a completed workbook to pre-fill a batch of affiliates at once - each still lands in Onboarding status and needs its own connectivity, data load and approval, same as onboarding one at a time."
+        description="Pre-fill a batch of affiliates from a workbook."
+        about="Each affiliate still lands in Onboarding status and needs its own connectivity, data load and approval, same as onboarding one at a time."
         asOfDate={null}
         scope="Ecobank Group"
       />
 
       {!canOnboard ? (
         <div role="alert" className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-          <p className="text-[13px] font-bold text-navy-900">Access restricted</p>
-          <p className="mt-1 text-[12px] text-gray-500">Your role doesn&rsquo;t have access to bulk onboarding.</p>
+          <p className="text-[14px] font-bold text-navy-900">Access restricted</p>
+          <p className="mt-1 text-[13px] text-gray-500">Your role doesn&rsquo;t have access to bulk onboarding.</p>
         </div>
       ) : (
         <>
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">1. Get the template</h2>
+            <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">1. Get the template</h2>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setShowTemplate((v) => !v)} className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700">
+              <button
+                type="button"
+                onClick={() => setShowTemplate((v) => !v)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
+              >
                 {showTemplate ? 'Hide template preview' : 'View template'}
               </button>
-              <button type="button" onClick={downloadTemplate} className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700">
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
+              >
                 Download Excel template
               </button>
             </div>
 
             {showTemplate && (
-              <div className="mt-4 space-y-3 rounded-lg bg-gray-50 p-4 text-[12px]">
-                <TemplateSheetPreview name="Affiliate Profile" cols={['Affiliate Code*', 'Legal Name*', 'Country*', 'Region*', 'Regulator*', 'Legal Entity Code', 'Functional Currency*', 'Reporting Currency*', 'Fiscal Year End', 'Holiday Calendar ID']} note="One row per affiliate." />
-                <TemplateSheetPreview name="Currencies" cols={['Affiliate Code*', 'Other Active Currency*']} note="One row per (affiliate, currency)." />
-                <TemplateSheetPreview name="Connectivity" cols={['Affiliate Code*', 'Domain*', 'Mode*', 'Connector Name', 'SLA Days*', 'Owner']} note="One row per (affiliate, domain) - six rows per affiliate." />
-                <TemplateSheetPreview name="COA Mapping" cols={['Affiliate Code*', 'Group COA Node Code*', 'Local GL Code*', 'Local GL Name']} note={`One row per local code mapped. ${commonCoaLeaves.length} Group COA nodes exist today.`} />
-                <TemplateSheetPreview name="Organisation" cols={['Affiliate Code*', 'Create Standard Org Template? (Y/N)*']} note="One row per affiliate." />
-                <TemplateSheetPreview name="Instructions & Reference" cols={['(free text + valid-value lists)']} note="Regulators, regions, currencies, calendars, domains, connectors and Group COA nodes, so you don't need to open the app to look anything up." />
+              <div className="mt-4 space-y-3 rounded-lg bg-gray-50 p-4 text-[13px]">
+                <TemplateSheetPreview
+                  name="Affiliate Profile"
+                  cols={[
+                    'Affiliate Code*',
+                    'Legal Name*',
+                    'Country*',
+                    'Region*',
+                    'Regulator*',
+                    'Legal Entity Code',
+                    'Functional Currency*',
+                    'Reporting Currency*',
+                    'Fiscal Year End',
+                    'Holiday Calendar ID',
+                  ]}
+                  note="One row per affiliate."
+                />
+                <TemplateSheetPreview
+                  name="Currencies"
+                  cols={['Affiliate Code*', 'Other Active Currency*']}
+                  note="One row per (affiliate, currency)."
+                />
+                <TemplateSheetPreview
+                  name="Connectivity"
+                  cols={['Affiliate Code*', 'Domain*', 'Mode*', 'Connector Name', 'SLA Days*', 'Owner']}
+                  note="One row per (affiliate, domain) - six rows per affiliate."
+                />
+                <TemplateSheetPreview
+                  name="COA Mapping"
+                  cols={['Affiliate Code*', 'Group COA Node Code*', 'Local GL Code*', 'Local GL Name']}
+                  note={`One row per local code mapped. ${commonCoaLeaves.length} Group COA nodes exist today.`}
+                />
+                <TemplateSheetPreview
+                  name="Organisation"
+                  cols={['Affiliate Code*', 'Create Standard Org Template? (Y/N)*']}
+                  note="One row per affiliate."
+                />
+                <TemplateSheetPreview
+                  name="Instructions & Reference"
+                  cols={['(free text + valid-value lists)']}
+                  note="Regulators, regions, currencies, calendars, domains, connectors and Group COA nodes, so you don't need to open the app to look anything up."
+                />
               </div>
             )}
           </section>
 
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">2. Upload the completed template</h2>
+            <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">
+              2. Upload the completed template
+            </h2>
             <input
               ref={fileInput}
               type="file"
               accept=".xlsx"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); }}
-              className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUpload(f);
+              }}
+              className="text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[13px] file:font-bold file:text-white hover:file:bg-navy-700"
             />
-            {fileName && <p className="mt-2 text-[11px] text-gray-500">{fileName}</p>}
+            {fileName && <p className="mt-2 text-[12px] text-gray-500">{fileName}</p>}
           </section>
 
           {rows && rows.length > 0 && (
             <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">3. Validate & preview</h2>
-              <p className="mb-4 text-[12px] text-gray-600">
-                {rows.length} affiliate{rows.length === 1 ? '' : 's'} detected - <span className="font-bold text-success">{validRows.length} valid</span>, <span className="font-bold text-danger">{invalidRows.length} with errors</span>.
+              <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">
+                3. Validate & preview
+              </h2>
+              <p className="mb-4 text-[13px] text-gray-600">
+                {rows.length} affiliate{rows.length === 1 ? '' : 's'} detected -{' '}
+                <span className="font-bold text-success">{validRows.length} valid</span>,{' '}
+                <span className="font-bold text-danger">{invalidRows.length} with errors</span>.
               </p>
 
-              <table className="w-full text-[12px]">
+              <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wider text-gray-400">
+                  <tr className="border-b border-gray-200 text-left text-[11px] uppercase tracking-wider text-gray-400">
                     <th className="py-2 px-3 font-bold">Row</th>
                     <th className="py-2 px-3 font-bold">Code</th>
                     <th className="py-2 px-3 font-bold">Name</th>
@@ -246,16 +319,21 @@ export function BulkOnboardAffiliates() {
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.rowNumber} className="border-b border-gray-100 align-top">
-                      <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{r.rowNumber}</td>
-                      <td className="py-2 px-3 font-mono text-[11px]">{r.code || '-'}</td>
+                      <td className="py-2 px-3 font-mono text-[12px] text-gray-500">{r.rowNumber}</td>
+                      <td className="py-2 px-3 font-mono text-[12px]">{r.code || '-'}</td>
                       <td className="py-2 px-3 text-navy-900">{r.name || '-'}</td>
                       <td className="py-2 px-3">
-                        <StatusBadge status={r.errors.length === 0 ? 'Valid' : 'Error'} tone={r.errors.length === 0 ? 'success' : 'danger'} />
+                        <StatusBadge
+                          status={r.errors.length === 0 ? 'Valid' : 'Error'}
+                          tone={r.errors.length === 0 ? 'success' : 'danger'}
+                        />
                       </td>
-                      <td className="py-2 px-3 text-[11px] text-danger">
+                      <td className="py-2 px-3 text-[12px] text-danger">
                         {r.errors.length > 0 && (
                           <ul className="list-disc space-y-0.5 pl-4">
-                            {r.errors.map((e, i) => <li key={i}>{e}</li>)}
+                            {r.errors.map((e, i) => (
+                              <li key={i}>{e}</li>
+                            ))}
                           </ul>
                         )}
                       </td>
@@ -269,12 +347,16 @@ export function BulkOnboardAffiliates() {
                   type="button"
                   disabled={validRows.length === 0 || importing}
                   onClick={() => void confirmImport()}
-                  className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                  className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                 >
-                  {importing ? 'Importing…' : `Confirm import - create ${validRows.length} affiliate${validRows.length === 1 ? '' : 's'}`}
+                  {importing
+                    ? 'Importing…'
+                    : `Confirm import - create ${validRows.length} affiliate${validRows.length === 1 ? '' : 's'}`}
                 </button>
                 {invalidRows.length > 0 && (
-                  <span className="text-[11px] text-gray-500">Rows with errors are skipped, not partially created - fix and re-upload to include them.</span>
+                  <span className="text-[12px] text-gray-500">
+                    Rows with errors are skipped, not partially created - fix and re-upload to include them.
+                  </span>
                 )}
               </div>
             </section>
@@ -282,8 +364,10 @@ export function BulkOnboardAffiliates() {
 
           {imported && (
             <section className="rounded-2xl border border-success/20 bg-success-bg p-8 text-center">
-              <h2 className="text-[16px] font-bold text-navy-900">✓ {imported.length} affiliate{imported.length === 1 ? '' : 's'} created</h2>
-              <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-600">
+              <h2 className="text-[16px] font-bold text-navy-900">
+                ✓ {imported.length} affiliate{imported.length === 1 ? '' : 's'} created
+              </h2>
+              <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-gray-600">
                 {imported.join(', ')} - all in <span className="font-bold">Onboarding</span> status. Open each from
                 Affiliates to finish connectivity, initial data load and submit for approval.
               </p>
@@ -299,10 +383,15 @@ function TemplateSheetPreview({ name, cols, note }: { name: string; cols: string
   return (
     <div>
       <p className="font-bold text-navy-900">{name}</p>
-      <p className="mb-1 text-[11px] text-gray-500">{note}</p>
+      <p className="mb-1 text-[12px] text-gray-500">{note}</p>
       <div className="flex flex-wrap gap-1.5">
         {cols.map((c) => (
-          <span key={c} className="rounded border border-gray-200 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{c}</span>
+          <span
+            key={c}
+            className="rounded border border-gray-200 bg-white px-2 py-0.5 font-mono text-[11px] text-gray-600"
+          >
+            {c}
+          </span>
         ))}
       </div>
     </div>

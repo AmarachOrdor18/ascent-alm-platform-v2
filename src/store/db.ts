@@ -1,14 +1,26 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Connector, ApprovalRequest, RemediationIssue, NotificationRule, RiskEntry, AlcoMeeting, RegulatoryReturn, ReportPack } from '@/engine/types';
+import type {
+  Connector,
+  ApprovalRequest,
+  RemediationIssue,
+  NotificationRule,
+  RiskEntry,
+  AlcoMeeting,
+  RegulatoryReturn,
+  ReportPack,
+} from '@/engine/types';
 import type { BreachNote, LimitConfig, TemporaryLimit } from '@/engine/limits';
-import type { StagedBatch } from './repository';
+import type { StagedBatch, StoredAccountObservation, StoredBalanceObservation, StoredModelRun } from './repository';
 import type {
   Affiliate,
+  AppNotification,
   AuditEvent,
+  DataSource,
   DimensionMember,
   EconomicIndicator,
   HolidayCalendar,
   LoadBatch,
+  OnboardingRecord,
   Position,
   PositionSnapshot,
   ProcessRun,
@@ -17,6 +29,7 @@ import type {
   RuleVersionSnapshot,
   RunResult,
   RunSchedule,
+  SettingRecord,
   StoredCurrency,
   StoredFxRate,
   StoredYieldCurve,
@@ -54,6 +67,13 @@ export class AscentDb extends Dexie {
   roles!: EntityTable<Role, 'code'>;
   snapshots!: EntityTable<PositionSnapshot, 'id'>;
   ruleHistory!: EntityTable<RuleVersionSnapshot, 'id'>;
+  balanceHistory!: EntityTable<StoredBalanceObservation, 'id'>;
+  accountHistory!: EntityTable<StoredAccountObservation, 'id'>;
+  modelRuns!: EntityTable<StoredModelRun, 'id'>;
+  onboarding!: EntityTable<OnboardingRecord, 'id'>;
+  settings!: EntityTable<SettingRecord, 'id'>;
+  dataSources!: EntityTable<DataSource, 'id'>;
+  notifications!: EntityTable<AppNotification, 'id'>;
 
   constructor(name = 'ascent-alm') {
     super(name);
@@ -128,6 +148,30 @@ export class AscentDb extends Dexie {
     // held even after the live row has since moved on.
     this.version(10).stores({
       ruleHistory: 'id, ruleId, version, [ruleId+version]',
+    });
+
+    // Behavioural-model calibration: uploaded balance / account history (each row tagged with the
+    // upload it came from, so an upload can be audited and deleted as a unit) and the model register.
+    this.version(11).stores({
+      balanceHistory: 'id, affiliateCode, uploadId, [affiliateCode+uploadId]',
+      accountHistory: 'id, affiliateCode, uploadId, [affiliateCode+uploadId]',
+      modelRuns: 'id, affiliateCode, modelType, status, createdAt',
+    });
+
+    // Onboarding progress (organisation 'ORG' / 'AFF:<code>') and organisation/affiliate-scoped settings.
+    this.version(12).stores({
+      onboarding: 'id, affiliateCode, status',
+      settings: 'id, affiliateCode, key, [affiliateCode+key]',
+    });
+
+    // Data sources (Phase 4): each affiliate's (and GROUP's) named feeds, with their expected fields.
+    this.version(13).stores({
+      dataSources: 'id, affiliateCode, domain, isActive, [affiliateCode+domain]',
+    });
+
+    // In-app notifications (header bell), one row per recipient.
+    this.version(14).stores({
+      notifications: 'id, userId, read, createdAt',
     });
   }
 }

@@ -1,23 +1,43 @@
 import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'wouter';
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
+import { HomeReadinessStrip } from '@/components/readiness/HomeReadinessStrip';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { Amount } from '@/components/ui/Amount';
 import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
-import { ShieldCheckIcon, BarChartIcon, ClockIcon, PieChartIcon, ArrowUpIcon, ArrowDownIcon, type IconProps } from '@/components/icons/Icons';
+import {
+  ShieldCheckIcon,
+  BarChartIcon,
+  ClockIcon,
+  PieChartIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  type IconProps,
+} from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, useYieldCurves, useEconomicIndicators, usePositions } from '@/lib/hooks';
 import { useScopedRuns } from '@/lib/runHooks';
 import { useKriSeries } from '@/lib/limitHooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
-import { formatPct } from '@/lib/format';
+import { formatDate, formatPct } from '@/lib/format';
 import { buildFxTable } from '@/engine/fx';
 import { latestCurveAsOf } from '@/engine/ftp';
 import { computeAllShocks } from '@/engine/irrbb';
+import { useRunValuationInputs } from '@/lib/cashflowBookHooks';
 import { defaultLadder } from '@/engine/buckets';
 import type { KriObservation } from '@/engine/kri';
 import type { ConcentrationResult, LcrResult, LoanToDepositResult, NsfrResult } from '@/engine/liquidity';
@@ -32,6 +52,10 @@ const MARKET_BY_CURRENCY: Record<string, { curveCode: string; indicatorCode?: st
 };
 
 type Tone = 'success' | 'warning' | 'danger' | 'neutral';
+
+// Computed, but nothing to divide by: the book carries no LCR run-off rates / RSF factors, which come from
+// a Product Characteristics rule (or columns in the uploaded file) - not the same as "not in this run".
+const NO_FACTORS_REASON = 'Computed, but no run-off/RSF factors - set them in Rules → Product characteristics';
 
 interface Trend {
   text: string;
@@ -49,16 +73,20 @@ interface Metric {
   trend?: Trend;
   /** Plain-English explanation shown behind an info button next to the label. */
   about: string;
+  /** Why the value is blank when the run did compute the element - e.g. no factors to measure with. */
+  blankReason?: string;
 }
 
 const METRIC_ABOUT: Record<string, string> = {
   lcr: 'Liquidity Coverage Ratio: high-quality liquid assets divided by expected net cash outflows over a 30-day stress scenario. Basel III sets a 100% regulatory floor.',
   nsfr: 'Net Stable Funding Ratio: available stable funding divided by required stable funding over a one-year horizon. Basel III sets a 100% regulatory floor.',
-  survival: 'Survival Horizon: how many days the counterbalancing capacity (liquid assets, committed lines) would last under a severe stressed outflow before running out.',
+  survival:
+    'Survival Horizon: how many days the counterbalancing capacity (liquid assets, committed lines) would last under a severe stressed outflow before running out.',
   ldr: 'Loan-to-Deposit: customer loans as a share of customer deposits. A classic funding-structure indicator - a high ratio signals reliance on deposits to fund lending.',
   nii: 'Net Interest Income sensitivity: how much a standard interest-rate shock (+200bp) would change this year’s net interest income, driven by the repricing gap.',
   eve: 'Economic Value of Equity sensitivity: how much an interest-rate shock would change the present value of the whole balance sheet, as a share of capital. Basel’s supervisory outlier test is ±15%.',
-  concentration: 'Largest single depositor’s share of total deposits - the single biggest funding-concentration vulnerability.',
+  concentration:
+    'Largest single depositor’s share of total deposits - the single biggest funding-concentration vulnerability.',
   npl: 'Non-Performing Loan ratio: share of the loan book classified Substandard, Doubtful or Loss.',
   nim: 'Net Interest Margin: interest income less interest expense, expressed as a share of total assets - a core profitability measure.',
   inbreach: 'Count of the metrics on this page currently outside their configured internal limit.',
@@ -123,9 +151,17 @@ export function Dashboard() {
   // A live "today" snapshot, not tied to a specific run - resolves to whichever dated curve is most
   // recent as of now, the same way any other curve consumer picks among several versions on file.
   const today = new Date().toISOString().slice(0, 10);
-  const localCurve = market ? latestCurveAsOf(yieldCurves, today, (c) => c.code === market.curveCode) : undefined;
+  // The named benchmark when it exists, else whatever curve this currency's own team loaded (a freshly
+  // onboarded affiliate names its curve itself, e.g. "NGN-BASE").
+  const localCurve =
+    (market ? latestCurveAsOf(yieldCurves, today, (c) => c.code === market.curveCode) : null) ??
+    latestCurveAsOf(yieldCurves, today, (c) => c.currency === marketCurrency);
   const sofrCurve = latestCurveAsOf(yieldCurves, today, (c) => c.code === 'USD-SOFR');
-  const policyIndicator = market?.indicatorCode ? indicators.find((i) => i.code === market.indicatorCode) : undefined;
+  const policyIndicator =
+    (market?.indicatorCode ? indicators.find((i) => i.code === market.indicatorCode) : undefined) ??
+    (affiliateCode !== 'GROUP'
+      ? indicators.find((i) => i.countryCode === affiliateCode && /policy|mpr/i.test(`${i.code} ${i.name}`))
+      : undefined);
 
   const policyRateRow = (() => {
     if (!policyIndicator || policyIndicator.observations.length === 0) return null;
@@ -169,8 +205,21 @@ export function Dashboard() {
       : null,
   ].filter((r): r is { label: string; sublabel: string; value: string; delta: number | null } => r !== null);
 
-  const rateRows = fxRates
-    .filter((r) => r.quote === 'USD' || r.base === 'USD')
+  // One row per currency - its latest rate on file - quoted the way the market reads it (units per USD),
+  // not every dated row in the series.
+  const rateRows = Array.from(
+    fxRates
+      .filter((r) => (r.quote === 'USD' || r.base === 'USD') && r.asOfDate <= today && r.rate > 0)
+      .reduce((latest, r) => {
+        const ccy = r.quote === 'USD' ? r.base : r.quote;
+        const cur = latest.get(ccy);
+        if (!cur || r.asOfDate > cur.asOfDate) latest.set(ccy, r);
+        return latest;
+      }, new Map<string, (typeof fxRates)[number]>())
+      .entries(),
+  )
+    .map(([ccy, r]) => ({ id: r.id, ccy, asOfDate: r.asOfDate, perUsd: r.quote === 'USD' ? 1 / r.rate : r.rate }))
+    .sort((a, b) => Number(b.ccy === marketCurrency) - Number(a.ccy === marketCurrency) || a.ccy.localeCompare(b.ccy))
     .slice(0, 6);
 
   const lcr = payloadOf<LcrResult>(results, 'Lcr');
@@ -184,18 +233,28 @@ export function Dashboard() {
   // All six BCBS supervisory rate shocks, recomputed from this scope's own positions at the run's as-of date.
   const shockPositionsScope = run?.affiliateCode ?? affiliateCode;
   const { data: shockPositions = [] } = usePositions(shockPositionsScope, run?.asOfDate ?? undefined);
+  // Same cashflow book and curves as the run's own EVE element, so the chart and the IRRBB page agree.
+  const shockValuation = useRunValuationInputs(run ?? null, shockPositions);
   const shockRows = useMemo(() => {
     if (!run || shockPositions.length === 0) return [];
-    const ctx = { asOfDate: run.asOfDate, reportingCurrency: currency, fx: buildFxTable(currency, fxRates, run.asOfDate), tier1Capital: null };
-    const { results: shockResults } = computeAllShocks(shockPositions, ctx, defaultLadder('RepricingGap'));
+    const ctx = {
+      asOfDate: run.asOfDate,
+      reportingCurrency: currency,
+      fx: buildFxTable(currency, fxRates, run.asOfDate),
+      tier1Capital: null,
+    };
+    const { results: shockResults } = computeAllShocks(
+      shockValuation?.positions ?? shockPositions,
+      ctx,
+      defaultLadder('RepricingGap'),
+      [],
+      shockValuation ? { book: shockValuation.book, curves: shockValuation.curves } : undefined,
+    );
     return Object.values(shockResults)
       .filter((r) => r.eve.eveSensitivityPercentOfEquity !== null)
       .map((r) => ({ shock: r.label, evePercent: r.eve.eveSensitivityPercentOfEquity! }));
-  }, [run, shockPositions, currency, fxRates]);
-  const survival = payloadOf<{ survivalHorizonDays: number; survivesFullHorizon: boolean }>(
-    results,
-    'SurvivalHorizon',
-  );
+  }, [run, shockPositions, shockValuation, currency, fxRates]);
+  const survival = payloadOf<{ survivalHorizonDays: number; survivesFullHorizon: boolean }>(results, 'SurvivalHorizon');
 
   const band = (value: number | null, regulatory: number, internal: number): Tone =>
     value === null ? 'neutral' : value < regulatory ? 'danger' : value < internal ? 'warning' : 'success';
@@ -208,6 +267,7 @@ export function Dashboard() {
       value: formatPct(lcr?.lcrPercent ?? null),
       tone: band(lcr?.lcrPercent ?? null, 100, 130),
       href: '/liquidity-risk',
+      blankReason: lcr && lcr.lcrPercent === null ? NO_FACTORS_REASON : undefined,
       icon: ShieldCheckIcon,
       trend: trendFrom(trendSeries?.get('lcrPercent'), true),
       about: METRIC_ABOUT.lcr!,
@@ -218,6 +278,7 @@ export function Dashboard() {
       value: formatPct(nsfr?.nsfrPercent ?? null),
       tone: band(nsfr?.nsfrPercent ?? null, 100, 110),
       href: '/liquidity-risk',
+      blankReason: nsfr && nsfr.nsfrPercent === null ? NO_FACTORS_REASON : undefined,
       icon: BarChartIcon,
       trend: trendFrom(trendSeries?.get('nsfrPercent'), true),
       about: METRIC_ABOUT.nsfr!,
@@ -236,7 +297,14 @@ export function Dashboard() {
       id: 'ldr',
       label: 'Loan-to-Deposit',
       value: formatPct(ldr?.ratioPercent ?? null),
-      tone: ldr?.ratioPercent == null ? 'neutral' : ldr.ratioPercent > 90 ? 'danger' : ldr.ratioPercent > 80 ? 'warning' : 'success',
+      tone:
+        ldr?.ratioPercent == null
+          ? 'neutral'
+          : ldr.ratioPercent > 90
+            ? 'danger'
+            : ldr.ratioPercent > 80
+              ? 'warning'
+              : 'success',
       href: '/liquidity-risk',
       icon: PieChartIcon,
       trend: trendFrom(trendSeries?.get('loanToDepositPercent'), false),
@@ -246,11 +314,60 @@ export function Dashboard() {
 
   // Everything else, read as a label next to a number, not a card.
   const baseSnapshot: Metric[] = [
-    { id: 'nii', label: 'NII sensitivity', value: formatPct(nii?.niiSensitivityPercent ?? null, 2), tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success', href: '/interest-rate-risk', about: METRIC_ABOUT.nii! },
-    { id: 'eve', label: 'EVE sensitivity', value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2), tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success', href: '/interest-rate-risk', about: METRIC_ABOUT.eve! },
-    { id: 'concentration', label: 'Largest depositor', value: formatPct(conc?.largestSharePercent ?? null), tone: conc?.largestSharePercent == null ? 'neutral' : conc.largestSharePercent > 10 ? 'danger' : conc.largestSharePercent > 5 ? 'warning' : 'success', href: '/concentration', about: METRIC_ABOUT.concentration! },
-    { id: 'npl', label: 'NPL ratio', value: formatPct(prof?.nplRatioPercent ?? null, 2), tone: prof?.nplRatioPercent == null ? 'neutral' : prof.nplRatioPercent > 5 ? 'danger' : prof.nplRatioPercent > 3 ? 'warning' : 'success', href: '/profitability', about: METRIC_ABOUT.npl! },
-    { id: 'nim', label: 'Net interest margin', value: formatPct(prof?.netInterestMarginPercent ?? null, 2), tone: 'neutral', href: '/profitability', about: METRIC_ABOUT.nim! },
+    {
+      id: 'nii',
+      label: 'NII sensitivity',
+      value: formatPct(nii?.niiSensitivityPercent ?? null, 2),
+      tone: nii == null ? 'neutral' : Math.abs(nii.niiSensitivityPercent ?? 0) > 10 ? 'warning' : 'success',
+      href: '/interest-rate-risk',
+      about: METRIC_ABOUT.nii!,
+    },
+    {
+      id: 'eve',
+      label: 'EVE sensitivity',
+      value: formatPct(eve?.eveSensitivityPercentOfEquity ?? null, 2),
+      tone: eve?.isBaselOutlier === true ? 'danger' : eve == null ? 'neutral' : 'success',
+      href: '/interest-rate-risk',
+      about: METRIC_ABOUT.eve!,
+    },
+    {
+      id: 'concentration',
+      label: 'Largest depositor',
+      value: formatPct(conc?.largestSharePercent ?? null),
+      tone:
+        conc?.largestSharePercent == null
+          ? 'neutral'
+          : conc.largestSharePercent > 10
+            ? 'danger'
+            : conc.largestSharePercent > 5
+              ? 'warning'
+              : 'success',
+      href: '/concentration',
+      about: METRIC_ABOUT.concentration!,
+    },
+    {
+      id: 'npl',
+      label: 'NPL ratio',
+      value: formatPct(prof?.nplRatioPercent ?? null, 2),
+      tone:
+        prof?.nplRatioPercent == null
+          ? 'neutral'
+          : prof.nplRatioPercent > 5
+            ? 'danger'
+            : prof.nplRatioPercent > 3
+              ? 'warning'
+              : 'success',
+      href: '/profitability',
+      about: METRIC_ABOUT.npl!,
+    },
+    {
+      id: 'nim',
+      label: 'Net interest margin',
+      value: formatPct(prof?.netInterestMarginPercent ?? null, 2),
+      tone: 'neutral',
+      href: '/profitability',
+      about: METRIC_ABOUT.nim!,
+    },
   ];
 
   const breaches = [...headline, ...baseSnapshot].filter((m) => m.tone === 'danger');
@@ -270,15 +387,17 @@ export function Dashboard() {
   return (
     <>
       <ModuleHeader
-        title="Dashboard"
+        title="Home"
         description="One run. Every number below reads off it."
         asOfDate={run?.asOfDate ?? null}
         scope={affiliate?.name ?? affiliateCode}
         currency={run?.reportingCurrency}
       />
 
+      <HomeReadinessStrip />
+
       <ResultsFrame {...frameProps(selected)} requires={[]}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div data-tour="kpis" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {headline.map((m) => {
             const Icon = m.icon;
             return (
@@ -289,23 +408,35 @@ export function Dashboard() {
               >
                 <div className="flex items-start justify-between">
                   <span className="flex items-center gap-1">
-                    <p className="text-[13px] font-medium text-gray-500">{m.label}</p>
-                    <InfoButton label={`About ${m.label}`} stopClickPropagation>{m.about}</InfoButton>
+                    <p className="text-[14px] font-medium text-gray-500">{m.label}</p>
+                    <InfoButton label={`About ${m.label}`} stopClickPropagation>
+                      {m.about}
+                    </InfoButton>
                   </span>
                   {Icon && (
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TONE_ICON_BG[m.tone]}`}>
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${TONE_ICON_BG[m.tone]}`}
+                    >
                       <Icon className="h-4 w-4" />
                     </div>
                   )}
                 </div>
                 {isUncomputed(m.value) ? (
-                  <p className="mt-3 text-[12px] italic text-gray-400">Not computed by this run</p>
+                  <p className="mt-3 text-[13px] italic text-gray-400">{m.blankReason ?? 'Not computed by this run'}</p>
                 ) : (
-                  <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>{m.value}</p>
+                  <p className={`mt-3 font-mono text-[26px] font-bold tracking-tight ${TONE_TEXT[m.tone]}`}>
+                    {m.value}
+                  </p>
                 )}
                 {m.trend && (
-                  <p className={`mt-2 flex items-center gap-1 text-[11px] font-bold ${m.trend.good ? 'text-success' : 'text-danger'}`}>
-                    {m.trend.text.startsWith('+') ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
+                  <p
+                    className={`mt-2 flex items-center gap-1 text-[12px] font-bold ${m.trend.good ? 'text-success' : 'text-danger'}`}
+                  >
+                    {m.trend.text.startsWith('+') ? (
+                      <ArrowUpIcon className="h-3 w-3" />
+                    ) : (
+                      <ArrowDownIcon className="h-3 w-3" />
+                    )}
                     {m.trend.text}
                   </p>
                 )}
@@ -316,18 +447,21 @@ export function Dashboard() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-1 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Rate shock sensitivity - ΔEVE by scenario
               <InfoButton label="What this chart shows">
                 All six BCBS-standard shocks (parallel up/down, steepener, flattener, short rate up/down) applied to
-                this scope's own book, showing the economic-value impact of each. Bars beyond the dashed ±15% lines
-                are highlighted - that's the Basel supervisory outlier threshold.
+                this scope's own book, showing the economic-value impact of each. Bars beyond the dashed ±15% lines are
+                highlighted - that's the Basel supervisory outlier threshold.
               </InfoButton>
             </h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">Capital impact under all six BCBS supervisory shocks, this scope's own book - dashed lines mark the ±15% outlier test</p>
+            <p className="mb-4 text-[12px] font-medium text-gray-400">
+              Capital impact under all six BCBS supervisory shocks, this scope's own book - dashed lines mark the ±15%
+              outlier test
+            </p>
             <div className="min-h-[260px] flex-1">
               {shockRows.length === 0 ? (
-                <div className="flex h-full items-center justify-center px-8 text-center text-[12px] text-gray-400">
+                <div className="flex h-full items-center justify-center px-8 text-center text-[13px] text-gray-400">
                   No run selected yet.
                 </div>
               ) : (
@@ -335,13 +469,21 @@ export function Dashboard() {
                   <BarChart data={shockRows} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                     <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="shock" tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} />
-                    <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}%`} />
+                    <YAxis
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v: number) => `${v}%`}
+                    />
                     <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} contentStyle={CHART_TOOLTIP_STYLE} />
                     <ReferenceLine y={15} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" />
                     <ReferenceLine y={-15} stroke={CHART_COLORS.neutral} strokeDasharray="4 4" />
                     <Bar dataKey="evePercent" name="ΔEVE % of equity" radius={[4, 4, 4, 4]}>
                       {shockRows.map((r) => (
-                        <Cell key={r.shock} fill={Math.abs(r.evePercent) > 15 ? 'hsl(0, 72%, 51%)' : CHART_COLORS.primary} />
+                        <Cell
+                          key={r.shock}
+                          fill={Math.abs(r.evePercent) > 15 ? 'hsl(0, 72%, 51%)' : CHART_COLORS.primary}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -351,7 +493,7 @@ export function Dashboard() {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-1 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Market &amp; Rate Monitor
               <InfoButton label="What this shows">
                 Live reference points for this scope's own currency - the local policy rate, an overnight interbank
@@ -359,23 +501,32 @@ export function Dashboard() {
                 they're the market context the run's figures sit against.
               </InfoButton>
             </h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">{marketCurrency} benchmarks, SOFR, and FX against USD</p>
+            <p className="mb-4 text-[12px] font-medium text-gray-400">
+              {marketCurrency} benchmarks, SOFR, and FX against USD
+            </p>
             {marketRows.length === 0 && rateRows.length === 0 ? (
-              <p className="text-[12px] text-gray-400">No market data loaded.</p>
+              <p className="text-[13px] text-gray-400">No market data loaded.</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {marketRows.map((r) => (
                   <div key={r.label} className="flex items-center justify-between py-2.5">
                     <div>
-                      <p className="text-[12px] font-bold text-navy-900">{r.label}</p>
-                      <p className="text-[10px] text-gray-400">{r.sublabel}</p>
+                      <p className="text-[13px] font-bold text-navy-900">{r.label}</p>
+                      <p className="text-[11px] text-gray-400">{r.sublabel}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-[13px] font-bold text-navy-900">{r.value}</p>
+                      <p className="font-mono text-[14px] font-bold text-navy-900">{r.value}</p>
                       {r.delta !== null && (
-                        <p className={`flex items-center justify-end gap-0.5 text-[10px] font-bold ${r.delta > 0 ? 'text-success' : 'text-danger'}`}>
-                          {r.delta > 0 ? <ArrowUpIcon className="h-2.5 w-2.5" /> : <ArrowDownIcon className="h-2.5 w-2.5" />}
-                          {r.delta > 0 ? '+' : ''}{r.delta.toFixed(2)}
+                        <p
+                          className={`flex items-center justify-end gap-0.5 text-[11px] font-bold ${r.delta > 0 ? 'text-success' : 'text-danger'}`}
+                        >
+                          {r.delta > 0 ? (
+                            <ArrowUpIcon className="h-2.5 w-2.5" />
+                          ) : (
+                            <ArrowDownIcon className="h-2.5 w-2.5" />
+                          )}
+                          {r.delta > 0 ? '+' : ''}
+                          {r.delta.toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -384,10 +535,12 @@ export function Dashboard() {
                 {rateRows.map((r) => (
                   <div key={r.id} className="flex items-center justify-between py-2.5">
                     <div>
-                      <p className="text-[12px] font-bold text-navy-900">{r.base}/{r.quote}</p>
-                      <p className="text-[10px] text-gray-400">Official rate</p>
+                      <p className="text-[13px] font-bold text-navy-900">USD/{r.ccy}</p>
+                      <p className="text-[11px] text-gray-400">
+                        {r.ccy} per USD · {formatDate(r.asOfDate)}
+                      </p>
                     </div>
-                    <span className="font-mono text-[13px] font-bold text-navy-900">{r.rate.toFixed(4)}</span>
+                    <span className="font-mono text-[14px] font-bold text-navy-900">{r.perUsd.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -397,16 +550,18 @@ export function Dashboard() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
+            <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">Risk snapshot</h2>
             <div className="grid grid-cols-3 gap-3">
               {snapshot.map((m) => (
                 <Link key={m.id} href={m.href} className="block rounded-lg bg-gray-50 p-3 hover:bg-gray-100">
                   <span className="flex items-center gap-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
-                    <InfoButton label={`About ${m.label}`} stopClickPropagation>{m.about}</InfoButton>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{m.label}</p>
+                    <InfoButton label={`About ${m.label}`} stopClickPropagation>
+                      {m.about}
+                    </InfoButton>
                   </span>
                   {isUncomputed(m.value) ? (
-                    <p className="mt-1 text-[11px] italic text-gray-400">Not computed</p>
+                    <p className="mt-1 text-[12px] italic text-gray-400">Not computed</p>
                   ) : (
                     <p className={`mt-1 text-[16px] font-bold ${TONE_TEXT[m.tone]}`}>{m.value}</p>
                   )}
@@ -416,7 +571,7 @@ export function Dashboard() {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-4 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Active Breaches
               <InfoButton label="What counts as a breach here">
                 Any headline or snapshot metric on this page currently graded Red against its configured limit. Click
@@ -424,7 +579,7 @@ export function Dashboard() {
               </InfoButton>
             </h2>
             {breaches.length === 0 ? (
-              <p className="text-[12px] text-gray-400">No active breaches for this scope.</p>
+              <p className="text-[13px] text-gray-400">No active breaches for this scope.</p>
             ) : (
               <div className="space-y-1">
                 {breaches.map((b) => (
@@ -435,7 +590,7 @@ export function Dashboard() {
                   >
                     <div>
                       <p className="font-mono text-[16px] font-bold text-danger">{b.value}</p>
-                      <p className="text-[11px] text-gray-500">{b.label}</p>
+                      <p className="text-[12px] text-gray-500">{b.label}</p>
                     </div>
                     <StatusBadge status="Breach" tone="danger" />
                   </Link>
@@ -447,14 +602,14 @@ export function Dashboard() {
 
         {prof && (
           <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-4 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Balance sheet shape
               <InfoButton label="What this shows">
-                The size and earnings profile the run's other figures sit on top of - total assets, interest income
-                and expense, and the net of the two. Read from the same run and positions as every ratio above.
+                The size and earnings profile the run's other figures sit on top of - total assets, interest income and
+                expense, and the net of the two. Read from the same run and positions as every ratio above.
               </InfoButton>
             </h2>
-            <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-4 text-[13px] md:grid-cols-4">
               <Stat label="Total assets" value={<Amount value={prof.totalAssets} currency={currency} />} />
               <Stat label="Interest income" value={<Amount value={prof.interestIncome} currency={currency} />} />
               <Stat label="Interest expense" value={<Amount value={prof.interestExpense} currency={currency} />} />
@@ -473,7 +628,7 @@ export function Dashboard() {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
+      <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
       <dd className="mt-0.5">{value}</dd>
     </div>
   );

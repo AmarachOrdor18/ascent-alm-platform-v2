@@ -13,7 +13,11 @@ export function useTableControls<T extends object>(data: T[], pageSize = 10, sea
     ? data.filter((row) => {
         const q = search.toLowerCase();
         const fields = searchableFields ?? (Object.keys(row) as (keyof T)[]);
-        return fields.some((f) => String(row[f] ?? '').toLowerCase().includes(q));
+        return fields.some((f) =>
+          String(row[f] ?? '')
+            .toLowerCase()
+            .includes(q),
+        );
       })
     : data;
 
@@ -70,7 +74,7 @@ export function TablePagination({ currentPage, totalItems, pageSize, onPageChang
 
   return (
     <div className="flex shrink-0 items-center justify-between border-t border-gray-100 bg-gray-50/30 px-6 py-4 backdrop-blur-sm">
-      <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+      <span className="text-[12px] font-bold uppercase tracking-widest text-gray-400">
         Showing <span className="text-navy-900">{start}</span>
         {'–'}
         <span className="text-navy-900">{end}</span> of <span className="text-navy-900">{totalItems}</span>
@@ -80,7 +84,7 @@ export function TablePagination({ currentPage, totalItems, pageSize, onPageChang
           type="button"
           disabled={currentPage === 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="shrink-0 rounded-lg border border-gray-100 bg-white p-2 text-[10px] font-bold uppercase transition-all hover:bg-gray-50 disabled:opacity-30"
+          className="shrink-0 rounded-lg border border-gray-100 bg-white p-2 text-[11px] font-bold uppercase transition-all hover:bg-gray-50 disabled:opacity-30"
         >
           {'< Prev'}
         </button>
@@ -95,7 +99,7 @@ export function TablePagination({ currentPage, totalItems, pageSize, onPageChang
               type="button"
               onClick={() => onPageChange(p)}
               className={cn(
-                'h-8 w-8 rounded-lg text-[11px] font-bold transition-all',
+                'h-8 w-8 rounded-lg text-[12px] font-bold transition-all',
                 currentPage === p
                   ? 'bg-navy-900 text-white shadow-lg'
                   : 'border border-gray-100 bg-white text-gray-500 hover:border-navy-900/20',
@@ -109,7 +113,7 @@ export function TablePagination({ currentPage, totalItems, pageSize, onPageChang
           type="button"
           disabled={currentPage === totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="shrink-0 rounded-lg border border-gray-100 bg-white p-2 text-[10px] font-bold uppercase transition-all hover:bg-gray-50 disabled:opacity-30"
+          className="shrink-0 rounded-lg border border-gray-100 bg-white p-2 text-[11px] font-bold uppercase transition-all hover:bg-gray-50 disabled:opacity-30"
         >
           {'Next >'}
         </button>
@@ -134,7 +138,10 @@ export function toCsv(rows: object[]): string {
   if (!first) return '';
   const headers = Object.keys(first);
   const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  return [headers.join(','), ...rows.map((r) => headers.map((h) => escape((r as Record<string, unknown>)[h])).join(','))].join('\n');
+  return [
+    headers.join(','),
+    ...rows.map((r) => headers.map((h) => escape((r as Record<string, unknown>)[h])).join(',')),
+  ].join('\n');
 }
 
 export function downloadBlob(content: string, filename: string, mime: string) {
@@ -176,14 +183,14 @@ export function TableToolbar({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-1 items-center gap-2">
-        <div className="relative max-w-xs flex-1">
+        <div data-tour="table-search" className="relative max-w-xs flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300" />
           <input
             type="text"
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Filter records..."
-            className="w-full rounded-lg border border-gray-200 py-1.5 pl-8 pr-7 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+            className="w-full rounded-lg border border-gray-200 py-1.5 pl-8 pr-7 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
           />
           {searchValue && (
             <button
@@ -204,7 +211,7 @@ export function TableToolbar({
           value={density}
           onChange={(e) => onDensityChange(e.target.value as Density)}
           aria-label="Row density"
-          className="rounded-lg border border-gray-100 bg-white px-2 py-1.5 text-[10px] font-bold uppercase text-gray-500 focus:border-navy-700 focus:outline-none"
+          className="rounded-lg border border-gray-100 bg-white px-2 py-1.5 text-[11px] font-bold uppercase text-gray-500 focus:border-navy-700 focus:outline-none"
         >
           <option value="compact">Compact</option>
           <option value="default">Default</option>
@@ -223,7 +230,7 @@ export function TableToolbar({
         )}
 
         {exportData && (
-          <div className="relative">
+          <div data-tour="table-export" className="relative">
             <button
               type="button"
               onClick={() => setExportOpen((v) => !v)}
@@ -237,7 +244,7 @@ export function TableToolbar({
                 <button
                   type="button"
                   onClick={handleExportCsv}
-                  className="block w-full px-3 py-1.5 text-left text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                  className="block w-full px-3 py-1.5 text-left text-[12px] font-medium text-gray-600 hover:bg-gray-50"
                 >
                   Export CSV
                 </button>

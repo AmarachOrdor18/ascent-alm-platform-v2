@@ -80,20 +80,28 @@ describe('route order', () => {
 
   it('gives every route a component and a screen name for its error boundary', () => {
     // React.lazy components are objects with $$typeof Symbol(react.lazy), not plain functions
-    const hasValidComponent = (r: typeof ROUTES[0]) => {
-      return typeof r.Component === 'function' || 
-             (r.Component && typeof r.Component === 'object' && '$$typeof' in r.Component);
+    const hasValidComponent = (r: (typeof ROUTES)[0]) => {
+      return (
+        typeof r.Component === 'function' ||
+        (r.Component && typeof r.Component === 'object' && '$$typeof' in r.Component)
+      );
     };
     expect(ROUTES.every(hasValidComponent)).toBe(true);
     expect(ROUTES.every((r) => r.screenName.length > 0)).toBe(true);
   });
 
-  it('keeps the sidebar to the ~13 module-level items the navigation redesign intends', () => {
-    // Deliberately small on purpose - individual screens are tabs inside a
-    // module (see src/pages/modules/*), not standing sidebar rows. This is
-    // the inverse of the pre-redesign invariant here (which asserted > 30).
-    expect(ALL_NAV_ITEMS.length).toBeGreaterThanOrEqual(10);
-    expect(ALL_NAV_ITEMS.length).toBeLessThanOrEqual(15);
+  it('keeps the sidebar to Home, the work areas and Admin', () => {
+    // Deliberately small - every screen is a tab inside an area (src/pages/areas/Areas.tsx), not a
+    // standing sidebar row. A new sidebar entry should be a deliberate design decision, not drift.
+    expect(ALL_NAV_ITEMS.map((i) => i.name)).toEqual([
+      'Home',
+      'Data',
+      'Assumptions',
+      'Run & results',
+      'Approvals',
+      'Reports',
+      'Admin',
+    ]);
   });
 
   it('registers every module tab path exactly once and gives it a real permission', () => {
@@ -114,7 +122,7 @@ describe('route-level permission gating', () => {
     expect(ROUTES.every((r) => typeof r.permission === 'string' && r.permission.length > 0)).toBe(true);
   });
 
-  it('matches each nav-listed route\'s permission to its sidebar entry - the two must never drift apart', () => {
+  it("matches each nav-listed route's permission to its sidebar entry - the two must never drift apart", () => {
     for (const item of ALL_NAV_ITEMS) {
       const route = ROUTES.find((r) => r.path === item.path);
       expect(route?.permission).toBe(item.permission);

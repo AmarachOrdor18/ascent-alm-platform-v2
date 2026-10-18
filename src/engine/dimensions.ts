@@ -198,9 +198,11 @@ export function deriveMembersFromFile(
   positions: Position[],
   affiliateCode: string,
   affiliateName: string,
+  /** The admit-time derivation also creates Common COA members (first upload builds the structure). */
+  options: { includeCommonCoa?: boolean } = {},
 ): DimensionMember[] {
   const key = positionKeyFor(dimension);
-  if (!key || dimension === 'CommonCoa' || codes.length === 0) return [];
+  if (!key || (dimension === 'CommonCoa' && !options.includeCommonCoa) || codes.length === 0) return [];
 
   const members: DimensionMember[] = [];
   const rootCode = `GL-${affiliateCode}`;
@@ -224,7 +226,8 @@ export function deriveMembersFromFile(
       dimension,
       affiliateCode,
       code,
-      name: dimension === 'GlAccount' ? (sample?.productClass ?? code) : code,
+      // A GL account or product is named after the product class the file gives it, when it gives one.
+      name: dimension === 'GlAccount' || dimension === 'Product' ? sample?.productClass || code : code,
       parentCode: dimension === 'GlAccount' ? rootCode : null,
       isLeaf: true,
     });

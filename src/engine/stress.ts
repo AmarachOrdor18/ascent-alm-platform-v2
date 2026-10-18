@@ -1,6 +1,7 @@
 import type { CurrencyCode, IsoDate, Position } from './types';
 import { convert, type FxTable } from './fx';
 import { addDays } from './dates';
+import { computeDepositRunoff, type BehaviourPattern } from './behavioural';
 
 export interface StressContext {
   asOfDate: IsoDate;
@@ -148,9 +149,94 @@ export function computeSurvivalHorizon(
   };
 }
 
-/** The standard severe scenario: a 30-day window with 55% of outflows in the first 10 days. */
+/**
+ * A fixed-shape severe scenario: a 30-day window with 55% of outflows in the first 10 days. Used only where
+ * a caller supplies its own total outflow (a scenario-supplied figure, reverse stress); the run's own severe
+ * scenario is derived from its behaviour pattern rule by `deriveSevereRun` instead.
+ */
 export function severeOutflowProfile(totalOutflow: number): OutflowProfile {
   return { totalOutflow, horizonDays: 30, frontLoadedPercent: 55, frontLoadedDays: 10 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Severe run derived from behaviour patterns
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * How much harsher than business-as-usual the severe run is. Applied to each deposit pattern's volatile
+ * share (shifting core balances into volatile, capped at 100%) and to every other LCR outflow rate.
+ * Configurable per Behaviour Pattern rule (`stressSeverityMultiplier`); 2 is a documented assumption -
+ * "twice the normal volatility" - not a calibrated figure.
+ */
+export const DEFAULT_STRESS_SEVERITY = 2;
+
+/** The other two dials of the severe run: the market-wide haircut on liquid assets, and how fast the run lands. */
+export const SEVERE_RUN_DEFAULTS = { horizonDays: 30, frontLoadedDays: 10, hqlaHaircutPercent: 10 } as const;
+
+export interface SevereRunOptions {
+  severityMultiplier?: number;
+  hqlaHaircutPercent?: number;
+  frontLoadedDays?: number;
+}
+
+export interface SevereRunAssumptions {
+  severityMultiplier: number;
+  hqlaHaircutPercent: number;
+  /** Volatile deposit balances (after stress) assumed to run in the front-loaded window. */
+  depositRunoff: number;
+  /** Every other 30-day LCR outflow (wholesale funding, undrawn commitments, unmodelled deposits), stressed. */
+  otherOutflows: number;
+  profile: OutflowProfile;
+  currency: CurrencyCode;
+  methodology: string;
+}
+
+// The severe run's size and shape both come from the behaviour pattern rule rather than constants: the
+// deposits' volatile share (scaled by the severity multiplier) is what runs fast, inside the front-loaded
+// window, and everything else that falls due within 30 days is spread across the remainder.
+export function deriveSevereRun(
+  positions: Position[],
+  patterns: BehaviourPattern[],
+  ctx: StressContext,
+  options: SevereRunOptions = {},
+): SevereRunAssumptions {
+  const severityMultiplier = Math.max(1, options.severityMultiplier ?? DEFAULT_STRESS_SEVERITY);
+  const hqlaHaircutPercent = options.hqlaHaircutPercent ?? SEVERE_RUN_DEFAULTS.hqlaHaircutPercent;
+  const frontLoadedDays = options.frontLoadedDays ?? SEVERE_RUN_DEFAULTS.frontLoadedDays;
+  const toReporting = (amount: number, p: Position) => convert(amount, p.currency, ctx.reportingCurrency, ctx.fx);
+
+  const runoff = computeDepositRunoff(positions, patterns, severityMultiplier);
+  const byId = new Map(positions.map((p) => [p.id, p]));
+  const modelled = new Set(runoff.lines.filter((l) => l.patternName !== null).map((l) => l.positionId));
+
+  const depositRunoff = runoff.lines.reduce((s, l) => {
+    const p = byId.get(l.positionId);
+    return p && l.patternName !== null ? s + toReporting(l.volatileAmount, p) : s;
+  }, 0);
+
+  // A deposit the patterns already modelled is not counted a second time at its LCR run-off rate.
+  const otherOutflows = positions
+    .filter((p) => p.lcrCashflowRole === 'Outflow' && !modelled.has(p.id))
+    .reduce((s, p) => s + toReporting(p.amount * Math.min(1, ((p.lcrRatePct ?? 0) / 100) * severityMultiplier), p), 0);
+
+  const totalOutflow = depositRunoff + otherOutflows;
+  const frontLoadedPercent = totalOutflow > 0 ? (depositRunoff / totalOutflow) * 100 : 0;
+
+  return {
+    severityMultiplier,
+    hqlaHaircutPercent,
+    depositRunoff,
+    otherOutflows,
+    profile: { totalOutflow, horizonDays: SEVERE_RUN_DEFAULTS.horizonDays, frontLoadedPercent, frontLoadedDays },
+    currency: ctx.reportingCurrency,
+    methodology:
+      `Severe run derived from the behaviour pattern rule: each deposit's volatile share, scaled by a ` +
+      `${severityMultiplier}× severity multiplier (capped at 100% of the balance), runs off within the first ` +
+      `${frontLoadedDays} days; every other 30-day LCR outflow, at its run-off rate × ${severityMultiplier}, is ` +
+      `spread across the rest of the ${SEVERE_RUN_DEFAULTS.horizonDays}-day window. The front-loaded share ` +
+      `(${frontLoadedPercent.toFixed(1)}%) is therefore an output of the rule, not a constant. The severity ` +
+      'multiplier is configured on the Behaviour Pattern rule.',
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────

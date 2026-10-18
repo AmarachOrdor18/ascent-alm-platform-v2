@@ -49,7 +49,10 @@ export function ShockCurveEditor({ points, onChange, readOnly, step = 5 }: Shock
 
   return (
     <div className="select-none">
-      <div className="flex items-stretch gap-1 rounded-lg border border-gray-200 bg-gray-50/50 px-2 pt-3 pb-1" style={{ height: HEIGHT + 24 }}>
+      <div
+        className="flex items-stretch gap-1 rounded-lg border border-gray-200 bg-gray-50/50 px-2 pt-3 pb-1"
+        style={{ height: HEIGHT + 24 }}
+      >
         {points.map((p) => {
           const zeroFraction = 0.5;
           const valueFraction = 0.5 - p.value / (2 * range);
@@ -80,13 +83,16 @@ export function ShockCurveEditor({ points, onChange, readOnly, step = 5 }: Shock
                   style={{ top: barTop, height: barHeight }}
                 />
               </div>
-              <span className="mt-1 text-[9px] font-mono text-gray-500">{p.value > 0 ? '+' : ''}{p.value}</span>
-              <span className="text-[9px] text-gray-400">{p.label}</span>
+              <span className="mt-1 text-[10px] font-mono text-gray-500">
+                {p.value > 0 ? '+' : ''}
+                {p.value}
+              </span>
+              <span className="text-[10px] text-gray-400">{p.label}</span>
             </div>
           );
         })}
       </div>
-      <p className="mt-1.5 text-[10px] text-gray-400">Drag a bar up or down to set its shock in basis points</p>
+      <p className="mt-1.5 text-[11px] text-gray-400">Drag a bar up or down to set its shock in basis points</p>
     </div>
   );
 }

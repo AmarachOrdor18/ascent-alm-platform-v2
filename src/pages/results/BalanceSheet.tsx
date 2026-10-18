@@ -86,7 +86,7 @@ export function BalanceSheet() {
     {
       key: 'code',
       header: 'Code',
-      render: (r) => <span className="font-mono text-[11px] text-gray-500">{r.code}</span>,
+      render: (r) => <span className="font-mono text-[12px] text-gray-500">{r.code}</span>,
     },
     {
       key: 'amount',
@@ -153,7 +153,7 @@ export function BalanceSheet() {
             value={dimension}
             onChange={(e) => setDimension(e.target.value as DimensionType)}
             aria-label="Roll up by"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-[12px] focus:border-navy-700 focus:outline-none"
+            className="rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
           >
             {DIMENSIONS.map((d) => (
               <option key={d.value} value={d.value}>
@@ -166,7 +166,7 @@ export function BalanceSheet() {
 
       <ResultsFrame {...frameProps(selected)} requires={[]}>
         {Math.abs(totals.plug) >= Math.max(1, totals.assets * 0.0001) && (
-          <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
+          <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
             <span className="font-bold">Assets less liabilities and capital is not zero.</span> The difference is{' '}
             <Amount value={totals.plug} currency={currency} colorBySign /> - shown rather than plugged, because a
             balance sheet that always balances on screen hides the load that did not.
@@ -174,7 +174,7 @@ export function BalanceSheet() {
         )}
 
         {unmapped.length > 0 && (
-          <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
+          <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
             <span className="font-bold">
               {unmapped.length} code(s) not in the {dimension} hierarchy:
             </span>{' '}
@@ -185,7 +185,7 @@ export function BalanceSheet() {
         )}
 
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+          <h2 className="mb-4 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
             Roll-up by {DIMENSIONS.find((d) => d.value === dimension)?.label.toLowerCase()}
             <InfoButton label="How to read this table">
               "Booked here" is the balance posted directly to that line; "Including children" rolls up every line
@@ -204,11 +204,11 @@ export function BalanceSheet() {
         </section>
 
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">By category</h2>
-          <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
+          <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">By category</h2>
+          <dl className="grid grid-cols-2 gap-4 text-[13px] md:grid-cols-4">
             {CATEGORY_ORDER.map((c) => (
               <div key={c}>
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{c}</dt>
+                <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{c}</dt>
                 <dd className="mt-0.5">
                   <Amount
                     value={c === 'Asset' ? totals.assets : c === 'Liability' ? totals.liabilities : totals.capital}
@@ -218,10 +218,10 @@ export function BalanceSheet() {
               </div>
             ))}
             <div>
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Off balance sheet</dt>
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Off balance sheet</dt>
               <dd className="mt-0.5">
                 <Amount value={totals.offBalanceSheet} currency={currency} />
-                <span className="ml-2 text-[10px] text-gray-400">notional, excluded from totals</span>
+                <span className="ml-2 text-[11px] text-gray-400">notional, excluded from totals</span>
               </dd>
             </div>
           </dl>
@@ -249,13 +249,13 @@ function PositionDetail({
   const matching = allMatching.slice(0, 50);
 
   if (matching.length === 0) {
-    return <p className="text-[11px] text-gray-500">This is a parent line - expand a leaf to see its accounts.</p>;
+    return <p className="text-[12px] text-gray-500">This is a parent line - expand a leaf to see its accounts.</p>;
   }
 
   return (
     <>
       <ResultTable
-        className="text-[11px]"
+        className="text-[12px]"
         rows={matching}
         rowKey={(p) => p.id}
         columns={[
@@ -293,7 +293,7 @@ function PositionDetail({
             render: (p) => (
               <Link
                 href={`/data/operations/position-book?batchId=${p.batchId}`}
-                className="text-[10px] font-bold text-navy-700 hover:underline"
+                className="text-[11px] font-bold text-navy-700 hover:underline"
               >
                 Source →
               </Link>
@@ -302,7 +302,7 @@ function PositionDetail({
         ]}
       />
       {allMatching.length > 50 && (
-        <p className="mt-2 text-[11px] text-gray-400">Showing 50 of {allMatching.length} accounts.</p>
+        <p className="mt-2 text-[12px] text-gray-400">Showing 50 of {allMatching.length} accounts.</p>
       )}
     </>
   );

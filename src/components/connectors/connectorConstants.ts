@@ -2,8 +2,16 @@
 import type { ConnectorStatus, DataDomain } from '@/engine/types';
 
 export const DOMAINS: DataDomain[] = [
-  'Positions', 'GeneralLedger', 'MarketRates', 'FxRates', 'Counterparties', 'EconomicIndicators',
+  'Positions',
+  'GeneralLedger',
+  'MarketRates',
+  'FxRates',
+  'Counterparties',
+  'EconomicIndicators',
 ];
+
+/** What an affiliate itself feeds: its positions and general ledger. Market data (curves, FX, indicators) is loaded by Group. */
+export const AFFILIATE_FEED_DOMAINS: DataDomain[] = ['Positions', 'GeneralLedger'];
 
 export const DOMAIN_LABEL: Record<DataDomain, string> = {
   Positions: 'Position book',
@@ -15,9 +23,15 @@ export const DOMAIN_LABEL: Record<DataDomain, string> = {
 };
 
 export const STATUS_LABEL: Record<ConnectorStatus, string> = {
-  Available: 'Available', Blocked: 'Blocked', Planned: 'Planned', Retired: 'Retired',
+  Available: 'Available',
+  Blocked: 'Blocked',
+  Planned: 'Planned',
+  Retired: 'Retired',
 };
 
 export const STATUS_TONE: Record<ConnectorStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  Available: 'success', Blocked: 'danger', Planned: 'warning', Retired: 'neutral',
+  Available: 'success',
+  Blocked: 'danger',
+  Planned: 'warning',
+  Retired: 'neutral',
 };

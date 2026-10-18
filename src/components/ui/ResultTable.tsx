@@ -93,13 +93,17 @@ export function ResultTable<T>({
   }, [rows, sort, columns]);
 
   if (rows.length === 0) {
-    return <p className="rounded-lg bg-gray-50 p-6 text-center text-[12px] text-gray-500">{emptyMessage}</p>;
+    return (
+      <p data-tour="table-empty" className="rounded-lg bg-gray-50 p-6 text-center text-[13px] text-gray-500">
+        {emptyMessage}
+      </p>
+    );
   }
 
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table className="w-full border-collapse text-[12px]">
-        {caption && <caption className="mb-2 text-left text-[11px] text-gray-500">{caption}</caption>}
+    <div data-tour="table" className={cn('overflow-x-auto', className)}>
+      <table data-tour="table-grid" className="w-full border-collapse text-[13px]">
+        {caption && <caption className="mb-2 text-left text-[12px] text-gray-500">{caption}</caption>}
         <thead>
           <tr className="border-b border-gray-200">
             {renderDetail && <th scope="col" className="w-8 py-2 px-3" />}
@@ -121,7 +125,7 @@ export function ResultTable<T>({
                       : undefined
                   }
                   className={cn(
-                    'py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400',
+                    'py-2 px-3 text-[11px] font-bold uppercase tracking-wider text-gray-400',
                     col.align === 'right' ? 'text-right' : 'text-left',
                     isSortable && 'cursor-pointer select-none hover:text-navy-700',
                   )}
@@ -142,7 +146,7 @@ export function ResultTable<T>({
                   <th
                     key={`${col.key}-delta`}
                     scope="col"
-                    className="py-2 px-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="py-2 px-3 text-right text-[11px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     {col.header} {priorLabel}
                   </th>
@@ -158,6 +162,7 @@ export function ResultTable<T>({
             return (
               <React.Fragment key={key}>
                 <tr
+                  data-tour-row={key}
                   className={cn(
                     'border-b border-gray-100',
                     renderDetail && 'hover:bg-gray-50',
@@ -169,6 +174,7 @@ export function ResultTable<T>({
                       <button
                         type="button"
                         onClick={() => toggle(key)}
+                        data-tour="row-view"
                         aria-expanded={isOpen}
                         aria-label={isOpen ? `Collapse detail for ${key}` : `Expand detail for ${key}`}
                         className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-transform hover:border-navy-700 hover:text-navy-700"
@@ -203,7 +209,7 @@ export function ResultTable<T>({
                       })}
                 </tr>
                 {renderDetail && isOpen && (
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr data-tour="row-detail" className="border-b border-gray-100 bg-gray-50">
                     <td colSpan={columns.length + 1 + (comparing ? columns.filter((c) => c.compareValue).length : 0)}>
                       <div className="p-4">{renderDetail(row)}</div>
                     </td>

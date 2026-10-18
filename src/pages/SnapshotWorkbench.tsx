@@ -72,12 +72,12 @@ export function SnapshotWorkbench() {
 
   const positionControls = useTableControls(snapshot?.positions ?? [], 50, ['id', 'productClass']);
 
-  if (isLoading) return <p className="p-6 text-[12px] text-gray-400">Loading…</p>;
+  if (isLoading) return <p className="p-6 text-[13px] text-gray-400">Loading…</p>;
   if (!snapshot) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-[13px] font-bold text-navy-900">Snapshot not found</p>
-        <p className="mt-1 text-[12px] text-gray-500">It may have been discarded, or the link is wrong.</p>
+        <p className="text-[14px] font-bold text-navy-900">Snapshot not found</p>
+        <p className="mt-1 text-[13px] text-gray-500">It may have been discarded, or the link is wrong.</p>
       </div>
     );
   }
@@ -124,7 +124,8 @@ export function SnapshotWorkbench() {
     <>
       <ModuleHeader
         title="Editable Snapshot"
-        description="Investigate, correct or what-if a committed batch's positions without touching the batch itself. Nothing here becomes official until it is recalculated, compared and approved."
+        description="Investigate, correct or what-if a committed batch's positions."
+        about="The batch itself is untouched, and nothing here becomes official until it is recalculated, compared and approved."
         asOfDate={snapshot.asOfDate}
         scope={snapshot.affiliateCode}
         metrics={[
@@ -143,7 +144,7 @@ export function SnapshotWorkbench() {
               <button
                 type="button"
                 onClick={() => void discard.mutateAsync(snapshot)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:border-danger hover:text-danger"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-gray-600 hover:border-danger hover:text-danger"
               >
                 Discard
               </button>
@@ -152,7 +153,7 @@ export function SnapshotWorkbench() {
                 onClick={() => void handleRecalculate()}
                 disabled={recalculate.isPending || snapshot.changes.length === 0}
                 title={snapshot.changes.length === 0 ? 'Make at least one edit first' : undefined}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
                 {recalculate.isPending ? 'Recalculating…' : 'Recalculate'}
               </button>
@@ -161,7 +162,7 @@ export function SnapshotWorkbench() {
         }
       />
 
-      <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 text-[12px] leading-relaxed text-gray-600">
+      <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 text-[13px] leading-relaxed text-gray-600">
         <span className="font-bold text-navy-900">Reason: </span>
         {snapshot.reason} · opened by {snapshot.createdBy} on {formatDate(snapshot.createdAt.slice(0, 10))} from{' '}
         <Link
@@ -174,7 +175,7 @@ export function SnapshotWorkbench() {
       </div>
 
       {snapshot.status === 'Committed' && snapshot.committedBatchId && (
-        <div className="mb-4 rounded-2xl border border-success/20 bg-success-bg p-4 text-[12px] leading-relaxed text-success">
+        <div className="mb-4 rounded-2xl border border-success/20 bg-success-bg p-4 text-[13px] leading-relaxed text-success">
           <span className="font-bold">Committed.</span> This snapshot is now Position Book version{' '}
           <Link
             href={`/data/operations/position-book?batchId=${snapshot.committedBatchId}`}
@@ -187,7 +188,7 @@ export function SnapshotWorkbench() {
       )}
 
       {snapshot.status === 'PendingApproval' && (
-        <div className="mb-4 rounded-2xl border border-warning/20 bg-warning-bg p-4 text-[12px] leading-relaxed text-warning">
+        <div className="mb-4 rounded-2xl border border-warning/20 bg-warning-bg p-4 text-[13px] leading-relaxed text-warning">
           {submitted ? 'Submitted.' : 'This snapshot is'} awaiting maker-checker approval in{' '}
           <Link href="/controls" className="font-bold underline hover:no-underline">
             Approvals
@@ -199,7 +200,7 @@ export function SnapshotWorkbench() {
       {comparison && (
         <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center gap-1.5">
-            <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Original vs snapshot</h2>
+            <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">Original vs snapshot</h2>
             <InfoButton label="How this comparison is computed">
               Both sides run the full calculation engine over the same scope and rules - only the position data differs.
               Original replays the parent batch as committed; Snapshot substitutes every edited field.
@@ -252,7 +253,7 @@ export function SnapshotWorkbench() {
                 type="button"
                 onClick={() => void handleSubmit()}
                 disabled={submitted || submitForApproval.isPending}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
                 {submitted
                   ? 'Submitted for approval ✓'
@@ -266,7 +267,7 @@ export function SnapshotWorkbench() {
       )}
 
       <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+        <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">
           Positions ({snapshot.positions.length})
         </h2>
 
@@ -285,7 +286,7 @@ export function SnapshotWorkbench() {
           rowKey={(p) => p.id}
           emptyMessage={positionControls.search ? 'No positions match your search.' : 'No positions in this snapshot.'}
           columns={[
-            { key: 'id', header: 'Position', render: (p) => <span className="font-mono text-[11px]">{p.id}</span> },
+            { key: 'id', header: 'Position', render: (p) => <span className="font-mono text-[12px]">{p.id}</span> },
             {
               key: 'product',
               header: 'Product',
@@ -307,7 +308,7 @@ export function SnapshotWorkbench() {
                 ) : (
                   <ul className="space-y-0.5">
                     {changes.map((c, i) => (
-                      <li key={i} className="text-[10px] text-warning">
+                      <li key={i} className="text-[11px] text-warning">
                         <span className="font-bold">{c.field}:</span> {String(c.oldValue ?? '-')} →{' '}
                         {String(c.newValue ?? '-')}
                       </li>
@@ -325,7 +326,7 @@ export function SnapshotWorkbench() {
                   <button
                     type="button"
                     onClick={() => setEditingId(editingId === p.id ? null : p.id)}
-                    className="text-[11px] font-bold text-navy-700 hover:underline"
+                    className="text-[12px] font-bold text-navy-700 hover:underline"
                   >
                     {editingId === p.id ? 'Close' : 'Edit'}
                   </button>
@@ -360,7 +361,7 @@ export function SnapshotWorkbench() {
         <button
           type="button"
           onClick={() => navigate(`/data/operations/position-book?batchId=${snapshot.parentBatchId}`)}
-          className="text-[11px] font-bold text-navy-700 hover:underline"
+          className="text-[12px] font-bold text-navy-700 hover:underline"
         >
           ← Back to Position Book
         </button>
@@ -381,8 +382,8 @@ function EditPanel({
   return (
     <div className="mt-4 rounded-2xl border border-navy-100 bg-navy-50 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-navy-900">Editing {position.id}</h3>
-        <button type="button" onClick={onClose} className="text-[11px] font-bold text-navy-700 hover:underline">
+        <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Editing {position.id}</h3>
+        <button type="button" onClick={onClose} className="text-[12px] font-bold text-navy-700 hover:underline">
           Done
         </button>
       </div>
@@ -393,7 +394,7 @@ function EditPanel({
             <div key={field}>
               <label
                 htmlFor={`edit-${field}`}
-                className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500"
+                className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-500"
               >
                 {label}
               </label>
@@ -402,7 +403,7 @@ function EditPanel({
                   id={`edit-${field}`}
                   defaultValue={String(current)}
                   onChange={(e) => onChange(field, e.target.value)}
-                  className="w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+                  className="w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
                 >
                   <option value="true">Yes</option>
                   <option value="false">No</option>
@@ -413,14 +414,14 @@ function EditPanel({
                   type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
                   defaultValue={current === null || current === undefined ? '' : String(current)}
                   onBlur={(e) => onChange(field, e.target.value)}
-                  className="w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
+                  className="w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
                 />
               )}
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-[10px] leading-relaxed text-navy-900/70">
+      <p className="mt-3 text-[11px] leading-relaxed text-navy-900/70">
         Every edit is recorded with the field, old value, new value, who made it and when - visible above in "Changed
         fields" and in the Audit Log.
       </p>

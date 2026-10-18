@@ -48,7 +48,7 @@ export function RuleRows<T>({
         {/* min-w-full, not w-full: a row with many narrow columns (Product Characteristics has 9) needs to be
             free to grow past the card's width and scroll horizontally, rather than every input being forced
             to shrink to fit - which is what made typed values invisible inside their own field. */}
-        <table className="min-w-full text-[12px]">
+        <table className="min-w-full text-[13px]">
           <thead>
             <tr className="border-b border-gray-200">
               {columns.map((c) => (
@@ -56,7 +56,7 @@ export function RuleRows<T>({
                   key={c.key}
                   scope="col"
                   className={cn(
-                    'py-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400',
+                    'py-1.5 px-3 text-[11px] font-bold uppercase tracking-wider text-gray-400',
                     c.align === 'right' ? 'text-right' : 'text-left',
                   )}
                   style={c.width ? { width: c.width } : undefined}
@@ -70,7 +70,7 @@ export function RuleRows<T>({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 1} className="py-6 px-3 text-center text-[12px] text-gray-400">
+                <td colSpan={columns.length + 1} className="py-6 px-3 text-center text-[13px] text-gray-400">
                   {emptyMessage}
                 </td>
               </tr>
@@ -88,7 +88,7 @@ export function RuleRows<T>({
                       <button
                         type="button"
                         onClick={() => onChange(rows.filter((_, i) => i !== index))}
-                        className="text-[11px] font-bold text-danger hover:underline"
+                        className="text-[12px] font-bold text-danger hover:underline"
                       >
                         Remove
                       </button>
@@ -106,12 +106,12 @@ export function RuleRows<T>({
           <button
             type="button"
             onClick={() => (onAdd ? onAdd() : onChange([...rows, createRow!()]))}
-            className="text-[11px] font-bold text-navy-700 hover:text-navy-900"
+            className="text-[12px] font-bold text-navy-700 hover:text-navy-900"
           >
             {addLabel}
           </button>
         )}
-        {footer && <div className="ml-auto text-[11px]">{footer}</div>}
+        {footer && <div className="ml-auto text-[12px]">{footer}</div>}
       </div>
     </div>
   );
@@ -150,7 +150,7 @@ export function RowSelect<T extends string>({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value as T)}
         className={cn(
-          'w-full min-w-[7rem] rounded border px-2 py-1 text-[11px] focus:outline-none focus:ring-1 disabled:bg-gray-50',
+          'w-full min-w-[7rem] rounded border px-2 py-1 text-[12px] focus:outline-none focus:ring-1 disabled:bg-gray-50',
           hasMatch || !value
             ? 'border-gray-200 focus:border-navy-700 focus:ring-navy-700'
             : 'border-danger text-danger focus:border-danger focus:ring-danger',
@@ -201,7 +201,7 @@ export function RowInput({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'w-full min-w-[4.5rem] rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50',
+          'w-full min-w-[4.5rem] rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50',
           type === 'number' && 'text-right font-mono',
         )}
       />

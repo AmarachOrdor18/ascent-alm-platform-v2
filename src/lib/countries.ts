@@ -11,7 +11,14 @@ export interface Country {
 
 // "West Africa" sits alongside the Anglophone/UEMOA split for a case that doesn't fit either
 // cleanly - no country in COUNTRIES auto-fills to it, so it's only ever reached by hand.
-export const REGIONS = ['West Africa', 'Anglophone West Africa', 'UEMOA', 'Central Africa', 'East Africa', 'Southern Africa'] as const;
+export const REGIONS = [
+  'West Africa',
+  'Anglophone West Africa',
+  'UEMOA',
+  'Central Africa',
+  'East Africa',
+  'Southern Africa',
+] as const;
 
 export const COUNTRIES: Country[] = [
   { code: 'NG', name: 'Nigeria', region: 'Anglophone West Africa' },

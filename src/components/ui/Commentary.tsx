@@ -49,7 +49,7 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
   return (
     <section className={cn('rounded-2xl border border-gray-100 bg-white p-6 shadow-sm', className)}>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Analyst Commentary</h3>
+        <h3 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">Analyst Commentary</h3>
         {record && <StatusBadge status={record.reviewState} />}
       </div>
 
@@ -65,14 +65,14 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
             disabled={!canEdit || saving}
             rows={4}
             placeholder="Explain the movement - what changed, why, and what is expected next period."
-            className="w-full rounded-lg border border-gray-200 p-3 text-[12px] leading-relaxed focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+            className="w-full rounded-lg border border-gray-200 p-3 text-[13px] leading-relaxed focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
           />
           <div className="mt-3 flex gap-2">
             <button
               type="button"
               onClick={handleSave}
               disabled={!canEdit || saving || draft.trim().length === 0}
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
               {saving ? 'Saving…' : 'Save commentary'}
             </button>
@@ -83,7 +83,7 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
                   setDraft(record.text);
                   setIsEditing(false);
                 }}
-                className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
               >
                 Cancel
               </button>
@@ -92,8 +92,8 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
         </>
       ) : (
         <>
-          <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-gray-700">{record.text}</p>
-          <p className="mt-3 text-[11px] text-gray-400">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-700">{record.text}</p>
+          <p className="mt-3 text-[12px] text-gray-400">
             {record.authorName} · {new Date(record.authoredAt).toLocaleString()}
             {record.reviewedBy && ` · reviewed by ${record.reviewedBy}`}
           </p>
@@ -102,7 +102,7 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="text-[12px] font-bold text-navy-900 hover:text-navy-700"
+                className="text-[13px] font-bold text-navy-900 hover:text-navy-700"
               >
                 Edit
               </button>
@@ -111,13 +111,13 @@ export function Commentary({ record, canEdit, canReview, onSave, onReview, class
               <button
                 type="button"
                 onClick={() => onReview('Approved')}
-                className="rounded-lg bg-success px-4 py-2 text-[12px] font-bold text-white hover:opacity-90"
+                className="rounded-lg bg-success px-4 py-2 text-[13px] font-bold text-white hover:opacity-90"
               >
                 Approve for ALCO
               </button>
             )}
             {reviewerIsAuthor && record.reviewState !== 'Approved' && (
-              <p className="text-[11px] text-gray-400">Awaiting review by someone other than the author.</p>
+              <p className="text-[12px] text-gray-400">Awaiting review by someone other than the author.</p>
             )}
           </div>
         </>

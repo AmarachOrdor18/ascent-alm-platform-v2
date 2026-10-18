@@ -35,6 +35,8 @@ export interface TemporaryLimit {
 export interface BreachNote {
   id: string;
   breachId: string;
+  /** The affiliate the note was written for (a Group-default limit is evaluated per affiliate). */
+  affiliateCode?: string | null;
   cause: string;
   resolutionAction: string;
   targetResolutionDate: IsoDate | null;
@@ -113,10 +115,12 @@ export function evaluateLimit(
     config.regulatoryMinimum !== null &&
     (higherIsBetter ? value < config.regulatoryMinimum : value > config.regulatoryMinimum);
 
-  // 100% utilisation means the metric is at the red line.
+  // 100% utilisation means the metric is at the red line; 0% means at or on the safe side of green. The
+  // distance is signed by direction - an LCR well above its green line has used none of its appetite, not
+  // "222%" of it, which an unsigned distance reported.
   const span = Math.abs(config.greenThreshold - red);
-  const travelled = Math.abs(config.greenThreshold - value);
-  const utilisationPercent = span > 0 ? Math.min(999, (travelled / span) * 100) : null;
+  const travelled = higherIsBetter ? config.greenThreshold - value : value - config.greenThreshold;
+  const utilisationPercent = span > 0 ? Math.min(999, (Math.max(0, travelled) / span) * 100) : null;
 
   return {
     ...base,

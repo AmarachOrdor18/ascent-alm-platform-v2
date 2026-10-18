@@ -131,7 +131,13 @@ function position(overrides: Partial<Position> = {}): Position {
     ccfPct: null,
     turnover: null,
     overdraft: null,
-    control: { maker: 'TEST', checker: 'SYSTEM', status: 'ACTIVE', createdAt: '2026-07-31T09:00:00Z', updatedAt: '2026-07-31T09:00:00Z' },
+    control: {
+      maker: 'TEST',
+      checker: 'SYSTEM',
+      status: 'ACTIVE',
+      createdAt: '2026-07-31T09:00:00Z',
+      updatedAt: '2026-07-31T09:00:00Z',
+    },
     notes: null,
     ...overrides,
   };
@@ -251,6 +257,9 @@ describe('multi-department Position Book contribution', () => {
       asfFactorPct: 50,
       rsfFactorPct: null,
       amount: 600_000_000,
+      // Wholesale term funding counts toward LCR outflows only as it matures inside the 30-day window (read
+      // from the run's cashflow book), so it must fall due within it to give the ratio a denominator.
+      maturityDate: '2026-08-20',
     });
     const allPositions = [loansPosition, treasuryPosition];
 

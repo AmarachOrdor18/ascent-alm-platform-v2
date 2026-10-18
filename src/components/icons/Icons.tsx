@@ -455,31 +455,31 @@ export const NairaIcon = ({ className, ...props }: IconProps) => (
 
 // Integration Logos
 export const NGXLogo = () => (
-  <div className="bg-[#004C97] text-white px-2 py-0.5 font-bold text-[10px] tracking-wider rounded-sm inline-flex items-center">
+  <div className="bg-[#004C97] text-white px-2 py-0.5 font-bold text-[11px] tracking-wider rounded-sm inline-flex items-center">
     NGX
   </div>
 );
 
 export const FMDQLogo = () => (
-  <div className="bg-[#00703C] text-white px-2 py-0.5 font-bold text-[10px] tracking-wider rounded-sm inline-flex items-center">
+  <div className="bg-[#00703C] text-white px-2 py-0.5 font-bold text-[11px] tracking-wider rounded-sm inline-flex items-center">
     FMDQ
   </div>
 );
 
 export const CSCSLogo = () => (
-  <div className="bg-[#C8102E] text-white px-2 py-0.5 font-bold text-[10px] tracking-wider rounded-sm inline-flex items-center">
+  <div className="bg-[#C8102E] text-white px-2 py-0.5 font-bold text-[11px] tracking-wider rounded-sm inline-flex items-center">
     CSCS
   </div>
 );
 
 export const SECLogo = () => (
-  <div className="bg-[#1A3C5E] text-white px-2 py-0.5 font-bold text-[10px] tracking-wider rounded-sm inline-flex items-center">
+  <div className="bg-[#1A3C5E] text-white px-2 py-0.5 font-bold text-[11px] tracking-wider rounded-sm inline-flex items-center">
     SEC NG
   </div>
 );
 
 export const CBNLogo = () => (
-  <div className="bg-[#006400] text-white px-2 py-0.5 font-bold text-[10px] tracking-wider rounded-sm inline-flex items-center">
+  <div className="bg-[#006400] text-white px-2 py-0.5 font-bold text-[11px] tracking-wider rounded-sm inline-flex items-center">
     CBN
   </div>
 );

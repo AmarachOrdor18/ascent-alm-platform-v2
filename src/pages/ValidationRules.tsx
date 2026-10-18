@@ -9,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { resolveSingleAffiliate, useAffiliates, useAuditEvents, usePositions } from '@/lib/hooks';
 import { accessibleAffiliates } from '@/lib/scope';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useRules, useRuleMutations, newRuleMeta } from '@/lib/ruleHooks';
 import { DEFAULT_VALIDATION_RULES, validatePositions, type ValidationRule } from '@/engine/validation';
 import type { ValidationRuleSet } from '@/engine/ruleTypes';
@@ -52,8 +52,8 @@ export function ValidationRules({
   const affiliate =
     embedded && forcedAffiliateCode
       ? affiliates.find((a) => a.code === forcedAffiliateCode)
-      : affiliates.find((a) => a.code === pickedCode) ??
-        (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode));
+      : (affiliates.find((a) => a.code === pickedCode) ??
+        (affiliateCode === 'GROUP' ? undefined : resolveSingleAffiliate(affiliates, affiliateCode)));
   const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
   const { data: auditEvents = [] } = useAuditEvents();
 
@@ -89,7 +89,11 @@ export function ValidationRules({
     const base =
       activeSet ??
       ({
-        ...newRuleMeta('ValidationRule', `Validation rules - ${affiliate?.name ?? 'Group default'}`, user?.name ?? 'unknown'),
+        ...newRuleMeta(
+          'ValidationRule',
+          `Validation rules - ${affiliate?.name ?? 'Group default'}`,
+          user?.name ?? 'unknown',
+        ),
         kind: 'ValidationRule' as const,
         affiliateCode: affiliate?.code ?? null,
         rules: DEFAULT_VALIDATION_RULES,
@@ -131,7 +135,7 @@ export function ValidationRules({
   };
 
   const columns: ResultColumn<ValidationRule>[] = [
-    { key: 'id', header: 'Rule', render: (r) => <span className="font-mono text-[11px]">{r.id}</span> },
+    { key: 'id', header: 'Rule', render: (r) => <span className="font-mono text-[12px]">{r.id}</span> },
     { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-navy-900">{r.name}</span> },
     { key: 'type', header: 'Check type', render: (r) => <span className="text-gray-600">{r.checkType}</span> },
     {
@@ -147,7 +151,7 @@ export function ValidationRules({
               id={`sev-${r.id}`}
               value={r.severity}
               onChange={(e) => update(r.id, { severity: e.target.value as Severity })}
-              className="rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+              className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
             >
               {SEVERITIES.map((s) => (
                 <option key={s} value={s}>
@@ -164,7 +168,7 @@ export function ValidationRules({
       key: 'blocks',
       header: 'Blocks commit',
       render: (r) => (
-        <label className="flex items-center gap-2 text-[11px] text-gray-600">
+        <label className="flex items-center gap-2 text-[12px] text-gray-600">
           <input
             type="checkbox"
             checked={r.blocksCommit}
@@ -180,7 +184,7 @@ export function ValidationRules({
       key: 'active',
       header: 'Active',
       render: (r) => (
-        <label className="flex items-center gap-2 text-[11px] text-gray-600">
+        <label className="flex items-center gap-2 text-[12px] text-gray-600">
           <input
             type="checkbox"
             checked={r.isActive}
@@ -214,51 +218,67 @@ export function ValidationRules({
   return (
     <>
       {!embedded && (
-      <ModuleHeader
-        title="Validation Rules"
-        description="Data-quality checks run as a gate before any calculation. Rules are configuration, so a bank adds its own without a release."
-        asOfDate={asOfDate}
-        scope={affiliate?.name ?? 'No affiliate selected'}
-        metrics={[
-          { label: 'Rules', value: String(rules.length), about: 'Data-quality checks configured for this scope, covering completeness, referential integrity, ranges and more.' },
-          { label: 'Active', value: String(rules.filter((r) => r.isActive).length), about: 'Rules currently enforced - a disabled rule is kept on file but not evaluated.' },
-          { label: 'Blocking', value: String(blocking), tone: 'warning', about: 'Active rules that prevent a batch being committed if it fails them, rather than just flagging the finding.' },
-          {
-            label: 'Last run',
-            value: result ? (result.blocked ? 'Blocked' : 'Passed') : 'Not run',
-            tone: result ? (result.blocked ? 'danger' : 'success') : 'neutral',
-            about: 'The outcome of the most recent check against this affiliate’s staged positions.',
-          },
-        ]}
-        actions={
-          <>
-            <label htmlFor="vr-asof" className="sr-only">
-              As-of date
-            </label>
-            <input
-              id="vr-asof"
-              type="date"
-              value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
-              className="rounded border border-gray-200 px-2 py-2 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-            />
-            <button
-              type="button"
-              onClick={() => void runChecks()}
-              disabled={positions.length === 0 || runningChecks || !result}
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
-            >
-              {runningChecks ? 'Recording…' : 'Run checks'}
-            </button>
-          </>
-        }
-      />
+        <ModuleHeader
+          title="Validation Rules"
+          description="Data-quality checks run as a gate before any calculation."
+          about="Rules are configuration, so a bank adds its own without a release."
+          asOfDate={asOfDate}
+          scope={affiliate?.name ?? 'No affiliate selected'}
+          metrics={[
+            {
+              label: 'Rules',
+              value: String(rules.length),
+              about:
+                'Data-quality checks configured for this scope, covering completeness, referential integrity, ranges and more.',
+            },
+            {
+              label: 'Active',
+              value: String(rules.filter((r) => r.isActive).length),
+              about: 'Rules currently enforced - a disabled rule is kept on file but not evaluated.',
+            },
+            {
+              label: 'Blocking',
+              value: String(blocking),
+              tone: 'warning',
+              about:
+                'Active rules that prevent a batch being committed if it fails them, rather than just flagging the finding.',
+            },
+            {
+              label: 'Last run',
+              value: result ? (result.blocked ? 'Blocked' : 'Passed') : 'Not run',
+              tone: result ? (result.blocked ? 'danger' : 'success') : 'neutral',
+              about: 'The outcome of the most recent check against this affiliate’s staged positions.',
+            },
+          ]}
+          actions={
+            <>
+              <label htmlFor="vr-asof" className="sr-only">
+                As-of date
+              </label>
+              <input
+                id="vr-asof"
+                type="date"
+                value={asOfDate}
+                onChange={(e) => setAsOfDate(e.target.value)}
+                className="rounded border border-gray-200 px-2 py-2 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+              />
+              <button
+                type="button"
+                onClick={() => void runChecks()}
+                disabled={positions.length === 0 || runningChecks || !result}
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              >
+                {runningChecks ? 'Recording…' : 'Run checks'}
+              </button>
+            </>
+          }
+        />
       )}
 
       {!embedded && <AffiliateSelector affiliates={affiliates} value={affiliate?.code} onChange={setPickedCode} />}
 
       {!embedded && !affiliate && (
-        <div className="mb-6 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-[12px] text-gray-500">
+        <div className="mb-6 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-[13px] text-gray-500">
           Group scope has no single affiliate to default to. Pick one above to check its own data.
         </div>
       )}
@@ -268,8 +288,8 @@ export function ValidationRules({
           role="status"
           className={
             result.blocked
-              ? 'mb-6 rounded-lg bg-danger-bg px-4 py-3 text-[12px] leading-relaxed text-danger'
-              : 'mb-6 rounded-lg bg-success-bg px-4 py-3 text-[12px] leading-relaxed text-success'
+              ? 'mb-6 rounded-lg bg-danger-bg px-4 py-3 text-[13px] leading-relaxed text-danger'
+              : 'mb-6 rounded-lg bg-success-bg px-4 py-3 text-[13px] leading-relaxed text-success'
           }
         >
           <span className="font-bold">
@@ -287,13 +307,13 @@ export function ValidationRules({
       )}
 
       <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Rules</h2>
+        <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">Rules</h2>
         <ResultTable
           rows={rules}
           columns={columns}
           rowKey={(r) => r.id}
           renderDetail={(r) => (
-            <div className="space-y-2 text-[11px] leading-relaxed text-gray-600">
+            <div className="space-y-2 text-[12px] leading-relaxed text-gray-600">
               <p>{CHECK_EXPLANATION[r.checkType] ?? 'Custom check.'}</p>
               <p>
                 <span className="font-bold">{r.blocksCommit ? 'Blocking: ' : 'Advisory: '}</span>
@@ -318,12 +338,12 @@ export function ValidationRules({
         />
       </section>
 
-      <p className="flex items-center gap-1.5 text-[11px] text-gray-400">
+      <p className="flex items-center gap-1.5 text-[12px] text-gray-400">
         Why blocking rules exist
         <InfoButton label="Why blocking rules exist">
-          Oracle runs Cash Flow Edits before any engine processing for the same reason: a calculation on data that
-          does not balance produces a confident, wrong answer, and a confident wrong answer is worse than a refusal.
-          Marking a rule blocking is what turns a data-quality report into a control.
+          Oracle runs Cash Flow Edits before any engine processing for the same reason: a calculation on data that does
+          not balance produces a confident, wrong answer, and a confident wrong answer is worse than a refusal. Marking
+          a rule blocking is what turns a data-quality report into a control.
         </InfoButton>
       </p>
     </>

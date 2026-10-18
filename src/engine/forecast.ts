@@ -68,11 +68,7 @@ function synthesizeFor(
  * matching `NewBusinessRule` line simply run off (today's implicit static assumption), and
  * maturing positions with a matching line get replaced/grown/topped-up per that line's method.
  */
-export function projectOnePeriod(
-  positions: Position[],
-  lines: ForecastBalanceLine[],
-  periodEnd: IsoDate,
-): Position[] {
+export function projectOnePeriod(positions: Position[], lines: ForecastBalanceLine[], periodEnd: IsoDate): Position[] {
   const lineByKey = new Map(lines.map((l) => [lineKeyOf(l), l]));
   const surviving: Position[] = [];
   const maturingByKey = new Map<string, { total: number; template: Position }>();
@@ -138,7 +134,7 @@ export interface ForecastPeriod {
 /**
  * Chains `projectOnePeriod` across `periodCount` periods and runs the real, unmodified
  * `executeRun` against each projected book. Never persisted (no `insertRunResults`/`upsertRun`
- * call) - a forecast is a hypothetical, not an auditable Process Run, and must not appear in Run
+ * call) - a forecast is a hypothetical, not an auditable run, and must not appear in Run
  * History or break the "results read from a run, never recomputed" invariant.
  */
 export function runForecast(

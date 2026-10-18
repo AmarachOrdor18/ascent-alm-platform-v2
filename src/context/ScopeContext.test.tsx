@@ -18,7 +18,7 @@ const NIGERIA_USER: User = {
   name: 'Test Nigeria User',
   email: 'test-ng@ecobank.com',
   passwordHash: 'test',
-  role: 'TREASURY_USER',
+  role: 'RISK_ANALYST',
   affiliateCode: 'NG',
   isActive: true,
   mfaEnrolled: true,
@@ -77,7 +77,7 @@ describe('ScopeContext follows the logged-in user', () => {
     expect(screen.getByTestId('scope').textContent).toBe(GROUP_CODE);
   });
 
-  it('scopes to a Nigeria-assigned user\'s own affiliate on login', async () => {
+  it("scopes to a Nigeria-assigned user's own affiliate on login", async () => {
     renderProbe();
     await act(async () => {
       screen.getByText('as-nigeria').click();

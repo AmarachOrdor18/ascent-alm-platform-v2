@@ -134,7 +134,13 @@ function position(overrides: Partial<Position> = {}): Position {
     ccfPct: null,
     turnover: null,
     overdraft: null,
-    control: { maker: 'TEST', checker: 'SYSTEM', status: 'ACTIVE', createdAt: '2026-07-31T09:00:00Z', updatedAt: '2026-07-31T09:00:00Z' },
+    control: {
+      maker: 'TEST',
+      checker: 'SYSTEM',
+      status: 'ACTIVE',
+      createdAt: '2026-07-31T09:00:00Z',
+      updatedAt: '2026-07-31T09:00:00Z',
+    },
     notes: null,
     ...overrides,
   };
@@ -268,7 +274,14 @@ describe('editable snapshot data flow', () => {
       reason: 'Restating after month-end true-up',
       positions: [editedPosition],
       changes: [
-        { positionId: editedPosition.id, field: 'amount', oldValue: 1_000_000_000, newValue: 1_500_000_000, changedBy: 'analyst', changedAt: '2026-08-01T00:00:00Z' },
+        {
+          positionId: editedPosition.id,
+          field: 'amount',
+          oldValue: 1_000_000_000,
+          newValue: 1_500_000_000,
+          changedBy: 'analyst',
+          changedAt: '2026-08-01T00:00:00Z',
+        },
       ],
       createdBy: 'analyst',
       createdAt: '2026-08-01T00:00:00Z',
@@ -304,7 +317,11 @@ describe('editable snapshot data flow', () => {
     };
     // Mirrors the id-collision fix in useCommitSnapshot: positions are keyed by id alone, so a committed
     // snapshot position must get a new id, never the parent position's id, or it would overwrite that row.
-    const adjustedPositions = snapshot.positions.map((p) => ({ ...p, id: `${p.id}-v${newBatch.version}`, batchId: newBatch.id }));
+    const adjustedPositions = snapshot.positions.map((p) => ({
+      ...p,
+      id: `${p.id}-v${newBatch.version}`,
+      batchId: newBatch.id,
+    }));
 
     await repo.upsertBatch({ ...parent, status: 'Superseded', supersededReason: newBatch.supersededReason });
     await repo.insertPositions(adjustedPositions);

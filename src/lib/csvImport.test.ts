@@ -77,7 +77,9 @@ describe('Ghana position book', () => {
   it('passes validation without a blocking exception', () => {
     const v = validatePositions(result.rows, {
       asOfDate: AS_OF,
-      knownAffiliateCodes: AFFILIATES.map((a) => a.code),
+      // The reference seed no longer pre-registers affiliates (they are onboarded), so the file's own
+      // affiliate is supplied here as the onboarded one it would be in practice.
+      knownAffiliateCodes: [...AFFILIATES.map((a) => a.code), 'GH'],
     });
     expect(v.blocked, v.exceptions.map((e) => e.description).join('; ')).toBe(false);
   });

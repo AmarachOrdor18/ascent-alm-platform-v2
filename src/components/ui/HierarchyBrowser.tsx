@@ -97,7 +97,7 @@ export function HierarchyBrowser({
               onClick={() => toggleCollapse(node.code)}
               aria-expanded={!isCollapsed}
               aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${node.name}`}
-              className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] text-gray-400 hover:bg-gray-200 hover:text-navy-700"
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[11px] text-gray-400 hover:bg-gray-200 hover:text-navy-700"
             >
               <span aria-hidden="true">{isCollapsed ? '▸' : '▾'}</span>
             </button>
@@ -117,7 +117,7 @@ export function HierarchyBrowser({
           <label
             htmlFor={`hb-${node.code}`}
             className={cn(
-              'cursor-pointer truncate text-[12px]',
+              'cursor-pointer truncate text-[13px]',
               node.isLeaf ? 'text-gray-700' : 'font-bold text-navy-900',
               !selectable && 'cursor-default text-gray-400',
             )}
@@ -136,7 +136,7 @@ export function HierarchyBrowser({
       <div className="border-b border-gray-100 p-3">
         <label
           htmlFor={`hb-search-${label}`}
-          className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+          className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
         >
           {label}
         </label>
@@ -146,13 +146,13 @@ export function HierarchyBrowser({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search…"
-          className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+          className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
         />
       </div>
 
       <div className="max-h-72 overflow-y-auto p-2">
         {tree.length === 0 ? (
-          <p className="p-4 text-center text-[12px] text-gray-400">{emptyMessage}</p>
+          <p className="p-4 text-center text-[13px] text-gray-400">{emptyMessage}</p>
         ) : (
           <ul>{tree.map(renderNode)}</ul>
         )}
@@ -160,14 +160,14 @@ export function HierarchyBrowser({
 
       {mode === 'multi' && (
         <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2">
-          <span className="text-[11px] text-gray-500">
+          <span className="text-[12px] text-gray-500">
             {selected.size === 0 ? 'No constraint - all members included' : `${selected.size} selected`}
           </span>
           {selected.size > 0 && (
             <button
               type="button"
               onClick={() => onChange([])}
-              className="text-[11px] font-bold text-navy-700 hover:text-navy-900"
+              className="text-[12px] font-bold text-navy-700 hover:text-navy-900"
             >
               Clear
             </button>

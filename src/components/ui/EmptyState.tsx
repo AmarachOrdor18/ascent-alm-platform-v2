@@ -19,17 +19,20 @@ interface EmptyStateProps {
  */
 export function EmptyState({ title, children, cta, className }: EmptyStateProps) {
   return (
-    <div className={cn('rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center', className)}>
+    <div
+      data-tour="empty-state"
+      className={cn('rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center', className)}
+    >
       {title && (
         <div className="flex items-center justify-center gap-1.5">
-          <p className="text-[13px] font-bold text-navy-900">{title}</p>
+          <p className="text-[14px] font-bold text-navy-900">{title}</p>
         </div>
       )}
-      {children && <div className="mx-auto mt-2 max-w-lg text-[11px] leading-relaxed text-gray-500">{children}</div>}
+      {children && <div className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-500">{children}</div>}
       {cta && (
         <Link
           href={cta.href}
-          className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+          className="mt-4 inline-block rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
         >
           {cta.label}
         </Link>

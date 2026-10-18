@@ -28,7 +28,8 @@ export function ForecastScenarios() {
   return (
     <RuleEditor<ForecastScenarioRule>
       title="Forecast Rate Scenarios"
-      description="Saved, reusable rate shocks - the six BCBS standardised scenarios, plus any the bank defines itself. Selectable on Process Run once Approved (see Approvals); left unselected, a run computes the base case only. Also drives Stress Testing and What-If, which can use one unapproved for exploration."
+      description="Saved, reusable rate shocks - the six BCBS standardised scenarios, plus any the bank defines itself."
+      about="Selectable on Run now once Approved (see Approvals); left unselected, a run computes the base case only. Also drives Stress Testing and What-If, which can use one unapproved for exploration."
       noun="scenario"
       rules={rules}
       isLoading={isLoading}
@@ -62,8 +63,8 @@ export function ForecastScenarios() {
                     onClick={() => update({ shockByBucket: { ...curve }, basedOn: name })}
                     className={
                       rule.basedOn === name
-                        ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[11px] font-bold text-white'
-                        : 'rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
+                        ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white'
+                        : 'rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
                     }
                   >
                     {SHOCK_LABELS[name] ?? name}
@@ -74,7 +75,7 @@ export function ForecastScenarios() {
           )}
 
           <div>
-            <h3 className="mb-2 text-[12px] font-bold text-navy-900">Shock by bucket (basis points)</h3>
+            <h3 className="mb-2 text-[13px] font-bold text-navy-900">Shock by bucket (basis points)</h3>
             <div className="mb-3">
               <ShockCurveEditor
                 points={LADDER.buckets.map((bucket) => ({
@@ -115,7 +116,7 @@ export function ForecastScenarios() {
           </div>
 
           {rule.basedOn && (
-            <p className="rounded-lg bg-navy-50 px-3 py-2 text-[11px] text-navy-900">
+            <p className="rounded-lg bg-navy-50 px-3 py-2 text-[12px] text-navy-900">
               Reproduces the BCBS <span className="font-bold">{SHOCK_LABELS[rule.basedOn] ?? rule.basedOn}</span>{' '}
               scenario shape.
             </p>
@@ -129,7 +130,7 @@ export function ForecastScenarios() {
               {indicators.map((ind) => (
                 <span
                   key={ind.code}
-                  className="flex items-center gap-1.5 rounded border border-gray-200 px-2 py-1 text-[11px]"
+                  className="flex items-center gap-1.5 rounded border border-gray-200 px-2 py-1 text-[12px]"
                 >
                   <input
                     id={`ind-${ind.code}`}

@@ -123,7 +123,8 @@ export function PrepaymentRules() {
   return (
     <RuleEditor<PrepaymentRule>
       title="Prepayment & Early Redemption"
-      description="How much principal comes back early, and what penalty damps the incentive. Not yet selectable on Process Run - computePrepayment exists in the engine but no run currently calls it."
+      description="How much principal comes back early."
+      about="Selected on Run now's Rules panel once approved, the constant prepayment rate re-dates loan principal in the behavioural liquidity gap, the repricing gap and NII sensitivity. Rate-dependent sensitivity and redemption penalties are recorded but not yet modelled - the run uses the base CPR."
       noun="prepayment rule"
       rules={rules}
       isLoading={isLoading}
@@ -241,8 +242,11 @@ export function DiscountMethods() {
       summarise={(r) => `${r.assignments.length} assignment(s)`}
       guidance={
         <>
-          <span className="font-bold">Duration proxy is the current default.</span> Full cash-flow discounting needs
-          contract-level flows, which are out of scope - so EVE is computed by duration gap, and every result says so.
+          <span className="font-bold">EVE discounts the run&apos;s cashflows.</span> Each run generates contractual and
+          behavioural cashflows for every position and discounts them on the latest curve for its currency (its own rate
+          index where one is loaded). The duration proxy is used only for balances with no curve or no dated cashflow,
+          and the EVE result reports how much that was. Assignments here are recorded against the run; the engine
+          currently discounts on spot curves.
         </>
       }
       renderBody={(rule, update, readOnly) => (
@@ -369,14 +373,12 @@ export function Patterns() {
 
           {rule.phases.length > 1 && (
             <TierAllocationBar
-              segments={rule.phases.map(
-                (p, i): AllocationSegment => ({
-                  key: `${p.term}-${i}`,
-                  label: p.term,
-                  percent: p.percent,
-                  tone: paletteTone(i),
-                }),
-              )}
+              segments={rule.phases.map((p, i): AllocationSegment => ({
+                key: `${p.term}-${i}`,
+                label: p.term,
+                percent: p.percent,
+                tone: paletteTone(i),
+              }))}
               readOnly={readOnly}
               onResize={(left, right, leftPercent, rightPercent) =>
                 update({
@@ -495,7 +497,7 @@ export function Filters() {
   return (
     <RuleEditor<FilterRule>
       title="Filters & Expressions"
-      description="Named, reusable data selections. Process Run does not yet have a way to select one of these - scope it there directly with the Organisational Unit / Product pickers instead."
+      description="Named, reusable data selections. Run now does not yet have a way to select one of these - scope it there directly with the Organisational Unit / Product pickers instead."
       noun="filter"
       rules={rules}
       isLoading={isLoading}
@@ -548,7 +550,7 @@ export function Filters() {
           />
 
           {rule.conditions.length > 0 && (
-            <p className="rounded-lg bg-gray-50 px-3 py-2 font-mono text-[11px] text-gray-600">
+            <p className="rounded-lg bg-gray-50 px-3 py-2 font-mono text-[12px] text-gray-600">
               {rule.conditions
                 .map((c) => `${c.field} ${OPERATORS.find((o) => o.value === c.operator)?.label} ${c.value}`)
                 .join(' AND ')}

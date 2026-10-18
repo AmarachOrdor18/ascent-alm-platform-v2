@@ -8,13 +8,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { useAffiliates, useBatches, resolveSingleAffiliate } from '@/lib/hooks';
-import { useRules } from '@/lib/ruleHooks';
+import { useApprovedRuleFor, useRules } from '@/lib/ruleHooks';
 import { assembleInputs, payloadOf } from '@/lib/runHooks';
 import { availableAsOfDates } from '@/engine/vintage';
 import { draftRun } from '@/engine/run';
 import { runForecast, type ForecastPeriod } from '@/engine/forecast';
 import { formatDate, formatPct } from '@/lib/format';
-import type { NewBusinessRule } from '@/engine/ruleTypes';
+import type { BehaviourPatternRule, NewBusinessRule, ProductCharacteristicRule } from '@/engine/ruleTypes';
 import type { CalculationElement } from '@/engine/types';
 
 const FORECAST_ELEMENTS: CalculationElement[] = ['Lcr', 'Nsfr', 'NiiSensitivity'];
@@ -26,7 +26,7 @@ interface PeriodRow {
   status: string;
   /** Why this period failed - a projected book can run down to nothing (every maturing position
    * rolled off with no New Business rule to replace it) or hit a currency with no FX rate, the same
-   * two hard stops a real Process Run would hit. Null on a Completed period. */
+   * two hard stops a real run would hit. Null on a Completed period. */
   errorMessage: string | null;
   lcrPercent: number | null;
   nsfrPercent: number | null;
@@ -64,24 +64,46 @@ export function Forecast() {
   const [periodMonths, setPeriodMonths] = useState(1);
   const [periodCount, setPeriodCount] = useState(6);
 
+  // Projected periods run on the same approved behavioural and product basis a real run would
+  // use for this affiliate (its own rule, else the Group default) - engine defaults only when none is approved.
+  const { rule: behaviourRule, isLoading: loadingBehaviour } = useApprovedRuleFor<BehaviourPatternRule>(
+    'BehaviourPattern',
+    affiliate?.code,
+  );
+  const { rule: productRule, isLoading: loadingProduct } = useApprovedRuleFor<ProductCharacteristicRule>(
+    'ProductCharacteristic',
+    affiliate?.code,
+  );
+
   const baseRun = useMemo(() => {
-    if (!affiliate || !asOfDate) return null;
-    return draftRun({
-      id: `FORECAST-${affiliate.code}-${asOfDate}`,
-      name: `Forecast base - ${affiliate.name}`,
-      asOfDate,
-      affiliateCode: affiliate.code,
-      reportingCurrency: affiliate.functionalCurrency,
-      timeBucketRuleId: '',
-      batchIds: [],
-      createdBy: user?.name ?? 'unknown',
-      createdAt: new Date().toISOString(),
-      elements: FORECAST_ELEMENTS,
-    });
-  }, [affiliate, asOfDate, user]);
+    if (!affiliate || !asOfDate || loadingBehaviour || loadingProduct) return null;
+    return {
+      ...draftRun({
+        id: `FORECAST-${affiliate.code}-${asOfDate}`,
+        name: `Forecast base - ${affiliate.name}`,
+        asOfDate,
+        affiliateCode: affiliate.code,
+        reportingCurrency: affiliate.functionalCurrency,
+        timeBucketRuleId: '',
+        batchIds: [],
+        createdBy: user?.name ?? 'unknown',
+        createdAt: new Date().toISOString(),
+        elements: FORECAST_ELEMENTS,
+      }),
+      behaviourPatternRuleId: behaviourRule?.id ?? null,
+      productCharacteristicRuleId: productRule?.id ?? null,
+    };
+  }, [affiliate, asOfDate, user, behaviourRule, productRule, loadingBehaviour, loadingProduct]);
 
   const { data: inputs, isLoading: loadingInputs } = useQuery({
-    queryKey: ['forecast-inputs', baseRun?.id],
+    queryKey: [
+      'forecast-inputs',
+      baseRun?.id,
+      baseRun?.behaviourPatternRuleId,
+      behaviourRule?.version,
+      baseRun?.productCharacteristicRuleId,
+      productRule?.version,
+    ],
     queryFn: () => assembleInputs(baseRun!),
     enabled: !!baseRun,
   });
@@ -95,7 +117,8 @@ export function Forecast() {
 
   const rows = periods.map((p, i) => rowFor(i, p));
   const hasFailedPeriod = rows.some((r) => r.status !== 'Completed');
-  const failedFromRunoff = hasFailedPeriod && !rule && rows.some((r) => r.errorMessage?.includes('No committed positions'));
+  const failedFromRunoff =
+    hasFailedPeriod && !rule && rows.some((r) => r.errorMessage?.includes('No committed positions'));
 
   const columns: ResultColumn<PeriodRow>[] = [
     { key: 'period', header: 'Period', render: (r) => <span className="font-mono">{r.period}</span> },
@@ -106,7 +129,7 @@ export function Forecast() {
       render: (r) => (
         <>
           <StatusBadge status={r.status} tone={r.status === 'Completed' ? 'success' : 'danger'} />
-          {r.errorMessage && <p className="mt-1 max-w-xs text-[10px] leading-snug text-danger">{r.errorMessage}</p>}
+          {r.errorMessage && <p className="mt-1 max-w-xs text-[11px] leading-snug text-danger">{r.errorMessage}</p>}
         </>
       ),
     },
@@ -134,7 +157,8 @@ export function Forecast() {
     <>
       <ModuleHeader
         title="Forecast"
-        description="A rule-driven, period-by-period projection of the book - each period runs the same calculation engine as a normal run, just against a projected position book rather than today's."
+        description="A rule-driven, period-by-period projection of the book."
+        about="Each period runs the same calculation engine as a normal run, just against a projected position book rather than today's."
         asOfDate={asOfDate || null}
         scope={affiliate?.name ?? affiliateCode}
         metrics={[
@@ -142,18 +166,19 @@ export function Forecast() {
           {
             label: 'New business rule',
             value: rule ? rule.name : 'None (runoff only)',
-            about: 'Growth/rollover assumptions applied each period. Without one, maturing balances simply run off - the same assumption a static run makes.',
+            about:
+              'Growth/rollover assumptions applied each period. Without one, maturing balances simply run off - the same assumption a static run makes.',
           },
         ]}
       />
 
       {!canRun ? (
         <div role="alert" className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-          <p className="text-[13px] font-bold text-navy-900">Access restricted</p>
-          <p className="mt-1 text-[12px] text-gray-500">Your role doesn&rsquo;t have access to forecasting.</p>
+          <p className="text-[14px] font-bold text-navy-900">Access restricted</p>
+          <p className="mt-1 text-[13px] text-gray-500">Your role doesn&rsquo;t have access to forecasting.</p>
         </div>
       ) : !affiliate || !asOfDate ? (
-        <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[12px] text-gray-500">
+        <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[13px] text-gray-500">
           Select an affiliate with committed position data to forecast from.
         </p>
       ) : (
@@ -161,14 +186,14 @@ export function Forecast() {
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-end gap-4">
               <div>
-                <label htmlFor="fc-rule" className="mb-1 block text-[11px] text-gray-600">
+                <label htmlFor="fc-rule" className="mb-1 block text-[12px] text-gray-600">
                   New business rule
                 </label>
                 <select
                   id="fc-rule"
                   value={ruleId}
                   onChange={(e) => setRuleId(e.target.value)}
-                  className="w-64 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  className="w-64 rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 >
                   <option value="">None - runoff only</option>
                   {rules.map((r) => (
@@ -179,28 +204,28 @@ export function Forecast() {
                 </select>
               </div>
               <div>
-                <label htmlFor="fc-period-length" className="mb-1 block text-[11px] text-gray-600">
+                <label htmlFor="fc-period-length" className="mb-1 block text-[12px] text-gray-600">
                   Period length
                 </label>
                 <select
                   id="fc-period-length"
                   value={periodMonths}
                   onChange={(e) => setPeriodMonths(Number(e.target.value))}
-                  className="w-32 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  className="w-32 rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 >
                   <option value={1}>Monthly</option>
                   <option value={3}>Quarterly</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="fc-period-count" className="mb-1 block text-[11px] text-gray-600">
+                <label htmlFor="fc-period-count" className="mb-1 block text-[12px] text-gray-600">
                   Number of periods
                 </label>
                 <select
                   id="fc-period-count"
                   value={periodCount}
                   onChange={(e) => setPeriodCount(Number(e.target.value))}
-                  className="w-32 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                  className="w-32 rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                 >
                   {PERIOD_COUNT_OPTIONS.map((n) => (
                     <option key={n} value={n}>
@@ -210,28 +235,28 @@ export function Forecast() {
                 </select>
               </div>
               <InfoButton label="How this differs from a real run">
-                This is a hypothetical projection - it computes with the same engine as any Process Run, but
-                nothing here is saved, pinned, or added to Run History. Only an actual Process Run is auditable.
+                This is a hypothetical projection - it computes with the same engine as any run, but nothing here is
+                saved, pinned, or added to Runs. Only an actual run is auditable.
               </InfoButton>
             </div>
 
             {loadingInputs ? (
-              <p className="text-[12px] text-gray-400">Loading the current book…</p>
+              <p className="text-[13px] text-gray-400">Loading the current book…</p>
             ) : rows.length === 0 ? (
-              <p className="text-[12px] text-gray-500">Nothing to project yet.</p>
+              <p className="text-[13px] text-gray-500">Nothing to project yet.</p>
             ) : (
               <>
                 {failedFromRunoff && (
-                  <p className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[11px] leading-relaxed text-navy-900">
+                  <p className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
                     <span className="font-bold">Some periods failed: </span>
-                    with no New Business rule selected, maturing positions simply run off with nothing
-                    replacing them - over enough periods the projected book ran down to nothing. Pick a New
-                    Business rule above to keep it populated, or shorten the horizon.
+                    with no New Business rule selected, maturing positions simply run off with nothing replacing them -
+                    over enough periods the projected book ran down to nothing. Pick a New Business rule above to keep
+                    it populated, or shorten the horizon.
                   </p>
                 )}
                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    <p className="mb-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">
                       LCR across periods
                     </p>
                     <RatioChart
@@ -242,7 +267,7 @@ export function Forecast() {
                     />
                   </div>
                   <div>
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    <p className="mb-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">
                       NSFR across periods
                     </p>
                     <RatioChart

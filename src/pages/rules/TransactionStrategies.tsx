@@ -164,8 +164,8 @@ export function TransactionStrategies() {
         <>
           <span className="font-bold">Decisions, not shocks.</span> A rate scenario asks what happens if the market
           moves. A transaction strategy asks what happens if <em>we</em> move - issue term funding, sell down the bill
-          book, hedge the duration gap. Process Run lets a strategy be attached and pins it to the run, but does not
-          yet apply its effect to any calculated element - that modelling is a separate, not-yet-built piece of work.
+          book, hedge the duration gap. Run now lets a strategy be attached and pins it to the run, but does not yet
+          apply its effect to any calculated element - that modelling is a separate, not-yet-built piece of work.
         </>
       }
       renderBody={(rule, update, readOnly) => {
@@ -196,21 +196,21 @@ export function TransactionStrategies() {
             />
 
             {rule.transactions.length > 0 && (
-              <dl className="grid grid-cols-3 gap-4 rounded-lg bg-gray-50 p-4 text-[12px]">
+              <dl className="grid grid-cols-3 gap-4 rounded-lg bg-gray-50 p-4 text-[13px]">
                 <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Added</dt>
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Added</dt>
                   <dd>
                     <Amount value={byAction('Add')} currency={rule.transactions[0]!.currency} />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Sold</dt>
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Sold</dt>
                   <dd>
                     <Amount value={byAction('Sell')} currency={rule.transactions[0]!.currency} />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Hedged (notional)</dt>
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Hedged (notional)</dt>
                   <dd>
                     <Amount value={byAction('Hedge')} currency={rule.transactions[0]!.currency} />
                   </dd>
@@ -220,7 +220,7 @@ export function TransactionStrategies() {
 
             {rule.transactions.map((t, i) => (
               <div key={`note-${i}`} className="flex items-start gap-2">
-                <label htmlFor={`tsnote-${i}`} className="mt-1 w-24 shrink-0 text-[11px] text-gray-500">
+                <label htmlFor={`tsnote-${i}`} className="mt-1 w-24 shrink-0 text-[12px] text-gray-500">
                   Note {i + 1}
                 </label>
                 <input
@@ -233,7 +233,7 @@ export function TransactionStrategies() {
                       transactions: rule.transactions.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)),
                     })
                   }
-                  className="flex-1 rounded border border-gray-200 px-2 py-1 text-[11px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                  className="flex-1 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
                 />
               </div>
             ))}

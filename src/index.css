@@ -6,7 +6,7 @@
 
 :root {
   /* Enterprise Typography */
-  --font-sans: "Google Sans", "Outfit", sans-serif;
+  --font-sans: 'Google Sans', 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* ───── Ecobank Brand Palette ───── */
@@ -335,7 +335,8 @@
      scrollable too, so scrolling kept going past where the (viewport-height, non-scrolling) sidebar
      ends, revealing blank body background beneath it. Pinning html/body to the viewport and hiding
      their own overflow makes <main> the only thing that ever scrolls. */
-  html, body {
+  html,
+  body {
     height: 100%;
     overflow: hidden;
   }
@@ -381,7 +382,6 @@
 }
 
 @layer utilities {
-
   /* ── Teal backgrounds ── */
   .bg-navy-950 {
     background-color: hsl(var(--teal-950));

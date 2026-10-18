@@ -73,18 +73,29 @@ export function CommandPalette({ items, collapsed }: { items: NavItem[]; collaps
         aria-label="Search navigation"
         title={collapsed ? 'Search (⌘K)' : undefined}
         className={cn(
-          'mx-2 mb-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-white/10 bg-white/5 py-2 text-left text-[12px] text-white/50 hover:border-white/20 hover:bg-white/10',
+          'mx-2 mb-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-white/10 bg-white/5 py-2 text-left text-[13px] text-white/50 hover:border-white/20 hover:bg-white/10',
           collapsed ? 'justify-center px-2' : 'px-3',
         )}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="shrink-0"
+        >
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.3-4.3" />
         </svg>
         {!collapsed && (
           <>
             <span className="flex-1">Search…</span>
-            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40">
+            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-white/40">
               {navigator.platform.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl K'}
             </span>
           </>
@@ -105,7 +116,18 @@ export function CommandPalette({ items, collapsed }: { items: NavItem[]; collaps
             className="relative w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 text-gray-400"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
@@ -115,13 +137,15 @@ export function CommandPalette({ items, collapsed }: { items: NavItem[]; collaps
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Search pages, actions…"
-                className="flex-1 text-[14px] text-navy-900 placeholder:text-gray-400 focus:outline-none"
+                className="flex-1 text-[15px] text-navy-900 placeholder:text-gray-400 focus:outline-none"
               />
-              <span className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-400">ESC</span>
+              <span className="rounded border border-gray-200 px-1.5 py-0.5 text-[11px] font-bold text-gray-400">
+                ESC
+              </span>
             </div>
 
             <div className="max-h-80 overflow-y-auto py-1">
-              <p className="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Navigate</p>
+              <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Navigate</p>
               {results.map((item, i) => {
                 const Icon = item.icon;
                 return (
@@ -131,24 +155,35 @@ export function CommandPalette({ items, collapsed }: { items: NavItem[]; collaps
                     onClick={() => go(item.path)}
                     onMouseEnter={() => setActiveIndex(i)}
                     className={cn(
-                      'flex w-full items-center gap-3 px-4 py-2 text-left text-[13px]',
+                      'flex w-full items-center gap-3 px-4 py-2 text-left text-[14px]',
                       i === activeIndex ? 'bg-gray-100 text-navy-900' : 'text-gray-700',
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0 text-gray-500" />
                     <span className="flex-1">{item.name}</span>
                     {i === activeIndex && (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0 text-gray-400"
+                      >
                         <path d="M5 12h14M12 5l7 7-7 7" />
                       </svg>
                     )}
                   </button>
                 );
               })}
-              {results.length === 0 && <p className="px-4 py-6 text-center text-[12px] text-gray-400">No matches.</p>}
+              {results.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-gray-400">No matches.</p>}
             </div>
 
-            <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2 text-[10px] text-gray-400">
+            <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-2 text-[11px] text-gray-400">
               <span className="flex items-center gap-1">
                 <kbd className="rounded border border-gray-200 px-1 py-0.5 font-mono">↵</kbd> select
               </span>

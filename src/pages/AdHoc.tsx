@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAffiliates } from '@/lib/hooks';
 import { useRuns, runKeys } from '@/lib/runHooks';
 import { accessibleAffiliates, scopedListCode } from '@/lib/scope';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { METRIC_SPECS, extractMetrics, formatMetric } from '@/lib/metrics';
 import type { RunResult } from '@/engine/types';
 
@@ -71,7 +71,7 @@ export function AdHoc() {
       render: (r) => (
         <span>
           <span className="font-medium text-navy-900">{r.name}</span>
-          <span className="ml-2 font-mono text-[10px] text-gray-400">{r.asOfDate ?? 'no run'}</span>
+          <span className="ml-2 font-mono text-[11px] text-gray-400">{r.asOfDate ?? 'no run'}</span>
         </span>
       ),
     },
@@ -118,7 +118,7 @@ export function AdHoc() {
         <div className="space-y-6 lg:col-span-2">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-1.5">
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Metrics</h2>
+              <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">Metrics</h2>
               <InfoButton label="Why this list">
                 The same catalogue Limits and KRI read from - nothing metric-specific to this screen.
               </InfoButton>
@@ -134,8 +134,8 @@ export function AdHoc() {
                   }}
                   className={`rounded-lg border p-3 text-left ${metricKeys.includes(m.key) ? 'border-gold-500 bg-gold-500/5' : 'border-gray-200 hover:border-navy-700'}`}
                 >
-                  <p className="text-[11px] font-bold text-navy-900">{m.label}</p>
-                  <p className="mt-0.5 text-[10px] text-gray-400">{m.element}</p>
+                  <p className="text-[12px] font-bold text-navy-900">{m.label}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400">{m.element}</p>
                 </button>
               ))}
             </div>
@@ -143,15 +143,15 @@ export function AdHoc() {
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-1.5">
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
+              <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">Affiliates</h2>
               <InfoButton label="Why this list">
                 Analysis, not the Group-consolidated view - any status, not just Live.
               </InfoButton>
             </div>
             {affiliatesLoading ? (
-              <p className="text-[11px] text-gray-400">Loading…</p>
+              <p className="text-[12px] text-gray-400">Loading…</p>
             ) : liveAffiliates.length === 0 ? (
-              <p className="text-[11px] text-gray-400">No affiliates onboarded yet.</p>
+              <p className="text-[12px] text-gray-400">No affiliates onboarded yet.</p>
             ) : (
               <MultiSelectDropdown
                 className="max-w-sm"
@@ -174,7 +174,7 @@ export function AdHoc() {
             type="button"
             onClick={() => setRan(true)}
             disabled={metricKeys.length === 0 || affiliateCodes.length === 0}
-            className="w-full rounded-lg bg-navy-900 py-3 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-lg bg-navy-900 py-3 text-[14px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Run analysis
           </button>
@@ -183,7 +183,7 @@ export function AdHoc() {
 
       {ran && (
         <section className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Results</h2>
+          <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">Results</h2>
           <ResultTable
             rows={rows}
             columns={columns}

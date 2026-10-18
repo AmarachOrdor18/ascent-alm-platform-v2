@@ -30,30 +30,54 @@ const GROUPS: Array<{
     label: 'Structure',
     hint: 'Who this affiliate is, and how it is organised internally.',
     dimensions: [
-      { type: 'LegalEntity', label: 'Legal Entity', purpose: 'Multi-entity consolidation and entity-level regulatory reporting.' },
-      { type: 'OrgUnit', label: 'Organisational Unit', purpose: 'Segment profitability and FTP attribution by business unit.' },
+      {
+        type: 'LegalEntity',
+        label: 'Legal Entity',
+        purpose: 'Multi-entity consolidation and entity-level regulatory reporting.',
+      },
+      {
+        type: 'OrgUnit',
+        label: 'Organisational Unit',
+        purpose: 'Segment profitability and FTP attribution by business unit.',
+      },
     ],
   },
   {
     label: 'Chart of accounts',
     hint: 'How this affiliate’s ledger maps onto the standard every affiliate reconciles against.',
     dimensions: [
-      { type: 'GlAccount', label: 'General Ledger Account', purpose: 'Reconciliation of instrument balances to the ledger.' },
-      { type: 'CommonCoa', label: 'Common Chart of Accounts', purpose: 'The reconciliation standard this affiliate’s local GL maps onto.' },
+      {
+        type: 'GlAccount',
+        label: 'General Ledger Account',
+        purpose: 'Reconciliation of instrument balances to the ledger.',
+      },
+      {
+        type: 'CommonCoa',
+        label: 'Common Chart of Accounts',
+        purpose: 'The reconciliation standard this affiliate’s local GL maps onto.',
+      },
     ],
   },
   {
     label: 'Products',
     hint: 'What this affiliate actually sells and books.',
     dimensions: [
-      { type: 'Product', label: 'Product', purpose: 'Product-level regulatory assumptions and transfer-pricing rules key off these codes.' },
+      {
+        type: 'Product',
+        label: 'Product',
+        purpose: 'Product-level regulatory assumptions and transfer-pricing rules key off these codes.',
+      },
     ],
   },
   {
     label: 'Measures',
     hint: 'A shared, Group-wide taxonomy - not specific to any one affiliate.',
     dimensions: [
-      { type: 'FinancialElement', label: 'Financial Element', purpose: 'What is being measured, so one results table serves every metric.' },
+      {
+        type: 'FinancialElement',
+        label: 'Financial Element',
+        purpose: 'What is being measured, so one results table serves every metric.',
+      },
     ],
   },
 ];
@@ -64,9 +88,8 @@ export function Dimensions() {
   const { user, hasPermission } = useAuth();
   const { affiliateCode: scopeAffiliateCode } = useScope();
   const { data: allAffiliates = [] } = useAffiliates();
-  // Live-only, same as Data Upload - dimension membership only matters once an affiliate is actually
-  // working with real data.
-  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission).filter((a) => a.status === 'Live');
+  // Any affiliate not suspended - structure is set up during onboarding/testing, before go-live.
+  const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission).filter((a) => a.status !== 'Suspended');
 
   const [active, setActive] = useState<DimensionType>('OrgUnit');
   const [pickedCode, setPickedCode] = useState<string | null>(null);
@@ -150,12 +173,12 @@ export function Dimensions() {
   };
 
   const columns: ResultColumn<DimensionMember>[] = [
-    { key: 'code', header: 'Code', render: (m) => <span className="font-mono text-[11px]">{m.code}</span> },
+    { key: 'code', header: 'Code', render: (m) => <span className="font-mono text-[12px]">{m.code}</span> },
     { key: 'name', header: 'Name', render: (m) => m.name },
     {
       key: 'parent',
       header: 'Parent',
-      render: (m) => <span className="font-mono text-[11px] text-gray-500">{m.parentCode ?? '-'}</span>,
+      render: (m) => <span className="font-mono text-[12px] text-gray-500">{m.parentCode ?? '-'}</span>,
     },
     {
       key: 'kind',
@@ -172,14 +195,14 @@ export function Dimensions() {
             <button
               type="button"
               onClick={() => handleEdit(m)}
-              className="text-[11px] font-bold text-navy-700 hover:underline"
+              className="text-[12px] font-bold text-navy-700 hover:underline"
             >
               Edit
             </button>
             <button
               type="button"
               onClick={() => handleDelete(m)}
-              className="text-[11px] font-bold text-danger hover:underline"
+              className="text-[12px] font-bold text-danger hover:underline"
             >
               Delete
             </button>
@@ -192,27 +215,47 @@ export function Dimensions() {
     <>
       <ModuleHeader
         title="Dimensions & Hierarchies"
-        description="How this affiliate is structured, classified and mapped. Configuration data, so it carries no as-of date - and it's owned by the affiliate you pick below, never shared Group-wide (Financial Element excepted)."
+        description="How this affiliate is structured, classified and mapped."
+        about="Configuration data, so it carries no as-of date - and it's owned by the affiliate you pick below, never shared Group-wide (Financial Element excepted)."
         asOfDate={null}
         scope={isGroupWide ? 'Group-wide' : (affiliate?.name ?? 'No affiliate selected')}
         actions={
           <InfoButton label="Where this data comes from">
-            Each affiliate's own hierarchies (legal entities, org units, GL accounts, its copy of the Common Chart
-            of Accounts, products) are seeded when it's onboarded, then are ordinary configuration data from
-            there - add, edit or reparent a member here, or via the CSV &ldquo;Create these from the file&rdquo;
-            flow on Data Upload, which adds anything a position file references that isn&rsquo;t mapped yet.
-            Financial Element is the one exception: a Group-wide taxonomy of what's being measured, not tied to
-            any affiliate.
+            Each affiliate's own hierarchies (legal entities, org units, GL accounts, its copy of the Common Chart of
+            Accounts, products) are seeded when it's onboarded, then are ordinary configuration data from there - add,
+            edit or reparent a member here, or via the CSV &ldquo;Create these from the file&rdquo; flow on Data Upload,
+            which adds anything a position file references that isn&rsquo;t mapped yet. Financial Element is the one
+            exception: a Group-wide taxonomy of what's being measured, not tied to any affiliate.
           </InfoButton>
         }
         metrics={
           effectiveAffiliateCode
             ? [
-                { label: `${definition.label} members`, value: String(members.length), about: `Every code defined on the ${definition.label} dimension for this scope, at any level of its hierarchy.` },
-                { label: 'Root nodes', value: String(roots.length), about: 'Top-level entries in this dimension’s hierarchy - everything else nests beneath one of these.' },
-                { label: 'Leaves', value: String(members.filter((m) => m.isLeaf).length), about: 'Members with no children - these are what a position can actually be tagged with; a rollup node cannot carry a balance directly.' },
+                {
+                  label: `${definition.label} members`,
+                  value: String(members.length),
+                  about: `Every code defined on the ${definition.label} dimension for this scope, at any level of its hierarchy.`,
+                },
+                {
+                  label: 'Root nodes',
+                  value: String(roots.length),
+                  about:
+                    'Top-level entries in this dimension’s hierarchy - everything else nests beneath one of these.',
+                },
+                {
+                  label: 'Leaves',
+                  value: String(members.filter((m) => m.isLeaf).length),
+                  about:
+                    'Members with no children - these are what a position can actually be tagged with; a rollup node cannot carry a balance directly.',
+                },
               ]
-            : [{ label: `${definition.label} members`, value: '—', about: 'Pick an affiliate below to see its own dimension data.' }]
+            : [
+                {
+                  label: `${definition.label} members`,
+                  value: '—',
+                  about: 'Pick an affiliate below to see its own dimension data.',
+                },
+              ]
         }
       />
 
@@ -230,7 +273,7 @@ export function Dimensions() {
       <div className="mb-6 flex flex-wrap gap-x-8 gap-y-4">
         {GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p>
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p>
             <div className="flex flex-wrap gap-2" role="tablist" aria-label={group.label}>
               {group.dimensions.map((d) => (
                 <button
@@ -246,8 +289,8 @@ export function Dimensions() {
                   title={d.purpose}
                   className={
                     active === d.type
-                      ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[12px] font-bold text-white'
-                      : 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
+                      ? 'rounded-lg bg-navy-900 px-3 py-1.5 text-[13px] font-bold text-white'
+                      : 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[13px] text-gray-600 hover:border-navy-700 hover:text-navy-900'
                   }
                 >
                   {d.label}
@@ -258,25 +301,25 @@ export function Dimensions() {
         ))}
       </div>
 
-      <p className="mb-6 rounded-lg bg-navy-50 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
+      <p className="mb-6 rounded-lg bg-navy-50 px-4 py-3 text-[13px] leading-relaxed text-navy-900">
         <span className="font-bold">{definition.label}.</span> {definition.purpose}
       </p>
 
       {!isGroupWide && !affiliate ? (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <p className="text-[13px] font-bold text-navy-900">Select an affiliate</p>
-          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+          <p className="text-[14px] font-bold text-navy-900">Select an affiliate</p>
+          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-500">
             {definition.label} is owned by each affiliate individually - pick one above to see or edit its entries.
           </p>
         </section>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="lg:col-span-1">
-            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Hierarchy
               <InfoButton label="How to use this tree">
-                Select one or more nodes to filter the table on the right to just those members. Selecting a rollup
-                node brings its whole subtree with it - everything nested beneath it is included automatically.
+                Select one or more nodes to filter the table on the right to just those members. Selecting a rollup node
+                brings its whole subtree with it - everything nested beneath it is included automatically.
               </InfoButton>
             </h2>
             <HierarchyBrowser
@@ -289,12 +332,12 @@ export function Dimensions() {
 
             {canEdit && (
               <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-                <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                <h3 className="mb-3 text-[12px] font-bold uppercase tracking-wider text-gray-400">
                   {editingCode ? `Editing ${editingCode}` : 'Add member'}
                 </h3>
                 <div className="space-y-2">
                   <div>
-                    <label htmlFor="dim-code" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="dim-code" className="mb-1 block text-[12px] text-gray-600">
                       Code
                     </label>
                     <input
@@ -304,19 +347,19 @@ export function Dimensions() {
                       onChange={(e) => setDraft({ ...draft, code: e.target.value })}
                       placeholder="OU-NG-RET-LAG"
                       className={cn(
-                        'w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700',
+                        'w-full rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700',
                         editingCode && 'bg-gray-50 text-gray-500',
                       )}
                     />
                     {editingCode && (
-                      <p className="mt-1 text-[10px] text-gray-400">
+                      <p className="mt-1 text-[11px] text-gray-400">
                         Locked - the code is what every reference to this member is keyed on. Delete and re-add to
                         change it.
                       </p>
                     )}
                   </div>
                   <div>
-                    <label htmlFor="dim-name" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="dim-name" className="mb-1 block text-[12px] text-gray-600">
                       Name
                     </label>
                     <input
@@ -324,18 +367,18 @@ export function Dimensions() {
                       value={draft.name}
                       onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                       placeholder="Lagos Branch Network"
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <div>
-                    <label htmlFor="dim-parent" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="dim-parent" className="mb-1 block text-[12px] text-gray-600">
                       Parent
                     </label>
                     <select
                       id="dim-parent"
                       value={draft.parentCode}
                       onChange={(e) => setDraft({ ...draft, parentCode: e.target.value })}
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     >
                       <option value="">- top level -</option>
                       {members
@@ -347,7 +390,10 @@ export function Dimensions() {
                         ))}
                     </select>
                   </div>
-                  <label htmlFor="dim-is-leaf" className="flex cursor-pointer items-start gap-2 text-[11px] text-gray-600">
+                  <label
+                    htmlFor="dim-is-leaf"
+                    className="flex cursor-pointer items-start gap-2 text-[12px] text-gray-600"
+                  >
                     <input
                       id="dim-is-leaf"
                       type="checkbox"
@@ -356,8 +402,8 @@ export function Dimensions() {
                       className="mt-0.5 accent-gold-500"
                     />
                     <span>
-                      Leaf - can be tagged directly on a position. Uncheck for a grouping node other members will
-                      nest under (a category, not something a position codes to itself).
+                      Leaf - can be tagged directly on a position. Uncheck for a grouping node other members will nest
+                      under (a category, not something a position codes to itself).
                     </span>
                   </label>
                   <div className="flex gap-2">
@@ -365,7 +411,7 @@ export function Dimensions() {
                       <button
                         type="button"
                         onClick={resetDraft}
-                        className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:border-navy-700 hover:text-navy-900"
+                        className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-gray-600 hover:border-navy-700 hover:text-navy-900"
                       >
                         Cancel
                       </button>
@@ -374,7 +420,7 @@ export function Dimensions() {
                       type="button"
                       onClick={handleSubmit}
                       disabled={save.isPending || !draft.code.trim() || !draft.name.trim()}
-                      className="flex-1 rounded-lg bg-navy-900 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                      className="flex-1 rounded-lg bg-navy-900 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                     >
                       {save.isPending
                         ? 'Saving…'
@@ -388,14 +434,14 @@ export function Dimensions() {
             )}
 
             {justSavedProduct && affiliate && (
-              <div className="mt-3 rounded-lg bg-navy-50 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
+              <div className="mt-3 rounded-lg bg-navy-50 px-4 py-3 text-[13px] leading-relaxed text-navy-900">
                 <p className="mb-3">
-                  Saved. This is the catalogue entry only - it has no effect on any calculation until it has
-                  Basel factors defined.
+                  Saved. This is the catalogue entry only - it has no effect on any calculation until it has Basel
+                  factors defined.
                 </p>
                 <Link
-                  href={`/affiliates/${affiliate.code}/settings?section=rule-ProductCharacteristic`}
-                  className="inline-block rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+                  href="/rules/product-characteristics"
+                  className="inline-block rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
                 >
                   Set Product Characteristics →
                 </Link>
@@ -404,7 +450,7 @@ export function Dimensions() {
           </section>
 
           <section className="lg:col-span-2">
-            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               {selected.length > 0 ? `Selected (${selected.length})` : `All ${definition.label} members`}
               <InfoButton label="Leaf vs rollup">
                 A Leaf member is what a position can actually be tagged with. A Rollup exists purely to organise leaves
@@ -429,7 +475,7 @@ export function Dimensions() {
                 rowKey={(m) => m.code}
                 emptyMessage={isLoading ? 'Loading…' : 'No members to show.'}
                 renderDetail={(m) => (
-                  <dl className="grid grid-cols-2 gap-3 text-[11px]">
+                  <dl className="grid grid-cols-2 gap-3 text-[12px]">
                     <div>
                       <dt className="font-bold uppercase tracking-wider text-gray-400">Identifier</dt>
                       <dd className="font-mono text-gray-700">{m.id}</dd>

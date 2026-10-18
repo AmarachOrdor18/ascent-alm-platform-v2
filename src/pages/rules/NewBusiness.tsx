@@ -153,7 +153,7 @@ export function NewBusiness() {
   return (
     <RuleEditor<NewBusinessRule>
       title="New Business Assumptions"
-      description="Forecast balances, pricing margins and maturity mix. Consumed by Forecast, and required to select a Dynamic process type on Process Run - it does not yet affect a Process Run's own calculated elements."
+      description="Forecast balances, pricing margins and maturity mix. Consumed by Forecast, and required to select a Dynamic process type on Run now - it does not yet affect a Run now's own calculated elements."
       noun="assumption set"
       rules={rules}
       isLoading={isLoading}
@@ -182,7 +182,7 @@ export function NewBusiness() {
             onChange={(lines) => update({ lines })}
             readOnly={readOnly}
             addLabel="Add product line"
-            emptyMessage="No new-business lines. This rule's lines feed the Forecast page, not a Process Run's own calculated elements."
+            emptyMessage="No new-business lines. This rule's lines feed the Forecast page, not a Run now's own calculated elements."
             createRow={() => ({
               productCode: leaves[0]?.code ?? '',
               currency: currencies[0]?.code ?? 'USD',
@@ -199,21 +199,19 @@ export function NewBusiness() {
             const total = Object.values(line.maturityMix).reduce((s, v) => s + v, 0);
             return (
               <div key={`mix-${i}`} className="rounded-lg border border-gray-200 p-4">
-                <h4 className="mb-1 text-[12px] font-bold text-navy-900">
+                <h4 className="mb-1 text-[13px] font-bold text-navy-900">
                   Maturity mix - {leaves.find((p) => p.code === line.productCode)?.name ?? line.productCode}
                 </h4>
-                <p className="mb-3 text-[11px] text-gray-500">{METHOD_HINT[line.method]}</p>
+                <p className="mb-3 text-[12px] text-gray-500">{METHOD_HINT[line.method]}</p>
 
                 <div className="mb-3">
                   <TierAllocationBar
-                    segments={BUCKETS.map(
-                      (bucket, bi): AllocationSegment => ({
-                        key: bucket,
-                        label: bucket,
-                        percent: line.maturityMix[bucket] ?? 0,
-                        tone: paletteTone(bi),
-                      }),
-                    )}
+                    segments={BUCKETS.map((bucket, bi): AllocationSegment => ({
+                      key: bucket,
+                      label: bucket,
+                      percent: line.maturityMix[bucket] ?? 0,
+                      tone: paletteTone(bi),
+                    }))}
                     readOnly={readOnly}
                     onResize={(left, right, leftPercent, rightPercent) =>
                       update({
@@ -257,7 +255,7 @@ export function NewBusiness() {
                     </RuleField>
                   ))}
                 </div>
-                <p className={`mt-2 text-[11px] ${Math.abs(total - 100) < 0.0001 ? 'text-success' : 'text-danger'}`}>
+                <p className={`mt-2 text-[12px] ${Math.abs(total - 100) < 0.0001 ? 'text-success' : 'text-danger'}`}>
                   Mix totals {total.toFixed(0)}%
                 </p>
               </div>

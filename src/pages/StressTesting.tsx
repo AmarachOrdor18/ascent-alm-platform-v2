@@ -8,16 +8,20 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useScope } from '@/context/ScopeContext';
 import { useFxRates, usePositions } from '@/lib/hooks';
 import { useSelectedRun, frameProps } from '@/lib/resultHooks';
+import { useRuleAsUsedBy } from '@/lib/ruleHooks';
+import { useRunValuationInputs } from '@/lib/cashflowBookHooks';
 import { buildFxTable, missingRates } from '@/engine/fx';
 import { computeAllShocks, computeEquity } from '@/engine/irrbb';
 import { defaultLadder } from '@/engine/buckets';
+import { DEFAULT_BETAS, DEFAULT_PATTERNS } from '@/engine/behavioural';
 import {
   computeCounterbalancingCapacity,
   computeSurvivalHorizon,
-  severeOutflowProfile,
+  deriveSevereRun,
   solveOutflowForSurvivalTarget,
   type SurvivalDay,
 } from '@/engine/stress';
+import type { BehaviourPatternRule } from '@/engine/ruleTypes';
 import { computeLcr } from '@/engine/liquidity';
 import { formatPct } from '@/lib/format';
 
@@ -43,6 +47,10 @@ export function StressTesting() {
   // battery below is reproducible: the same run always shows the same six shocks and severe-run result,
   // regardless of what has loaded or been superseded since.
   const { data: positions = [] } = usePositions(run?.affiliateCode, run?.asOfDate);
+  // The severe run and the deposit betas come from the behaviour pattern rule this run actually used (at
+  // the version it used), so this screen and the run's own Survival Horizon element tell the same story.
+  // No rule on the run means the engine defaults, exactly as the run itself fell back to.
+  const { data: behaviourRule = null } = useRuleAsUsedBy<BehaviourPatternRule>(run?.behaviourPatternRuleId, run);
 
   const fx = useMemo(
     () => (effectiveDate ? buildFxTable(currency, fxRates, effectiveDate) : null),
@@ -60,12 +68,31 @@ export function StressTesting() {
     [positions, currency, fx],
   );
 
+  // The run's own cashflow book (same rules, same versions, same builder), so the shock battery revalues the
+  // same cashflows the run's EVE element did and the severe run starts from the same classified book.
+  const valuation = useRunValuationInputs(run, positions);
+
   const analysis = useMemo(() => {
     if (!effectiveDate || !fx || positions.length === 0 || missingFx.length > 0) return null;
+    const book = valuation?.book;
+    const classified = valuation?.positions ?? positions;
 
-    const ctx = { asOfDate: effectiveDate, reportingCurrency: currency, fx, tier1Capital: null };
-    const equity = computeEquity(positions, ctx);
-    const { results, worstCase } = computeAllShocks(positions, ctx, defaultLadder('RepricingGap'));
+    const ctx = {
+      asOfDate: effectiveDate,
+      reportingCurrency: currency,
+      fx,
+      tier1Capital: null,
+      depositBetas: behaviourRule?.betas ?? DEFAULT_BETAS,
+    };
+    const equity = computeEquity(classified, ctx);
+    const { results, worstCase } = computeAllShocks(
+      classified,
+      ctx,
+      defaultLadder('RepricingGap'),
+      [],
+      valuation ? { book: valuation.book, curves: valuation.curves } : undefined,
+    );
+    const eveMethod = Object.values(results)[0]?.eve.method ?? null;
 
     const rows: ShockRow[] = Object.entries(results).map(([name, r]) => ({
       name,
@@ -78,17 +105,24 @@ export function StressTesting() {
     }));
 
     const liqCtx = { asOfDate: effectiveDate, reportingCurrency: currency, fx };
-    const lcr = computeLcr(positions, liqCtx);
-    const stressedLcr = computeLcr(positions, liqCtx, { runoffMultiplier: 2, hqlaHaircutPercent: 10 });
-    const capacity = computeCounterbalancingCapacity(positions, liqCtx, 10);
-    const survival = computeSurvivalHorizon(
-      capacity.total,
-      severeOutflowProfile(stressedLcr.grossOutflows * 2),
+    const lcr = computeLcr(classified, liqCtx, {}, book);
+    const severe = deriveSevereRun(classified, behaviourRule?.patterns ?? DEFAULT_PATTERNS, liqCtx, {
+      severityMultiplier: behaviourRule?.stressSeverityMultiplier,
+    });
+    const stressedLcr = computeLcr(
+      classified,
       liqCtx,
+      {
+        runoffMultiplier: severe.severityMultiplier,
+        hqlaHaircutPercent: severe.hqlaHaircutPercent,
+      },
+      book,
     );
+    const capacity = computeCounterbalancingCapacity(classified, liqCtx, severe.hqlaHaircutPercent);
+    const survival = computeSurvivalHorizon(capacity.total, severe.profile, liqCtx);
 
-    return { rows, worstCase, equity, capacity, survival, lcr, stressedLcr, capitalBasis: results };
-  }, [positions, missingFx, effectiveDate, currency, fx]);
+    return { rows, worstCase, equity, capacity, survival, severe, lcr, stressedLcr, capitalBasis: results, eveMethod };
+  }, [positions, valuation, missingFx, effectiveDate, currency, fx, behaviourRule]);
 
   const worstRow = analysis?.rows.find((r) => r.name === analysis.worstCase?.name) ?? null;
   const outliers = analysis?.rows.filter((r) => r.isOutlier === true) ?? [];
@@ -98,9 +132,11 @@ export function StressTesting() {
   const reverseResult = useMemo(() => {
     if (!reverseMode || !analysis || !effectiveDate || !fx) return null;
     const liqCtx = { asOfDate: effectiveDate, reportingCurrency: currency, fx };
+    // Same run shape as the forward severe run - only the size is solved for.
+    const { horizonDays, frontLoadedPercent, frontLoadedDays } = analysis.severe.profile;
     return solveOutflowForSurvivalTarget(
       analysis.capacity.total,
-      { horizonDays: 30, frontLoadedPercent: 55, frontLoadedDays: 10 },
+      { horizonDays, frontLoadedPercent, frontLoadedDays },
       targetDays,
       liqCtx,
     );
@@ -152,7 +188,8 @@ export function StressTesting() {
     <>
       <ModuleHeader
         title="Stress Testing"
-        description="The six BCBS supervisory shocks and the severe liquidity run, computed against the selected run's own book - the prescribed battery, not a sandbox."
+        description="The six BCBS supervisory shocks and the severe liquidity run."
+        about="Computed against the selected run's own book - the prescribed battery, not a sandbox."
         asOfDate={effectiveDate}
         scope={affiliate?.name ?? affiliateCode}
         currency={currency}
@@ -182,22 +219,22 @@ export function StressTesting() {
             value: analysis ? `${analysis.survival.survivalHorizonDays} days` : '-',
             tone: (analysis?.survival.survivalHorizonDays ?? 30) < 20 ? 'danger' : 'success',
             about:
-              'Days the counterbalancing capacity lasts under a doubled 30-day outflow with an additional HQLA haircut, before the buffer runs out.',
+              "Days the counterbalancing capacity lasts under the severe run derived from this run's behaviour pattern rule (volatile deposits running off fast, at the rule's severity multiplier) with an additional HQLA haircut, before the buffer runs out.",
           },
         ]}
       />
 
       <ResultsFrame {...frameProps(selected)} requires={[]}>
         {positions.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[12px] text-gray-500">
+          <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[13px] text-gray-500">
             No committed positions for {affiliate?.name ?? 'this affiliate'} as at {effectiveDate}.
           </p>
         ) : missingFx.length > 0 ? (
           <div className="rounded-2xl border border-danger/30 bg-danger/5 p-10 text-center">
-            <p className="text-[12px] font-bold text-danger">
+            <p className="text-[13px] font-bold text-danger">
               No {currency} rate for {missingFx.join(', ')} as at {effectiveDate}.
             </p>
-            <p className="mx-auto mt-2 max-w-lg text-[11px] leading-relaxed text-gray-600">
+            <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-600">
               A stress result that quietly converted those balances at 1.0 would be indefensible. Load the rates on the
               FX Rates screen and this recomputes.
             </p>
@@ -208,7 +245,7 @@ export function StressTesting() {
               <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-baseline justify-between">
                   <div className="flex items-center gap-1.5">
-                    <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">
                       Interest rate - six supervisory shocks
                     </h2>
                     <InfoButton label="Why balance-sheet equity">
@@ -216,7 +253,7 @@ export function StressTesting() {
                       on the affiliate record changes the denominator and can change the verdict.
                     </InfoButton>
                   </div>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-[12px] text-gray-500">
                     Capital basis: balance-sheet equity of <Amount value={analysis.equity} currency={currency} />
                   </p>
                 </div>
@@ -225,25 +262,33 @@ export function StressTesting() {
                   rows={analysis.rows}
                   columns={columns}
                   rowKey={(r) => r.name}
-                  caption="BCBS 368 standardised interest rate shocks. The 15% test compares ΔEVE against the capital basis named above."
+                  caption={
+                    analysis.eveMethod === 'CashflowPv' || analysis.eveMethod === 'Mixed'
+                      ? "BCBS 368 standardised interest rate shocks. ΔEVE revalues the run's cashflows (prepayment and deposit run-off applied) on each shocked curve, tenor by tenor" +
+                        (analysis.eveMethod === 'Mixed' ? '; balances with no curve fall back to duration' : '') +
+                        '. The 15% test compares ΔEVE against the capital basis named above.'
+                      : 'BCBS 368 standardised interest rate shocks, by duration gap (no yield curve on file). The 15% test compares ΔEVE against the capital basis named above.'
+                  }
                 />
               </section>
 
               <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5">
-                    <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">
                       Liquidity - {reverseMode ? 'reverse stress' : 'severe run'}
                     </h2>
                     <InfoButton label="Methodology">
-                      {reverseMode ? (reverseResult?.methodology ?? '') : analysis.survival.methodology}
+                      {reverseMode
+                        ? (reverseResult?.methodology ?? '')
+                        : `${analysis.survival.methodology} ${analysis.severe.methodology}`}
                     </InfoButton>
                   </div>
                   <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5">
                     <button
                       type="button"
                       onClick={() => setReverseMode(false)}
-                      className={`rounded px-3 py-1 text-[11px] font-bold ${
+                      className={`rounded px-3 py-1 text-[12px] font-bold ${
                         !reverseMode ? 'bg-navy-900 text-white' : 'text-gray-500 hover:text-navy-900'
                       }`}
                     >
@@ -252,7 +297,7 @@ export function StressTesting() {
                     <button
                       type="button"
                       onClick={() => setReverseMode(true)}
-                      className={`rounded px-3 py-1 text-[11px] font-bold ${
+                      className={`rounded px-3 py-1 text-[12px] font-bold ${
                         reverseMode ? 'bg-navy-900 text-white' : 'text-gray-500 hover:text-navy-900'
                       }`}
                     >
@@ -284,7 +329,7 @@ export function StressTesting() {
                   <>
                     <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
                       <div>
-                        <label htmlFor="target-days" className="mb-1 block text-[11px] text-gray-600">
+                        <label htmlFor="target-days" className="mb-1 block text-[12px] text-gray-600">
                           Target survival horizon (days)
                         </label>
                         <input
@@ -294,11 +339,11 @@ export function StressTesting() {
                           max={30}
                           value={targetDays}
                           onChange={(e) => setTargetDays(Math.max(1, Math.min(30, Number(e.target.value))))}
-                          className="w-32 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                          className="w-32 rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                         />
                       </div>
                       {reverseResult && (
-                        <p className="text-[11px] text-gray-500">
+                        <p className="text-[12px] text-gray-500">
                           A stressed outflow of{' '}
                           <span className="font-mono font-bold text-navy-900">
                             <Amount value={reverseResult.solvedTotalOutflow} currency={currency} />
@@ -324,10 +369,12 @@ export function StressTesting() {
                         }
                         tone={analysis.survival.survivesFullHorizon ? 'success' : 'danger'}
                       />
-                      <span className="text-[11px] text-gray-500">
+                      <span className="text-[12px] text-gray-500">
                         LCR falls from {formatPct(analysis.lcr.lcrPercent)} to{' '}
-                        {formatPct(analysis.stressedLcr.lcrPercent)} under a doubled run-off with a 10% additional
-                        haircut.
+                        {formatPct(analysis.stressedLcr.lcrPercent)} under run-off ×{analysis.severe.severityMultiplier}{' '}
+                        (from the behaviour pattern rule) with a {analysis.severe.hqlaHaircutPercent}% additional
+                        haircut; {analysis.severe.profile.frontLoadedPercent.toFixed(0)}% of the stressed outflow lands
+                        in the first {analysis.severe.profile.frontLoadedDays} days.
                       </span>
                     </div>
                   </>
@@ -386,7 +433,7 @@ function SurvivalTimeline({ timeline, currency }: { timeline: SurvivalDay[]; cur
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
+      <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
       <dd className="mt-0.5">{value}</dd>
     </div>
   );

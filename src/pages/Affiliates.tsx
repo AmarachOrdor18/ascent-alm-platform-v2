@@ -6,7 +6,7 @@ import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { useAffiliates, useBatches, useDeleteAffiliate } from '@/lib/hooks';
 import { useRuns, runKeys } from '@/lib/runHooks';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { accessibleAffiliates } from '@/lib/scope';
 import { checkAllDomains, worstFreshness as computeWorstFreshness, type FreshnessCheck } from '@/engine/vintage';
 import { formatDate } from '@/lib/format';
@@ -101,7 +101,7 @@ export function Affiliates() {
     {
       key: 'currency',
       header: 'Functional',
-      render: (a) => <span className="font-mono text-[11px]">{a.functionalCurrency}</span>,
+      render: (a) => <span className="font-mono text-[12px]">{a.functionalCurrency}</span>,
     },
     { key: 'status', header: 'Status', render: (a) => <StatusBadge status={a.status} /> },
     {
@@ -118,7 +118,7 @@ export function Affiliates() {
       render: (a) => {
         const run = latestRunByAffiliate.get(a.code);
         return run ? (
-          <span className="font-mono text-[11px] text-gray-600">{formatDate(run.asOfDate)}</span>
+          <span className="font-mono text-[12px] text-gray-600">{formatDate(run.asOfDate)}</span>
         ) : (
           <span className="text-gray-300">-</span>
         );
@@ -143,14 +143,14 @@ export function Affiliates() {
               <button
                 type="button"
                 onClick={() => navigate(`/affiliates/onboard/${a.code}`)}
-                className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+                className="rounded border border-gray-200 px-2 py-1 text-[12px] font-bold text-navy-900 hover:border-navy-700"
               >
                 Resume
               </button>
               <button
                 type="button"
                 onClick={() => cancelOnboarding(a)}
-                className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold text-danger hover:border-danger"
+                className="rounded border border-gray-200 px-2 py-1 text-[12px] font-bold text-danger hover:border-danger"
               >
                 Cancel
               </button>
@@ -162,7 +162,7 @@ export function Affiliates() {
             <button
               type="button"
               onClick={() => navigate(`/affiliates/${a.code}/settings`)}
-              className="rounded border border-gray-200 px-3 py-1 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+              className="rounded border border-gray-200 px-3 py-1 text-[12px] font-bold text-navy-900 hover:border-navy-700"
             >
               Settings →
             </button>
@@ -177,12 +177,22 @@ export function Affiliates() {
     <>
       <ModuleHeader
         title="Affiliates"
-        description="The Group footprint, with how current each affiliate's data is. Only Live affiliates consolidate into Group figures."
+        description="The Group footprint, with how current each affiliate's data is."
+        about="Only Live affiliates consolidate into Group figures."
         asOfDate={null}
         scope="Ecobank Group"
         metrics={[
-          { label: 'Affiliates', value: String(rows.length), about: 'Every affiliate registered in the platform, at any stage of onboarding.' },
-          { label: 'Live', value: String(live.length), tone: 'success', about: 'Affiliates whose data is trusted enough to roll up into Group figures.' },
+          {
+            label: 'Affiliates',
+            value: String(rows.length),
+            about: 'Every affiliate registered in the platform, at any stage of onboarding.',
+          },
+          {
+            label: 'Live',
+            value: String(live.length),
+            tone: 'success',
+            about: 'Affiliates whose data is trusted enough to roll up into Group figures.',
+          },
           {
             label: 'Onboarding',
             value: String(onboarding.length),
@@ -204,19 +214,19 @@ export function Affiliates() {
                   below only shows individual affiliates. */}
               <Link
                 href="/affiliates/GROUP/settings"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
               >
                 Group settings
               </Link>
               <Link
                 href="/affiliates/bulk-onboard"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
               >
                 Bulk onboard
               </Link>
               <Link
                 href="/affiliates/onboard"
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
               >
                 Onboard affiliate
               </Link>
@@ -233,13 +243,13 @@ export function Affiliates() {
           emptyMessage={isLoading ? 'Loading…' : 'No affiliates yet.'}
           renderDetail={(a) => (
             <div>
-              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Feeds by domain</h3>
+              <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">Feeds by domain</h3>
               {a.feeds.length === 0 ? (
-                <p className="text-[12px] text-gray-500">
+                <p className="text-[13px] text-gray-500">
                   No feeds configured - this affiliate has not started onboarding.
                 </p>
               ) : (
-                <table className="w-full text-[11px]">
+                <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-gray-400">
                       <th className="py-1 px-3 font-bold uppercase tracking-wider">Domain</th>
@@ -279,4 +289,3 @@ export function Affiliates() {
     </>
   );
 }
-

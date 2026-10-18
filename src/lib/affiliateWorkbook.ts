@@ -26,15 +26,31 @@ export interface BulkAffiliateRow {
   errors: string[];
 }
 
-const DOMAINS: DataDomain[] = ['Positions', 'GeneralLedger', 'MarketRates', 'FxRates', 'Counterparties', 'EconomicIndicators'];
+// An affiliate feeds only its own positions and general ledger - market data is loaded by Group.
+const DOMAINS: DataDomain[] = ['Positions', 'GeneralLedger'];
 const FEED_MODES: FeedMode[] = ['NotConfigured', 'Connector', 'File'];
 
 const PROFILE_HEADERS = [
-  'Affiliate Code*', 'Legal Name*', 'Country*', 'Region*', 'Regulator*',
-  'Legal Entity Code', 'Functional Currency*', 'Reporting Currency*', 'Fiscal Year End (MM-DD)', 'Holiday Calendar ID',
+  'Affiliate Code*',
+  'Legal Name*',
+  'Country*',
+  'Region*',
+  'Regulator*',
+  'Legal Entity Code',
+  'Functional Currency*',
+  'Reporting Currency*',
+  'Fiscal Year End (MM-DD)',
+  'Holiday Calendar ID',
 ];
 const CURRENCY_HEADERS = ['Affiliate Code*', 'Other Active Currency*'];
-const CONNECTIVITY_HEADERS = ['Affiliate Code*', 'Domain*', 'Mode* (NotConfigured/Connector/File)', 'Connector Name (if Mode=Connector)', 'SLA Days*', 'Owner'];
+const CONNECTIVITY_HEADERS = [
+  'Affiliate Code*',
+  'Domain*',
+  'Mode* (NotConfigured/Connector/File)',
+  'Connector Name (if Mode=Connector)',
+  'SLA Days*',
+  'Owner',
+];
 const COA_HEADERS = ['Affiliate Code*', 'Group COA Node Code*', 'Local GL Code*', 'Local GL Name'];
 const ORG_HEADERS = ['Affiliate Code*', 'Create Standard Org Template? (Y/N)*'];
 
@@ -52,8 +68,16 @@ export function generateAffiliateTemplate(ref: WorkbookReferenceData): ArrayBuff
   const wb = XLSX.utils.book_new();
 
   const profileExample = [
-    'ZM', 'Ecobank Zambia Limited', 'Zambia', 'Southern Africa', 'Bank of Zambia',
-    'LE-ZM', 'ZMW', 'USD', '12-31', '',
+    'ZM',
+    'Ecobank Zambia Limited',
+    'Zambia',
+    'Southern Africa',
+    'Bank of Zambia',
+    'LE-ZM',
+    'ZMW',
+    'USD',
+    '12-31',
+    '',
   ];
   const profileSheet = XLSX.utils.aoa_to_sheet([PROFILE_HEADERS, profileExample]);
   profileSheet['!cols'] = PROFILE_HEADERS.map(() => ({ wch: 22 }));
@@ -63,12 +87,21 @@ export function generateAffiliateTemplate(ref: WorkbookReferenceData): ArrayBuff
   currencySheet['!cols'] = CURRENCY_HEADERS.map(() => ({ wch: 22 }));
   XLSX.utils.book_append_sheet(wb, currencySheet, 'Currencies');
 
-  const connectivityRows = DOMAINS.map((d) => ['ZM', d, 'File', '', d === 'MarketRates' || d === 'FxRates' ? '1' : '30', '']);
+  const connectivityRows = DOMAINS.map((d) => [
+    'ZM',
+    d,
+    'File',
+    '',
+    d === 'MarketRates' || d === 'FxRates' ? '1' : '30',
+    '',
+  ]);
   const connectivitySheet = XLSX.utils.aoa_to_sheet([CONNECTIVITY_HEADERS, ...connectivityRows]);
   connectivitySheet['!cols'] = CONNECTIVITY_HEADERS.map(() => ({ wch: 24 }));
   XLSX.utils.book_append_sheet(wb, connectivitySheet, 'Connectivity');
 
-  const coaExample = ref.commonCoaNodes.slice(0, 3).map((n) => ['ZM', n.code, `ZM-${n.code.replace('COA-', '')}`, n.name]);
+  const coaExample = ref.commonCoaNodes
+    .slice(0, 3)
+    .map((n) => ['ZM', n.code, `ZM-${n.code.replace('COA-', '')}`, n.name]);
   const coaSheet = XLSX.utils.aoa_to_sheet([COA_HEADERS, ...coaExample]);
   coaSheet['!cols'] = COA_HEADERS.map(() => ({ wch: 26 }));
   XLSX.utils.book_append_sheet(wb, coaSheet, 'COA Mapping');
@@ -80,23 +113,36 @@ export function generateAffiliateTemplate(ref: WorkbookReferenceData): ArrayBuff
   const instructionsRows: (string | number)[][] = [
     ['Ascent ALM - Bulk Affiliate Onboarding Template'],
     [],
-    ['One row per affiliate on "Affiliate Profile". "Currencies", "Connectivity" and "COA Mapping" take one row per (Affiliate Code, value) pair - repeat the Affiliate Code on each of that affiliate\'s rows.'],
-    ['Every affiliate is created in Onboarding status only. Chart-of-accounts mapping, connectivity, initial data load and approval are not bulk-created - complete them per affiliate after import, same as onboarding one affiliate at a time.'],
-    ['Local GL structures genuinely differ by affiliate - Nigeria numeric, Ghana letter-prefixed, UEMOA SYSCOHADA. Map each affiliate\'s own local codes on the COA Mapping sheet; do not assume one scheme fits every row.'],
+    [
+      'One row per affiliate on "Affiliate Profile". "Currencies", "Connectivity" and "COA Mapping" take one row per (Affiliate Code, value) pair - repeat the Affiliate Code on each of that affiliate\'s rows.',
+    ],
+    [
+      'Every affiliate is created in Onboarding status only. Chart-of-accounts mapping, connectivity, initial data load and approval are not bulk-created - complete them per affiliate after import, same as onboarding one affiliate at a time.',
+    ],
+    [
+      "Local GL structures genuinely differ by affiliate - Nigeria numeric, Ghana letter-prefixed, UEMOA SYSCOHADA. Map each affiliate's own local codes on the COA Mapping sheet; do not assume one scheme fits every row.",
+    ],
     [],
-    ['Valid Regulators'], ...ref.regulators.map((r) => [r]),
+    ['Valid Regulators'],
+    ...ref.regulators.map((r) => [r]),
     [],
-    ['Valid Regions'], ...ref.regions.map((r) => [r]),
+    ['Valid Regions'],
+    ...ref.regions.map((r) => [r]),
     [],
-    ['Valid Currency Codes'], ...ref.currencyCodes.map((c) => [c]),
+    ['Valid Currency Codes'],
+    ...ref.currencyCodes.map((c) => [c]),
     [],
-    ['Valid Holiday Calendar IDs (optional)'], ...ref.calendarIds.map((c) => [c]),
+    ['Valid Holiday Calendar IDs (optional)'],
+    ...ref.calendarIds.map((c) => [c]),
     [],
-    ['Valid Domains (Connectivity sheet)'], ...DOMAINS.map((d) => [d]),
+    ['Valid Domains (Connectivity sheet)'],
+    ...DOMAINS.map((d) => [d]),
     [],
-    ['Existing Connectors (Connectivity sheet, only if Mode = Connector)'], ...ref.connectorNames.map((c) => [c]),
+    ['Existing Connectors (Connectivity sheet, only if Mode = Connector)'],
+    ...ref.connectorNames.map((c) => [c]),
     [],
-    ['Group Common COA nodes (COA Mapping sheet)'], ...ref.commonCoaNodes.map((n) => [`${n.code} - ${n.name}`]),
+    ['Group Common COA nodes (COA Mapping sheet)'],
+    ...ref.commonCoaNodes.map((n) => [`${n.code} - ${n.name}`]),
   ];
   const instructionsSheet = XLSX.utils.aoa_to_sheet(instructionsRows);
   instructionsSheet['!cols'] = [{ wch: 90 }];
@@ -161,14 +207,19 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
     if (!country) errors.push('Country is required.');
     if (!region) errors.push('Region is required.');
     if (!regulator) errors.push('Regulator is required.');
-    else if (!ctx.validRegulators.has(regulator)) errors.push(`Regulator "${regulator}" is not one of the valid regulators - see Instructions & Reference.`);
+    else if (!ctx.validRegulators.has(regulator))
+      errors.push(`Regulator "${regulator}" is not one of the valid regulators - see Instructions & Reference.`);
     if (!functionalCurrency) errors.push('Functional Currency is required.');
-    else if (!ctx.validCurrencies.has(functionalCurrency)) errors.push(`Functional Currency "${functionalCurrency}" is not a known currency code.`);
-    if (reportingCurrency && !ctx.validCurrencies.has(reportingCurrency)) errors.push(`Reporting Currency "${reportingCurrency}" is not a known currency code.`);
-    if (holidayCalendarId && !ctx.validCalendarIds.has(holidayCalendarId)) errors.push(`Holiday Calendar ID "${holidayCalendarId}" was not found.`);
+    else if (!ctx.validCurrencies.has(functionalCurrency))
+      errors.push(`Functional Currency "${functionalCurrency}" is not a known currency code.`);
+    if (reportingCurrency && !ctx.validCurrencies.has(reportingCurrency))
+      errors.push(`Reporting Currency "${reportingCurrency}" is not a known currency code.`);
+    if (holidayCalendarId && !ctx.validCalendarIds.has(holidayCalendarId))
+      errors.push(`Holiday Calendar ID "${holidayCalendarId}" was not found.`);
 
     if (code) {
-      if (seenInWorkbook.has(code)) errors.push(`Affiliate Code "${code}" appears more than once in Affiliate Profile.`);
+      if (seenInWorkbook.has(code))
+        errors.push(`Affiliate Code "${code}" appears more than once in Affiliate Profile.`);
       seenInWorkbook.add(code);
       if (ctx.existingCodes.has(code)) errors.push(`Affiliate Code "${code}" already exists.`);
     }
@@ -181,7 +232,13 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
       if (!ctx.validCurrencies.has(c)) errors.push(`Currencies: "${c}" is not a known currency code.`);
     }
 
-    const feeds: DomainFeed[] = DOMAINS.map((domain) => ({ domain, mode: 'NotConfigured', connectorId: null, slaDays: 30, owner: null }));
+    const feeds: DomainFeed[] = DOMAINS.map((domain) => ({
+      domain,
+      mode: 'NotConfigured',
+      connectorId: null,
+      slaDays: 30,
+      owner: null,
+    }));
     connectivityRows
       .filter((r) => str(r, 'Affiliate Code*').toUpperCase() === code)
       .forEach((r) => {
@@ -191,17 +248,27 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
         const slaDays = Number(str(r, 'SLA Days*') || '30');
         const owner = str(r, 'Owner') || null;
 
-        if (!DOMAINS.includes(domain)) { errors.push(`Connectivity: "${domain}" is not a valid domain.`); return; }
-        if (!FEED_MODES.includes(mode)) { errors.push(`Connectivity (${domain}): "${mode}" is not a valid mode.`); return; }
+        if (!DOMAINS.includes(domain)) {
+          errors.push(`Connectivity: "${domain}" is not a valid domain.`);
+          return;
+        }
+        if (!FEED_MODES.includes(mode)) {
+          errors.push(`Connectivity (${domain}): "${mode}" is not a valid mode.`);
+          return;
+        }
         if (mode === 'Connector') {
           const known = ctx.activeConnectorNamesByDomain.get(domain) ?? new Set();
-          if (!connectorName) errors.push(`Connectivity (${domain}): Mode is Connector but no Connector Name was given.`);
-          else if (!known.has(connectorName)) errors.push(`Connectivity (${domain}): connector "${connectorName}" was not found for that domain.`);
+          if (!connectorName)
+            errors.push(`Connectivity (${domain}): Mode is Connector but no Connector Name was given.`);
+          else if (!known.has(connectorName))
+            errors.push(`Connectivity (${domain}): connector "${connectorName}" was not found for that domain.`);
         }
-        if (!Number.isFinite(slaDays) || slaDays <= 0) errors.push(`Connectivity (${domain}): SLA Days must be a positive number.`);
+        if (!Number.isFinite(slaDays) || slaDays <= 0)
+          errors.push(`Connectivity (${domain}): SLA Days must be a positive number.`);
 
         const idx = feeds.findIndex((f) => f.domain === domain);
-        if (idx >= 0) feeds[idx] = { domain, mode, connectorId: null, slaDays: Number.isFinite(slaDays) ? slaDays : 30, owner };
+        if (idx >= 0)
+          feeds[idx] = { domain, mode, connectorId: null, slaDays: Number.isFinite(slaDays) ? slaDays : 30, owner };
       });
 
     const coaMappings: CoaMappingRow[] = [];
@@ -212,10 +279,19 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
         const commonCoaCode = str(r, 'Group COA Node Code*');
         const localCode = str(r, 'Local GL Code*');
         const localName = str(r, 'Local GL Name') || localCode;
-        if (!commonCoaCode || !localCode) { errors.push('COA Mapping: both Group COA Node Code and Local GL Code are required.'); return; }
-        if (!ctx.commonCoaCodes.has(commonCoaCode)) { errors.push(`COA Mapping: "${commonCoaCode}" is not a Group COA node.`); return; }
+        if (!commonCoaCode || !localCode) {
+          errors.push('COA Mapping: both Group COA Node Code and Local GL Code are required.');
+          return;
+        }
+        if (!ctx.commonCoaCodes.has(commonCoaCode)) {
+          errors.push(`COA Mapping: "${commonCoaCode}" is not a Group COA node.`);
+          return;
+        }
         const key = `${commonCoaCode}:${localCode}`;
-        if (coaSeen.has(key)) { errors.push(`COA Mapping: "${localCode}" mapped to "${commonCoaCode}" more than once.`); return; }
+        if (coaSeen.has(key)) {
+          errors.push(`COA Mapping: "${localCode}" mapped to "${commonCoaCode}" more than once.`);
+          return;
+        }
         coaSeen.add(key);
         coaMappings.push({ commonCoaCode, localCode, localName });
       });
@@ -226,9 +302,22 @@ export function parseAffiliateWorkbook(buffer: ArrayBuffer, ctx: ParseAffiliateW
     const createOrgTemplate = orgFlag === 'Y';
 
     rows.push({
-      rowNumber, code, name, country, region, regulator, legalEntityCode,
-      functionalCurrency, reportingCurrency, fiscalYearEnd, holidayCalendarId,
-      activeCurrencies, feeds, coaMappings, createOrgTemplate, errors,
+      rowNumber,
+      code,
+      name,
+      country,
+      region,
+      regulator,
+      legalEntityCode,
+      functionalCurrency,
+      reportingCurrency,
+      fiscalYearEnd,
+      holidayCalendarId,
+      activeCurrencies,
+      feeds,
+      coaMappings,
+      createOrgTemplate,
+      errors,
     });
   });
 

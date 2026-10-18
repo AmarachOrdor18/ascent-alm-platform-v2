@@ -1,7 +1,7 @@
 import type { LoadBatch, ProcessRun } from '@/engine/types';
 
 /** A run is stale once its pinned data version has been superseded. Shared by every screen that
- * reads from a run - resultHooks.ts, RunHistory.tsx, and the reporting screens - so the predicate
+ * reads from a run - resultHooks.ts, Runs.tsx, and the reporting screens - so the predicate
  * lives in exactly one place. */
 export function isRunStale(run: ProcessRun | null, batches: LoadBatch[]): boolean {
   if (!run) return false;

@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAffiliates, useFxRates } from '@/lib/hooks';
 import { useRuns, runKeys } from '@/lib/runHooks';
 import { accessibleAffiliates } from '@/lib/scope';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { metricValue } from '@/lib/metrics';
 import { buildFxTable } from '@/engine/fx';
 import { isDeposit } from '@/engine/liquidity';
@@ -167,7 +167,7 @@ export function RiskMap() {
       render: (p) => (
         <div>
           <p className="font-medium text-navy-900">{p.name}</p>
-          <p className="text-[10px] text-gray-400">{p.region}</p>
+          <p className="text-[11px] text-gray-400">{p.region}</p>
         </div>
       ),
     },
@@ -254,7 +254,7 @@ export function RiskMap() {
         <div
           role="status"
           aria-live="polite"
-          className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-[12px] text-gray-400 shadow-sm"
+          className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-[13px] text-gray-400 shadow-sm"
         >
           Loading affiliate risk positions…
         </div>
@@ -266,7 +266,7 @@ export function RiskMap() {
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                 Group liquidity risk concentration
                 <InfoButton label="How severity is classified">
                   Each affiliate is read from its own latest completed run - a High rating means its LCR is below 100%
@@ -274,7 +274,7 @@ export function RiskMap() {
                   internal buffer (130% LCR, 20% deposit share).
                 </InfoButton>
               </h2>
-              <p className="mt-1 text-[11px] font-medium text-gray-400">
+              <p className="mt-1 text-[12px] font-medium text-gray-400">
                 Severity from LCR standing and each affiliate's share of Group deposit funding
               </p>
             </div>
@@ -282,7 +282,7 @@ export function RiskMap() {
               {(['Low', 'Medium', 'High'] as const).map((label) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <span className={`h-2.5 w-2.5 rounded-full ${SEVERITY_STYLE[label].dot}`} />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</span>
+                  <span className="text-[12px] font-bold uppercase tracking-wide text-gray-500">{label}</span>
                 </div>
               ))}
             </div>
@@ -293,7 +293,7 @@ export function RiskMap() {
             columns={columns}
             rowKey={(p) => p.code}
             renderDetail={(p) => (
-              <p className="text-[11px] leading-relaxed text-gray-500">
+              <p className="text-[12px] leading-relaxed text-gray-500">
                 {primaryDriver(p.lcr, p.depositSharePercent, p.severity)}
               </p>
             )}

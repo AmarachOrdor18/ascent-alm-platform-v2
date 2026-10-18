@@ -4,6 +4,7 @@ import { TierAllocationBar, type AllocationSegment } from '@/components/ui/TierA
 import { useAuth } from '@/context/AuthContext';
 import { useRuleMutations, useRules, newRuleMeta } from '@/lib/ruleHooks';
 import { DEFAULT_PATTERNS, DEFAULT_BETAS, type RunoffTier } from '@/engine/behavioural';
+import { DEFAULT_STRESS_SEVERITY, SEVERE_RUN_DEFAULTS } from '@/engine/stress';
 import { allocationError, type BehaviourPatternRule } from '@/engine/ruleTypes';
 import type { BehaviouralTag } from '@/engine/types';
 
@@ -74,7 +75,8 @@ export function BehaviourPatterns() {
   return (
     <RuleEditor<BehaviourPatternRule>
       title="Behaviour Patterns"
-      description="How non-maturity deposits actually run off. Tiers must total 100%, and each is classified Core or Volatile. Feeds the Liquidity Gap's behavioural basis and NII Sensitivity's deposit betas; selected on Process Run's Rules panel, left unselected the engine default pattern set applies and the result discloses which basis it used."
+      description="How non-maturity deposits actually run off."
+      about="Tiers must total 100%, and each is classified Core or Volatile. Feeds the Liquidity Gap's behavioural basis, NII Sensitivity's deposit betas, the behavioural tenor non-maturity deposits are transfer-priced at, and the severe-run stress; selected on Run now's Rules panel once approved, left unselected the engine default pattern set applies and the result discloses which basis it used."
       noun="pattern set"
       rules={rules}
       isLoading={isLoading}
@@ -91,6 +93,9 @@ export function BehaviourPatterns() {
         }
         for (const b of r.betas) {
           if (b.beta < 0 || b.beta > 1) return `Beta for ${b.behaviouralTag} must be between 0 and 1.`;
+        }
+        if (r.stressSeverityMultiplier !== undefined && !(r.stressSeverityMultiplier >= 1)) {
+          return 'Severity multiplier must be at least 1 - a stress cannot be milder than business as usual.';
         }
         return null;
       }}
@@ -117,7 +122,7 @@ export function BehaviourPatterns() {
                   <RuleField label="Applies to deposit types">
                     <div className="flex flex-wrap gap-2 pt-1">
                       {TAGS.filter((t) => t !== 'N/A').map((tag) => (
-                        <span key={tag} className="flex items-center gap-1 text-[11px]">
+                        <span key={tag} className="flex items-center gap-1 text-[12px]">
                           <input
                             id={`tag-${patternIndex}-${tag}`}
                             type="checkbox"
@@ -144,14 +149,12 @@ export function BehaviourPatterns() {
                 {pattern.tiers.length > 1 && (
                   <div className="mb-4">
                     <TierAllocationBar
-                      segments={sortedTierOrder(pattern.tiers).map(
-                        (origIndex): AllocationSegment => ({
-                          key: String(origIndex),
-                          label: `${pattern.tiers[origIndex]!.tenorDays}d`,
-                          percent: pattern.tiers[origIndex]!.percent,
-                          tone: pattern.tiers[origIndex]!.type === 'Core' ? 'core' : 'volatile',
-                        }),
-                      )}
+                      segments={sortedTierOrder(pattern.tiers).map((origIndex): AllocationSegment => ({
+                        key: String(origIndex),
+                        label: `${pattern.tiers[origIndex]!.tenorDays}d`,
+                        percent: pattern.tiers[origIndex]!.percent,
+                        tone: pattern.tiers[origIndex]!.type === 'Core' ? 'core' : 'volatile',
+                      }))}
                       readOnly={readOnly}
                       onResize={(leftDisplay, rightDisplay, leftPercent, rightPercent) => {
                         const order = sortedTierOrder(pattern.tiers);
@@ -159,7 +162,11 @@ export function BehaviourPatterns() {
                         const rightOrig = order[rightDisplay]!;
                         setPattern({
                           tiers: pattern.tiers.map((t, i) =>
-                            i === leftOrig ? { ...t, percent: leftPercent } : i === rightOrig ? { ...t, percent: rightPercent } : t,
+                            i === leftOrig
+                              ? { ...t, percent: leftPercent }
+                              : i === rightOrig
+                                ? { ...t, percent: rightPercent }
+                                : t,
                           ),
                         });
                       }}
@@ -186,8 +193,8 @@ export function BehaviourPatterns() {
           })}
 
           <div className="rounded-lg border border-gray-200 p-4">
-            <h3 className="mb-1 text-[12px] font-bold text-navy-900">Deposit betas</h3>
-            <p className="mb-3 text-[11px] leading-relaxed text-gray-500">
+            <h3 className="mb-1 text-[13px] font-bold text-navy-900">Deposit betas</h3>
+            <p className="mb-3 text-[12px] leading-relaxed text-gray-500">
               What share of a policy-rate move reaches depositors. Without these, NII sensitivity assumes full
               pass-through, which no bank experiences - stickier balances reprice least.
             </p>
@@ -211,6 +218,29 @@ export function BehaviourPatterns() {
                   />
                 </RuleField>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-4">
+            <h3 className="mb-1 text-[13px] font-bold text-navy-900">Severe liquidity run</h3>
+            <p className="mb-3 text-[12px] leading-relaxed text-gray-500">
+              The survival-horizon stress is built from these patterns: each deposit&rsquo;s volatile share, scaled by
+              this multiplier, runs off in the first {SEVERE_RUN_DEFAULTS.frontLoadedDays} days, and every other 30-day
+              outflow is scaled by it too. 2 means twice normal volatility - an assumption, not a calibrated figure.
+            </p>
+            <div className="max-w-[200px]">
+              <RuleField label="Severity multiplier">
+                <input
+                  type="number"
+                  step="0.25"
+                  min={1}
+                  value={rule.stressSeverityMultiplier ?? DEFAULT_STRESS_SEVERITY}
+                  disabled={readOnly}
+                  onChange={(e) => update({ stressSeverityMultiplier: Number(e.target.value) })}
+                  className={`${ruleInput} text-right font-mono`}
+                  aria-label="Stress severity multiplier"
+                />
+              </RuleField>
             </div>
           </div>
         </div>

@@ -1,15 +1,26 @@
-import { useState } from 'react';
-import { Link } from 'wouter';
+// Approvals (/controls): three plain lists - what is waiting for me, what I raised, and everything decided -
+// each request a card saying WHAT changes and WHY. Clicking one opens a side panel (?request=<id>) with the
+// details, Approve, and Reject (a reason is required). Maker-checker stays a property of the decision itself:
+// the person who raised a request, or ran the run being signed off, can never decide it - and the database
+// enforces the same rule by user id.
+import { useMemo, useState } from 'react';
+import { Link, useLocation, useSearch } from 'wouter';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateReadinessInputs } from '@/lib/readinessHooks';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { TableToolbar, TablePagination, useTableControls } from '@/components/ui/TableControls';
+import { Drawer } from '@/components/ui/Drawer';
 import { useAuth } from '@/context/AuthContext';
-import { useAffiliates, useBatches, useSaveAffiliate } from '@/lib/hooks';
-import { approvals, approvalBlockedReason, newId } from '@/lib/governanceHooks';
-import { repository } from '@/store/localRepository';
+import { keys, useAffiliates, useBatches } from '@/lib/hooks';
+import { approvals, approvalBlockedReason, isRequester, newApprovalRequest, newId } from '@/lib/governanceHooks';
+import { repository } from '@/store/repositoryInstance';
 import { useCommitSnapshot } from '@/lib/snapshotHooks';
 import { checkAllDomains } from '@/engine/vintage';
-import type { ApprovalRequest } from '@/engine/types';
+import { runHeadlines, runKeys, useRunResults, useRuns } from '@/lib/runHooks';
+import { signOffStatusOf, SIGN_OFF_LABEL, versionOf } from '@/lib/runSeries';
+import { formatDate, formatPct } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import type { Affiliate, ApprovalRequest, ProcessRun, RuleMeta } from '@/engine/types';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -22,6 +33,40 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> 
   Withdrawn: 'neutral',
 };
 
+type Tab = 'mine' | 'raised' | 'history';
+
+/** Plain name of the kind of request. */
+function typeOf(r: ApprovalRequest): string {
+  if (r.module === 'Runs') return 'Run sign-off';
+  if (r.module === 'Business Rules') return 'Assumption change';
+  if (r.module === 'Affiliates' && r.action === 'Activate') return 'Affiliate go-live';
+  if (r.module === 'Limits') return 'Limit change';
+  if (r.module === 'Position Snapshot') return 'Position correction';
+  return r.module || 'Other';
+}
+
+/** Rule kinds in plain words. */
+const RULE_KIND_WORDS: Record<string, string> = {
+  BehaviourPattern: 'Deposit behaviour',
+  Prepayment: 'Loan prepayment',
+  ProductCharacteristic: 'Product characteristics',
+  CostAllocation: 'Operating cost allocation',
+  CreditLoss: 'Expected credit loss',
+  CapitalAllocation: 'Capital charge',
+  FtpRule: 'Transfer pricing',
+  AdjustmentRule: 'Transfer pricing add-ons',
+  ForecastScenario: 'Forecast scenario',
+};
+
+const day = (iso: string | null | undefined) => (iso ? formatDate(iso.slice(0, 10)) : '-');
+
+/** "amber 80% / red 70% (organisation default amber 90% / red 80%)" -> old and new thresholds. */
+function parseLimitChange(summary: string): { amber: [string, string]; red: [string, string] } | null {
+  const m = summary.match(/amber ([\d.]+)% \/ red ([\d.]+)% \(organisation default amber ([\d.]+)% \/ red ([\d.]+)%\)/);
+  if (!m) return null;
+  return { amber: [m[3]!, m[1]!], red: [m[4]!, m[2]!] };
+}
+
 export function Approvals() {
   const { user, hasPermission } = useAuth();
   const canDecide = hasPermission('approvals.approve');
@@ -29,12 +74,42 @@ export function Approvals() {
   const { data: batches = [] } = useBatches();
   const { data: requests = [], isLoading } = approvals.useList();
   const save = approvals.useSave();
-  const saveAffiliate = useSaveAffiliate();
+  const queryClient = useQueryClient();
   const commitSnapshot = useCommitSnapshot();
+  const { data: allRuns = [] } = useRuns();
+  const [location, navigate] = useLocation();
+  const search = useSearch();
+  const openId = new URLSearchParams(search).get('request');
 
-  const [tab, setTab] = useState<'pending' | 'history'>('pending');
+  const [tab, setTab] = useState<Tab>('mine');
+  const [filters, setFilters] = useState({ type: '', affiliate: '', status: '', from: '', to: '', text: '' });
   const [newOpen, setNewOpen] = useState(false);
   const [commitConfirmation, setCommitConfirmation] = useState<{ requestId: string; batchId: string } | null>(null);
+
+  const setOpen = (id: string | null) => {
+    const p = new URLSearchParams(search);
+    if (id) p.set('request', id);
+    else p.delete('request');
+    const q = p.toString();
+    navigate(`${location}${q ? `?${q}` : ''}`, { replace: true });
+  };
+
+  const affiliateName = (code: string | null) =>
+    !code || code === 'GROUP' ? 'Group-wide' : (affiliates.find((a) => a.code === code)?.name ?? code);
+
+  /** Why this user may not decide this request - null when they may. */
+  const blockedReason = (r: ApprovalRequest): string | null => {
+    if (r.status !== 'Pending') {
+      return `Already ${r.status.toLowerCase()}${r.decidedBy ? ` by ${r.decidedBy}` : ''}${r.decidedAt ? ` on ${day(r.decidedAt)}` : ''}.`;
+    }
+    const base = approvalBlockedReason(r, user);
+    if (base) return base;
+    const run = runSignOffBlockedReason(r, allRuns, user);
+    if (run) return run;
+    if (!canDecide)
+      return 'Your role does not include approval rights. An Approver or Organisation Admin decides this.';
+    return null;
+  };
 
   /** Informational only - a human still decides, this just tells them what they'd otherwise have to check by hand. */
   const activationReadiness = (r: ApprovalRequest): { issues: string[] } | null => {
@@ -47,48 +122,69 @@ export function Approvals() {
     if (!affiliate.limitsConfirmed) issues.push('Risk thresholds not confirmed');
     return { issues };
   };
-  const [draft, setDraft] = useState({
-    module: '',
-    entityType: '',
-    entityId: '',
-    entityLabel: '',
-    action: 'Update' as ApprovalRequest['action'],
-    summary: '',
-    affiliateCode: '',
-  });
 
-  const pending = requests.filter((r) => r.status === 'Pending');
-  const history = requests.filter((r) => r.status !== 'Pending');
-  const rows = tab === 'pending' ? pending : history;
+  const waiting = requests.filter((r) => r.status === 'Pending' && !blockedReason(r));
+  const raised = requests.filter((r) => isRequester(r, user));
+  const base = tab === 'mine' ? waiting : tab === 'raised' ? raised : requests;
 
-  const { search, setSearch, page, setPage, density, setDensity, paged, totalItems, pageSize } = useTableControls(
-    rows,
-    10,
-    ['module', 'entityLabel', 'summary', 'requestedBy'],
+  const types = useMemo(() => Array.from(new Set(requests.map(typeOf))).sort(), [requests]);
+  const affiliateCodes = useMemo(
+    () => Array.from(new Set(requests.map((r) => r.affiliateCode ?? 'GROUP'))).sort(),
+    [requests],
   );
 
-  // Approving an Activate request on Affiliates also applies the affiliate's Testing → Live transition.
-  const decide = (request: ApprovalRequest, status: 'Approved' | 'Rejected') => {
-    if (!user || !canDecide) return;
-    void save.mutateAsync({
-      ...request,
-      status,
-      decidedBy: user.name,
-      decidedAt: new Date().toISOString(),
-      decisionNote: status === 'Rejected' ? 'Rejected from the Approvals queue.' : null,
-    });
+  const rows = base
+    .filter((r) => !filters.type || typeOf(r) === filters.type)
+    .filter((r) => !filters.affiliate || (r.affiliateCode ?? 'GROUP') === filters.affiliate)
+    .filter((r) => !filters.status || r.status === filters.status)
+    .filter((r) => !filters.from || r.requestedAt.slice(0, 10) >= filters.from)
+    .filter((r) => !filters.to || r.requestedAt.slice(0, 10) <= filters.to)
+    .filter((r) => {
+      const t = filters.text.trim().toLowerCase();
+      if (!t) return true;
+      return [r.entityLabel, r.summary, r.requestedBy, r.module, typeOf(r)].some((v) => v.toLowerCase().includes(t));
+    })
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 
-    if (status === 'Approved' && request.module === 'Affiliates' && request.action === 'Activate') {
-      const affiliate = affiliates.find((a) => a.code === request.entityId);
-      if (affiliate && affiliate.status === 'Testing') {
-        saveAffiliate.mutate({ ...affiliate, status: 'Live' });
-      }
+  // Approving an Activate request on Affiliates moves the affiliate Live - the repository does that as part
+  // of saving the decision (a database trigger on Supabase), never this screen; it only refetches.
+  // Approving a Business Rules request (behaviour patterns, prepayment, product characteristics) is what
+  // makes that rule version selectable on Run now - see lib/ruleApproval.ts isRuleApproved.
+  const decide = async (request: ApprovalRequest, status: 'Approved' | 'Rejected', note: string): Promise<boolean> => {
+    // The buttons are already disabled for the maker; refuse here too so segregation of duties is a
+    // property of the action, not just of the screen.
+    if (!user || !canDecide || approvalBlockedReason(request, user) || runSignOffBlockedReason(request, allRuns, user))
+      return false;
+    if (status === 'Rejected' && !note.trim()) return false;
+    // Awaited: the database can still refuse the decision (maker-checker is enforced there too), and
+    // nothing downstream - activating an affiliate, committing a snapshot - may happen if it did.
+    try {
+      await save.mutateAsync({
+        ...request,
+        status,
+        decidedBy: user.name,
+        decidedById: user.id,
+        decidedAt: new Date().toISOString(),
+        decisionNote: note.trim() || null,
+      });
+    } catch {
+      return false;
     }
 
-    // Approving an edited position snapshot commits it as a new, superseding
-    // Position Book version - the parent batch is never touched (see
-    // useCommitSnapshot). A rejection leaves the snapshot exactly as it was,
-    // still editable from Position Book.
+    if (status === 'Approved' && request.module === 'Affiliates' && request.action === 'Activate') {
+      void queryClient.invalidateQueries({ queryKey: keys.affiliates });
+    }
+    // A decision can unblock (or block) a run anywhere - readiness recalculates; the requester's bell updates.
+    invalidateReadinessInputs(queryClient);
+    void queryClient.invalidateQueries({ queryKey: ['inAppNotifications'] });
+
+    // A Runs/SignOff decision moves the run itself (SignedOff, or back to Open) - same pattern, the
+    // repository / database trigger does it; this screen only refetches.
+    if (request.module === 'Runs') void queryClient.invalidateQueries({ queryKey: runKeys.all });
+
+    // Approving an edited position snapshot commits it as a new, superseding Position Book version - the
+    // parent batch is never touched (see useCommitSnapshot). A rejection leaves the snapshot exactly as it
+    // was, still editable from Position Book.
     if (status === 'Approved' && request.module === 'Position Snapshot') {
       void repository.getSnapshot(request.entityId).then((snapshot) => {
         if (snapshot && snapshot.status === 'PendingApproval') {
@@ -98,61 +194,69 @@ export function Approvals() {
         }
       });
     }
+    return true;
   };
 
-  const handleRaise = async () => {
-    if (!user || !draft.module || !draft.entityLabel || !draft.summary) return;
-    await save.mutateAsync({
-      id: newId('APR'),
-      module: draft.module,
-      entityType: draft.entityType || draft.module,
-      entityId: draft.entityId || newId('ENT'),
-      entityLabel: draft.entityLabel,
-      action: draft.action,
-      summary: draft.summary,
-      affiliateCode: draft.affiliateCode || null,
-      status: 'Pending',
-      requestedBy: user.name,
-      requestedAt: new Date().toISOString(),
-      decidedBy: null,
-      decidedAt: null,
-      decisionNote: null,
-    });
-    setNewOpen(false);
-    setDraft({ module: '', entityType: '', entityId: '', entityLabel: '', action: 'Update', summary: '', affiliateCode: '' });
-  };
+  const open = openId ? (requests.find((r) => r.id === openId) ?? null) : null;
+
+  const tabs: Array<{ key: Tab; label: string; count: number; hint: string }> = [
+    {
+      key: 'mine',
+      label: 'Waiting for me',
+      count: waiting.length,
+      hint: 'Requests you are allowed to approve or reject.',
+    },
+    {
+      key: 'raised',
+      label: 'Raised by me',
+      count: raised.length,
+      hint: 'Requests you sent - someone else decides them.',
+    },
+    { key: 'history', label: 'History', count: requests.length, hint: 'Every request, pending or decided.' },
+  ];
+  const active = tabs.find((t) => t.key === tab)!;
+  const filtered = Object.values(filters).some(Boolean);
 
   return (
     <>
       <ModuleHeader
         title="Approvals"
-        description="Segregation-of-duties queue: the person who raises a request cannot also decide it."
+        description="Changes that need a second person."
+        about="Whoever raised a request - or ran the run being signed off - cannot decide it."
         asOfDate={null}
-        scope="Ecobank Group"
         metrics={[
-          { label: 'Pending', value: String(pending.length), tone: pending.length > 0 ? 'warning' : 'success', about: 'Requests awaiting a decision from someone other than the person who raised them.' },
-          { label: 'Approved', value: String(requests.filter((r) => r.status === 'Approved').length), tone: 'success', about: 'Requests a different user has approved.' },
-          { label: 'Rejected', value: String(requests.filter((r) => r.status === 'Rejected').length), about: 'Requests a different user has declined.' },
-          { label: 'Total', value: String(requests.length), about: 'Every approval request ever raised, regardless of outcome.' },
+          {
+            label: 'Waiting for me',
+            value: String(waiting.length),
+            tone: waiting.length > 0 ? 'warning' : 'success',
+            about: 'Pending requests you may decide.',
+          },
+          {
+            label: 'Pending (all)',
+            value: String(requests.filter((r) => r.status === 'Pending').length),
+            about: 'Every request still waiting for a decision.',
+          },
+          {
+            label: 'Raised by me',
+            value: String(raised.filter((r) => r.status === 'Pending').length),
+            about: 'Your own requests still waiting for someone else.',
+          },
         ]}
-        actions={
-          <button
-            type="button"
-            onClick={() => setNewOpen(true)}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
-          >
-            New request
-          </button>
-        }
       />
+
+      {save.error && (
+        <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-3 text-[13px] text-danger">
+          {save.error instanceof Error ? save.error.message : String(save.error)}
+        </div>
+      )}
 
       {commitConfirmation && (
         <div
           role="status"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-success-bg px-4 py-3 text-[13px] text-success"
         >
           <span>
-            <span className="font-bold">Committed.</span> The approved snapshot is now Position Book version{' '}
+            <span className="font-bold">Committed.</span> The approved correction is now Position Book version{' '}
             <span className="font-mono font-bold">{commitConfirmation.batchId}</span>.
           </span>
           <div className="flex items-center gap-3">
@@ -174,235 +278,731 @@ export function Approvals() {
         </div>
       )}
 
-      <div className="mb-6 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setTab('pending');
-            setPage(1);
-          }}
-          className={`rounded-lg px-4 py-2 text-[12px] font-bold transition-colors ${tab === 'pending' ? 'bg-navy-900 text-white' : 'border border-gray-200 bg-white text-gray-600 hover:border-navy-700'}`}
-        >
-          Pending ({pending.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTab('history');
-            setPage(1);
-          }}
-          className={`rounded-lg px-4 py-2 text-[12px] font-bold transition-colors ${tab === 'history' ? 'bg-navy-900 text-white' : 'border border-gray-200 bg-white text-gray-600 hover:border-navy-700'}`}
-        >
-          History ({history.length})
-        </button>
+      <div role="tablist" className="mb-5 flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'rounded-lg px-4 py-2 text-[13px] font-bold transition-colors',
+              tab === t.key
+                ? 'bg-navy-900 text-white'
+                : 'border border-gray-200 bg-white text-gray-600 hover:border-navy-700',
+            )}
+          >
+            {t.label} ({t.count})
+          </button>
+        ))}
       </div>
 
-      <div className="table-datagrid-container">
-        <div className="border-b border-gray-100 bg-white/50 p-5">
-          <div className="mb-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-navy-900">
-              {tab === 'pending' ? 'Pending requests' : 'Decided requests'}
-            </h3>
-            <p className="text-[11px] font-medium text-gray-400">
-              {tab === 'pending' ? 'Awaiting a decision from someone other than the requester.' : 'Approved, rejected or withdrawn.'}
-            </p>
+      <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <input
+            aria-label="Search requests"
+            placeholder="Search…"
+            value={filters.text}
+            onChange={(e) => setFilters((f) => ({ ...f, text: e.target.value }))}
+            className={cn(filterCls, 'lg:col-span-2')}
+          />
+          <select
+            aria-label="Type"
+            value={filters.type}
+            onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
+            className={filterCls}
+          >
+            <option value="">All types</option>
+            {types.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Affiliate"
+            value={filters.affiliate}
+            onChange={(e) => setFilters((f) => ({ ...f, affiliate: e.target.value }))}
+            className={filterCls}
+          >
+            <option value="">All affiliates</option>
+            {affiliateCodes.map((c) => (
+              <option key={c} value={c}>
+                {affiliateName(c)}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Status"
+            value={filters.status}
+            onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+            className={filterCls}
+          >
+            <option value="">Any status</option>
+            {['Pending', 'Approved', 'Rejected', 'Withdrawn'].map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-1">
+            <input
+              aria-label="Raised from"
+              type="date"
+              value={filters.from}
+              onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+              className={filterCls}
+            />
+            <span className="text-gray-400">–</span>
+            <input
+              aria-label="Raised to"
+              type="date"
+              value={filters.to}
+              onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+              className={filterCls}
+            />
           </div>
-          <TableToolbar
-            searchValue={search}
-            onSearchChange={setSearch}
-            exportData={() => rows}
-            exportFilename={`approvals-${tab}`}
-            density={density}
-            onDensityChange={setDensity}
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[12px] text-gray-500">
+          <span>{active.hint}</span>
+          {filtered && (
+            <button
+              type="button"
+              className="font-bold text-navy-700 hover:underline"
+              onClick={() => setFilters({ type: '', affiliate: '', status: '', from: '', to: '', text: '' })}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="py-8 text-center text-[13px] text-gray-400">Loading…</p>
+      ) : rows.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center text-[13px] text-gray-500">
+          {filtered
+            ? 'Nothing matches these filters.'
+            : tab === 'mine'
+              ? 'Nothing is waiting for you. New requests appear here when someone else needs your decision.'
+              : tab === 'raised'
+                ? 'You have not raised any requests. Sign-off requests, assumption changes and go-live requests you send appear here.'
+                : 'No requests yet.'}
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <RequestCard
+                request={r}
+                affiliate={affiliateName(r.affiliateCode)}
+                allRuns={allRuns}
+                affiliates={affiliates}
+                readiness={r.status === 'Pending' ? activationReadiness(r) : null}
+                onOpen={() => setOpen(r.id)}
+                canDecide={!blockedReason(r)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-6 text-[12px] text-gray-400">
+        Requests are raised from the screen where the change is made (run sign-off, assumptions, affiliate setup,
+        limits).{' '}
+        <button type="button" onClick={() => setNewOpen(true)} className="font-bold text-navy-700 hover:underline">
+          Other request
+        </button>
+      </p>
+
+      {open && (
+        <RequestDrawer
+          request={open}
+          affiliate={affiliateName(open.affiliateCode)}
+          allRuns={allRuns}
+          affiliates={affiliates}
+          readiness={open.status === 'Pending' ? activationReadiness(open) : null}
+          blocked={blockedReason(open)}
+          busy={save.isPending}
+          onClose={() => setOpen(null)}
+          onDecide={async (status, note) => {
+            if (await decide(open, status, note)) setOpen(null);
+          }}
+        />
+      )}
+      {!open && openId && !isLoading && (
+        <Drawer title="Request not found" onClose={() => setOpen(null)}>
+          <p className="text-[13px] text-gray-500">This request does not exist or is outside your scope.</p>
+        </Drawer>
+      )}
+
+      {newOpen && <OtherRequestForm affiliates={affiliates} onClose={() => setNewOpen(false)} />}
+    </>
+  );
+}
+
+const filterCls =
+  'w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] text-navy-900 focus:border-navy-700 focus:outline-none';
+
+// ─── Card ──────────────────────────────────────────────────────────────────
+
+function RequestCard({
+  request: r,
+  affiliate,
+  allRuns,
+  affiliates,
+  readiness,
+  onOpen,
+  canDecide,
+}: {
+  request: ApprovalRequest;
+  affiliate: string;
+  allRuns: ProcessRun[];
+  affiliates: Affiliate[];
+  readiness: { issues: string[] } | null;
+  onOpen: () => void;
+  canDecide: boolean;
+}) {
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">
+            {typeOf(r)} <span className="text-gray-300">·</span>{' '}
+            <span className="normal-case tracking-normal">{affiliate}</span>
+          </p>
+          <h3 className="mt-1 text-[15px] font-bold text-navy-900">{r.entityLabel}</h3>
+        </div>
+        <StatusBadge status={r.status} tone={STATUS_TONE[r.status]} />
+      </div>
+      <WhatChanges request={r} allRuns={allRuns} affiliates={affiliates} readiness={readiness} />
+      <p className="mt-2 text-[13px] text-gray-600">
+        <span className="font-bold text-navy-900">Why: </span>
+        {r.summary || '-'}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-50 pt-3 text-[12px] text-gray-500">
+        <span>
+          Raised by <span className="font-bold text-navy-900">{r.requestedBy}</span> on {day(r.requestedAt)}
+          {r.status !== 'Pending' && r.decidedBy && (
+            <>
+              {' '}
+              · {r.status.toLowerCase()} by <span className="font-bold text-navy-900">{r.decidedBy}</span> on{' '}
+              {day(r.decidedAt)}
+            </>
+          )}
+        </span>
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(
+            'rounded-lg px-4 py-1.5 text-[13px] font-bold',
+            canDecide
+              ? 'bg-navy-900 text-white hover:bg-navy-700'
+              : 'border border-gray-200 text-navy-900 hover:border-navy-700',
+          )}
+        >
+          {canDecide ? 'Review & decide' : 'View details'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/** One plain line (or block) saying what the request changes, by kind of request. */
+function WhatChanges({
+  request: r,
+  allRuns,
+  affiliates,
+  readiness,
+}: {
+  request: ApprovalRequest;
+  allRuns: ProcessRun[];
+  affiliates: Affiliate[];
+  readiness: { issues: string[] } | null;
+}) {
+  if (r.module === 'Runs' && r.action === 'SignOff')
+    return <RunSignOffSummary request={r} allRuns={allRuns} affiliates={affiliates} />;
+  const box = 'mt-3 rounded-lg bg-navy-50 px-3 py-2 text-[13px] text-navy-900';
+  if (r.module === 'Business Rules') {
+    return (
+      <p className={box}>
+        <span className="font-bold">{RULE_KIND_WORDS[r.entityType] ?? r.entityType}</span>
+        {r.entityVersion ? ` - version ${r.entityVersion}` : ''}
+        {r.entityVersion && r.entityVersion > 1
+          ? ` replaces version ${r.entityVersion - 1}`
+          : r.entityVersion === 1
+            ? ' (new)'
+            : ''}
+        . Not used in any run until approved.
+      </p>
+    );
+  }
+  if (r.module === 'Affiliates' && r.action === 'Activate') {
+    return (
+      <p className={box}>
+        Makes the affiliate <span className="font-bold">Live</span> - its results join Group figures.{' '}
+        {readiness && (
+          <span className={cn('font-bold', readiness.issues.length > 0 ? 'text-warning' : 'text-success')}>
+            {readiness.issues.length > 0 ? `⚠ ${readiness.issues.join(' · ')}` : '✓ Data readiness checks pass'}
+          </span>
+        )}
+      </p>
+    );
+  }
+  if (r.module === 'Limits') {
+    const change = parseLimitChange(r.summary);
+    if (change) {
+      return (
+        <p className={box}>
+          Amber threshold{' '}
+          <span className="font-mono font-bold">
+            {change.amber[0]}% → {change.amber[1]}%
+          </span>{' '}
+          · Red threshold{' '}
+          <span className="font-mono font-bold">
+            {change.red[0]}% → {change.red[1]}%
+          </span>{' '}
+          (organisation default → requested)
+        </p>
+      );
+    }
+  }
+  if (r.module === 'Position Snapshot') {
+    return (
+      <p className={box}>
+        Edited positions become a new Position Book version once approved. The original upload is kept.
+      </p>
+    );
+  }
+  return null;
+}
+
+// ─── Side panel ────────────────────────────────────────────────────────────
+
+function RequestDrawer({
+  request: r,
+  affiliate,
+  allRuns,
+  affiliates,
+  readiness,
+  blocked,
+  busy,
+  onClose,
+  onDecide,
+}: {
+  request: ApprovalRequest;
+  affiliate: string;
+  allRuns: ProcessRun[];
+  affiliates: Affiliate[];
+  readiness: { issues: string[] } | null;
+  blocked: string | null;
+  busy: boolean;
+  onClose: () => void;
+  onDecide: (status: 'Approved' | 'Rejected', note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+  const facts: Array<[string, string]> = [
+    ['Type', typeOf(r)],
+    ['Affiliate', affiliate],
+    ['Raised by', r.requestedBy],
+    ['Raised on', day(r.requestedAt)],
+    ['Status', r.status],
+    ...(r.status !== 'Pending'
+      ? ([
+          ['Decided by', r.decidedBy ?? '-'],
+          ['Decided on', day(r.decidedAt)],
+        ] as Array<[string, string]>)
+      : []),
+  ];
+  return (
+    <Drawer
+      title={r.entityLabel}
+      description={`${typeOf(r)} · ${affiliate}`}
+      onClose={onClose}
+      wide
+      footer={
+        blocked ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+            <span className="font-bold text-navy-900">You can&rsquo;t decide this: </span>
+            {blocked}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="decision-note" className="mb-1 block text-[12px] font-bold text-navy-900">
+                {rejecting ? 'Reason for rejecting (required)' : 'Note (optional)'}
+              </label>
+              <textarea
+                id="decision-note"
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={rejecting ? 'Tell the requester what to fix.' : 'Anything the requester should know.'}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+              />
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              {rejecting ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRejecting(false)}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !note.trim()}
+                    onClick={() => void onDecide('Rejected', note)}
+                    className="rounded-lg bg-danger px-4 py-2 text-[13px] font-bold text-white hover:bg-danger/80 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Confirm reject
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setRejecting(true)}
+                    className="rounded-lg border border-danger/40 px-4 py-2 text-[13px] font-bold text-danger hover:bg-danger-bg disabled:opacity-40"
+                  >
+                    Reject…
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onDecide('Approved', note)}
+                    className="rounded-lg bg-success px-4 py-2 text-[13px] font-bold text-white hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {busy ? 'Saving…' : 'Approve'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      }
+    >
+      <div className="space-y-6">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-gray-50 p-4">
+          {facts.map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{k}</dt>
+              <dd className="mt-0.5 text-[13px] text-navy-900">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <section>
+          <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">What changes</h3>
+          <WhatChanges request={r} allRuns={allRuns} affiliates={affiliates} readiness={readiness} />
+          {r.module === 'Business Rules' && r.entityVersion && (
+            <RuleVersionDiff ruleId={r.entityId} version={r.entityVersion} />
+          )}
+          {r.module !== 'Business Rules' &&
+            r.module !== 'Runs' &&
+            r.module !== 'Limits' &&
+            r.module !== 'Position Snapshot' &&
+            !(r.module === 'Affiliates' && r.action === 'Activate') && (
+              <p className="mt-2 text-[13px] text-gray-600">
+                {r.action} · {r.entityType}
+              </p>
+            )}
+        </section>
+        <section>
+          <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Why</h3>
+          <p className="mt-2 text-[13px] leading-relaxed text-gray-600">{r.summary || '-'}</p>
+        </section>
+        {r.decisionNote && (
+          <section>
+            <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Decision note</h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-gray-600">{r.decisionNote}</p>
+          </section>
+        )}
+      </div>
+    </Drawer>
+  );
+}
+
+const META_KEYS = new Set([
+  'id',
+  'kind',
+  'name',
+  'description',
+  'folder',
+  'accessType',
+  'affiliateCode',
+  'version',
+  'isActive',
+  'createdBy',
+  'createdAt',
+  'updatedBy',
+  'updatedAt',
+]);
+
+function showValue(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '-';
+  if (Array.isArray(v)) return `${v.length} item${v.length === 1 ? '' : 's'}`;
+  if (typeof v === 'object') return 'settings';
+  return String(v);
+}
+
+/** Which settings differ between the version asked for and the one before it - top-level settings only. */
+function RuleVersionDiff({ ruleId, version }: { ruleId: string; version: number }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['ruleVersionDiff', ruleId, version],
+    queryFn: async () => {
+      const current =
+        (await repository.getRuleVersion<RuleMeta>(ruleId, version)) ??
+        (await repository.getRule<RuleMeta>(ruleId).then((r) => (r?.version === version ? r : null)));
+      const previous = version > 1 ? await repository.getRuleVersion<RuleMeta>(ruleId, version - 1) : null;
+      return { current, previous };
+    },
+  });
+  if (isLoading) return <p className="mt-2 text-[12px] text-gray-400">Comparing with the previous version…</p>;
+  if (!data?.current) return null;
+  if (!data.previous) {
+    return version === 1 ? (
+      <p className="mt-2 text-[12px] text-gray-500">A new assumption - there is no earlier version to compare with.</p>
+    ) : null;
+  }
+  const cur = data.current as unknown as Record<string, unknown>;
+  const prev = data.previous as unknown as Record<string, unknown>;
+  const changed = Array.from(new Set([...Object.keys(cur), ...Object.keys(prev)]))
+    .filter((k) => !META_KEYS.has(k))
+    .filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(prev[k]));
+  if (changed.length === 0)
+    return (
+      <p className="mt-2 text-[12px] text-gray-500">
+        No setting differs from version {version - 1} (name or description only).
+      </p>
+    );
+  const label = (k: string) => k.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  return (
+    <div className="mt-3 overflow-x-auto rounded-lg border border-gray-100">
+      <table className="w-full text-[12px]">
+        <thead className="bg-gray-50 text-left text-gray-500">
+          <tr>
+            <th className="px-3 py-2 font-bold">Setting</th>
+            <th className="px-3 py-2 font-bold">Version {version - 1}</th>
+            <th className="px-3 py-2 font-bold">Version {version}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {changed.map((k) => {
+            const a = showValue(prev[k]);
+            const b = showValue(cur[k]);
+            return (
+              <tr key={k}>
+                <td className="px-3 py-2 font-bold text-navy-900">{label(k)}</td>
+                <td className="px-3 py-2 font-mono text-gray-500">{a}</td>
+                <td className="px-3 py-2 font-mono text-navy-900">{a === b ? `${b} (contents changed)` : b}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Other request (free-text) ─────────────────────────────────────────────
+
+function OtherRequestForm({ affiliates, onClose }: { affiliates: Affiliate[]; onClose: () => void }) {
+  const { user } = useAuth();
+  const save = approvals.useSave();
+  const [draft, setDraft] = useState({
+    module: '',
+    entityLabel: '',
+    action: 'Update' as ApprovalRequest['action'],
+    summary: '',
+    affiliateCode: '',
+  });
+  const field =
+    'w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none';
+  const raise = async () => {
+    if (!user || !draft.module || !draft.entityLabel || !draft.summary) return;
+    await save.mutateAsync(
+      newApprovalRequest(
+        {
+          module: draft.module,
+          entityType: draft.module,
+          entityId: newId('ENT'),
+          entityLabel: draft.entityLabel,
+          action: draft.action,
+          summary: draft.summary,
+          affiliateCode: draft.affiliateCode || null,
+        },
+        user,
+      ),
+    );
+    onClose();
+  };
+  return (
+    <Drawer
+      title="Other request"
+      description="For a change that has no approval button of its own. Someone else must decide it."
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void raise()}
+            disabled={!draft.module || !draft.entityLabel || !draft.summary || save.isPending}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Send request
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="apr-module" className="mb-1 block text-[12px] font-bold text-navy-900">
+            Area
+          </label>
+          <input
+            id="apr-module"
+            value={draft.module}
+            onChange={(e) => setDraft((d) => ({ ...d, module: e.target.value }))}
+            placeholder="e.g. Limits"
+            className={field}
           />
         </div>
-        <div className="overflow-x-auto">
-          <table className="table-datagrid">
-            <thead>
-              <tr>
-                <th>Module</th>
-                <th>Request</th>
-                <th>Requested by</th>
-                <th>Requested</th>
-                <th>Status</th>
-                {tab === 'pending' && <th>Decision</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && (
-                <tr>
-                  <td colSpan={tab === 'pending' ? 6 : 5} className="py-8 text-center text-gray-400">
-                    Loading.
-                  </td>
-                </tr>
-              )}
-              {!isLoading && paged.length === 0 && (
-                <tr>
-                  <td colSpan={tab === 'pending' ? 6 : 5} className="py-8 text-center text-gray-400">
-                    No {tab === 'pending' ? 'pending' : 'decided'} requests. {tab === 'pending' ? 'Click "New request" to raise one.' : 'Decided requests will appear here.'}
-                  </td>
-                </tr>
-              )}
-              {paged.map((r) => {
-                const blocked = !canDecide
-                  ? 'Your role does not have permission to approve or reject requests.'
-                  : approvalBlockedReason(r, user?.name);
-                const readiness = r.status === 'Pending' ? activationReadiness(r) : null;
-                return (
-                  <tr key={r.id}>
-                    <td>
-                      <span className="text-[11px] font-bold text-navy-900">{r.module}</span>
-                    </td>
-                    <td>
-                      <p className="font-bold text-navy-900">{r.entityLabel}</p>
-                      <p className="mt-0.5 text-[11px] font-medium text-gray-400">
-                        {r.action}. {r.summary}
-                      </p>
-                      {readiness && (
-                        <p
-                          className={`mt-1 text-[11px] font-bold ${readiness.issues.length > 0 ? 'text-warning' : 'text-success'}`}
-                        >
-                          {readiness.issues.length > 0 ? `⚠ ${readiness.issues.join(' · ')}` : '✓ Data readiness checks pass'}
-                        </p>
-                      )}
-                    </td>
-                    <td>{r.requestedBy}</td>
-                    <td>{new Date(r.requestedAt).toLocaleDateString()}</td>
-                    <td>
-                      <StatusBadge status={r.status} tone={STATUS_TONE[r.status]} />
-                    </td>
-                    {tab === 'pending' && (
-                      <td>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={!!blocked}
-                            title={blocked ?? undefined}
-                            onClick={() => decide(r, 'Approved')}
-                            className="rounded bg-success px-3 py-1 text-[11px] font-bold text-white transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!!blocked}
-                            title={blocked ?? undefined}
-                            onClick={() => decide(r, 'Rejected')}
-                            className="rounded bg-danger px-3 py-1 text-[11px] font-bold text-white transition-colors hover:bg-danger/80 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div>
+          <label htmlFor="apr-label" className="mb-1 block text-[12px] font-bold text-navy-900">
+            What is being changed
+          </label>
+          <input
+            id="apr-label"
+            value={draft.entityLabel}
+            onChange={(e) => setDraft((d) => ({ ...d, entityLabel: e.target.value }))}
+            placeholder="e.g. Nigeria LCR internal limit"
+            className={field}
+          />
         </div>
-        <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
-      </div>
-
-      {newOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-[13px] font-bold uppercase tracking-wider text-navy-900">New approval request</h3>
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="apr-module" className="mb-1 block text-[11px] text-gray-600">
-                  Module
-                </label>
-                <input
-                  id="apr-module"
-                  value={draft.module}
-                  onChange={(e) => setDraft((d) => ({ ...d, module: e.target.value }))}
-                  placeholder="e.g. Limits and Breaches"
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label htmlFor="apr-label" className="mb-1 block text-[11px] text-gray-600">
-                  What is being changed
-                </label>
-                <input
-                  id="apr-label"
-                  value={draft.entityLabel}
-                  onChange={(e) => setDraft((d) => ({ ...d, entityLabel: e.target.value }))}
-                  placeholder="e.g. Nigeria LCR internal limit"
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="apr-action" className="mb-1 block text-[11px] text-gray-600">
-                    Action
-                  </label>
-                  <select
-                    id="apr-action"
-                    value={draft.action}
-                    onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value as ApprovalRequest['action'] }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                  >
-                    {ACTIONS.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="apr-affiliate" className="mb-1 block text-[11px] text-gray-600">
-                    Affiliate
-                  </label>
-                  <select
-                    id="apr-affiliate"
-                    value={draft.affiliateCode}
-                    onChange={(e) => setDraft((d) => ({ ...d, affiliateCode: e.target.value }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                  >
-                    <option value="">Group-wide</option>
-                    {affiliates.map((a) => (
-                      <option key={a.code} value={a.code}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="apr-summary" className="mb-1 block text-[11px] text-gray-600">
-                  Summary
-                </label>
-                <textarea
-                  id="apr-summary"
-                  value={draft.summary}
-                  onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
-                  rows={3}
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
-                />
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setNewOpen(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleRaise()}
-                disabled={!draft.module || !draft.entityLabel || !draft.summary}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Raise request
-              </button>
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="apr-action" className="mb-1 block text-[12px] font-bold text-navy-900">
+              Action
+            </label>
+            <select
+              id="apr-action"
+              value={draft.action}
+              onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value as ApprovalRequest['action'] }))}
+              className={field}
+            >
+              {ACTIONS.map((a) => (
+                <option key={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="apr-affiliate" className="mb-1 block text-[12px] font-bold text-navy-900">
+              Affiliate
+            </label>
+            <select
+              id="apr-affiliate"
+              value={draft.affiliateCode}
+              onChange={(e) => setDraft((d) => ({ ...d, affiliateCode: e.target.value }))}
+              className={field}
+            >
+              <option value="">Group-wide</option>
+              {affiliates
+                .filter((a) => a.code !== 'GROUP')
+                .map((a) => (
+                  <option key={a.code} value={a.code}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
           </div>
         </div>
-      )}
-    </>
+        <div>
+          <label htmlFor="apr-summary" className="mb-1 block text-[12px] font-bold text-navy-900">
+            Why
+          </label>
+          <textarea
+            id="apr-summary"
+            rows={3}
+            value={draft.summary}
+            onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
+            className={field}
+          />
+        </div>
+        {save.error && (
+          <p role="alert" className="text-[12px] text-danger">
+            {save.error instanceof Error ? save.error.message : String(save.error)}
+          </p>
+        )}
+      </div>
+    </Drawer>
+  );
+}
+
+// ─── Runs ──────────────────────────────────────────────────────────────────
+
+/** The approver of a run's sign-off may not be the person who executed it (maker-checker on the run itself). */
+function runSignOffBlockedReason(
+  request: ApprovalRequest,
+  runs: ProcessRun[],
+  user: { id: string } | null | undefined,
+): string | null {
+  if (request.module !== 'Runs' || request.action !== 'SignOff' || !user) return null;
+  const run = runs.find((r) => r.id === request.entityId);
+  if (run?.createdById && run.createdById === user.id) {
+    return 'You ran this run. Segregation of duties means someone else must sign it off.';
+  }
+  return null;
+}
+
+/** What a checker is signing off: scope, date, version and the headline figures from the run itself. */
+function RunSignOffSummary({
+  request,
+  allRuns,
+  affiliates,
+}: {
+  request: ApprovalRequest;
+  allRuns: ProcessRun[];
+  affiliates: Array<{ code: string; name: string }>;
+}) {
+  const run = allRuns.find((r) => r.id === request.entityId) ?? null;
+  const { data: results = [] } = useRunResults(run ? run.id : null);
+  if (!run)
+    return <p className="mt-3 text-[12px] text-gray-400">Run {request.entityId} is not visible in your scope.</p>;
+  const name =
+    run.affiliateCode === 'GROUP'
+      ? 'Ecobank Group'
+      : (affiliates.find((a) => a.code === run.affiliateCode)?.name ?? run.affiliateCode);
+  const heads = runHeadlines(results);
+  const pick = (label: string) => heads.find((h) => h.label === label)?.value ?? null;
+  const lcr = pick('LCR');
+  const nsfr = pick('NSFR');
+  const status = signOffStatusOf(run);
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-navy-50 px-3 py-2 text-[13px] text-navy-900">
+      <span className="font-bold">{name}</span>
+      <span>
+        as of <span className="font-mono">{formatDate(run.asOfDate)}</span>
+      </span>
+      <span className="font-mono font-bold">v{versionOf(run, allRuns)}</span>
+      <span>
+        LCR <span className="font-mono font-bold">{lcr === null ? '-' : formatPct(lcr, 1)}</span>
+      </span>
+      <span>
+        NSFR <span className="font-mono font-bold">{nsfr === null ? '-' : formatPct(nsfr, 1)}</span>
+      </span>
+      <span className="text-gray-500">run by {run.createdBy}</span>
+      <span className="text-gray-500">· now {SIGN_OFF_LABEL[status].toLowerCase()}</span>
+      <Link href={`/execution/history?run=${run.id}`} className="font-bold underline hover:no-underline">
+        Open run
+      </Link>
+    </div>
   );
 }

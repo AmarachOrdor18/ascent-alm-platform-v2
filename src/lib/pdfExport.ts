@@ -63,7 +63,9 @@ export function exportPackPdf(data: PdfPackData): void {
   doc.setTextColor(...GRAY);
   const meta = [
     data.runAsOfDate ? `As of ${data.runAsOfDate}` : null,
-    data.generatedAt ? `Generated ${data.generatedAt.slice(0, 10)}${data.generatedBy ? ` by ${data.generatedBy}` : ''}` : null,
+    data.generatedAt
+      ? `Generated ${data.generatedAt.slice(0, 10)}${data.generatedBy ? ` by ${data.generatedBy}` : ''}`
+      : null,
     data.recipients.length > 0 ? `Distributed to ${data.recipients.join(', ')}` : null,
   ]
     .filter(Boolean)
@@ -95,12 +97,20 @@ export function exportPackPdf(data: PdfPackData): void {
     doc.text(`Page ${page} of ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
   }
 
-  const slug = data.packName.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+  const slug = data.packName
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
   doc.save(`${slug || 'report-pack'}.pdf`);
 }
 
 function packSlug(data: PdfPackData): string {
-  return data.packName.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'report-pack';
+  return (
+    data.packName
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'report-pack'
+  );
 }
 
 function packMetaRows(data: PdfPackData): string[][] {

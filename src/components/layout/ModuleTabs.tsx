@@ -21,7 +21,7 @@ export interface ModuleTab {
 function ScreenFallback() {
   return (
     <div className="flex items-center justify-center p-12" role="status" aria-live="polite">
-      <span className="text-[12px] text-gray-400">Loading…</span>
+      <span className="text-[13px] text-gray-400">Loading…</span>
     </div>
   );
 }
@@ -51,7 +51,7 @@ function TabBar({
               href={t.path}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors',
+                'rounded-md px-2.5 py-1 text-[12px] font-bold transition-colors',
                 active ? 'bg-white text-navy-900 shadow-sm' : 'text-gray-500 hover:text-navy-900',
               )}
             >
@@ -67,7 +67,7 @@ function TabBar({
   // bottom rule - reads as one cohesive control, with a bolder filled pill than the secondary
   // variant's lighter treatment so the two remain visually distinct where one nests inside the other.
   return (
-    <div className="mb-5 inline-flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1">
+    <div data-tour="module-tabs" className="mb-5 inline-flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1">
       {tabs.map((t) => {
         const active = t.key === activeKey;
         return (
@@ -76,7 +76,7 @@ function TabBar({
             href={t.path}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'rounded-lg px-3.5 py-1.5 text-[12px] font-bold transition-colors',
+              'rounded-lg px-3.5 py-1.5 text-[13px] font-bold transition-colors',
               active ? 'bg-navy-900 text-white shadow-sm' : 'text-gray-600 hover:bg-white/60 hover:text-navy-900',
             )}
           >
@@ -91,8 +91,8 @@ function TabBar({
 function AccessRestricted({ screenName }: { screenName?: string }) {
   return (
     <div role="alert" className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-      <p className="text-[13px] font-bold text-navy-900">Access restricted</p>
-      <p className="mt-1 text-[12px] text-gray-500">
+      <p className="text-[14px] font-bold text-navy-900">Access restricted</p>
+      <p className="mt-1 text-[13px] text-gray-500">
         {screenName
           ? `Your role doesn't have access to ${screenName}.`
           : "Your role doesn't have access to any screen in this module."}

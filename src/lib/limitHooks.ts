@@ -1,16 +1,33 @@
+import { useMemo } from 'react';
+import { buildSeries, officialVersionOf } from './runSeries';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
-import { evaluateLimit, type BreachNote, type LimitConfig, type LimitEvaluation, type TemporaryLimit } from '@/engine/limits';
+import {
+  evaluateLimit,
+  REGULATORY_MINIMA,
+  type BreachNote,
+  type LimitConfig,
+  type LimitEvaluation,
+  type TemporaryLimit,
+} from '@/engine/limits';
+import { useAffiliates } from './hooks';
 import { evaluateKri, DEFAULT_KRIS, type KriEvaluation, type KriObservation } from '@/engine/kri';
 import { extractMetrics } from './metrics';
-import type { ProcessRun, RunResult, User } from '@/engine/types';
+import type { Affiliate, ProcessRun, RunResult, User } from '@/engine/types';
 
 let auditCounter = 0;
 
 /** Limit thresholds, temporary overrides and breach notes previously had no audit trail at all - a
  * limit could be loosened or a breach explained away with no record on the central Audit Log. */
-function recordAudit(user: User | null, module: string, action: string, entity: string, entityId: string, detail: string) {
+function recordAudit(
+  user: User | null,
+  module: string,
+  action: string,
+  entity: string,
+  entityId: string,
+  detail: string,
+) {
   if (!user) return Promise.resolve();
   auditCounter += 1;
   return repository.recordAuditEvent({
@@ -35,11 +52,51 @@ export const limitKeys = {
   kri: ['kriSeries'] as const,
 };
 
+/**
+ * The limits that actually apply to one affiliate. An affiliate's own config for a metric replaces the
+ * Group-wide one (previously both were listed and evaluated). Where it has none, the internal amber/red
+ * floors and regulator minimum confirmed at onboarding step 6 are layered onto the Group default - those
+ * were stored on the affiliate but never reached Limits & Breaches. Only floor-style (higher-is-better)
+ * limits take them, since that is what step 6 sets. The derived row carries the affiliate's code and its
+ * own id, so editing it saves an affiliate-specific limit rather than overwriting the Group default.
+ */
+export function effectiveLimitConfigs(configs: LimitConfig[], affiliate: Affiliate | undefined): LimitConfig[] {
+  if (!affiliate || affiliate.code === 'GROUP') return configs;
+  const own = new Set(configs.filter((c) => c.affiliateCode === affiliate.code).map((c) => c.metricKey));
+  const minima = REGULATORY_MINIMA[affiliate.regulator] ?? {};
+  return configs
+    .filter((c) => c.affiliateCode !== null || !own.has(c.metricKey))
+    .map((c) => {
+      if (c.affiliateCode !== null || c.direction !== 'higher-is-better') return c;
+      const t = affiliate.internalThresholds[c.metricKey];
+      const minimum = minima[c.metricKey];
+      const usable = t && t.amberPercent >= t.redPercent;
+      if (!usable && minimum === undefined) return c;
+      const amber = usable ? t.amberPercent : c.amberThreshold;
+      return {
+        ...c,
+        id: `${c.id}-${affiliate.code}`,
+        affiliateCode: affiliate.code,
+        amberThreshold: amber,
+        redThreshold: usable ? t.redPercent : c.redThreshold,
+        greenThreshold: Math.max(c.greenThreshold, amber),
+        regulatoryMinimum: minimum ?? c.regulatoryMinimum,
+      };
+    });
+}
+
 export function useLimitConfigs(affiliateCode?: string) {
-  return useQuery({
+  const { data: affiliates = [] } = useAffiliates();
+  const affiliate = affiliates.find((a) => a.code === affiliateCode);
+  const query = useQuery({
     queryKey: [...limitKeys.configs, affiliateCode ?? 'ALL'],
     queryFn: () => repository.listLimitConfigs(affiliateCode === 'GROUP' ? undefined : affiliateCode),
   });
+  const data = useMemo(
+    () => (query.data ? effectiveLimitConfigs(query.data, affiliate) : undefined),
+    [query.data, affiliate],
+  );
+  return { ...query, data };
 }
 
 export function useTemporaryLimits() {
@@ -147,10 +204,13 @@ export function useKriSeries(runs: ProcessRun[], metricKeys: string[]) {
     queryKey: [...limitKeys.kri, ids, metricKeys.join(',')],
     enabled: completed.length > 0,
     queryFn: async () => {
+      // One observation per as-of date: that date's official version (signed off, else its latest
+      // provisional one) - never a reopened or superseded version alongside it.
       const byDate = new Map<string, ProcessRun>();
-      for (const run of completed) {
-        const held = byDate.get(run.asOfDate);
-        if (!held || run.createdAt > held.createdAt) byDate.set(run.asOfDate, run);
+      for (const s of buildSeries(completed)) {
+        const run = officialVersionOf(s);
+        const held = byDate.get(s.asOfDate);
+        if (run && (!held || run.createdAt > held.createdAt)) byDate.set(s.asOfDate, run);
       }
 
       const dated = Array.from(byDate.values()).sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));

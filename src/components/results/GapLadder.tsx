@@ -33,7 +33,12 @@ export function GapLadderChart({
         <ComposedChart data={buckets} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <CartesianGrid stroke="hsl(var(--gray-200))" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="bucket" tick={AXIS} axisLine={false} tickLine={false} />
-          <YAxis tick={AXIS} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatAmount(v, currency)} />
+          <YAxis
+            tick={AXIS}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => formatAmount(v, currency)}
+          />
           <Tooltip
             formatter={(value: number, name: string) => [formatAmount(value, currency), name]}
             contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--gray-200))' }}

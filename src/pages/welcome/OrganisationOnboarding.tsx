@@ -29,7 +29,9 @@ function Progress({ current, done }: { current: OrgStep; done: (s: OrgStep) => b
           const isDone = done(s) && !isCurrent;
           return (
             <li key={s} className="flex-1" aria-current={isCurrent ? 'step' : undefined}>
-              <div className={cn('h-1.5 rounded-full', isCurrent ? 'bg-gold-500' : isDone ? 'bg-success' : 'bg-gray-200')} />
+              <div
+                className={cn('h-1.5 rounded-full', isCurrent ? 'bg-gold-500' : isDone ? 'bg-success' : 'bg-gray-200')}
+              />
               <p className={cn('mt-1.5 text-[12px]', isCurrent ? 'font-bold text-navy-900' : 'text-gray-500')}>
                 {isDone ? '✓ ' : `${i + 1}. `}
                 {ORG_STEP_META[s].title}
@@ -71,13 +73,19 @@ function OrganisationReady() {
   const [, navigate] = useLocation();
   return (
     <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success text-[22px] font-bold text-white">✓</div>
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success text-[22px] font-bold text-white">
+        ✓
+      </div>
       <h1 className="mt-4 text-[20px] font-bold text-navy-900">Organisation ready</h1>
       <p className="mt-2 text-[13px] leading-relaxed text-gray-500">
-        The organisation is set up. Affiliate Admins are guided through their own affiliate setup when they sign in,
-        and you can revisit any of these settings under Admin → Organisation setup.
+        The organisation is set up. Affiliate Admins are guided through their own affiliate setup when they sign in, and
+        you can revisit any of these settings under Admin → Organisation setup.
       </p>
-      <button type="button" onClick={() => navigate('/dashboard')} className="mt-6 rounded-lg bg-navy-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-navy-700">
+      <button
+        type="button"
+        onClick={() => navigate('/dashboard')}
+        className="mt-6 rounded-lg bg-navy-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-navy-700"
+      >
         Go to Home
       </button>
     </div>
@@ -115,8 +123,15 @@ export function OrganisationOnboarding() {
         minutes={10}
         steps={[
           { title: 'Organisation', detail: 'Name, reporting currency and reporting calendar.' },
-          { title: 'Affiliates & people', detail: 'Add each affiliate with its basic details, invite its admin, then upload the team with a CSV.' },
-          { title: 'Organisation defaults', detail: 'Limits, FTP method and currencies every affiliate inherits. Assumptions ship pre-set and stay editable under Admin → Organisation setup.' },
+          {
+            title: 'Affiliates & people',
+            detail: 'Add each affiliate with its basic details, invite its admin, then upload the team with a CSV.',
+          },
+          {
+            title: 'Organisation defaults',
+            detail:
+              'Limits, FTP method and currencies every affiliate inherits. Assumptions ship pre-set and stay editable under Admin → Organisation setup.',
+          },
           { title: 'Review', detail: 'Check everything, then open the Group dashboard.' },
         ]}
         onStart={() => setStarted(true)}

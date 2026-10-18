@@ -3,11 +3,11 @@
 // and committed as a new, superseding batch version. See engine/types.ts
 // `PositionSnapshot` for the invariants this enforces.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
 import { executeRun, draftRun, ALL_ELEMENTS, type RunOutcome } from '@/engine/run';
 import { assembleInputs } from '@/lib/runHooks';
-import { newId } from '@/lib/governanceHooks';
+import { newApprovalRequest, newId } from '@/lib/governanceHooks';
 import type { LoadBatch, Position, PositionSnapshot, SnapshotChange, SnapshotEditableField } from '@/engine/types';
 
 export const snapshotKeys = {
@@ -147,22 +147,21 @@ export function useSubmitSnapshotForApproval() {
       if (!user) throw new Error('Not signed in.');
       const now = new Date().toISOString();
       await repository.upsertSnapshot({ ...snapshot, status: 'PendingApproval', updatedAt: now });
-      await repository.upsertApprovalRequest({
-        id: newId('APR'),
-        module: 'Position Snapshot',
-        entityType: 'PositionSnapshot',
-        entityId: snapshot.id,
-        entityLabel: snapshot.name,
-        action: 'Update',
-        summary: `${snapshot.changes.length} field change(s) on ${snapshot.parentBatchId}: ${snapshot.reason}`,
-        affiliateCode: snapshot.affiliateCode,
-        status: 'Pending',
-        requestedBy: user.name,
-        requestedAt: now,
-        decidedBy: null,
-        decidedAt: null,
-        decisionNote: null,
-      });
+      await repository.upsertApprovalRequest(
+        newApprovalRequest(
+          {
+            module: 'Position Snapshot',
+            entityType: 'PositionSnapshot',
+            entityId: snapshot.id,
+            entityLabel: snapshot.name,
+            action: 'Update',
+            summary: `${snapshot.changes.length} field change(s) on ${snapshot.parentBatchId}: ${snapshot.reason}`,
+            affiliateCode: snapshot.affiliateCode,
+          },
+          user,
+          now,
+        ),
+      );
     },
     onSuccess: (_r, snapshot) => {
       client.invalidateQueries({ queryKey: snapshotKeys.all });
@@ -225,7 +224,9 @@ export function useRecalculateSnapshot() {
         batchIds: [snapshot.parentBatchId],
         createdBy: 'system',
         createdAt: new Date().toISOString(),
-        elements: ALL_ELEMENTS,
+        // Multi-layer profitability needs rules this comparison run does not select - leave it out rather
+        // than record a failed element on both sides of every comparison.
+        elements: ALL_ELEMENTS.filter((e) => e !== 'ProfitabilityLayers'),
       });
 
       const inputs = await assembleInputs(compareRun);
@@ -235,9 +236,18 @@ export function useRecalculateSnapshot() {
 
       const editedById = new Map(snapshot.positions.map((p) => [p.id, p]));
       const editedPositions = inputs.positions.map((p) => editedById.get(p.id) ?? p);
-      const edited = executeRun({ ...compareRun, id: `${snapshot.id}-COMPARE-EDITED` }, { ...inputs, positions: editedPositions }, now);
+      const edited = executeRun(
+        { ...compareRun, id: `${snapshot.id}-COMPARE-EDITED` },
+        { ...inputs, positions: editedPositions },
+        now,
+      );
 
-      const updated: PositionSnapshot = { ...snapshot, status: 'Recalculated', lastRecalculatedAt: now, updatedAt: now };
+      const updated: PositionSnapshot = {
+        ...snapshot,
+        status: 'Recalculated',
+        lastRecalculatedAt: now,
+        updatedAt: now,
+      };
       await repository.upsertSnapshot(updated);
 
       return { baseline, edited };
@@ -291,12 +301,21 @@ export function useCommitSnapshot() {
       // The adjusted rows carry both a new id and the new batch's id: positions are keyed by id alone
       // (see AscentDb.positions in store/db.ts), so reusing the parent's position id here would overwrite
       // that row in place - silently mutating the very history this flow exists to protect.
-      const adjustedPositions = snapshot.positions.map((p) => ({ ...p, id: `${p.id}-v${newBatch.version}`, batchId: newBatch.id }));
+      const adjustedPositions = snapshot.positions.map((p) => ({
+        ...p,
+        id: `${p.id}-v${newBatch.version}`,
+        batchId: newBatch.id,
+      }));
 
       await repository.upsertBatch({ ...parent, status: 'Superseded', supersededReason: newBatch.supersededReason });
       await repository.insertPositions(adjustedPositions);
       await repository.upsertBatch(newBatch);
-      await repository.upsertSnapshot({ ...snapshot, status: 'Committed', committedBatchId: newBatch.id, updatedAt: now });
+      await repository.upsertSnapshot({
+        ...snapshot,
+        status: 'Committed',
+        committedBatchId: newBatch.id,
+        updatedAt: now,
+      });
 
       if (user) {
         await repository.recordAuditEvent({

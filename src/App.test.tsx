@@ -20,7 +20,7 @@ const REPORTING_USER: User = {
   name: 'Test Reporting User',
   email: 'test-reporting@ecobank.com',
   passwordHash: 'test',
-  role: 'REPORTING_USER',
+  role: 'EXECUTIVE_VIEWER',
   affiliateCode: 'GH',
   isActive: true,
   mfaEnrolled: true,
@@ -57,7 +57,7 @@ function renderHarness(permission: string) {
 
 describe('RouteGate', () => {
   it('blocks a screen the signed-in role does not have permission for, even though the component would happily render it', async () => {
-    renderHarness('rules.edit'); // Reporting User doesn't have this
+    renderHarness('rules.edit'); // Viewer doesn't have this
     await act(async () => {
       screen.getByText('sign-in').click();
     });
@@ -66,7 +66,7 @@ describe('RouteGate', () => {
   });
 
   it('renders the real screen when the role does have the permission', async () => {
-    renderHarness('reporting.view'); // Reporting User does have this
+    renderHarness('reporting.view'); // Viewer does have this
     await act(async () => {
       screen.getByText('sign-in').click();
     });

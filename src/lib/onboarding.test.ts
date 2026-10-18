@@ -75,7 +75,9 @@ describe('landing', () => {
 
   it('never sends other roles to onboarding', () => {
     expect(resolveLanding(groupAdmin, perms('APPROVER'), null, null)).toBe('/dashboard');
-    expect(resolveLanding({ id: 'U-3', affiliateCode: 'GROUP' }, perms('AFFILIATE_ADMIN'), null, null)).toBe('/dashboard');
+    expect(resolveLanding({ id: 'U-3', affiliateCode: 'GROUP' }, perms('AFFILIATE_ADMIN'), null, null)).toBe(
+      '/dashboard',
+    );
     expect(resolveLanding(null, perms('ADMIN'), null, null)).toBe('/dashboard');
   });
 
@@ -102,14 +104,27 @@ describe('landing', () => {
       startedAt: '2026-10-16T00:00:00Z',
     };
     expect(resumeStep(oldRecord)).toBe('affiliates');
-    const allDoneButOld = { ...oldRecord, steps: { ...oldRecord.steps, affiliates: { done: true, at: '2026-10-16T00:00:00Z', by: 'U-1' }, settings: { done: true, at: '2026-10-16T00:00:00Z', by: 'U-1' } } };
+    const allDoneButOld = {
+      ...oldRecord,
+      steps: {
+        ...oldRecord.steps,
+        affiliates: { done: true, at: '2026-10-16T00:00:00Z', by: 'U-1' },
+        settings: { done: true, at: '2026-10-16T00:00:00Z', by: 'U-1' },
+      },
+    };
     expect(resumeStep(allDoneButOld)).toBe('review');
   });
 });
 
 describe('effectiveSetting', () => {
   const s = (affiliateCode: string, key: string, value: unknown, overridable?: boolean): SettingRecord => ({
-    id: `${affiliateCode}:${key}`, affiliateCode, key, value, overridable, updatedBy: null, updatedAt: null,
+    id: `${affiliateCode}:${key}`,
+    affiliateCode,
+    key,
+    value,
+    overridable,
+    updatedBy: null,
+    updatedAt: null,
   });
 
   it('falls back to the default when nothing is set', () => {
@@ -121,6 +136,10 @@ describe('effectiveSetting', () => {
     expect(effectiveSetting('tz', 'GH', rows, 'UTC')).toMatchObject({ value: 'Africa/Accra', source: 'Affiliate' });
     expect(effectiveSetting('tz', 'KE', rows, 'UTC')).toMatchObject({ value: 'Africa/Lagos', source: 'Organisation' });
     const locked = [s('GROUP', 'tz', 'Africa/Lagos', false), s('GH', 'tz', 'Africa/Accra')];
-    expect(effectiveSetting('tz', 'GH', locked, 'UTC')).toEqual({ value: 'Africa/Lagos', source: 'Organisation', overridable: false });
+    expect(effectiveSetting('tz', 'GH', locked, 'UTC')).toEqual({
+      value: 'Africa/Lagos',
+      source: 'Organisation',
+      overridable: false,
+    });
   });
 });

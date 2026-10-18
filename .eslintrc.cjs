@@ -14,13 +14,8 @@ module.exports = {
   ],
   ignorePatterns: ['dist', 'coverage', 'node_modules', '*.cjs'],
   rules: {
-    // Context modules export their own hook alongside the provider, and a
-    // few UI modules export a typed column builder. Those are deliberate;
-    // anything else exported from a component file is still flagged.
-    'react-refresh/only-export-components': [
-      'warn',
-      { allowConstantExport: true, allowExportNames: ['useAuth', 'useScope', 'ROLES', 'moneyColumn'] },
-    ],
+    // Only affects dev hot-reload; many screens deliberately export their step/editor lists alongside components.
+    'react-refresh/only-export-components': 'off',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'error',
     'no-console': ['error', { allow: ['warn', 'error'] }],
@@ -55,5 +50,7 @@ module.exports = {
       },
     },
     { files: ['**/*.test.ts', '**/*.test.tsx'], env: { node: true } },
+    // Command-line scripts report progress on the console.
+    { files: ['scripts/**/*.ts'], env: { node: true }, rules: { 'no-console': 'off' } },
   ],
 };

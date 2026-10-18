@@ -23,7 +23,7 @@ export const UPLOAD_ACCEPT =
  * - .xlsx / .xls: the first sheet, first row treated as the header - same
  *   layout as the CSV templates.
  */
-export async function readUploadAsCsvText(file: File): Promise<string> {
+export async function readUploadAsCsvText(file: File, options: { allSheets?: boolean } = {}): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
   if (ext === 'json') {
@@ -33,7 +33,7 @@ export async function readUploadAsCsvText(file: File): Promise<string> {
     return tableToCsv(xmlToTable(await file.text()));
   }
   if (ext === 'xlsx' || ext === 'xls') {
-    return tableToCsv(excelToTable(await file.arrayBuffer()));
+    return tableToCsv(excelToTable(await file.arrayBuffer(), options.allSheets));
   }
   return file.text();
 }
@@ -116,12 +116,40 @@ function xmlToTable(text: string): string[][] {
   return objectsToTable(objects);
 }
 
-function excelToTable(buffer: ArrayBuffer): string[][] {
+/**
+ * With `allSheets`, every non-empty sheet is stacked into one table (headers merged by name) and each row
+ * gets a `dataType` column holding its sheet's name, unless the sheet already has one - used for the
+ * market-data workbook, where FX rates, curves and policy rates sit on separate sheets.
+ */
+function excelToTable(buffer: ArrayBuffer, allSheets = false): string[][] {
   let workbook: XLSX.WorkBook;
   try {
     workbook = XLSX.read(buffer, { type: 'array' });
   } catch {
     throw new Error('This Excel file could not be read.');
+  }
+  if (allSheets && workbook.SheetNames.length > 1) {
+    const header: string[] = ['dataType'];
+    const out: Array<Record<string, string>> = [];
+    for (const name of workbook.SheetNames) {
+      const rows = XLSX.utils
+        .sheet_to_json<unknown[]>(workbook.Sheets[name]!, { header: 1, raw: false, defval: '' })
+        .map((r) => r.map(stringifyCell));
+      if (rows.length < 2) continue;
+      const head = rows[0]!.map((h) => h.trim());
+      for (const h of head) if (h && !header.some((x) => x.toLowerCase() === h.toLowerCase())) header.push(h);
+      for (const r of rows.slice(1)) {
+        const obj: Record<string, string> = { dataType: name };
+        head.forEach((h, i) => {
+          if (!h) return;
+          const key = header.find((x) => x.toLowerCase() === h.toLowerCase())!;
+          if (key === 'dataType' && !r[i]) return;
+          obj[key] = r[i] ?? '';
+        });
+        out.push(obj);
+      }
+    }
+    return [header, ...out.map((o) => header.map((h) => o[h] ?? ''))];
   }
   const sheetName = workbook.SheetNames[0];
   const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
@@ -146,4 +174,27 @@ export function tableToCsv(table: string[][]): string {
         .join(','),
     )
     .join('\n');
+}
+
+/** Every sheet of an Excel workbook as a table of strings (header row first), keyed by sheet name. */
+export async function readWorkbookSheets(file: File): Promise<Record<string, string[][]>> {
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  } catch {
+    throw new Error('This Excel file could not be read.');
+  }
+  const out: Record<string, string[][]> = {};
+  for (const name of workbook.SheetNames) {
+    const sheet = workbook.Sheets[name];
+    if (!sheet) continue;
+    out[name] = XLSX.utils
+      .sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '' })
+      .map((r) =>
+        r.map((c) =>
+          c === null || c === undefined ? '' : c instanceof Date ? c.toISOString().slice(0, 10) : String(c),
+        ),
+      );
+  }
+  return out;
 }

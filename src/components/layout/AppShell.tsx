@@ -1,13 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/cn';
-import { formatDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
 import { GROUP_CODE, useScope } from '@/context/ScopeContext';
-import { useBatches } from '@/lib/hooks';
+import { formatDate } from '@/lib/format';
 import { accessibleAffiliates, isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { NAV_GROUPS, SEARCH_INDEX } from './navigation';
 import { CommandPalette } from './CommandPalette';
+import { RunPill } from './RunPill';
+import { NotificationBell } from './NotificationBell';
 import { TourLauncher, TourProvider } from '@/components/tour/Tour';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -15,21 +16,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['OVERVIEW', 'RISK MANAGEMENT']));
   const { user, role, hasPermission, logout } = useAuth();
-  const { affiliateCode, setAffiliateCode, affiliates, run } = useScope();
-  const { data: batches = [] } = useBatches();
-
-  // A results screen keeps scope's `run` in sync with whatever it's actually displaying
-  // (useSelectedRun, resultHooks.ts) - while one is active, "As at" should read that run's own date,
-  // not just the latest upload, or the header can disagree with the numbers on screen below it. Away
-  // from a results screen (Data Upload, Dimensions, Admin...) there's no run in play, so it falls back
-  // to the most recently committed batch, same as before.
-  const latestBatchDate = useMemo(() => {
-    const committed = batches
-      .filter((b) => b.status === 'Committed' && (affiliateCode === GROUP_CODE || b.affiliateCode === affiliateCode))
-      .sort((a, b) => b.asOfDate.localeCompare(a.asOfDate));
-    return committed[0]?.asOfDate ?? null;
-  }, [batches, affiliateCode]);
-  const asOfDate = run?.asOfDate ?? latestBatchDate;
+  const { affiliateCode, setAffiliateCode, affiliates, asOfDate, availableDates, setAsOfDate, asOfDateChosen } =
+    useScope();
 
   // Settings pages are pinned to one affiliate by their own URL (see AffiliateSettings.tsx) and aren't
   // as-of dated - the Scope switcher and "As at" here are for the rest of the app, whose data genuinely
@@ -53,14 +41,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     [hasPermission],
   );
 
-  // A user assigned to one affiliate sees only that affiliate here, unless group.manage says otherwise -
-  // the same rule every other affiliate picker in the app applies via accessibleAffiliates(). Live-only
-  // either way: an affiliate that hasn't gone live yet has nothing signed-off to work with in scope, even
-  // for the one user confined to it - RouteGate separately blocks the screens that would matter if this
-  // ever somehow carried a non-Live affiliateCode anyway.
+  // Scope = Group or one affiliate, limited by permission: a user assigned to one affiliate is fixed to it
+  // (the same rule every affiliate picker applies via accessibleAffiliates()); Group-level users can pick
+  // Group or any affiliate - including one still onboarding, so its readiness can be worked on. Screens that
+  // need a Live affiliate (results, runs, reports) are still gated by RouteGate.
   const restrictedToOwn = isRestrictedToOwnAffiliate(user, hasPermission);
-  const selectable = (restrictedToOwn ? accessibleAffiliates(affiliates, user, hasPermission) : affiliates).filter(
-    (a) => a.code === GROUP_CODE || a.status === 'Live',
+  const selectable = useMemo(
+    () =>
+      restrictedToOwn
+        ? accessibleAffiliates(affiliates, user, hasPermission)
+        : [...affiliates].sort((a, b) =>
+            a.code === GROUP_CODE ? -1 : b.code === GROUP_CODE ? 1 : a.name.localeCompare(b.name),
+          ),
+    [restrictedToOwn, affiliates, user, hasPermission],
   );
 
   const toggleGroup = (groupLabel: string) => {
@@ -79,6 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <TourProvider>
       <div className="flex h-screen overflow-hidden bg-gray-50">
         <nav
+          data-tour="nav"
           aria-label="Main navigation"
           className={cn(
             'flex h-full shrink-0 flex-col bg-navy-900 transition-all duration-200',
@@ -98,8 +92,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             {!collapsed && (
               <div className="flex flex-col">
-                <span className="text-[13px] font-bold tracking-wide text-white">Ecobank</span>
-                <span className="text-[10px] font-medium text-white/60">ALM Platform</span>
+                <span className="text-[14px] font-bold tracking-wide text-white">Ecobank</span>
+                <span className="text-[11px] font-medium text-white/60">ALM Platform</span>
               </div>
             )}
             <button
@@ -127,15 +121,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
 
-          <div className="pt-3">
+          <div data-tour="search" className="pt-3">
             <CommandPalette items={visibleSearchItems} collapsed={collapsed} />
           </div>
 
           <div className="flex-1 overflow-y-auto py-1 px-2">
             {visibleGroups.map((group) => {
               const isExpanded = expandedGroups.has(group.label);
-              const hasActiveItem = group.items.some(
-                (item) => location === item.path || location.startsWith(`${item.path}/`),
+              const hasActiveItem = group.items.some((item) =>
+                [item.path, ...(item.matchPrefixes ?? [])].some((p) => location === p || location.startsWith(`${p}/`)),
               );
               // A dropdown for a single item is chrome, not navigation - single-item groups
               // render their entry flat, exactly like an expanded multi-item group.
@@ -148,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       type="button"
                       onClick={() => toggleGroup(group.label)}
                       className={cn(
-                        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
+                        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-bold uppercase tracking-wider transition-colors',
                         hasActiveItem ? 'text-gold-500' : 'text-white/50 hover:text-white/80',
                       )}
                     >
@@ -175,7 +169,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {(isExpanded || collapsed || !collapsible) && (
                     <ul className={cn('mt-1 space-y-0.5', collapsed && 'px-1')}>
                       {group.items.map((item) => {
-                        const active = location === item.path || location.startsWith(`${item.path}/`);
+                        const active = [item.path, ...(item.matchPrefixes ?? [])].some(
+                          (p) => location === p || location.startsWith(`${p}/`),
+                        );
                         const Icon = item.icon;
                         return (
                           <li key={item.path}>
@@ -184,7 +180,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                               aria-current={active ? 'page' : undefined}
                               title={collapsed ? item.name : undefined}
                               className={cn(
-                                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] transition-all duration-150',
+                                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-all duration-150',
                                 active
                                   ? 'bg-gold-500/10 text-gold-500 font-medium border-l-2 border-gold-500'
                                   : 'text-white/70 hover:bg-white/5 hover:text-white border-l-2 border-transparent',
@@ -205,19 +201,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           {!collapsed && user && (
-            <div className="border-t border-white/10 p-4">
+            <div data-tour="user-menu" className="border-t border-white/10 p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white font-bold text-[12px]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white font-bold text-[13px]">
                   {user.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-[12px] font-bold text-white">{user.name}</p>
-                  <p className="truncate text-[10px] text-white/50">{role?.name}</p>
+                  <p className="truncate text-[13px] font-bold text-white">{user.name}</p>
+                  <p className="truncate text-[11px] text-white/50">{role?.name}</p>
                 </div>
               </div>
               <Link
                 href="/account"
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -238,7 +234,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {!hasPermission('group.manage') && hasPermission('users.manage') && (
                 <Link
                   href={`/affiliates/${user.affiliateCode}/settings`}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -260,7 +256,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={logout}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -285,34 +281,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              aria-label="Go back"
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-              Back
-            </button>
-            <TourLauncher className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:border-navy-700" />
+            <TourLauncher className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-[14px] font-bold text-navy-900 hover:border-navy-700" />
             {!onSettingsPage && (
               <div className="ml-auto flex items-center gap-6">
-                <div className="flex items-center gap-2">
+                <div data-tour="scope" className="flex items-center gap-2">
                   <label
                     htmlFor="scope-affiliate"
-                    className="text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="text-[11px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Scope
                   </label>
@@ -321,24 +296,57 @@ export function AppShell({ children }: { children: ReactNode }) {
                     value={affiliateCode}
                     disabled={restrictedToOwn}
                     onChange={(e) => setAffiliateCode(e.target.value)}
-                    title={restrictedToOwn ? 'This account is scoped to one affiliate' : undefined}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50 disabled:opacity-70"
+                    title={
+                      restrictedToOwn
+                        ? 'This account is scoped to one affiliate'
+                        : 'Group, or one affiliate - every screen follows this'
+                    }
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 bg-gray-50 disabled:opacity-70"
                   >
                     {selectable.length === 0 && <option value={GROUP_CODE}>Ecobank Group</option>}
                     {selectable.map((a) => (
                       <option key={a.code} value={a.code}>
-                        {a.code === GROUP_CODE ? 'Ecobank Group (Consolidated)' : a.name}
+                        {a.code === GROUP_CODE
+                          ? 'Ecobank Group (Consolidated)'
+                          : a.status === 'Live'
+                            ? a.name
+                            : `${a.name} (${a.status})`}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                  <span className="font-bold uppercase tracking-wider text-gray-400">As at</span>
-                  <span className="font-mono text-navy-900">{asOfDate ? formatDate(asOfDate) : 'no data loaded'}</span>
+                <div data-tour="asof-date" className="flex items-center gap-2">
+                  <label htmlFor="scope-asof" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    As of
+                  </label>
+                  <select
+                    id="scope-asof"
+                    value={asOfDateChosen && asOfDate ? asOfDate : ''}
+                    onChange={(e) => setAsOfDate(e.target.value || null)}
+                    disabled={availableDates.length === 0}
+                    title="The working date - uploads, readiness, runs and results all use it. Only dates with committed position data are listed."
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:opacity-70"
+                  >
+                    {availableDates.length === 0 ? (
+                      <option value="">No data loaded yet</option>
+                    ) : (
+                      <option value="">Latest ({formatDate(availableDates[0]!)})</option>
+                    )}
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>
+                        {formatDate(d)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                <RunPill fallbackDate={asOfDate} />
               </div>
             )}
+            <div className={onSettingsPage ? 'ml-auto' : undefined}>
+              <NotificationBell />
+            </div>
           </div>
 
           <main className="flex-1 overflow-y-auto p-6">{children}</main>

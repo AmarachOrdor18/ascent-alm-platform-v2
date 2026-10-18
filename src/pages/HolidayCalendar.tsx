@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
+import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { useHolidayCalendars, useSaveHolidayCalendar } from '@/lib/hooks';
 import { formatDate } from '@/lib/format';
 import { addDays } from '@/engine/dates';
@@ -24,10 +25,11 @@ function nextBusinessDay(calendar: Calendar, date: string): string {
 }
 
 export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {}) {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { data: calendars = [], isLoading } = useHolidayCalendars();
   const save = useSaveHolidayCalendar();
-  const canEdit = hasPermission('data.configure');
+  // Market data is Group-wide: only Group-level users change it (affiliate users see it read-only).
+  const canEdit = hasPermission('data.configure') && !isRestrictedToOwnAffiliate(user, hasPermission);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState({ date: '', name: '' });
@@ -93,46 +95,46 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
   return (
     <>
       {!embedded && (
-      <ModuleHeader
-        title="Holiday Calendar"
-        description="Business-day conventions per jurisdiction. A flow due on a holiday settles on the next business day, moving it between buckets at the short end."
-        asOfDate={null}
-        scope={active?.name ?? 'Group'}
-        metrics={[
-          {
-            label: 'Calendars',
-            value: String(calendars.length),
-            about: 'Business-day calendars defined, typically one per jurisdiction.',
-          },
-          {
-            label: 'Holidays defined',
-            value: active ? String(active.holidays.length) : '-',
-            about: 'Dates on the selected calendar that are not business days.',
-          },
-          {
-            label: 'Weekend',
-            value: active ? active.weekendDays.map((d) => DAY_NAMES[d]!.slice(0, 3)).join(' & ') : '-',
-            about:
-              'Which weekdays this jurisdiction treats as non-business days - not every calendar uses Saturday/Sunday.',
-          },
-          {
-            label: 'Exceptions',
-            value: active ? String(active.holidays.filter((h) => h.isException).length) : '-',
-            about: 'Holidays that move each year (like Eid) rather than falling on a fixed recurring date.',
-          },
-        ]}
-      />
+        <ModuleHeader
+          title="Holiday Calendar"
+          description="Business-day conventions per jurisdiction. A flow due on a holiday settles on the next business day, moving it between buckets at the short end."
+          asOfDate={null}
+          scope={active?.name ?? 'Group'}
+          metrics={[
+            {
+              label: 'Calendars',
+              value: String(calendars.length),
+              about: 'Business-day calendars defined, typically one per jurisdiction.',
+            },
+            {
+              label: 'Holidays defined',
+              value: active ? String(active.holidays.length) : '-',
+              about: 'Dates on the selected calendar that are not business days.',
+            },
+            {
+              label: 'Weekend',
+              value: active ? active.weekendDays.map((d) => DAY_NAMES[d]!.slice(0, 3)).join(' & ') : '-',
+              about:
+                'Which weekdays this jurisdiction treats as non-business days - not every calendar uses Saturday/Sunday.',
+            },
+            {
+              label: 'Exceptions',
+              value: active ? String(active.holidays.filter((h) => h.isException).length) : '-',
+              about: 'Holidays that move each year (like Eid) rather than falling on a fixed recurring date.',
+            },
+          ]}
+        />
       )}
 
       <div className="mb-6 flex items-center gap-3">
-        <label htmlFor="calendar-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+        <label htmlFor="calendar-picker" className="text-[12px] font-bold uppercase tracking-wider text-gray-400">
           Calendar
         </label>
         <select
           id="calendar-picker"
           value={activeId ?? ''}
           onChange={(e) => setActiveId(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
         >
           {calendars.map((c) => (
             <option key={c.id} value={c.id}>
@@ -140,12 +142,12 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
             </option>
           ))}
         </select>
-        {isLoading && <span className="text-[12px] text-gray-400">Loading…</span>}
+        {isLoading && <span className="text-[13px] text-gray-400">Loading…</span>}
         {canEdit && !creating && (
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="ml-auto rounded-lg border border-navy-700 px-3 py-1.5 text-[11px] font-bold text-navy-700 hover:bg-navy-50"
+            className="ml-auto rounded-lg border border-navy-700 px-3 py-1.5 text-[12px] font-bold text-navy-700 hover:bg-navy-50"
           >
             New calendar
           </button>
@@ -154,33 +156,37 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
 
       {creating && (
         <section className="mb-6 rounded-2xl border border-navy-700 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">New calendar</h2>
+          <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">New calendar</h2>
           <div className="mb-4 flex flex-wrap items-end gap-3">
             <div>
-              <label htmlFor="cal-country" className="mb-1 block text-[11px] text-gray-600">Country code</label>
+              <label htmlFor="cal-country" className="mb-1 block text-[12px] text-gray-600">
+                Country code
+              </label>
               <input
                 id="cal-country"
                 value={newCalendar.countryCode}
                 onChange={(e) => setNewCalendar({ ...newCalendar, countryCode: e.target.value.toUpperCase() })}
                 placeholder="NG"
-                className="w-24 rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                className="w-24 rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
               />
             </div>
             <div className="flex-1">
-              <label htmlFor="cal-name" className="mb-1 block text-[11px] text-gray-600">Name</label>
+              <label htmlFor="cal-name" className="mb-1 block text-[12px] text-gray-600">
+                Name
+              </label>
               <input
                 id="cal-name"
                 value={newCalendar.name}
                 onChange={(e) => setNewCalendar({ ...newCalendar, name: e.target.value })}
                 placeholder="Nigeria"
-                className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
               />
             </div>
             <div>
-              <span className="mb-1 block text-[11px] text-gray-600">Weekend</span>
+              <span className="mb-1 block text-[12px] text-gray-600">Weekend</span>
               <div className="flex gap-2">
                 {DAY_NAMES.map((day, i) => (
-                  <label key={day} className="flex items-center gap-1 text-[11px]">
+                  <label key={day} className="flex items-center gap-1 text-[12px]">
                     <input
                       type="checkbox"
                       checked={newCalendar.weekendDays.includes(i)}
@@ -201,14 +207,18 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900">
+            <button
+              type="button"
+              onClick={() => setCreating(false)}
+              className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
+            >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleCreateCalendar}
               disabled={!newCalendar.countryCode.trim() || !newCalendar.name.trim()}
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
               Create calendar
             </button>
@@ -219,7 +229,7 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
       {active && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-4 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Public holidays
               <InfoButton label="Recurring vs exception">
                 Recurring holidays fall on the same pattern every year. Exceptions are dates added directly - a declared
@@ -230,7 +240,7 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
             {canEdit && (
               <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
                 <div>
-                  <label htmlFor="hol-date" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="hol-date" className="mb-1 block text-[12px] text-gray-600">
                     Date
                   </label>
                   <input
@@ -238,11 +248,11 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
                     type="date"
                     value={draft.date}
                     onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                    className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                    className="rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                   />
                 </div>
                 <div className="flex-1">
-                  <label htmlFor="hol-name" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="hol-name" className="mb-1 block text-[12px] text-gray-600">
                     Name
                   </label>
                   <input
@@ -250,18 +260,18 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
                     value={draft.name}
                     onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                     placeholder="Eid al-Fitr (declared)"
-                    className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                    className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleAdd}
                   disabled={save.isPending || !draft.date || !draft.name.trim()}
-                  className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                  className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                 >
                   Add holiday
                 </button>
-                <p className="w-full text-[11px] text-gray-500">
+                <p className="w-full text-[12px] text-gray-500">
                   Added dates are marked as exceptions - declared holidays such as Eid move each year and are not part
                   of the recurring pattern.
                 </p>
@@ -307,7 +317,7 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
                           <button
                             type="button"
                             onClick={() => handleRemove(h.date)}
-                            className="text-[11px] font-bold text-danger hover:underline"
+                            className="text-[12px] font-bold text-danger hover:underline"
                           >
                             Remove
                           </button>
@@ -320,14 +330,14 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Settlement probe
               <InfoButton label="Why this matters for buckets">
                 A flow due on a non-business day rolls forward to the next one. At the short end of a liquidity ladder,
                 that roll can shift a flow across a bucket boundary and change the reported gap.
               </InfoButton>
             </h2>
-            <label htmlFor="probe-date" className="mb-1 block text-[11px] text-gray-600">
+            <label htmlFor="probe-date" className="mb-1 block text-[12px] text-gray-600">
               A flow falls due on
             </label>
             <input
@@ -335,16 +345,16 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
               type="date"
               value={probe}
               onChange={(e) => setProbe(e.target.value)}
-              className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+              className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
             />
-            <p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-gray-400">It settles on</p>
+            <p className="mt-4 text-[12px] font-bold uppercase tracking-wider text-gray-400">It settles on</p>
             <p className="text-[18px] font-bold text-navy-900">{settlement ? formatDate(settlement) : '-'}</p>
             {shifted && (
-              <p className="mt-2 rounded-lg bg-warning-bg px-3 py-2 text-[11px] leading-relaxed text-warning">
+              <p className="mt-2 rounded-lg bg-warning-bg px-3 py-2 text-[12px] leading-relaxed text-warning">
                 Shifted forward - the due date is a weekend or a public holiday in {active.name}.
               </p>
             )}
-            <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
+            <p className="mt-4 text-[12px] leading-relaxed text-gray-500">
               At the short end of the liquidity ladder this matters: a flow shifted across a bucket boundary changes
               which bucket it lands in, and therefore the reported gap.
             </p>
@@ -354,8 +364,8 @@ export function HolidayCalendar({ embedded = false }: { embedded?: boolean } = {
 
       {!active && !isLoading && (
         <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-          <p className="text-[13px] font-bold text-navy-900">No calendars defined</p>
-          <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+          <p className="text-[14px] font-bold text-navy-900">No calendars defined</p>
+          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-500">
             No business-day calendar has been set up yet for any jurisdiction.
           </p>
         </section>

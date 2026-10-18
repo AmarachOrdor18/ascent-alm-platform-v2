@@ -1,7 +1,16 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
-import type { RuleKind, RuleMeta } from '@/engine/types';
+import { approvals, isRequester } from '@/lib/governanceHooks';
+import {
+  isApprovalGated,
+  isRuleApproved,
+  pickApprovedRule,
+  ruleApprovalRequest,
+  supersededRequests,
+} from '@/lib/ruleApproval';
+import type { ProcessRun, RuleKind, RuleMeta } from '@/engine/types';
 
 export function ruleKey(kind: RuleKind) {
   return ['rules', kind] as const;
@@ -17,9 +26,44 @@ export function useRules<T extends RuleMeta>(kind: RuleKind) {
 let auditCounter = 0;
 
 /** Save and delete, with an audit event for each. */
+/**
+ * A rule as a run actually used it - the version recorded in `run.ruleVersionsUsed`, recovered from
+ * rule history, rather than whatever the row holds now. Falls back to the current row for runs that
+ * pre-date version capture.
+ */
+export function useRuleAsUsedBy<T extends RuleMeta>(ruleId: string | null | undefined, run: ProcessRun | null) {
+  const version = ruleId ? run?.ruleVersionsUsed?.[ruleId] : undefined;
+  return useQuery({
+    queryKey: ['ruleAsUsed', ruleId ?? 'none', version ?? 'current'],
+    queryFn: async () => {
+      if (!ruleId) return null;
+      const used = version !== undefined ? await repository.getRuleVersion<T>(ruleId, version) : null;
+      return used ?? (await repository.getRule<T>(ruleId));
+    },
+    enabled: !!ruleId,
+  });
+}
+
+/** Ids of every rule a run may consume as approved - seeded defaults plus approval-gated rules signed off at their current version. */
+export function useApprovedRuleIds<T extends RuleMeta>(rules: T[]): Set<string> {
+  const { data: requests = [] } = approvals.useList();
+  return useMemo(
+    () => new Set(rules.filter((r) => !isApprovalGated(r.kind) || isRuleApproved(r, requests)).map((r) => r.id)),
+    [rules, requests],
+  );
+}
+
+/** The approved, active rule of a kind for an affiliate (affiliate override, else Group default), or null. */
+export function useApprovedRuleFor<T extends RuleMeta>(kind: RuleKind, affiliateCode: string | null | undefined) {
+  const { data: rules = [], isLoading: loadingRules } = useRules<T>(kind);
+  const { data: requests = [], isLoading: loadingApprovals } = approvals.useList();
+  const rule = useMemo(() => pickApprovedRule(rules, affiliateCode, requests), [rules, affiliateCode, requests]);
+  return { rule, isLoading: loadingRules || loadingApprovals };
+}
+
 export function useRuleMutations<T extends RuleMeta>(kind: RuleKind) {
   const client = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const record = async (action: string, rule: { id: string; name: string; version: number }) => {
     if (!user) return;
@@ -42,12 +86,27 @@ export function useRuleMutations<T extends RuleMeta>(kind: RuleKind) {
   const invalidate = () => {
     client.invalidateQueries({ queryKey: ruleKey(kind) });
     client.invalidateQueries({ queryKey: ['auditEvents'] });
+    client.invalidateQueries({ queryKey: ['approvals'] });
   };
 
   const save = useMutation({
     mutationFn: async (rule: T) => {
       await repository.upsertRule(rule);
       await record('Save', rule);
+      // An approval-gated rule is saved but not yet usable: the save itself raises the request, so
+      // sign-off can't be skipped by forgetting a second step. The maker is whoever saved it, and
+      // approvalBlockedReason stops them being their own checker.
+      if (isApprovalGated(kind) && user) {
+        const now = new Date().toISOString();
+        for (const stale of supersededRequests(rule, await repository.listApprovalRequests(), now)) {
+          // Only the requester or an approver may withdraw a request (the database enforces this too);
+          // anyone else's stale request is left for an approver to clear rather than failing the save.
+          if (!isRequester(stale, user) && !hasPermission('approvals.approve')) continue;
+          await repository.upsertApprovalRequest(stale);
+        }
+        await repository.upsertApprovalRequest(ruleApprovalRequest(rule, user.name, now, user.id));
+        await record('Submit for approval', rule);
+      }
     },
     onSuccess: invalidate,
   });

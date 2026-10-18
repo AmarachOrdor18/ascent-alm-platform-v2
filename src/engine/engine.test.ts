@@ -236,6 +236,21 @@ describe('limits', () => {
     expect(evaluateLimit(config, 95, NIGERIA_AS_OF).status).toBe('Red');
   });
 
+  it('uses no appetite on the safe side of green, and all of it at the red line', () => {
+    expect(evaluateLimit(config, 196.7, NIGERIA_AS_OF).utilisationPercent).toBe(0);
+    expect(evaluateLimit(config, 115, NIGERIA_AS_OF).utilisationPercent).toBeCloseTo(50, 5);
+    expect(evaluateLimit(config, 100, NIGERIA_AS_OF).utilisationPercent).toBeCloseTo(100, 5);
+    const ldr = {
+      ...config,
+      direction: 'lower-is-better' as const,
+      greenThreshold: 75,
+      amberThreshold: 85,
+      redThreshold: 95,
+    };
+    expect(evaluateLimit(ldr, 69.2, NIGERIA_AS_OF).utilisationPercent).toBe(0);
+    expect(evaluateLimit(ldr, 85, NIGERIA_AS_OF).utilisationPercent).toBeCloseTo(50, 5);
+  });
+
   it('reports no-data rather than green for an unmeasured metric', () => {
     const result = evaluateLimit(config, null, NIGERIA_AS_OF);
     expect(result.status).toBe('No data');
@@ -736,6 +751,14 @@ describe('run orchestrator', () => {
     orgUnitMembers: [] as DimensionMember[],
     productMembers: [] as DimensionMember[],
     tier1Capital: null,
+    // Multi-layer profitability has no defaults - every element computing means supplying its three rules.
+    costAllocation: {
+      currency: 'NGN',
+      pools: [{ id: 'OPEX', name: 'Opex', amount: 1_000_000, driver: 'Balance' as const }],
+      headcountByOrgUnit: {},
+    },
+    creditLoss: { method: 'PdLgd' as const, defaultPdPct: 2, defaultLgdPct: 45, useProvisionAmount: false },
+    capital: { riskWeightByProductClass: {}, defaultRiskWeightPct: 100, capitalRatioPct: 12.5, costOfCapitalPct: 15 },
   };
 
   const base = draftRun({

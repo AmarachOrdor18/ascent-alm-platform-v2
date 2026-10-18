@@ -60,7 +60,8 @@ export function CustomMetrics() {
   return (
     <RuleEditor<CustomMetricRule>
       title="Custom Metrics"
-      description="Derived measures over run outputs. Define the bank's own ratio without waiting for a release. Definition only for now - no screen yet evaluates a saved formula against a run's results."
+      description="Derived measures over run outputs."
+      about="Define the bank's own ratio without waiting for a release. Definition only for now - no screen yet evaluates a saved formula against a run's results."
       noun="metric"
       rules={rules}
       isLoading={isLoading}
@@ -140,9 +141,9 @@ export function CustomMetrics() {
               <RuleField label="Preview" hint="Evaluated against the Nigeria baseline figures.">
                 <p className="pt-1 text-[16px] font-bold text-navy-900">
                   {error ? (
-                    <span className="text-[12px] font-normal text-danger">{error}</span>
+                    <span className="text-[13px] font-normal text-danger">{error}</span>
                   ) : value === null ? (
-                    <span className="text-[12px] font-normal text-gray-400">Enter an expression</span>
+                    <span className="text-[13px] font-normal text-gray-400">Enter an expression</span>
                   ) : (
                     <>
                       {value.toFixed(rule.decimals)}
@@ -156,7 +157,7 @@ export function CustomMetrics() {
 
             {used.length > 0 && (
               <div>
-                <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Depends on</h4>
+                <h4 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">Depends on</h4>
                 <div className="flex flex-wrap gap-2">
                   {used.map((a) => (
                     <StatusBadge key={a.name} status={a.name} tone="info" />
@@ -166,8 +167,8 @@ export function CustomMetrics() {
             )}
 
             <div className="rounded-lg border border-gray-200 p-4">
-              <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Available names</h4>
-              <table className="w-full text-[11px]">
+              <h4 className="mb-2 text-[12px] font-bold uppercase tracking-wider text-gray-400">Available names</h4>
+              <table className="w-full text-[12px]">
                 <tbody>
                   {AVAILABLE.map((a) => (
                     <tr key={a.name} className="border-b border-gray-50 last:border-0">

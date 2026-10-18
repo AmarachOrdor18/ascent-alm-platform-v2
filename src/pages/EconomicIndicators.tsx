@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'wouter';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
+import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { useEconomicIndicators, useSaveEconomicIndicator, useSaveBatch } from '@/lib/hooks';
-import { importIndicatorObservations, type RowError } from '@/lib/csvImport';
-import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
 import { formatDate } from '@/lib/format';
 import { referenceLoadBatch } from '@/lib/referenceBatch';
 import type { EconomicIndicator, IndicatorFrequency, IndicatorValueType } from '@/engine/types';
@@ -29,23 +29,30 @@ export function EconomicIndicators() {
   const { data: indicators = [], isLoading } = useEconomicIndicators();
   const save = useSaveEconomicIndicator();
   const saveBatch = useSaveBatch();
-  const canEdit = hasPermission('data.configure') || hasPermission('risk.configure');
+  // Market data is Group-wide: only Group-level users change it (affiliate users see it read-only).
+  const canEdit =
+    (hasPermission('data.configure') || hasPermission('risk.configure')) &&
+    !isRestrictedToOwnAffiliate(user, hasPermission);
 
   // Group-wide reference data, entered here rather than staged like a Position file - but Data Sources'
   // freshness page only reads LoadBatch rows, so without recording one this domain reads "Never loaded"
   // forever no matter how current the indicator history actually is.
   const recordIndicatorLoad = (label: string, asOfDate: string, rowCount: number) =>
     saveBatch.mutate(
-      referenceLoadBatch({ domain: 'EconomicIndicators', affiliateCode: 'GROUP', asOfDate, label, uploadedBy: user?.name ?? 'unknown', rowCount }),
+      referenceLoadBatch({
+        domain: 'EconomicIndicators',
+        affiliateCode: 'GROUP',
+        asOfDate,
+        label,
+        uploadedBy: user?.name ?? 'unknown',
+        rowCount,
+      }),
     );
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newObs, setNewObs] = useState({ asOfDate: '', value: '' });
   const [creatingSeries, setCreatingSeries] = useState(false);
   const [seriesDraft, setSeriesDraft] = useState(emptySeriesDraft());
-  const [uploadErrors, setUploadErrors] = useState<RowError[]>([]);
-  const [uploadResult, setUploadResult] = useState<{ count: number; ignoredColumns: string[] } | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const handleCreateSeries = () => {
     const code = seriesDraft.code.trim().toUpperCase();
@@ -80,12 +87,6 @@ export function EconomicIndicators() {
     if (!activeId && indicators.length > 0) setActiveId(indicators[0]!.id);
   }, [indicators, activeId]);
 
-  // Switching series should never leave the previous series' upload feedback showing.
-  useEffect(() => {
-    setUploadErrors([]);
-    setUploadResult(null);
-  }, [activeId]);
-
   const active = indicators.find((i) => i.id === activeId) ?? null;
 
   const handleAddObservation = () => {
@@ -109,44 +110,6 @@ export function EconomicIndicators() {
     );
   };
 
-  const handleUploadObservations = async (file: File) => {
-    if (!active) return;
-    let text: string;
-    try {
-      text = await readUploadAsCsvText(file);
-    } catch (err) {
-      setUploadErrors([{ line: 1, column: '', message: err instanceof Error ? err.message : 'This file could not be read.' }]);
-      setUploadResult(null);
-      if (fileInput.current) fileInput.current.value = '';
-      return;
-    }
-    const result = importIndicatorObservations(text);
-    setUploadErrors(result.errors);
-    if (fileInput.current) fileInput.current.value = '';
-    if (result.rows.length === 0) {
-      setUploadResult(null);
-      return;
-    }
-
-    // Same replace-by-date rule as a single manual entry - a bulk file re-observing an existing
-    // date restates history rather than duplicating it.
-    const uploadedDates = new Set(result.rows.map((o) => o.asOfDate));
-    const observations = [...active.observations.filter((o) => !uploadedDates.has(o.asOfDate)), ...result.rows].sort(
-      (a, b) => a.asOfDate.localeCompare(b.asOfDate),
-    );
-
-    const latestUploadedDate = result.rows.reduce((max, o) => (o.asOfDate > max ? o.asOfDate : max), result.rows[0]!.asOfDate);
-    save.mutate(
-      { ...active, observations, updatedBy: 'current-user', updatedAt: new Date().toISOString() },
-      {
-        onSuccess: () => {
-          recordIndicatorLoad(`${active.code} - bulk upload`, latestUploadedDate, result.rows.length);
-          setUploadResult({ count: result.rows.length, ignoredColumns: result.ignoredColumns });
-        },
-      },
-    );
-  };
-
   const latest = active?.observations[active.observations.length - 1] ?? null;
   const previous =
     active && active.observations.length > 1 ? active.observations[active.observations.length - 2]! : null;
@@ -156,7 +119,8 @@ export function EconomicIndicators() {
     <>
       <ModuleHeader
         title="Economic Indicators"
-        description="Macro series driving behavioural assumptions and stress scenarios - inflation, policy rates, and for Nigeria the oil price its fiscal position tracks."
+        description="Macro series driving behavioural assumptions and stress scenarios."
+        about="Covers inflation, policy rates, and for Nigeria the oil price its fiscal position tracks."
         asOfDate={latest?.asOfDate ?? null}
         scope="Group"
         metrics={[
@@ -187,7 +151,7 @@ export function EconomicIndicators() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="lg:col-span-1">
-          <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+          <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
             Series
             <InfoButton label="What these drive">
               These macro series feed forecast scenarios and behavioural assumptions - an economic-indicator-conditioned
@@ -207,8 +171,8 @@ export function EconomicIndicators() {
                       : 'w-full rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-navy-700'
                   }
                 >
-                  <span className="block text-[12px] font-bold text-navy-900">{i.name}</span>
-                  <span className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-500">
+                  <span className="block text-[13px] font-bold text-navy-900">{i.name}</span>
+                  <span className="mt-0.5 flex items-center gap-2 text-[12px] text-gray-500">
                     <span className="font-mono">{i.countryCode}</span>
                     <span aria-hidden="true">·</span>
                     <span>{i.frequency}</span>
@@ -218,9 +182,9 @@ export function EconomicIndicators() {
                 </button>
               </li>
             ))}
-            {isLoading && <li className="text-[12px] text-gray-400">Loading…</li>}
+            {isLoading && <li className="text-[13px] text-gray-400">Loading…</li>}
             {!isLoading && indicators.length === 0 && (
-              <li className="rounded-lg bg-gray-50 p-4 text-center text-[12px] text-gray-500">
+              <li className="rounded-lg bg-gray-50 p-4 text-center text-[13px] text-gray-500">
                 No indicator series defined yet.
               </li>
             )}
@@ -231,7 +195,7 @@ export function EconomicIndicators() {
               {creatingSeries ? (
                 <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <div>
-                    <label htmlFor="series-code" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="series-code" className="mb-1 block text-[12px] text-gray-600">
                       Code
                     </label>
                     <input
@@ -239,11 +203,11 @@ export function EconomicIndicators() {
                       value={seriesDraft.code}
                       onChange={(e) => setSeriesDraft({ ...seriesDraft, code: e.target.value })}
                       placeholder="KE-CPI"
-                      className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <div>
-                    <label htmlFor="series-name" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="series-name" className="mb-1 block text-[12px] text-gray-600">
                       Name
                     </label>
                     <input
@@ -251,11 +215,11 @@ export function EconomicIndicators() {
                       value={seriesDraft.name}
                       onChange={(e) => setSeriesDraft({ ...seriesDraft, name: e.target.value })}
                       placeholder="Kenya - Headline Inflation"
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <div>
-                    <label htmlFor="series-country" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="series-country" className="mb-1 block text-[12px] text-gray-600">
                       Country code
                     </label>
                     <input
@@ -263,11 +227,11 @@ export function EconomicIndicators() {
                       value={seriesDraft.countryCode}
                       onChange={(e) => setSeriesDraft({ ...seriesDraft, countryCode: e.target.value })}
                       placeholder="KE"
-                      className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <div>
-                    <label htmlFor="series-unit" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="series-unit" className="mb-1 block text-[12px] text-gray-600">
                       Unit
                     </label>
                     <input
@@ -275,11 +239,11 @@ export function EconomicIndicators() {
                       value={seriesDraft.unit}
                       onChange={(e) => setSeriesDraft({ ...seriesDraft, unit: e.target.value })}
                       placeholder="% y/y"
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <div>
-                    <label htmlFor="series-freq" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="series-freq" className="mb-1 block text-[12px] text-gray-600">
                       Frequency
                     </label>
                     <select
@@ -288,7 +252,7 @@ export function EconomicIndicators() {
                       onChange={(e) =>
                         setSeriesDraft({ ...seriesDraft, frequency: e.target.value as IndicatorFrequency })
                       }
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     >
                       {FREQUENCIES.map((f) => (
                         <option key={f} value={f}>
@@ -298,7 +262,7 @@ export function EconomicIndicators() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="series-valuetype" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="series-valuetype" className="mb-1 block text-[12px] text-gray-600">
                       Value type
                     </label>
                     <select
@@ -307,7 +271,7 @@ export function EconomicIndicators() {
                       onChange={(e) =>
                         setSeriesDraft({ ...seriesDraft, valueType: e.target.value as IndicatorValueType })
                       }
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     >
                       {VALUE_TYPES.map((v) => (
                         <option key={v} value={v}>
@@ -323,7 +287,7 @@ export function EconomicIndicators() {
                         setCreatingSeries(false);
                         setSeriesDraft(emptySeriesDraft());
                       }}
-                      className="flex-1 rounded-lg px-3 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                      className="flex-1 rounded-lg px-3 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
                     >
                       Cancel
                     </button>
@@ -337,7 +301,7 @@ export function EconomicIndicators() {
                         !seriesDraft.countryCode.trim() ||
                         !seriesDraft.unit.trim()
                       }
-                      className="flex-1 rounded-lg bg-navy-900 px-3 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                      className="flex-1 rounded-lg bg-navy-900 px-3 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                     >
                       {save.isPending ? 'Creating…' : 'Create series'}
                     </button>
@@ -347,7 +311,7 @@ export function EconomicIndicators() {
                 <button
                   type="button"
                   onClick={() => setCreatingSeries(true)}
-                  className="w-full rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[12px] font-bold text-gray-500 hover:border-navy-700 hover:text-navy-900"
+                  className="w-full rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[13px] font-bold text-gray-500 hover:border-navy-700 hover:text-navy-900"
                 >
                   + New series
                 </button>
@@ -360,7 +324,7 @@ export function EconomicIndicators() {
           <section className="space-y-6 lg:col-span-2">
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">{active.name}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">{active.name}</h2>
                 <StatusBadge status={active.valueType} tone="info" />
               </div>
 
@@ -398,7 +362,7 @@ export function EconomicIndicators() {
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-4 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                 Observations
                 <InfoButton label="How revisions are handled">
                   Recording a new value for a date that's already on file replaces that observation rather than
@@ -410,7 +374,7 @@ export function EconomicIndicators() {
               {canEdit && (
                 <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-gray-50 p-4">
                   <div>
-                    <label htmlFor="obs-date" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="obs-date" className="mb-1 block text-[12px] text-gray-600">
                       As-of date
                     </label>
                     <input
@@ -418,11 +382,11 @@ export function EconomicIndicators() {
                       type="date"
                       value={newObs.asOfDate}
                       onChange={(e) => setNewObs({ ...newObs, asOfDate: e.target.value })}
-                      className="rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <div>
-                    <label htmlFor="obs-value" className="mb-1 block text-[11px] text-gray-600">
+                    <label htmlFor="obs-value" className="mb-1 block text-[12px] text-gray-600">
                       Value ({active.unit})
                     </label>
                     <input
@@ -431,18 +395,18 @@ export function EconomicIndicators() {
                       step="any"
                       value={newObs.value}
                       onChange={(e) => setNewObs({ ...newObs, value: e.target.value })}
-                      className="w-32 rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                      className="w-32 rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleAddObservation}
                     disabled={save.isPending || !newObs.asOfDate || newObs.value === ''}
-                    className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                    className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                   >
                     {save.isPending ? 'Saving…' : 'Record observation'}
                   </button>
-                  <p className="w-full text-[11px] text-gray-500">
+                  <p className="w-full text-[12px] text-gray-500">
                     Re-recording an existing date replaces that observation - agencies revise, and a series cannot carry
                     two values for one period.
                   </p>
@@ -450,56 +414,14 @@ export function EconomicIndicators() {
               )}
 
               {canEdit && (
-                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-gray-300 p-4">
-                  <div className="min-w-[220px] flex-1">
-                    <p className="text-[11px] font-bold text-navy-900">Or load a full history at once</p>
-                    <p className="text-[11px] text-gray-500">
-                      CSV, Excel, JSON or XML with <span className="font-mono">asOfDate</span> (or{' '}
-                      <span className="font-mono">date</span>) and <span className="font-mono">value</span> columns -
-                      one row per period. Same replace-by-date rule as a single entry.
-                    </p>
-                  </div>
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept={UPLOAD_ACCEPT}
-                    aria-label="Upload observation history file"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void handleUploadObservations(file);
-                    }}
-                    className="text-[12px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[12px] file:font-bold file:text-white hover:file:bg-navy-700"
-                  />
-                </div>
-              )}
-
-              {uploadResult && (
-                <p role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-3 text-[12px] text-success">
-                  <span className="font-bold">
-                    {uploadResult.count} observation{uploadResult.count === 1 ? '' : 's'} loaded.
-                  </span>
-                  {uploadResult.ignoredColumns.length > 0 && (
-                    <> Columns not used: {uploadResult.ignoredColumns.join(', ')}.</>
-                  )}
+                <p className="mb-4 rounded-lg bg-gray-50 px-4 py-2.5 text-[12px] leading-relaxed text-gray-500">
+                  A full observation history loads through the combined market-data upload on{' '}
+                  <Link href="/data/market" className="font-bold text-navy-700 hover:underline">
+                    Data → Market data
+                  </Link>{' '}
+                  - one file covers FX rates, curves and indicator series together. This screen keeps single
+                  observations and corrections.
                 </p>
-              )}
-
-              {uploadErrors.length > 0 && (
-                <div className="mb-4 rounded-lg border border-danger/20 bg-danger-bg p-4">
-                  <p className="mb-1 text-[11px] font-bold text-danger">
-                    {uploadErrors.length} row{uploadErrors.length === 1 ? '' : 's'} could not be read
-                  </p>
-                  <ul className="space-y-0.5 text-[11px] text-gray-700">
-                    {uploadErrors.slice(0, 10).map((e, i) => (
-                      <li key={i}>
-                        <span className="font-mono">line {e.line}</span> - {e.message}
-                      </li>
-                    ))}
-                  </ul>
-                  {uploadErrors.length > 10 && (
-                    <p className="mt-1 text-[11px] text-gray-500">…and {uploadErrors.length - 10} more.</p>
-                  )}
-                </div>
               )}
 
               <ResultTable

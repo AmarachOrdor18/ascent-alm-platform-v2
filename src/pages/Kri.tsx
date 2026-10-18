@@ -13,10 +13,15 @@ import { formatMetric } from '@/lib/metrics';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  Green: 'success', Amber: 'warning', Red: 'danger', 'No data': 'neutral',
+  Green: 'success',
+  Amber: 'warning',
+  Red: 'danger',
+  'No data': 'neutral',
 };
 const TREND_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  Improving: 'success', Stable: 'neutral', Deteriorating: 'danger',
+  Improving: 'success',
+  Stable: 'neutral',
+  Deteriorating: 'danger',
 };
 
 export function Kri() {
@@ -54,7 +59,9 @@ export function Kri() {
         k.changeOverWindow === null ? (
           <span className="text-gray-300">-</span>
         ) : (
-          <span className={`font-mono ${k.trend === 'Deteriorating' ? 'text-danger' : k.trend === 'Improving' ? 'text-success' : ''}`}>
+          <span
+            className={`font-mono ${k.trend === 'Deteriorating' ? 'text-danger' : k.trend === 'Improving' ? 'text-success' : ''}`}
+          >
             {k.changeOverWindow > 0 ? '+' : ''}
             {k.changeOverWindow.toFixed(2)}
           </span>
@@ -68,7 +75,7 @@ export function Kri() {
         k.slopePerPeriod === null ? (
           <span className="text-gray-300">-</span>
         ) : (
-          <span className="font-mono text-[11px]">
+          <span className="font-mono text-[12px]">
             {k.slopePerPeriod > 0 ? '+' : ''}
             {k.slopePerPeriod.toFixed(2)}
           </span>
@@ -82,12 +89,17 @@ export function Kri() {
         k.projectedValue === null ? (
           <span className="text-gray-300">-</span>
         ) : (
-          <span className="font-mono text-[11px] text-gray-600">{formatMetric(k.projectedValue, k.metricKey)}</span>
+          <span className="font-mono text-[12px] text-gray-600">{formatMetric(k.projectedValue, k.metricKey)}</span>
         ),
     },
     { key: 'trend', header: 'Trend', render: (k) => <StatusBadge status={k.trend} tone={TREND_TONE[k.trend]} /> },
     { key: 'status', header: 'Status', render: (k) => <StatusBadge status={k.status} tone={TONE[k.status]} /> },
-    { key: 'n', header: 'Obs', align: 'right', render: (k) => <span className="font-mono text-[11px]">{k.observationsUsed}</span> },
+    {
+      key: 'n',
+      header: 'Obs',
+      align: 'right',
+      render: (k) => <span className="font-mono text-[12px]">{k.observationsUsed}</span>,
+    },
   ];
 
   return (
@@ -98,20 +110,35 @@ export function Kri() {
         asOfDate={null}
         scope={affiliateCode}
         metrics={[
-          { label: 'Indicators', value: String(evaluations.length), about: "Key Risk Indicators currently active - each one tracks a metric's trend across successive runs, not just its latest level." },
+          {
+            label: 'Indicators',
+            value: String(evaluations.length),
+            about:
+              "Key Risk Indicators currently active - each one tracks a metric's trend across successive runs, not just its latest level.",
+          },
           {
             label: 'Deteriorating',
             value: String(deteriorating.length),
             tone: deteriorating.length > 0 ? 'danger' : 'success',
-            about: 'Indicators whose least-squares slope over the observation window is moving the wrong way for that metric.',
+            about:
+              'Indicators whose least-squares slope over the observation window is moving the wrong way for that metric.',
           },
-          { label: 'Runs in history', value: String(completed), about: 'Completed runs in this scope, which is how many data points the trend lines below can draw from.' },
-          { label: 'Longest series', value: `${observationCount} obs`, about: 'The longest run of observations behind any single indicator. At least 3 are needed before a trend can be called.' },
+          {
+            label: 'Runs in history',
+            value: String(completed),
+            about: 'Completed runs in this scope, which is how many data points the trend lines below can draw from.',
+          },
+          {
+            label: 'Longest series',
+            value: `${observationCount} obs`,
+            about:
+              'The longest run of observations behind any single indicator. At least 3 are needed before a trend can be called.',
+          },
         ]}
         actions={
           <Link
             href="/limits"
-            className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700"
           >
             See today's levels
           </Link>
@@ -119,7 +146,7 @@ export function Kri() {
       />
 
       {isLoading ? (
-        <p className="text-[12px] text-gray-500">Loading run history…</p>
+        <p className="text-[13px] text-gray-500">Loading run history…</p>
       ) : completed === 0 ? (
         <EmptyState
           title={
@@ -131,12 +158,12 @@ export function Kri() {
               </InfoButton>
             </>
           }
-          cta={{ label: 'Go to Process Run', href: '/runs/new' }}
+          cta={{ label: 'Go to Run now', href: '/execution' }}
         />
       ) : (
         <>
           {observationCount < 3 && (
-            <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[11px] leading-relaxed text-gray-600">
+            <p className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-[12px] leading-relaxed text-gray-600">
               <span className="font-bold text-navy-900">
                 Only {observationCount} observation{observationCount === 1 ? '' : 's'} available.
               </span>
@@ -147,9 +174,9 @@ export function Kri() {
             <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-5">
               <div className="mb-2 flex items-center gap-2">
                 <StatusBadge status={`${deteriorating.length} deteriorating`} tone="danger" />
-                <span className="text-[12px] font-bold text-navy-900">Moving the wrong way</span>
+                <span className="text-[13px] font-bold text-navy-900">Moving the wrong way</span>
               </div>
-              <ul className="space-y-1 text-[11px] text-gray-700">
+              <ul className="space-y-1 text-[12px] text-gray-700">
                 {deteriorating.map((k) => (
                   <li key={k.definitionId}>
                     <span className="font-bold text-navy-900">{k.label}</span> - {k.narrative}
@@ -161,11 +188,11 @@ export function Kri() {
 
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-1.5">
-              <h2 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">Indicators</h2>
+              <h2 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">Indicators</h2>
               <InfoButton label="Methodology">
                 The slope is a least-squares fit over the window, not the difference between the first and last
-                observation, so one anomalous month does not read as a trend. &ldquo;If it persists&rdquo; projects
-                the current slope forward by another window - an extrapolation, not a forecast.
+                observation, so one anomalous month does not read as a trend. &ldquo;If it persists&rdquo; projects the
+                current slope forward by another window - an extrapolation, not a forecast.
               </InfoButton>
             </div>
             <ResultTable
@@ -191,7 +218,7 @@ function KriDetail({
 }) {
   if (observations.length === 0) {
     return (
-      <p className="text-[11px] text-gray-500">
+      <p className="text-[12px] text-gray-500">
         No run has produced this metric. Its element was not among the calculation elements selected.
       </p>
     );
@@ -199,13 +226,23 @@ function KriDetail({
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] leading-relaxed text-gray-600">{evaluation.narrative}</p>
+      <p className="text-[12px] leading-relaxed text-gray-600">{evaluation.narrative}</p>
       <div style={{ width: '100%', height: 180 }}>
         <ResponsiveContainer>
           <LineChart data={observations} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
             <CartesianGrid stroke="hsl(var(--gray-200))" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="asOfDate" tick={{ fontSize: 10, fill: 'hsl(var(--gray-500))' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--gray-500))' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+            <XAxis
+              dataKey="asOfDate"
+              tick={{ fontSize: 10, fill: 'hsl(var(--gray-500))' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: 'hsl(var(--gray-500))' }}
+              axisLine={false}
+              tickLine={false}
+              domain={['auto', 'auto']}
+            />
             <Tooltip
               contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--gray-200))' }}
               formatter={(v: number) => formatMetric(v, evaluation.metricKey)}
@@ -221,10 +258,10 @@ function KriDetail({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-[10px] text-gray-400">
-        {observations.length} observation{observations.length === 1 ? '' : 's'} from{' '}
-        {observations[0]!.asOfDate} to {observations[observations.length - 1]!.asOfDate}. One run per as-of date; where
-        a date was run more than once, the most recent stands.
+      <p className="text-[11px] text-gray-400">
+        {observations.length} observation{observations.length === 1 ? '' : 's'} from {observations[0]!.asOfDate} to{' '}
+        {observations[observations.length - 1]!.asOfDate}. One run per as-of date; where a date was run more than once,
+        the most recent stands.
       </p>
     </div>
   );

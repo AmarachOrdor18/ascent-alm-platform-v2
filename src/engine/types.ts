@@ -292,7 +292,10 @@ export type RuleKind =
   | 'CustomMetric'
   | 'ValidationRule'
   | 'FieldMapping'
-  | 'CodeMapping';
+  | 'CodeMapping'
+  | 'CostAllocation'
+  | 'CreditLoss'
+  | 'CapitalAllocation';
 
 // Common envelope for every rule type: folder, access type, versioning and dependency checking behave
 // identically, which is what lets one `<RuleEditor>` shell serve fourteen screens.
@@ -372,7 +375,8 @@ export type PositionContributor = 'Loans' | 'Deposits' | 'Treasury';
 export interface LoadBatch {
   id: string;
   affiliateCode: string;
-  domain: DataDomain;
+  /** A DataDomain, or BalanceHistory/AccountHistory for a behavioural-model history load. */
+  domain: DataSourceDomain;
   /** Which department's slice of the Positions domain this is. Always null outside the Positions domain. */
   contributor: PositionContributor | null;
   asOfDate: IsoDate;
@@ -401,6 +405,18 @@ export interface LoadBatch {
    * ingestion - same pattern as ProcessRun.ruleVersionsUsed, completing the lineage chain source -> mapping
    * version -> batch -> run -> report. Absent when no mapping rule was applied (the file was already canonical). */
   mappingRuleVersionsUsed?: Record<string, number>;
+  /** The data source the file was uploaded to (Phase 4). Absent on loads made before sources existed. */
+  sourceId?: string;
+  /** SHA-256 of the file content - blocks the same file being loaded twice. */
+  checksum?: string;
+  /** Set when an admitted load is withdrawn (status becomes Superseded) - who, when and why. */
+  withdrawnBy?: string | null;
+  withdrawnAt?: string | null;
+  withdrawnReason?: string | null;
+  /** Rows the checks flagged (advisory findings) when the file was uploaded. */
+  rowsFlagged?: number;
+  /** The first problems the upload checks found, worded for a person - kept for the load's history. */
+  checkIssues?: Array<{ line: number | null; field: string; message: string; blocking: boolean }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -423,9 +439,38 @@ export type CalculationElement =
   | 'TpAdjustments'
   | 'SurvivalHorizon'
   | 'ProfitabilityRatios'
-  | 'FxPosition';
+  | 'FxPosition'
+  | 'ProfitabilityLayers';
 
 export type RunStatus = 'Draft' | 'Queued' | 'Running' | 'Completed' | 'Failed';
+
+/**
+ * Where one version of a run series stands in the sign-off lifecycle. Open = provisional figures;
+ * PendingSignOff = an approval request is with a checker; SignedOff = the official figures, frozen;
+ * Reopened = was signed off, then reopened with a reason - stays frozen and read-only, and the next
+ * execution for that series becomes a new version.
+ */
+export type RunSignOffStatus = 'Open' | 'PendingSignOff' | 'SignedOff' | 'Reopened';
+
+export interface RunSignOff {
+  status: RunSignOffStatus;
+  /** The Runs/SignOff approval request behind the current (or last) sign-off. */
+  approvalId?: string | null;
+  requestedAt?: string | null;
+  requestedById?: string | null;
+  requestedBy?: string | null;
+  signedOffAt?: string | null;
+  signedOffById?: string | null;
+  signedOffBy?: string | null;
+  /** Last rejection (or withdrawal) of a sign-off request - the run went back to Open. */
+  rejectedAt?: string | null;
+  rejectedBy?: string | null;
+  rejectReason?: string | null;
+  reopenedAt?: string | null;
+  reopenedById?: string | null;
+  reopenedBy?: string | null;
+  reopenReason?: string | null;
+}
 
 export interface ProcessRun {
   id: string;
@@ -442,12 +487,21 @@ export interface ProcessRun {
   timeBucketRuleId: string;
   productCharacteristicRuleId: string | null;
   behaviourPatternRuleId: string | null;
+  /** Constant prepayment rates re-dating loan principal in the behavioural gap, repricing gap and NII. Absent on older runs, which used none. */
+  prepaymentRuleId?: string | null;
   forecastScenarioIds: string[];
   newBusinessRuleId: string | null;
   transactionStrategyId: string | null;
   /** Transfer-pricing method assignments and the adjustment stack layered on top. */
   ftpRuleId: string | null;
   adjustmentRuleId: string | null;
+  /**
+   * Multi-layer profitability (ProfitabilityLayers element): operating-expense cost pools, expected credit
+   * loss and capital charge. All three are required for that element; absent on runs created before it existed.
+   */
+  costAllocationRuleId?: string | null;
+  creditLossRuleId?: string | null;
+  capitalRuleId?: string | null;
 
   /**
    * The `version` each referenced rule (by id) actually had at execution time, captured when the
@@ -465,9 +519,36 @@ export interface ProcessRun {
 
   status: RunStatus;
   createdBy: string;
+  /** app_users id of whoever executed the run - a checker may not sign off a run they executed. */
+  createdById?: string;
   createdAt: string;
   completedAt: string | null;
   errorLog: RunError[];
+
+  /**
+   * Run series: one affiliate + one as-of date (`${affiliateCode}|${asOfDate}`). Each execution within
+   * a series is a new version (v1, v2, ...). Absent on older runs - those read as their own series' v1.
+   */
+  seriesKey?: string;
+  version?: number;
+  /** Sign-off lifecycle. Absent = Open. */
+  signOff?: RunSignOff;
+  /** The newer version of the same series that replaced this one, once it exists. */
+  supersededByRunId?: string | null;
+  /**
+   * What this run computed with something missing - each named, with the output it affected and where it
+   * is fixed. A run is only blocked when it cannot be correct; everything else runs and says what it lacked.
+   */
+  degradations?: RunDegradation[];
+}
+
+/** One named gap a run worked around (a missing rule, curve or classification), shown on its results. */
+export interface RunDegradation {
+  /** The calculation element (or 'Run' for the whole run) the gap affects. */
+  element: CalculationElement | 'Run';
+  message: string;
+  /** The screen that fixes it. */
+  fixHref: string | null;
 }
 
 export interface RunError {
@@ -555,14 +636,14 @@ export interface PositionSnapshot {
 // Users, roles, audit
 // ─────────────────────────────────────────────────────────────────────────
 
-export type RoleCode =
-  | 'ADMIN'
-  | 'RISK_ANALYST'
-  | 'TREASURY_USER'
-  | 'EXECUTIVE_VIEWER'
-  | 'CONTROL_TESTER'
-  | 'REPORTING_USER'
-  | 'AFFILIATE_ADMIN';
+/** The five live roles. */
+export type ActiveRoleCode = 'ADMIN' | 'AFFILIATE_ADMIN' | 'RISK_ANALYST' | 'APPROVER' | 'EXECUTIVE_VIEWER';
+/**
+ * Retired in the 8 → 5 role simplification; kept in the type only so historical records (audit events written
+ * before the migration) still type-check. No user holds one and none is selectable - see RETIRED_ROLE_MAP.
+ */
+export type RetiredRoleCode = 'TREASURY_USER' | 'CONTROL_TESTER' | 'REPORTING_USER';
+export type RoleCode = ActiveRoleCode | RetiredRoleCode;
 
 export interface Role {
   code: RoleCode;
@@ -583,6 +664,34 @@ export interface User {
   mfaEnrolled: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  /** When the user first saw (or dismissed) their welcome/onboarding screen. Self-editable. */
+  onboardingSeenAt?: string;
+  /** Guided tours already shown, by tour id → the tour version seen. Self-editable. */
+  toursSeen?: Record<string, number>;
+  /** The scope and as-of date this user last worked on - restored on sign-in, on any device. Self-editable. */
+  workingContext?: WorkingContext;
+}
+
+/** Scope (Group or an affiliate) and working as-of date, persisted per user. */
+export interface WorkingContext {
+  affiliateCode: string;
+  asOfDate: IsoDate | null;
+  updatedAt: string;
+}
+
+/** One in-app notification for one user (bell in the header). */
+export interface AppNotification {
+  id: string;
+  userId: string;
+  /** The affiliate the event concerns, or GROUP / null for organisation-wide. */
+  affiliateCode: string | null;
+  kind: string;
+  title: string;
+  body: string;
+  /** In-app route to open. */
+  link: string | null;
+  read: boolean;
+  createdAt: string;
 }
 
 export interface AuditEvent {
@@ -812,20 +921,28 @@ export interface ApprovalRequest {
   entityType: string;
   entityId: string;
   entityLabel: string;
-  action: 'Create' | 'Update' | 'Delete' | 'Activate' | 'Override';
+  /**
+   * For a versioned entity (an approval-gated rule), the version this request asks to approve. An
+   * approval covers that version only - editing the rule afterwards needs a fresh sign-off.
+   */
+  entityVersion?: number;
+  action: 'Create' | 'Update' | 'Delete' | 'Activate' | 'Override' | 'SignOff';
   summary: string;
   affiliateCode: string | null;
   status: ApprovalStatus;
   requestedBy: string;
+  /** app_users id of the requester - what maker-checker compares (absent on older/seed rows). */
+  requestedById?: string;
   requestedAt: string;
   decidedBy: string | null;
+  /** app_users id of the decider. */
+  decidedById?: string | null;
   decidedAt: string | null;
   decisionNote: string | null;
 }
 
 /** Oracle-style six-stage control lifecycle; a closure needs a second pair of eyes. */
-export type RemediationStage =
-  'Identified' | 'Assessed' | 'Planned' | 'In Progress' | 'Verified' | 'Closed';
+export type RemediationStage = 'Identified' | 'Assessed' | 'Planned' | 'In Progress' | 'Verified' | 'Closed';
 
 export interface RemediationUpdate {
   at: string;
@@ -965,4 +1082,114 @@ export interface ReportPack {
   generatedBy: string | null;
   updatedBy: string;
   updatedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Onboarding state and scoped settings
+// ─────────────────────────────────────────────────────────────────────────
+
+export type OnboardingScope = 'Organisation' | 'Affiliate';
+export type OnboardingStatus = 'NotStarted' | 'InProgress' | 'Complete';
+
+export interface OnboardingStepState {
+  done: boolean;
+  at: string | null;
+  by: string | null;
+}
+
+/** Progress through organisation ('ORG') or one affiliate's ('AFF:<code>') onboarding. */
+export interface OnboardingRecord {
+  /** 'ORG' or 'AFF:<affiliateCode>'. */
+  id: string;
+  scope: OnboardingScope;
+  /** GROUP for the organisation record. */
+  affiliateCode: string;
+  status: OnboardingStatus;
+  currentStep: string | null;
+  steps: Record<string, OnboardingStepState>;
+  startedAt: string | null;
+  startedBy: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
+/** One configuration value at organisation (GROUP) or affiliate scope; id is '<scopeCode>:<key>'. */
+export interface SettingRecord {
+  id: string;
+  /** GROUP for an organisation default, else the affiliate the override belongs to. */
+  affiliateCode: string;
+  key: string;
+  value: unknown;
+  /** Only meaningful on GROUP rows: whether affiliates may override it. */
+  overridable?: boolean;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Data sources (Phase 4)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * What a data source delivers. The six `DataDomain`s plus the two behavioural-model history feeds, which
+ * land in their own stores (balance_history / account_history) rather than as a position batch, and
+ * `MarketData` - Group's one combined file of FX rates, yield curves and policy/economic rates.
+ */
+export type DataSourceDomain = DataDomain | 'BalanceHistory' | 'AccountHistory' | 'MarketData';
+
+/** How files reach a source. Only ManualUpload is driven from the screen; the others name an existing connector. */
+export type SourceConnectorType = 'ManualUpload' | 'SFTP' | 'API' | 'Database';
+
+export type SourceFieldType = 'Text' | 'Number' | 'Date' | 'YesNo';
+
+export type SourceFrequency = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'As needed';
+
+/** One column a source's file is expected to carry - its platform name plus the file headers also accepted for it. */
+export interface SourceField {
+  name: string;
+  type: SourceFieldType;
+  required: boolean;
+  /** Part of the row's identity - two rows with the same key values are duplicates. */
+  key?: boolean;
+  /** Other headers that mean this field ("Acct No", "account_number" ...). Matched ignoring case, spaces and punctuation. */
+  aliases: string[];
+}
+
+/**
+ * A named feed of one kind of data for one affiliate (or GROUP, for market data). Uploads are made to a
+ * source, never to an affiliate picked on the screen - the source already says whose data it is.
+ */
+export interface DataSource {
+  id: string;
+  /** Owner: an affiliate code, or 'GROUP' for organisation-wide market data. */
+  affiliateCode: string;
+  name: string;
+  domain: DataSourceDomain;
+  /** Positions only: which department's slice of the book this source carries. */
+  contributor?: PositionContributor;
+  connectorType: SourceConnectorType;
+  /** For SFTP / API / Database: the connectors-table entry that delivers it. */
+  connectorId?: string | null;
+  /** Person or team accountable for the feed. */
+  owner: string;
+  frequency: SourceFrequency;
+  /** Free text: when files are expected ("by 08:00 on the first business day"). */
+  schedule?: string;
+  fields: SourceField[];
+  /** The field holding the date the data is "as of", read from the file. */
+  businessDateField?: string;
+  /** When true, a clean file (nothing blocking) is admitted straight away instead of waiting in the lobby. */
+  autoAdmit: boolean;
+  /**
+   * The file headers (normalised) a person confirmed in the column mapping - a later file with the same
+   * headers is read with the saved mapping without asking again.
+   */
+  mappedHeaders?: string[];
+  isActive: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }

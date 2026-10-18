@@ -30,16 +30,28 @@ export function AffiliateSelector({
   const options = affiliates.filter((a) => a.code !== 'GROUP');
   const current = options.find((a) => a.code === value);
 
+  // Someone confined to one affiliate (the caller passes accessibleAffiliates) has nothing to choose:
+  // no picker - just the extra controls, if any, with the affiliate named rather than selectable.
+  if (options.length === 1 && current) {
+    if (!children) return null;
+    return (
+      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+        <span className="text-[13px] font-bold text-navy-900">{current.name}</span>
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-      <label htmlFor="entity-picker" className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+      <label htmlFor="entity-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
         Working on
       </label>
       <select
         id="entity-picker"
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded border border-gray-200 px-2 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+        className="rounded border border-gray-200 px-2 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
       >
         {options.length === 0 && <option value="">No affiliates onboarded yet</option>}
         {options.length > 0 && !current && <option value="">Select an affiliate…</option>}
@@ -49,9 +61,7 @@ export function AffiliateSelector({
           </option>
         ))}
       </select>
-      {current && (
-        <span className={`text-[11px] font-bold ${STATUS_TONE[current.status]}`}>{current.status}</span>
-      )}
+      {current && <span className={`text-[12px] font-bold ${STATUS_TONE[current.status]}`}>{current.status}</span>}
       {children}
     </div>
   );

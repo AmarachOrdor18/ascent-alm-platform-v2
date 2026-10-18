@@ -62,7 +62,13 @@ function position(overrides: Partial<Position> = {}): Position {
     ccfPct: null,
     turnover: null,
     overdraft: null,
-    control: { maker: 'TEST', checker: 'SYSTEM', status: 'ACTIVE', createdAt: '2026-07-31T09:00:00Z', updatedAt: '2026-07-31T09:00:00Z' },
+    control: {
+      maker: 'TEST',
+      checker: 'SYSTEM',
+      status: 'ACTIVE',
+      createdAt: '2026-07-31T09:00:00Z',
+      updatedAt: '2026-07-31T09:00:00Z',
+    },
     notes: null,
     ...overrides,
   };
@@ -70,7 +76,18 @@ function position(overrides: Partial<Position> = {}): Position {
 
 describe('applyProductCharacteristics', () => {
   const assumptions: ProductAssumption[] = [
-    { productCode: 'P-TREASURY-BILLS', currency: 'NGN', hqlaLevel: 'Level 1', hqlaHaircutPct: 0, lcrCashflowRole: 'HQLA', lcrRatePct: null, asfFactorPct: null, rsfFactorPct: 5, approxDurationYears: 0.38, isRateSensitive: true },
+    {
+      productCode: 'P-TREASURY-BILLS',
+      currency: 'NGN',
+      hqlaLevel: 'Level 1',
+      hqlaHaircutPct: 0,
+      lcrCashflowRole: 'HQLA',
+      lcrRatePct: null,
+      asfFactorPct: null,
+      rsfFactorPct: 5,
+      approxDurationYears: 0.38,
+      isRateSensitive: true,
+    },
   ];
 
   it('overrides classification for a matching product/currency, leaving everything else untouched', () => {
@@ -84,6 +101,19 @@ describe('applyProductCharacteristics', () => {
     // Untouched: not part of ProductAssumption.
     expect(classified!.amount).toBe(5_000_000);
     expect(classified!.id).toBe('P-1');
+  });
+
+  it('keeps the loaded value for a factor the rule leaves blank, rather than wiping it', () => {
+    const uploaded = position({
+      productCode: 'P-TREASURY-BILLS',
+      currency: 'NGN',
+      approxDurationYears: 1.2,
+      lcrRatePct: 7,
+    });
+    const [classified] = applyProductCharacteristics([uploaded], [{ ...assumptions[0]!, approxDurationYears: null }]);
+    expect(classified!.approxDurationYears).toBe(1.2);
+    expect(classified!.lcrRatePct).toBe(7);
+    expect(classified!.rsfFactorPct).toBe(5);
   });
 
   it('leaves a position unchanged when its product/currency has no configured assumption - a gap to close in the rule, not a run failure', () => {
@@ -113,12 +143,30 @@ describe('the seeded Group Default Product Characteristics rule', () => {
     // account (Outflow) - both already fully classified, exactly as today's single-file upload provides.
     const fullyClassified: Position[] = [
       position({
-        id: 'P-TB-1', productCode: 'P-TREASURY-BILLS', productClass: 'Treasury Bills', category: 'Asset', amount: 2_000_000_000,
-        hqlaLevel: 'Level 1', hqlaHaircutPct: 0, lcrCashflowRole: 'HQLA', rsfFactorPct: 5, approxDurationYears: 0.38, irrbbRateSensitive: true,
+        id: 'P-TB-1',
+        productCode: 'P-TREASURY-BILLS',
+        productClass: 'Treasury Bills',
+        category: 'Asset',
+        amount: 2_000_000_000,
+        hqlaLevel: 'Level 1',
+        hqlaHaircutPct: 0,
+        lcrCashflowRole: 'HQLA',
+        rsfFactorPct: 5,
+        approxDurationYears: 0.38,
+        irrbbRateSensitive: true,
       }),
       position({
-        id: 'P-CUR-1', productCode: 'P-CURRENT', productClass: 'Current', category: 'Liability', amount: 1_200_000_000,
-        hqlaLevel: 'None', hqlaHaircutPct: 0, lcrCashflowRole: 'Outflow', lcrRatePct: 5, asfFactorPct: 90, approxDurationYears: 0.59,
+        id: 'P-CUR-1',
+        productCode: 'P-CURRENT',
+        productClass: 'Current',
+        category: 'Liability',
+        amount: 1_200_000_000,
+        hqlaLevel: 'None',
+        hqlaHaircutPct: 0,
+        lcrCashflowRole: 'Outflow',
+        lcrRatePct: 5,
+        asfFactorPct: 90,
+        approxDurationYears: 0.59,
       }),
     ];
 

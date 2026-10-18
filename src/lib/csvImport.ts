@@ -573,3 +573,131 @@ export function importFxRates(text: string, defaultAsOfDate: IsoDate, updatedBy:
 
   return { rows, errors, ignoredColumns, headerColumns: header };
 }
+
+/** One point on a yield curve, as read from a market-data file. */
+export interface CurvePointRow {
+  currency: string;
+  curveCode: string;
+  asOfDate: IsoDate;
+  tenorDays: number;
+  ratePercent: number;
+}
+
+const CURVE_COLUMNS = ['currency', 'curvecode', 'asofdate', 'tenordays', 'ratepercent'];
+
+/** Parse a yield-curve file - one row per curve point: currency, curveCode, asOfDate, tenorDays, ratePercent. */
+export function importYieldCurvePoints(text: string, defaultAsOfDate: IsoDate): ImportResult<CurvePointRow> {
+  const table = parseCsv(text);
+  if (table.length === 0) {
+    return {
+      rows: [],
+      errors: [{ line: 1, column: '', message: 'File is empty' }],
+      ignoredColumns: [],
+      headerColumns: [],
+    };
+  }
+  const header = table[0]!.map((h) => h.trim());
+  const index = new Map(header.map((h, i) => [h.trim().toLowerCase(), i]));
+  const ignoredColumns = header.filter((h) => !CURVE_COLUMNS.includes(h.trim().toLowerCase()));
+  const errors: RowError[] = [];
+  const rows: CurvePointRow[] = [];
+
+  const missing = ['currency', 'tenordays', 'ratepercent'].filter((c) => !index.has(c));
+  if (missing.length > 0) {
+    errors.push({ line: 1, column: missing.join(', '), message: `Required column(s) missing: ${missing.join(', ')}` });
+    return { rows, errors, ignoredColumns, headerColumns: header };
+  }
+
+  for (let r = 1; r < table.length; r += 1) {
+    const line = r + 1;
+    const cells = table[r]!;
+    const get = (name: string) => {
+      const i = index.get(name);
+      return i === undefined ? undefined : cells[i];
+    };
+    const before = errors.length;
+    const currency = optionalText(get('currency'))?.toUpperCase();
+    const tenorDays = optionalNumber(get('tenordays'), 'tenorDays', line, errors);
+    const ratePercent = optionalNumber(get('ratepercent'), 'ratePercent', line, errors);
+    const asOfDate = isoDate(get('asofdate'), 'asOfDate', line, errors) ?? defaultAsOfDate;
+    if (!currency) errors.push({ line, column: 'currency', message: 'currency is required' });
+    if (tenorDays === null) errors.push({ line, column: 'tenorDays', message: 'tenorDays is required' });
+    else if (tenorDays <= 0) errors.push({ line, column: 'tenorDays', message: 'tenorDays must be more than zero' });
+    if (ratePercent === null) errors.push({ line, column: 'ratePercent', message: 'ratePercent is required' });
+    if (errors.length > before || !currency || tenorDays === null || ratePercent === null) continue;
+    rows.push({
+      currency,
+      curveCode: optionalText(get('curvecode'))?.toUpperCase() ?? `${currency}-BASE`,
+      asOfDate,
+      tenorDays: Math.round(tenorDays),
+      ratePercent,
+    });
+  }
+  return { rows, errors, ignoredColumns, headerColumns: header };
+}
+
+/** One dated observation of a named indicator series. */
+export interface IndicatorSeriesRow {
+  indicatorCode: string;
+  countryCode: string | null;
+  asOfDate: IsoDate;
+  value: number;
+}
+
+/** Parse a file of indicator observations for one or more series: indicatorCode, countryCode, asOfDate (or date), value. */
+export function importIndicatorSeries(text: string): ImportResult<IndicatorSeriesRow> {
+  const table = parseCsv(text);
+  if (table.length === 0) {
+    return {
+      rows: [],
+      errors: [{ line: 1, column: '', message: 'File is empty' }],
+      ignoredColumns: [],
+      headerColumns: [],
+    };
+  }
+  const header = table[0]!.map((h) => h.trim());
+  const index = new Map(header.map((h, i) => [h.trim().toLowerCase(), i]));
+  const dateColumn = index.has('asofdate') ? 'asofdate' : index.has('date') ? 'date' : null;
+  const errors: RowError[] = [];
+  const rows: IndicatorSeriesRow[] = [];
+  if (!dateColumn || !index.has('value') || !index.has('indicatorcode')) {
+    errors.push({
+      line: 1,
+      column: '',
+      message: 'Required column(s) missing: indicatorCode, asOfDate (or date), value',
+    });
+    return { rows, errors, ignoredColumns: [], headerColumns: header };
+  }
+  const used = new Set([dateColumn, 'value', 'indicatorcode', 'countrycode']);
+  const ignoredColumns = header.filter((h) => !used.has(h.trim().toLowerCase()));
+
+  for (let r = 1; r < table.length; r += 1) {
+    const line = r + 1;
+    const cells = table[r]!;
+    const get = (name: string) => {
+      const i = index.get(name);
+      return i === undefined ? undefined : cells[i];
+    };
+    const code = optionalText(get('indicatorcode'))?.toUpperCase();
+    const asOfDate = isoDate(get(dateColumn), 'asOfDate', line, errors);
+    const value = optionalNumber(get('value'), 'value', line, errors);
+    if (!code) {
+      errors.push({ line, column: 'indicatorCode', message: 'indicatorCode is required' });
+      continue;
+    }
+    if (asOfDate === null || value === null) {
+      if (asOfDate === null && !errors.some((e) => e.line === line))
+        errors.push({ line, column: 'asOfDate', message: 'asOfDate is required' });
+      if (value === null && !errors.some((e) => e.line === line))
+        errors.push({ line, column: 'value', message: 'value is required' });
+      continue;
+    }
+    rows.push({
+      indicatorCode: code,
+      countryCode: optionalText(get('countrycode'))?.toUpperCase() ?? null,
+      asOfDate,
+      value,
+    });
+  }
+  return { rows, errors, ignoredColumns, headerColumns: header };
+}

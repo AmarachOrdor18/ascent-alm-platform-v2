@@ -10,13 +10,13 @@ export function Placeholder({ item }: { item: NavItem }) {
         asOfDate={null}
       />
       <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-        <p className="text-[13px] font-bold text-navy-900">Scheduled for phase {item.phase}</p>
-        <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+        <p className="text-[14px] font-bold text-navy-900">Scheduled for phase {item.phase}</p>
+        <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-500">
           The foundation, engine and component library are built first so that every screen inherits the same
           conventions - currency-aware amounts, threshold lines, prior-period variance and drill-through - rather than
           each one re-deciding them.
         </p>
-        <p className="mt-4 font-mono text-[11px] text-gray-400">{item.path}</p>
+        <p className="mt-4 font-mono text-[12px] text-gray-400">{item.path}</p>
       </div>
     </>
   );

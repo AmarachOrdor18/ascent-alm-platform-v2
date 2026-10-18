@@ -20,13 +20,11 @@ export function AdminAudit({
   const [module, setModule] = useState<string>('ALL');
   const [outcome, setOutcome] = useState<string>('ALL');
 
-  const modules = useMemo(
-    () => Array.from(new Set(events.map((e) => e.module))).sort(),
-    [events],
-  );
+  const modules = useMemo(() => Array.from(new Set(events.map((e) => e.module))).sort(), [events]);
 
   const preFiltered = useMemo(
-    () => events.filter((e) => (module === 'ALL' || e.module === module) && (outcome === 'ALL' || e.outcome === outcome)),
+    () =>
+      events.filter((e) => (module === 'ALL' || e.module === module) && (outcome === 'ALL' || e.outcome === outcome)),
     [events, module, outcome],
   );
 
@@ -43,7 +41,7 @@ export function AdminAudit({
     {
       key: 'when',
       header: 'When',
-      render: (e) => <span className="font-mono text-[11px]">{new Date(e.recordedAt).toLocaleString()}</span>,
+      render: (e) => <span className="font-mono text-[12px]">{new Date(e.recordedAt).toLocaleString()}</span>,
     },
     { key: 'module', header: 'Module', render: (e) => e.module },
     { key: 'action', header: 'Action', render: (e) => <span className="font-medium">{e.action}</span> },
@@ -53,7 +51,7 @@ export function AdminAudit({
       render: (e) => (
         <span>
           {e.entity}
-          {e.entityId && <span className="ml-1 font-mono text-[10px] text-gray-400">{e.entityId}</span>}
+          {e.entityId && <span className="ml-1 font-mono text-[11px] text-gray-400">{e.entityId}</span>}
         </span>
       ),
     },
@@ -63,38 +61,45 @@ export function AdminAudit({
       render: (e) => (
         <span>
           {e.userName}
-          <span className="ml-1 rounded border border-gray-200 px-1 text-[9px] text-gray-500">{e.role}</span>
+          <span className="ml-1 rounded border border-gray-200 px-1 text-[10px] text-gray-500">{e.role}</span>
         </span>
       ),
     },
     {
       key: 'outcome',
       header: 'Outcome',
-      render: (e) => (
-        <StatusBadge status={e.outcome} tone={e.outcome === 'Success' ? 'success' : 'danger'} />
-      ),
+      render: (e) => <StatusBadge status={e.outcome} tone={e.outcome === 'Success' ? 'success' : 'danger'} />,
     },
   ];
 
   return (
     <>
       {!embedded && (
-      <ModuleHeader
-        title="Audit Trail"
-        description="Every recorded action, as it happened. Nothing on this screen is generated for display."
-        asOfDate={null}
-        metrics={[
-          { label: 'Events recorded', value: String(events.length), about: 'Every logged action across the platform - rule changes, run executions, data loads, sign-ins and more.' },
-          { label: 'Showing', value: String(totalItems), about: 'Events matching the current module, outcome and search filters below.' },
-          { label: 'Distinct actors', value: String(actors), about: 'Unique users who have taken a logged action.' },
-          {
-            label: 'Failures',
-            value: String(failures.length),
-            tone: failures.length > 0 ? 'warning' : 'success',
-            about: 'Actions that were attempted but did not succeed - a failed run, a rejected save, and similar.',
-          },
-        ]}
-      />
+        <ModuleHeader
+          title="Audit Trail"
+          description="Every recorded action, as it happened. Nothing on this screen is generated for display."
+          asOfDate={null}
+          metrics={[
+            {
+              label: 'Events recorded',
+              value: String(events.length),
+              about:
+                'Every logged action across the platform - rule changes, run executions, data loads, sign-ins and more.',
+            },
+            {
+              label: 'Showing',
+              value: String(totalItems),
+              about: 'Events matching the current module, outcome and search filters below.',
+            },
+            { label: 'Distinct actors', value: String(actors), about: 'Unique users who have taken a logged action.' },
+            {
+              label: 'Failures',
+              value: String(failures.length),
+              tone: failures.length > 0 ? 'warning' : 'success',
+              about: 'Actions that were attempted but did not succeed - a failed run, a rejected save, and similar.',
+            },
+          ]}
+        />
       )}
 
       <section className="table-datagrid-container">
@@ -114,11 +119,13 @@ export function AdminAudit({
                 setPage(1);
               }}
               aria-label="Filter by module"
-              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+              className="rounded-lg border border-gray-200 bg-gray-50 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
             >
               <option value="ALL">All modules</option>
               {modules.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
             <select
@@ -128,7 +135,7 @@ export function AdminAudit({
                 setPage(1);
               }}
               aria-label="Filter by outcome"
-              className="rounded-lg border border-gray-200 bg-gray-50 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+              className="rounded-lg border border-gray-200 bg-gray-50 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
             >
               <option value="ALL">All outcomes</option>
               <option value="Success">Success</option>
@@ -149,7 +156,7 @@ export function AdminAudit({
                 : 'No events match those filters.'
           }
           renderDetail={(e) => (
-            <dl className="grid grid-cols-2 gap-3 text-[11px] md:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-3 text-[12px] md:grid-cols-4">
               <D label="Event ID" value={e.id} mono />
               <D label="User ID" value={e.userId} mono />
               <D label="Role" value={e.role} />
@@ -164,9 +171,9 @@ export function AdminAudit({
         <TablePagination currentPage={page} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />
       </section>
 
-      <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
-        Events are append-only and are written by the action itself, not by the screen. The trail is capped at the
-        most recent 500 here for rendering; the store keeps all of them.
+      <p className="mt-4 text-[12px] leading-relaxed text-gray-500">
+        Events are append-only and are written by the action itself, not by the screen. The trail is capped at the most
+        recent 500 here for rendering; the store keeps all of them.
       </p>
     </>
   );

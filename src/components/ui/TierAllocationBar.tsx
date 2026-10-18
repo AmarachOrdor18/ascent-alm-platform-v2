@@ -18,8 +18,7 @@ const TONE_CLASS: Record<AllocationSegment['tone'], string> = {
 };
 
 /** Cycles a neutral palette by position - for segments with no natural Core/Volatile-style classification. */
-export const paletteTone = (index: number): AllocationSegment['tone'] =>
-  (['a', 'b', 'c', 'd'] as const)[index % 4]!;
+export const paletteTone = (index: number): AllocationSegment['tone'] => (['a', 'b', 'c', 'd'] as const)[index % 4]!;
 
 const MIN_PERCENT = 1;
 
@@ -85,7 +84,7 @@ export function TierAllocationBar({ segments, onResize, readOnly }: TierAllocati
             key={seg.key}
             style={{ width: `${(seg.percent / total) * 100}%` }}
             className={cn(
-              'flex shrink-0 items-center justify-center text-[11px] font-bold text-white transition-colors',
+              'flex shrink-0 items-center justify-center text-[12px] font-bold text-white transition-colors',
               TONE_CLASS[seg.tone],
               i > 0 && 'border-l border-white/30',
             )}
@@ -100,24 +99,28 @@ export function TierAllocationBar({ segments, onResize, readOnly }: TierAllocati
         ))}
 
         {!readOnly &&
-          segments.slice(0, -1).map((_seg, i) => (
-            <button
-              key={`handle-${i}`}
-              type="button"
-              aria-label={`Drag to reallocate between ${segments[i]!.label} and ${segments[i + 1]!.label}`}
-              onPointerDown={handlePointerDown(i)}
-              style={{ left: `${(offsets[i + 1]! / total) * 100}%` }}
-              className={cn(
-                'absolute top-0 h-full w-2 -translate-x-1/2 cursor-col-resize touch-none',
-                'after:absolute after:left-1/2 after:top-1/2 after:h-6 after:w-1 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-white/70',
-                dragging === i && 'after:bg-white',
-              )}
-            />
-          ))}
+          segments
+            .slice(0, -1)
+            .map((_seg, i) => (
+              <button
+                key={`handle-${i}`}
+                type="button"
+                aria-label={`Drag to reallocate between ${segments[i]!.label} and ${segments[i + 1]!.label}`}
+                onPointerDown={handlePointerDown(i)}
+                style={{ left: `${(offsets[i + 1]! / total) * 100}%` }}
+                className={cn(
+                  'absolute top-0 h-full w-2 -translate-x-1/2 cursor-col-resize touch-none',
+                  'after:absolute after:left-1/2 after:top-1/2 after:h-6 after:w-1 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-white/70',
+                  dragging === i && 'after:bg-white',
+                )}
+              />
+            ))}
       </div>
-      <div className="mt-1.5 flex justify-between text-[10px] text-gray-400">
+      <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
         <span>Drag a divider to reallocate between neighbouring tiers</span>
-        <span className={Math.abs(total - 100) < 0.05 ? 'text-success' : 'text-danger'}>{total.toFixed(1)}% allocated</span>
+        <span className={Math.abs(total - 100) < 0.05 ? 'text-success' : 'text-danger'}>
+          {total.toFixed(1)}% allocated
+        </span>
       </div>
     </div>
   );

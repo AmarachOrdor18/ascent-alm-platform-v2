@@ -73,7 +73,12 @@ export function Notifications({
 
   const toggleActive = async (rule: NotificationRule) => {
     if (!user || !canEdit) return;
-    await save.mutateAsync({ ...rule, isActive: !rule.isActive, updatedBy: user.name, updatedAt: new Date().toISOString() });
+    await save.mutateAsync({
+      ...rule,
+      isActive: !rule.isActive,
+      updatedBy: user.name,
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const handleSave = async () => {
@@ -83,11 +88,17 @@ export function Notifications({
       name: draft.name,
       event: draft.event,
       channel: draft.channel,
-      recipients: draft.recipients.split(',').map((r) => r.trim()).filter(Boolean),
+      recipients: draft.recipients
+        .split(',')
+        .map((r) => r.trim())
+        .filter(Boolean),
       minimumSeverity: draft.minimumSeverity,
       affiliateCode: draft.affiliateCode || null,
       escalateAfterHours: draft.escalateAfterHours ? Number(draft.escalateAfterHours) : null,
-      escalateTo: draft.escalateTo.split(',').map((r) => r.trim()).filter(Boolean),
+      escalateTo: draft.escalateTo
+        .split(',')
+        .map((r) => r.trim())
+        .filter(Boolean),
       isActive: draft.isActive,
       updatedBy: user.name,
       updatedAt: new Date().toISOString(),
@@ -98,29 +109,46 @@ export function Notifications({
   return (
     <>
       {!embedded && (
-      <ModuleHeader
-        title="Notifications"
-        description="Which events raise an alert, over which channel, to whom, and when it escalates."
-        asOfDate={null}
-        scope="Ecobank Group"
-        metrics={[
-          { label: 'Rules', value: String(rules.length), about: 'Configured event-to-alert rules across every channel and affiliate.' },
-          { label: 'Active', value: String(active.length), tone: 'success', about: 'Rules currently live - a disabled rule stops firing without being deleted.' },
-          { label: 'With escalation', value: String(withEscalation.length), about: 'Rules that forward to a second recipient if nobody acts within the configured hours.' },
-          { label: 'Channels used', value: String(new Set(rules.map((r) => r.channel)).size), about: 'Distinct delivery channels (Email, SMS, In-App, Webhook) in use across all rules.' },
-        ]}
-        actions={
-          <button
-            type="button"
-            onClick={openNew}
-            disabled={!canEdit}
-            title={canEdit ? undefined : 'Only an Administrator can configure notification rules'}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            New rule
-          </button>
-        }
-      />
+        <ModuleHeader
+          title="Notifications"
+          description="Which events raise an alert, over which channel, to whom, and when it escalates."
+          asOfDate={null}
+          scope="Ecobank Group"
+          metrics={[
+            {
+              label: 'Rules',
+              value: String(rules.length),
+              about: 'Configured event-to-alert rules across every channel and affiliate.',
+            },
+            {
+              label: 'Active',
+              value: String(active.length),
+              tone: 'success',
+              about: 'Rules currently live - a disabled rule stops firing without being deleted.',
+            },
+            {
+              label: 'With escalation',
+              value: String(withEscalation.length),
+              about: 'Rules that forward to a second recipient if nobody acts within the configured hours.',
+            },
+            {
+              label: 'Channels used',
+              value: String(new Set(rules.map((r) => r.channel)).size),
+              about: 'Distinct delivery channels (Email, SMS, In-App, Webhook) in use across all rules.',
+            },
+          ]}
+          actions={
+            <button
+              type="button"
+              onClick={openNew}
+              disabled={!canEdit}
+              title={canEdit ? undefined : 'Only an Administrator can configure notification rules'}
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              New rule
+            </button>
+          }
+        />
       )}
       {embedded && (
         <div className="mb-3 flex justify-end">
@@ -129,7 +157,7 @@ export function Notifications({
             onClick={openNew}
             disabled={!canEdit}
             title={canEdit ? undefined : 'Only an Administrator can configure notification rules'}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             New rule
           </button>
@@ -139,7 +167,9 @@ export function Notifications({
       {!isLoading && rules.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
           <BellIcon className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-          <p className="text-sm text-gray-400">No notification rules configured yet. Click "New rule" to raise the first one.</p>
+          <p className="text-sm text-gray-400">
+            No notification rules configured yet. Click "New rule" to raise the first one.
+          </p>
         </div>
       )}
 
@@ -148,7 +178,9 @@ export function Notifications({
           <div className="border-b border-gray-100 bg-white/50 p-5">
             <div className="mb-3">
               <h3 className="text-sm font-bold uppercase tracking-wider text-navy-900">Notification rules</h3>
-              <p className="text-[11px] font-medium text-gray-400">One row per event this platform can raise an alert for.</p>
+              <p className="text-[12px] font-medium text-gray-400">
+                One row per event this platform can raise an alert for.
+              </p>
             </div>
             <TableToolbar
               searchValue={search}
@@ -185,27 +217,40 @@ export function Notifications({
                   <tr key={r.id}>
                     <td>
                       <p className="font-bold text-navy-900">{r.name}</p>
-                      <p className="mt-0.5 text-[11px] font-medium text-gray-400">
-                        {r.affiliateCode ? affiliates.find((a) => a.code === r.affiliateCode)?.name ?? r.affiliateCode : 'Group-wide'}
+                      <p className="mt-0.5 text-[12px] font-medium text-gray-400">
+                        {r.affiliateCode
+                          ? (affiliates.find((a) => a.code === r.affiliateCode)?.name ?? r.affiliateCode)
+                          : 'Group-wide'}
                       </p>
                     </td>
                     <td>{r.event}</td>
                     <td>
-                      <span className="font-mono text-[11px]">{r.channel}</span>
+                      <span className="font-mono text-[12px]">{r.channel}</span>
                     </td>
                     <td>
-                      <StatusBadge status={r.minimumSeverity} tone={r.minimumSeverity === 'Critical' || r.minimumSeverity === 'High' ? 'danger' : r.minimumSeverity === 'Medium' ? 'warning' : 'success'} />
+                      <StatusBadge
+                        status={r.minimumSeverity}
+                        tone={
+                          r.minimumSeverity === 'Critical' || r.minimumSeverity === 'High'
+                            ? 'danger'
+                            : r.minimumSeverity === 'Medium'
+                              ? 'warning'
+                              : 'success'
+                        }
+                      />
                     </td>
                     <td>
-                      <span className="text-[12px] text-gray-600">{r.recipients.length > 0 ? r.recipients.join(', ') : 'None set'}</span>
+                      <span className="text-[13px] text-gray-600">
+                        {r.recipients.length > 0 ? r.recipients.join(', ') : 'None set'}
+                      </span>
                     </td>
                     <td>
                       {r.escalateAfterHours !== null ? (
-                        <span className="text-[12px] text-gray-600">
+                        <span className="text-[13px] text-gray-600">
                           After {r.escalateAfterHours}h to {r.escalateTo.join(', ') || 'nobody set'}
                         </span>
                       ) : (
-                        <span className="text-[12px] text-gray-300">None</span>
+                        <span className="text-[13px] text-gray-300">None</span>
                       )}
                     </td>
                     <td>
@@ -216,7 +261,10 @@ export function Notifications({
                         title={canEdit ? undefined : 'Only an Administrator can change this'}
                         className="disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} tone={r.isActive ? 'success' : 'neutral'} />
+                        <StatusBadge
+                          status={r.isActive ? 'Active' : 'Inactive'}
+                          tone={r.isActive ? 'success' : 'neutral'}
+                        />
                       </button>
                     </td>
                     <td>
@@ -225,7 +273,7 @@ export function Notifications({
                         onClick={() => openEdit(r)}
                         disabled={!canEdit}
                         title={canEdit ? undefined : 'Only an Administrator can edit notification rules'}
-                        className="text-[11px] font-bold text-navy-700 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+                        className="text-[12px] font-bold text-navy-700 hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
                       >
                         Edit
                       </button>
@@ -240,15 +288,15 @@ export function Notifications({
       )}
 
       {editorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-4">
+        <div data-tour="drawer" className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-[13px] font-bold uppercase tracking-wider text-navy-900">
+            <h3 className="mb-4 text-[14px] font-bold uppercase tracking-wider text-navy-900">
               {draft.id ? 'Edit notification rule' : 'New notification rule'}
             </h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="not-name" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="not-name" className="mb-1 block text-[12px] text-gray-600">
                     Name
                   </label>
                   <input
@@ -256,11 +304,11 @@ export function Notifications({
                     value={draft.name}
                     onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                     placeholder="e.g. LCR below floor"
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="not-event" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="not-event" className="mb-1 block text-[12px] text-gray-600">
                     Event
                   </label>
                   <input
@@ -268,20 +316,20 @@ export function Notifications({
                     value={draft.event}
                     onChange={(e) => setDraft((d) => ({ ...d, event: e.target.value }))}
                     placeholder="e.g. Limit status turns Red"
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="not-channel" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="not-channel" className="mb-1 block text-[12px] text-gray-600">
                     Channel
                   </label>
                   <select
                     id="not-channel"
                     value={draft.channel}
                     onChange={(e) => setDraft((d) => ({ ...d, channel: e.target.value as NotificationChannel }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                   >
                     {CHANNELS.map((c) => (
                       <option key={c} value={c}>
@@ -291,14 +339,14 @@ export function Notifications({
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="not-severity" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="not-severity" className="mb-1 block text-[12px] text-gray-600">
                     Minimum severity
                   </label>
                   <select
                     id="not-severity"
                     value={draft.minimumSeverity}
                     onChange={(e) => setDraft((d) => ({ ...d, minimumSeverity: e.target.value as Severity }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s} value={s}>
@@ -309,7 +357,7 @@ export function Notifications({
                 </div>
               </div>
               <div>
-                <label htmlFor="not-recipients" className="mb-1 block text-[11px] text-gray-600">
+                <label htmlFor="not-recipients" className="mb-1 block text-[12px] text-gray-600">
                   Recipients (comma separated)
                 </label>
                 <input
@@ -317,18 +365,18 @@ export function Notifications({
                   value={draft.recipients}
                   onChange={(e) => setDraft((d) => ({ ...d, recipients: e.target.value }))}
                   placeholder="name@ecobank.com, name2@ecobank.com"
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                 />
               </div>
               <div>
-                <label htmlFor="not-affiliate" className="mb-1 block text-[11px] text-gray-600">
+                <label htmlFor="not-affiliate" className="mb-1 block text-[12px] text-gray-600">
                   Affiliate
                 </label>
                 <select
                   id="not-affiliate"
                   value={draft.affiliateCode}
                   onChange={(e) => setDraft((d) => ({ ...d, affiliateCode: e.target.value }))}
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                  className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                 >
                   <option value="">Group-wide</option>
                   {affiliates.map((a) => (
@@ -340,7 +388,7 @@ export function Notifications({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="not-escalate-hours" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="not-escalate-hours" className="mb-1 block text-[12px] text-gray-600">
                     Escalate after (hours, optional)
                   </label>
                   <input
@@ -349,22 +397,22 @@ export function Notifications({
                     min={0}
                     value={draft.escalateAfterHours}
                     onChange={(e) => setDraft((d) => ({ ...d, escalateAfterHours: e.target.value }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="not-escalate-to" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="not-escalate-to" className="mb-1 block text-[12px] text-gray-600">
                     Escalate to (comma separated)
                   </label>
                   <input
                     id="not-escalate-to"
                     value={draft.escalateTo}
                     onChange={(e) => setDraft((d) => ({ ...d, escalateTo: e.target.value }))}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:border-navy-700 focus:outline-none"
+                    className="w-full rounded border border-gray-200 px-3 py-2 text-[14px] focus:border-navy-700 focus:outline-none"
                   />
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-[12px] text-gray-600">
+              <label className="flex items-center gap-2 text-[13px] text-gray-600">
                 <input
                   type="checkbox"
                   checked={draft.isActive}
@@ -375,9 +423,10 @@ export function Notifications({
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button
+                data-tour="drawer-close"
                 type="button"
                 onClick={() => setEditorOpen(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[12px] font-bold text-gray-600 hover:bg-gray-50"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-bold text-gray-600 hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -385,7 +434,7 @@ export function Notifications({
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={!canEdit || !draft.name || !draft.event}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Save rule
               </button>

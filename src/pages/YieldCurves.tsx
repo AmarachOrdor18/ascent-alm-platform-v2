@@ -5,10 +5,12 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { ResultTable } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
+import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { useScope } from '@/context/ScopeContext';
 import { useCurrencies, useYieldCurves, useSaveYieldCurve, useSaveBatch } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
 import { referenceLoadBatch } from '@/lib/referenceBatch';
+import { useMarketDataSaved } from '@/lib/marketDataHooks';
 import { interpolateCurve } from '@/engine/ftp';
 import type { AccrualBasis, CompoundingBasis, RateFormat, StoredYieldCurve } from '@/engine/types';
 
@@ -51,7 +53,11 @@ export function YieldCurves() {
   const { data: currencies = [] } = useCurrencies();
   const save = useSaveYieldCurve();
   const saveBatch = useSaveBatch();
-  const canEdit = hasPermission('data.configure') || hasPermission('rules.edit');
+  const marketDataSaved = useMarketDataSaved();
+  // Market data is Group-wide: only Group-level users change it (affiliate users see it read-only).
+  const canEdit =
+    (hasPermission('data.configure') || hasPermission('rules.edit')) &&
+    !isRestrictedToOwnAffiliate(user, hasPermission);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StoredYieldCurve | null>(null);
@@ -82,7 +88,9 @@ export function YieldCurves() {
     // one - it lands the new curve already valid for whatever the uploader is actually working on. A
     // currency that already has a curve gets an additional dated version here, not a replacement - the
     // "New curve for currency" list intentionally isn't restricted to currencies with none.
-    setDraft(blankCurve(creatingCurrency, scopeAsOfDate ?? curves[0]?.asOfDate ?? new Date().toISOString().slice(0, 10)));
+    setDraft(
+      blankCurve(creatingCurrency, scopeAsOfDate ?? curves[0]?.asOfDate ?? new Date().toISOString().slice(0, 10)),
+    );
     setCreatingCurrency('');
   };
 
@@ -100,7 +108,7 @@ export function YieldCurves() {
 
   const handleSave = () => {
     if (!draft || duplicateDate) return;
-    const saved = { ...draft, updatedBy: 'current-user', updatedAt: new Date().toISOString() };
+    const saved = { ...draft, updatedBy: user?.name ?? 'unknown', updatedAt: new Date().toISOString() };
     save.mutate(saved, {
       onSuccess: () => {
         // Curves are Group-wide reference data, entered here rather than staged like a Position file -
@@ -116,6 +124,13 @@ export function YieldCurves() {
             rowCount: saved.terms.length,
           }),
         );
+        marketDataSaved({
+          fileName: 'Manual entry (yield curve)',
+          asOfDate: saved.asOfDate,
+          fx: [],
+          curves: [{ currency: saved.currency, curveCode: saved.code }],
+          indicators: [],
+        });
         setDraft(null);
         setActiveId(saved.id);
       },
@@ -162,7 +177,7 @@ export function YieldCurves() {
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
               >
                 Cancel
               </button>
@@ -170,8 +185,12 @@ export function YieldCurves() {
                 type="button"
                 onClick={handleSave}
                 disabled={save.isPending || duplicateDate}
-                title={duplicateDate ? `${editing?.currency} already has a curve dated ${editing?.asOfDate} - change the date or edit that one instead` : undefined}
-                className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                title={
+                  duplicateDate
+                    ? `${editing?.currency} already has a curve dated ${editing?.asOfDate} - change the date or edit that one instead`
+                    : undefined
+                }
+                className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
               >
                 {save.isPending ? 'Saving…' : isNewCurve ? 'Create curve' : 'Save curve'}
               </button>
@@ -181,7 +200,7 @@ export function YieldCurves() {
       />
 
       {duplicateDate && (
-        <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-3 text-[12px] leading-relaxed text-danger">
+        <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-3 text-[13px] leading-relaxed text-danger">
           {editing?.currency} already has a curve dated {editing?.asOfDate}. Pick a different as-of date above, or
           cancel and edit that existing curve instead.
         </div>
@@ -190,7 +209,7 @@ export function YieldCurves() {
       {canEdit && !draft && (
         <div className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-white p-4">
           <div>
-            <label htmlFor="new-curve-currency" className="mb-1 block text-[11px] text-gray-600">
+            <label htmlFor="new-curve-currency" className="mb-1 block text-[12px] text-gray-600">
               New dated curve for currency
             </label>
             <select
@@ -198,7 +217,7 @@ export function YieldCurves() {
               value={creatingCurrency}
               onChange={(e) => setCreatingCurrency(e.target.value)}
               disabled={currencies.length === 0}
-              className="w-48 rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+              className="w-48 rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
             >
               <option value="">Select…</option>
               {currencies.map((c) => (
@@ -212,22 +231,22 @@ export function YieldCurves() {
             type="button"
             onClick={handleCreate}
             disabled={!creatingCurrency}
-            className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
           >
             New curve
           </button>
-          <p className="w-full text-[11px] text-gray-500">
+          <p className="w-full text-[12px] text-gray-500">
             Starts from a standard O/N–5Y ladder at 0% - fill in real rates before saving. A currency with no rate
-            registered yet on Currency &amp; FX Rates can still get a curve here; register its rate separately.
-            Picking a currency that already has a curve adds another dated version alongside it - a run always uses
-            whichever is most recent as of its own date, so this is how rates move over time rather than one curve
-            being edited in place forever.
+            registered yet on Currency &amp; FX Rates can still get a curve here; register its rate separately. Picking
+            a currency that already has a curve adds another dated version alongside it - a run always uses whichever is
+            most recent as of its own date, so this is how rates move over time rather than one curve being edited in
+            place forever.
           </p>
         </div>
       )}
 
       <div className="mb-6 flex items-center gap-3">
-        <label htmlFor="curve-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+        <label htmlFor="curve-picker" className="text-[12px] font-bold uppercase tracking-wider text-gray-400">
           Curve
         </label>
         <select
@@ -237,7 +256,7 @@ export function YieldCurves() {
             setActiveId(e.target.value);
             setDraft(null);
           }}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
         >
           {isNewCurve && (
             <option value={draft!.id}>
@@ -250,18 +269,18 @@ export function YieldCurves() {
             </option>
           ))}
         </select>
-        {isLoading && <span className="text-[12px] text-gray-400">Loading…</span>}
+        {isLoading && <span className="text-[13px] text-gray-400">Loading…</span>}
       </div>
 
       {!editing ? (
-        <p className="rounded-lg bg-gray-50 p-6 text-center text-[12px] text-gray-500">
+        <p className="rounded-lg bg-gray-50 p-6 text-center text-[13px] text-gray-500">
           {isLoading ? 'Loading curves…' : 'No curves defined yet.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                 {editing.name}
                 <InfoButton label="What this curve drives">
                   This curve is what FTP base rates and interest-rate shock scenarios are read from for{' '}
@@ -332,7 +351,7 @@ export function YieldCurves() {
                           step="0.01"
                           value={t.ratePercent}
                           onChange={(e) => updateTerm(t.index, Number(e.target.value))}
-                          className="w-24 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                          className="w-24 rounded border border-gray-200 px-2 py-1 text-right font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                         />
                       </>
                     ) : (
@@ -345,7 +364,7 @@ export function YieldCurves() {
 
           <section className="space-y-6">
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                 Conventions
                 <InfoButton label="Why these matter">
                   Rate format, compounding and accrual basis together determine what a quoted rate actually means in
@@ -356,7 +375,7 @@ export function YieldCurves() {
               <div className="space-y-3">
                 <Field label="Currency" value={editing.currency} />
                 <div>
-                  <label htmlFor="curve-asof" className="mb-1 block text-[11px] text-gray-600">
+                  <label htmlFor="curve-asof" className="mb-1 block text-[12px] text-gray-600">
                     As of date
                   </label>
                   <input
@@ -365,9 +384,9 @@ export function YieldCurves() {
                     value={editing.asOfDate}
                     disabled={!canEdit}
                     onChange={(e) => setDraft({ ...editing, asOfDate: e.target.value })}
-                    className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                    className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
                   />
-                  <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                  <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
                     Valid for any run from this date onward, until a later curve replaces it - not a single day's
                     snapshot.
                   </p>
@@ -397,14 +416,14 @@ export function YieldCurves() {
                   onChange={(v) => setDraft({ ...editing, accrualBasis: v as AccrualBasis })}
                 />
               </div>
-              <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
+              <p className="mt-4 text-[12px] leading-relaxed text-gray-500">
                 The same quoted rate produces different cash flows under different conventions - which is why these are
                 attributes of the curve rather than assumptions buried in the engine.
               </p>
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-3 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="mb-3 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                 Interpolation probe
                 <InfoButton label="How this is calculated">
                   Linearly interpolates between the two term points bracketing the tenor you enter, and holds flat
@@ -412,7 +431,7 @@ export function YieldCurves() {
                   in-between tenor.
                 </InfoButton>
               </h2>
-              <label htmlFor="probe" className="mb-1 block text-[11px] text-gray-600">
+              <label htmlFor="probe" className="mb-1 block text-[12px] text-gray-600">
                 Tenor in days
               </label>
               <input
@@ -421,10 +440,10 @@ export function YieldCurves() {
                 min={1}
                 value={probeTenor}
                 onChange={(e) => setProbeTenor(Number(e.target.value))}
-                className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                className="w-full rounded border border-gray-200 px-2 py-1 font-mono text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
               />
               <p className="mt-3 text-[24px] font-bold text-navy-900">{formatPct(probeRate, 3)}</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
+              <p className="mt-1 text-[12px] leading-relaxed text-gray-500">
                 Linearly interpolated between the bracketing term points, and held flat beyond either end. This is the
                 rate FTP would charge a position repricing in {probeTenor} days.
               </p>
@@ -439,8 +458,8 @@ export function YieldCurves() {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] text-gray-600">{label}</p>
-      <p className="font-mono text-[12px] font-bold text-navy-900">{value}</p>
+      <p className="text-[12px] text-gray-600">{label}</p>
+      <p className="font-mono text-[13px] font-bold text-navy-900">{value}</p>
     </div>
   );
 }
@@ -462,7 +481,7 @@ function Select({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-[11px] text-gray-600">
+      <label htmlFor={id} className="mb-1 block text-[12px] text-gray-600">
         {label}
       </label>
       <select
@@ -470,7 +489,7 @@ function Select({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+        className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
       >
         {options.map((o) => (
           <option key={o} value={o}>

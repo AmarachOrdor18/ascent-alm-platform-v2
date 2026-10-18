@@ -8,7 +8,14 @@ import type { Affiliate, OnboardingRecord, SettingRecord, User } from '@/engine/
 // section of Admin → Organisation setup (ORG_SETUP_STEPS).
 export const ORG_STEPS = ['organisation', 'affiliates', 'settings', 'review'] as const;
 export const ORG_SETUP_STEPS = ['organisation', 'affiliates', 'settings', 'assumptions', 'review'] as const;
-export const AFFILIATE_STEPS = ['confirm', 'dataSources', 'users', 'configuration', 'initialData', 'readiness'] as const;
+export const AFFILIATE_STEPS = [
+  'confirm',
+  'dataSources',
+  'users',
+  'configuration',
+  'initialData',
+  'readiness',
+] as const;
 
 export type OrgStep = (typeof ORG_SETUP_STEPS)[number];
 export type AffiliateStep = (typeof AFFILIATE_STEPS)[number];
@@ -71,7 +78,11 @@ export function markStep(
 }
 
 /** A Group administrator (group.manage) whose organisation set-up is not complete. */
-export function needsOrgOnboarding(user: MinimalUser, perms: Perms, orgRecord: OnboardingRecord | null | undefined): boolean {
+export function needsOrgOnboarding(
+  user: MinimalUser,
+  perms: Perms,
+  orgRecord: OnboardingRecord | null | undefined,
+): boolean {
   if (!user) return false;
   return has(perms, 'group.manage') && orgRecord?.status !== 'Complete';
 }
@@ -148,7 +159,12 @@ export const settingId = (scopeCode: string, key: string) => `${scopeCode}:${key
 // ─── Organisation onboarding (Phase 3) ──────────────────────────────────────
 
 /** Moves the record to `step` (resume point) without marking anything done. */
-export function atStep(record: OnboardingRecord, step: string, by: string, at = new Date().toISOString()): OnboardingRecord {
+export function atStep(
+  record: OnboardingRecord,
+  step: string,
+  by: string,
+  at = new Date().toISOString(),
+): OnboardingRecord {
   return {
     ...record,
     currentStep: step,
@@ -161,7 +177,11 @@ export function atStep(record: OnboardingRecord, step: string, by: string, at = 
 }
 
 /** Marks every step of the record's scope done and the record Complete. */
-export function completeOnboarding(record: OnboardingRecord, by: string, at = new Date().toISOString()): OnboardingRecord {
+export function completeOnboarding(
+  record: OnboardingRecord,
+  by: string,
+  at = new Date().toISOString(),
+): OnboardingRecord {
   const order: readonly string[] = record.scope === 'Organisation' ? ORG_STEPS : AFFILIATE_STEPS;
   const steps = { ...record.steps };
   for (const s of order) if (!steps[s]?.done) steps[s] = { done: true, at, by };
@@ -243,6 +263,12 @@ export const ORG_SETTING_DEFAULTS: Record<(typeof ORG_SETTING)[keyof typeof ORG_
 };
 
 /** A GROUP settings row for `key`. */
-export function orgSetting(key: string, value: unknown, overridable: boolean, by: string, at = new Date().toISOString()): SettingRecord {
+export function orgSetting(
+  key: string,
+  value: unknown,
+  overridable: boolean,
+  by: string,
+  at = new Date().toISOString(),
+): SettingRecord {
   return { id: settingId('GROUP', key), affiliateCode: 'GROUP', key, value, overridable, updatedBy: by, updatedAt: at };
 }

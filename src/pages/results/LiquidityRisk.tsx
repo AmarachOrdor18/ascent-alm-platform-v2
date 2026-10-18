@@ -1,9 +1,25 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
-import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { ResultsFrame } from '@/components/results/ResultsFrame';
-import { CHART_AXIS_TICK, CHART_COLORS, CHART_GRID_STROKE, CHART_LEGEND_STYLE, CHART_TOOLTIP_STYLE } from '@/components/results/chartStyle';
+import {
+  CHART_AXIS_TICK,
+  CHART_COLORS,
+  CHART_GRID_STROKE,
+  CHART_LEGEND_STYLE,
+  CHART_TOOLTIP_STYLE,
+} from '@/components/results/chartStyle';
 import { ResultTable, type ResultColumn } from '@/components/ui/ResultTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Amount } from '@/components/ui/Amount';
@@ -13,7 +29,13 @@ import { useFxRates, usePositions } from '@/lib/hooks';
 import { useSelectedRun, frameProps, payloadOf } from '@/lib/resultHooks';
 import { formatAmount, formatPct } from '@/lib/format';
 import { buildFxTable } from '@/engine/fx';
-import { computeDepositsByAffiliate, type LcrResult, type LiquidityGapResult, type LoanToDepositResult, type NsfrResult } from '@/engine/liquidity';
+import {
+  computeDepositsByAffiliate,
+  type LcrResult,
+  type LiquidityGapResult,
+  type LoanToDepositResult,
+  type NsfrResult,
+} from '@/engine/liquidity';
 import type { FxPositionResult } from '@/engine/profitability';
 import type { DepositRunoffResult } from '@/engine/behavioural';
 
@@ -64,30 +86,34 @@ export function LiquidityRisk() {
             label: 'LCR',
             value: formatPct(lcr?.lcrPercent ?? null),
             tone: (lcr?.lcrPercent ?? 200) < 100 ? 'danger' : (lcr?.lcrPercent ?? 200) < 130 ? 'warning' : 'success',
-            about: 'Liquidity Coverage Ratio: high-quality liquid assets over 30-day net cash outflows under stress. Basel III floor is 100%.',
+            about:
+              'Liquidity Coverage Ratio: high-quality liquid assets over 30-day net cash outflows under stress. Basel III floor is 100%.',
           },
           {
             label: 'NSFR',
             value: formatPct(nsfr?.nsfrPercent ?? null),
             tone: (nsfr?.nsfrPercent ?? 200) < 100 ? 'danger' : 'success',
-            about: 'Net Stable Funding Ratio: available stable funding over required stable funding across a one-year horizon. Basel III floor is 100%.',
+            about:
+              'Net Stable Funding Ratio: available stable funding over required stable funding across a one-year horizon. Basel III floor is 100%.',
           },
           {
             label: 'Loan-to-deposit',
             value: formatPct(ldr?.ratioPercent ?? null),
             tone: (ldr?.ratioPercent ?? 0) > 90 ? 'warning' : 'success',
-            about: 'Customer loans as a share of customer deposits - a classic funding-structure indicator. A high ratio signals reliance on deposits to fund lending.',
+            about:
+              'Customer loans as a share of customer deposits - a classic funding-structure indicator. A high ratio signals reliance on deposits to fund lending.',
           },
           {
             label: 'Largest affiliate deposit share',
             value: depositsByAffiliate[0] ? formatPct(depositsByAffiliate[0].sharePercent) : '-',
-            about: 'The single affiliate holding the largest share of Group deposit funding - a Group-diversification question, distinct from depositor-level concentration.',
+            about:
+              'The single affiliate holding the largest share of Group deposit funding - a Group-diversification question, distinct from depositor-level concentration.',
           },
         ]}
         actions={
           <Link
             href="/rules"
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-navy-900 hover:bg-gray-50 transition-colors"
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-bold text-navy-900 hover:bg-gray-50 transition-colors"
           >
             Configure Rules
           </Link>
@@ -100,15 +126,20 @@ export function LiquidityRisk() {
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                     Maturity gap analysis
                     <InfoButton label="What this chart shows">
-                      Assets minus liabilities and capital by maturity bucket, bucketed on contractual maturity date (or
-                      behavioural re-dating in the Behavioural view). A negative gap means more matures on the
-                      liability side than the asset side in that window - net cash out, not in.
+                      Assets minus liabilities and capital by maturity bucket.{' '}
+                      {activeGap.source === 'Cashflows'
+                        ? "Every principal payment is bucketed on its own date from the run's cashflow book - the Behavioural view applies prepayment, deposit run-off and term-deposit roll-over to the same cashflows the IRRBB and FTP results use."
+                        : 'Bucketed on contractual maturity date (or behavioural re-dating in the Behavioural view).'}{' '}
+                      A negative gap means more matures on the liability side than the asset side in that window - net
+                      cash out, not in.
                     </InfoButton>
                   </h2>
-                  <p className="mt-1 text-[11px] font-medium text-gray-400">Assets vs. liabilities by maturity bucket</p>
+                  <p className="mt-1 text-[12px] font-medium text-gray-400">
+                    Assets vs. liabilities by maturity bucket
+                  </p>
                 </div>
                 <div className="flex rounded-lg border border-gray-200 p-0.5">
                   {(['Behavioural', 'Contractual'] as const).map((v) => (
@@ -116,7 +147,7 @@ export function LiquidityRisk() {
                       key={v}
                       type="button"
                       onClick={() => setGapView(v)}
-                      className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                      className={`rounded-md px-3 py-1 text-[12px] font-bold transition-colors ${
                         gapView === v ? 'bg-navy-900 text-white' : 'text-gray-500 hover:text-navy-900'
                       }`}
                     >
@@ -136,7 +167,10 @@ export function LiquidityRisk() {
                       tickLine={false}
                       tickFormatter={(v: number) => formatAmount(v, currency)}
                     />
-                    <Tooltip formatter={(value: number, name: string) => [formatAmount(value, currency), name]} contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [formatAmount(value, currency), name]}
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                    />
                     <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                     <ReferenceLine y={0} stroke={CHART_COLORS.neutral} strokeWidth={1} />
                     <Bar dataKey="assets" name="Assets" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
@@ -149,21 +183,23 @@ export function LiquidityRisk() {
           )}
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-1 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Deposit concentration by affiliate
               <InfoButton label="What this shows">
                 Each affiliate's share of total Group deposit funding - a diversification question at the affiliate
                 level, distinct from the depositor-level concentration on the Concentration screen.
               </InfoButton>
             </h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">Share of Group deposit funding</p>
+            <p className="mb-4 text-[12px] font-medium text-gray-400">Share of Group deposit funding</p>
             {depositsByAffiliate.length === 0 ? (
-              <p className="text-[12px] text-gray-400">Only meaningful at Group scope with more than one affiliate's deposits in the run.</p>
+              <p className="text-[13px] text-gray-400">
+                Only meaningful at Group scope with more than one affiliate's deposits in the run.
+              </p>
             ) : (
               <div className="space-y-4">
                 {depositsByAffiliate.slice(0, 6).map((d) => (
                   <div key={d.affiliateCode}>
-                    <div className="mb-1 flex items-center justify-between text-[12px]">
+                    <div className="mb-1 flex items-center justify-between text-[13px]">
                       <span className="font-bold text-navy-900">{d.affiliateCode}</span>
                       <span className="font-mono font-bold text-navy-900">{formatPct(d.sharePercent)}</span>
                     </div>
@@ -182,15 +218,14 @@ export function LiquidityRisk() {
 
         {fxPosition && fxPosition.lines.length > 0 && (
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+            <h2 className="mb-1 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
               Cross-currency funding position
               <InfoButton label="What this shows">
-                Assets and liabilities converted to the reporting currency, broken out by the currency they are
-                actually settled in - this is where a currency mismatch shows up even when the overall book looks
-                balanced.
+                Assets and liabilities converted to the reporting currency, broken out by the currency they are actually
+                settled in - this is where a currency mismatch shows up even when the overall book looks balanced.
               </InfoButton>
             </h2>
-            <p className="mb-4 text-[11px] font-medium text-gray-400">Assets and liabilities by settlement currency</p>
+            <p className="mb-4 text-[12px] font-medium text-gray-400">Assets and liabilities by settlement currency</p>
             <FxPositionTable lines={fxPosition.lines} currency={currency} />
           </section>
         )}
@@ -199,22 +234,25 @@ export function LiquidityRisk() {
           {lcr && (
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                   Liquidity Coverage Ratio
                   <InfoButton label="Methodology">
-                    High-quality liquid assets net of each position's own haircut, unencumbered only, divided by
-                    30-day net cash outflows (gross outflows less inflows, inflows capped at 75% of outflows).
+                    High-quality liquid assets net of each position's own haircut, unencumbered only, divided by 30-day
+                    net cash outflows (gross outflows less inflows, inflows capped at 75% of outflows).
                   </InfoButton>
                 </h2>
                 <StatusBadge
-                  status={lcr.lcrPercent === null ? 'Not computable' : lcr.lcrPercent >= 100 ? 'Above 100%' : 'Below 100%'}
+                  status={
+                    lcr.lcrPercent === null ? 'Not computable' : lcr.lcrPercent >= 100 ? 'Above 100%' : 'Below 100%'
+                  }
                   tone={lcr.lcrPercent === null ? 'neutral' : lcr.lcrPercent >= 100 ? 'success' : 'danger'}
                 />
               </div>
 
               <p className="mb-4 font-mono text-[30px] font-bold text-navy-900">{formatPct(lcr.lcrPercent)}</p>
+              {lcr.lcrPercent === null && <NoFactorsNote what="LCR run-off and inflow rates" />}
 
-              <dl className="space-y-2 text-[12px]">
+              <dl className="space-y-2 text-[13px]">
                 <Row label="High-quality liquid assets" value={<Amount value={lcr.hqla} currency={currency} />} bold />
                 {Object.entries(lcr.hqlaByLevel).map(([level, amount]) => (
                   <Row key={level} label={level} value={<Amount value={amount} currency={currency} />} indent />
@@ -247,7 +285,7 @@ export function LiquidityRisk() {
           {nsfr && (
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                <h2 className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                   Net Stable Funding Ratio
                   <InfoButton label="Methodology">
                     Available stable funding (liabilities and capital, weighted by each position's ASF factor) over
@@ -255,14 +293,17 @@ export function LiquidityRisk() {
                   </InfoButton>
                 </h2>
                 <StatusBadge
-                  status={nsfr.nsfrPercent === null ? 'Not computable' : nsfr.nsfrPercent >= 100 ? 'Above 100%' : 'Below 100%'}
+                  status={
+                    nsfr.nsfrPercent === null ? 'Not computable' : nsfr.nsfrPercent >= 100 ? 'Above 100%' : 'Below 100%'
+                  }
                   tone={nsfr.nsfrPercent === null ? 'neutral' : nsfr.nsfrPercent >= 100 ? 'success' : 'danger'}
                 />
               </div>
 
               <p className="mb-4 font-mono text-[30px] font-bold text-navy-900">{formatPct(nsfr.nsfrPercent)}</p>
+              {nsfr.nsfrPercent === null && <NoFactorsNote what="ASF and RSF factors" />}
 
-              <dl className="space-y-2 text-[12px]">
+              <dl className="space-y-2 text-[13px]">
                 <Row
                   label="Available stable funding"
                   value={<Amount value={nsfr.availableStableFunding} currency={currency} />}
@@ -291,7 +332,7 @@ export function LiquidityRisk() {
         {activeGap && activeGap.buckets.length > 0 && (
           <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="mb-1 flex items-center justify-between gap-1.5">
-              <h2 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+              <h2 className="flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                 {gapView} gap - summary
                 <InfoButton label="Why only a summary here">
                   The full bucket-by-bucket ladder (chart and table, with the maturity/repricing toggle) lives on
@@ -299,7 +340,7 @@ export function LiquidityRisk() {
                   two tabs.
                 </InfoButton>
               </h2>
-              <Link href="/risk/liquidity/gap-analysis" className="text-[11px] font-bold text-navy-700 hover:underline">
+              <Link href="/risk/liquidity/gap-analysis" className="text-[12px] font-bold text-navy-700 hover:underline">
                 Full ladder →
               </Link>
             </div>
@@ -310,7 +351,16 @@ export function LiquidityRisk() {
                 colorBySign
               />
             </p>
-            <p className="text-[11px] text-gray-500">Cumulative net gap across the whole ladder, as of this run.</p>
+            <p className="text-[12px] text-gray-500">Cumulative net gap across the whole ladder, as of this run.</p>
+            {activeGap.undated && (activeGap.undated.assets !== 0 || activeGap.undated.liabilities !== 0) && (
+              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-gray-700">
+                <span className="font-bold text-navy-900">Not bucketed</span> (no maturity
+                {gapView === 'Behavioural' ? ' and no behavioural pattern' : ''}):{' '}
+                <Amount value={activeGap.undated.assets} currency={currency} /> of assets and{' '}
+                <Amount value={activeGap.undated.liabilities} currency={currency} /> of liabilities and capital -
+                outside the ladder, so not in the cumulative gap above.
+              </p>
+            )}
           </section>
         )}
 
@@ -322,10 +372,24 @@ export function LiquidityRisk() {
 
 function FxPositionTable({ lines, currency }: { lines: FxPositionResult['lines']; currency: string }) {
   const columns: ResultColumn<FxPositionResult['lines'][number]>[] = [
-    { key: 'currency', header: 'Currency', render: (l) => <span className="font-mono font-bold text-navy-900">{l.currency}</span> },
+    {
+      key: 'currency',
+      header: 'Currency',
+      render: (l) => <span className="font-mono font-bold text-navy-900">{l.currency}</span>,
+    },
     { key: 'assets', header: 'Assets', align: 'right', render: (l) => <Amount value={l.assets} currency={currency} /> },
-    { key: 'liabilities', header: 'Liabilities', align: 'right', render: (l) => <Amount value={l.liabilities} currency={currency} /> },
-    { key: 'net', header: 'Net position', align: 'right', render: (l) => <Amount value={l.netOpenPosition} currency={currency} colorBySign /> },
+    {
+      key: 'liabilities',
+      header: 'Liabilities',
+      align: 'right',
+      render: (l) => <Amount value={l.liabilities} currency={currency} />,
+    },
+    {
+      key: 'net',
+      header: 'Net position',
+      align: 'right',
+      render: (l) => <Amount value={l.netOpenPosition} currency={currency} colorBySign />,
+    },
   ];
   return <ResultTable rows={lines} columns={columns} rowKey={(l) => l.currency} />;
 }
@@ -334,7 +398,12 @@ function RunoffSummary({ runoff, currency }: { runoff: DepositRunoffResult; curr
   const columns: ResultColumn<DepositRunoffResult['lines'][number]>[] = [
     { key: 'product', header: 'Product', render: (l) => l.productClass },
     { key: 'tag', header: 'Behavioural tag', render: (l) => <StatusBadge status={l.behaviouralTag} tone="neutral" /> },
-    { key: 'balance', header: 'Balance', align: 'right', render: (l) => <Amount value={l.balance} currency={currency} /> },
+    {
+      key: 'balance',
+      header: 'Balance',
+      align: 'right',
+      render: (l) => <Amount value={l.balance} currency={currency} />,
+    },
     { key: 'core', header: 'Core', align: 'right', render: (l) => <Amount value={l.coreAmount} currency={currency} /> },
     {
       key: 'volatile',
@@ -353,31 +422,31 @@ function RunoffSummary({ runoff, currency }: { runoff: DepositRunoffResult; curr
 
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+      <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">
         Deposit core and volatile split
       </h2>
 
-      <dl className="mb-4 grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
+      <dl className="mb-4 grid grid-cols-2 gap-4 text-[13px] md:grid-cols-4">
         <div>
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total deposits</dt>
+          <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total deposits</dt>
           <dd>
             <Amount value={runoff.totalDeposits} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Core</dt>
+          <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Core</dt>
           <dd>
             <Amount value={runoff.totalCore} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Volatile</dt>
+          <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Volatile</dt>
           <dd>
             <Amount value={runoff.totalVolatile} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Unmodelled</dt>
+          <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Unmodelled</dt>
           <dd>
             <Amount value={runoff.unmodelled} currency={currency} />
           </dd>
@@ -385,7 +454,7 @@ function RunoffSummary({ runoff, currency }: { runoff: DepositRunoffResult; curr
       </dl>
 
       {runoff.unmodelled > 0 && (
-        <p className="mb-4 rounded border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] leading-relaxed text-navy-900">
+        <p className="mb-4 rounded border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-relaxed text-navy-900">
           <Amount value={runoff.unmodelled} currency={currency} /> of deposits have a behavioural tag with no matching
           pattern, reported here rather than defaulted into core or volatile.
         </p>
@@ -394,7 +463,7 @@ function RunoffSummary({ runoff, currency }: { runoff: DepositRunoffResult; curr
       <ResultTable rows={runoff.lines.slice(0, 40)} columns={columns} rowKey={(l) => l.positionId} />
 
       {runoff.lines.length > 40 && (
-        <p className="mt-3 text-[11px] text-gray-500">
+        <p className="mt-3 text-[12px] text-gray-500">
           Showing 40 of {runoff.lines.length}. The totals above are computed over all of them.
         </p>
       )}
@@ -404,17 +473,7 @@ function RunoffSummary({ runoff, currency }: { runoff: DepositRunoffResult; curr
 
 const ELEMENT_LABELS = { Lcr: 'the liquidity coverage ratio', Nsfr: 'the net stable funding ratio' } as const;
 
-function Row({
-  label,
-  value,
-  bold,
-  indent,
-}: {
-  label: string;
-  value: ReactNode;
-  bold?: boolean;
-  indent?: boolean;
-}) {
+function Row({ label, value, bold, indent }: { label: string; value: ReactNode; bold?: boolean; indent?: boolean }) {
   return (
     <div
       className={`flex items-center justify-between gap-3 ${bold ? 'border-t border-gray-100 pt-2 font-bold text-navy-900' : ''}`}
@@ -425,3 +484,15 @@ function Row({
   );
 }
 
+/** Why a ratio came out blank: the book this run read carries no factors to weight it with. */
+function NoFactorsNote({ what }: { what: string }) {
+  return (
+    <p className="mb-4 rounded-lg bg-warning-bg px-3 py-2 text-[12px] leading-relaxed text-warning">
+      None of the positions in this run carry {what}, so there is nothing to divide by. They come from a{' '}
+      <Link href="/rules/product-characteristics" className="font-bold underline">
+        Product Characteristics rule
+      </Link>{' '}
+      (selected on Run now, after approval) or from columns in the uploaded file - then re-run.
+    </p>
+  );
+}

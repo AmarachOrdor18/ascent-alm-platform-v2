@@ -66,8 +66,10 @@ export function InfoButton({
         aria-label={label}
         aria-expanded={open}
         className={cn(
-          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold transition-colors',
-          open ? 'border-navy-700 text-navy-700' : 'border-gray-300 text-gray-400 hover:border-navy-700 hover:text-navy-700',
+          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-colors',
+          open
+            ? 'border-navy-700 text-navy-700'
+            : 'border-gray-300 text-gray-400 hover:border-navy-700 hover:text-navy-700',
         )}
       >
         i
@@ -77,7 +79,7 @@ export function InfoButton({
           ref={panelRef}
           role="tooltip"
           className={cn(
-            'absolute top-full z-30 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 text-[11px] font-normal normal-case leading-relaxed tracking-normal text-gray-600 shadow-lg',
+            'absolute top-full z-30 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 text-[12px] font-normal normal-case leading-relaxed tracking-normal text-gray-600 shadow-lg',
             align === 'left' ? 'left-0' : 'right-0',
             panelClassName,
           )}

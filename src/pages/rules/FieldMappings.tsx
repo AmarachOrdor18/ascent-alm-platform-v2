@@ -81,7 +81,9 @@ export function FieldMappings() {
       onSave={save}
       onDelete={remove}
       checkDependencies={checkDependencies}
-      summarise={(r) => `${r.sourceSystem || 'Unnamed source'} · ${DOMAIN_LABEL[r.domain]} · ${r.columns.length} column(s)`}
+      summarise={(r) =>
+        `${r.sourceSystem || 'Unnamed source'} · ${DOMAIN_LABEL[r.domain]} · ${r.columns.length} column(s)`
+      }
       validate={(r) => {
         if (!r.sourceSystem.trim()) return 'Name the source system this mapping is for.';
         if (r.columns.length === 0) return 'Add at least one column mapping.';
@@ -91,8 +93,8 @@ export function FieldMappings() {
       guidance={
         <>
           A row not covered here passes through unchanged — only list the columns that actually differ from the
-          canonical name. Lookups against a code table (e.g. a source product code) aren&rsquo;t handled here yet;
-          this covers column renaming and simple value formats (numbers, dates, percentages).
+          canonical name. Lookups against a code table (e.g. a source product code) aren&rsquo;t handled here yet; this
+          covers column renaming and simple value formats (numbers, dates, percentages).
         </>
       }
       renderBody={(rule, update, readOnly) => (

@@ -15,8 +15,12 @@ import type { CalculationElement, RunResult } from '@/engine/types';
 
 function result(element: CalculationElement, payload: Record<string, unknown>): RunResult {
   return {
-    id: `R-${element}`, runId: 'RUN-1', element, payload,
-    methodology: 'test', computedAt: '2026-08-01T00:00:00.000Z',
+    id: `R-${element}`,
+    runId: 'RUN-1',
+    element,
+    payload,
+    methodology: 'test',
+    computedAt: '2026-08-01T00:00:00.000Z',
   };
 }
 
@@ -26,7 +30,11 @@ const FULL: RunResult[] = [
   result('LoanToDeposit', { ratioPercent: 78.571429 }),
   result('SurvivalHorizon', { survivalHorizonDays: 17 }),
   result('Concentration', { largestSharePercent: 18.97, topTenSharePercent: 41.2 }),
-  result('ProfitabilityRatios', { nplRatioPercent: 4.57, nplCoverageRatioPercent: 92.1, netInterestMarginPercent: 5.4 }),
+  result('ProfitabilityRatios', {
+    nplRatioPercent: 4.57,
+    nplCoverageRatioPercent: 92.1,
+    netInterestMarginPercent: 5.4,
+  }),
   result('NiiSensitivity', { niiSensitivityPercent: -8.062891 }),
   result('EveSensitivity', { eveSensitivityPercentOfEquity: -13.809067 }),
   result('FxPosition', { aggregatePercentOfCapital: 12.4 }),
@@ -92,7 +100,12 @@ describe('limits evaluated against real results', () => {
   const temps: never[] = [];
 
   it('grades the workbook figures against the seeded appetite', () => {
-    const evals = evaluateAll(SEED_LIMITS.filter((c) => c.affiliateCode === null), FULL, '2026-07-31', temps);
+    const evals = evaluateAll(
+      SEED_LIMITS.filter((c) => c.affiliateCode === null),
+      FULL,
+      '2026-07-31',
+      temps,
+    );
     const by = (k: string) => evals.find((e) => e.metricKey === k)!;
 
     // LCR 168.9% against green 130 - comfortably within appetite.

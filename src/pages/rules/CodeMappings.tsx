@@ -53,7 +53,8 @@ export function CodeMappings() {
   return (
     <RuleEditor<CodeMappingRule>
       title="Code Mappings"
-      description="Translates a source system's own reference codes (org units, GL accounts, chart of accounts) into codes that already exist here, so a Flexcube-shaped code doesn't fork a duplicate classification instead of resolving to the real one."
+      description="Translates a source system's own reference codes into codes that already exist here."
+      about="Covers org units, GL accounts and the chart of accounts, so a Flexcube-shaped code doesn't fork a duplicate classification instead of resolving to the real one."
       noun="code mapping"
       rules={rules}
       isLoading={isLoading}
@@ -70,7 +71,9 @@ export function CodeMappings() {
       onSave={save}
       onDelete={remove}
       checkDependencies={checkDependencies}
-      summarise={(r) => `${r.sourceSystem || 'Unnamed source'} · ${DIMENSION_LABEL[r.dimension]} · ${r.mappings.length} code(s)`}
+      summarise={(r) =>
+        `${r.sourceSystem || 'Unnamed source'} · ${DIMENSION_LABEL[r.dimension]} · ${r.mappings.length} code(s)`
+      }
       validate={(r) => {
         if (!r.sourceSystem.trim()) return 'Name the source system this mapping is for.';
         if (r.mappings.length === 0) return 'Add at least one code mapping.';
@@ -81,10 +84,10 @@ export function CodeMappings() {
       }}
       guidance={
         <>
-          The target code must already exist as a real member of that dimension — this only translates a source
-          value into it, it never creates a new one. Counterparties aren&rsquo;t mapped here: use the "Also known
-          as" cross-reference on the Counterparty Register instead, which is edited directly on the counterparty
-          itself rather than as a bulk table.
+          The target code must already exist as a real member of that dimension — this only translates a source value
+          into it, it never creates a new one. Counterparties aren&rsquo;t mapped here: use the "Also known as"
+          cross-reference on the Counterparty Register instead, which is edited directly on the counterparty itself
+          rather than as a bulk table.
         </>
       }
       renderBody={(rule, update, readOnly) => (

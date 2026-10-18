@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { repository } from '@/store/localRepository';
+import { repository } from '@/store/repositoryInstance';
+import { createLogin, setLoginPassword } from '@/lib/supabaseAuth';
 import { useAuth } from '@/context/AuthContext';
+import { defaultAffiliateSources } from '@/lib/dataSources';
+import { commitPositionsBatch } from '@/lib/sourceIngest';
 import type { StagedBatch } from '@/store/repository';
 import type {
   Affiliate,
@@ -253,8 +256,8 @@ export function useBatches() {
   return useQuery({ queryKey: keys.batches, queryFn: () => repository.listBatches() });
 }
 
-export function useUsers() {
-  return useQuery({ queryKey: ['users'], queryFn: () => repository.listUsers() });
+export function useUsers(options: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: ['users'], queryFn: () => repository.listUsers(), enabled: options.enabled ?? true });
 }
 
 export function useSaveUser() {
@@ -264,6 +267,30 @@ export function useSaveUser() {
     'User',
     (u) => repository.upsertUser(u),
     (u) => ({ id: u.id, detail: `${u.name} (${u.email}), ${u.role}, ${u.isActive ? 'active' : 'disabled'}` }),
+    [['users']],
+  );
+}
+
+/** Supabase mode: creates the user's sign-in and app_users record together (public.create_login). */
+export function useCreateLogin() {
+  return useAuditedMutation<{ user: User; password: string }>(
+    'Administration',
+    'Create',
+    'User',
+    ({ user, password }) => createLogin(user, password),
+    ({ user: u }) => ({ id: u.id, detail: `${u.name} (${u.email}), ${u.role}, sign-in created` }),
+    [['users']],
+  );
+}
+
+/** Supabase mode: an administrator's password reset for another user. */
+export function useResetLoginPassword() {
+  return useAuditedMutation<{ user: User; password: string }>(
+    'Administration',
+    'Reset password',
+    'User',
+    ({ user, password }) => setLoginPassword(user.id, password),
+    ({ user: u }) => ({ id: u.id, detail: `Password reset for ${u.name} (${u.email})` }),
     [['users']],
   );
 }
@@ -288,8 +315,9 @@ export function useAuditEvents(limit = 200) {
 }
 
 // ── Positions ────────────────────────────────────────────────────────────
-export function usePositions(affiliateCode?: string, asOfDate?: string) {
+export function usePositions(affiliateCode?: string, asOfDate?: string, options: { enabled?: boolean } = {}) {
   return useQuery({
+    enabled: options.enabled ?? true,
     queryKey: ['positions', affiliateCode ?? 'ALL', asOfDate ?? 'ANY'],
     queryFn: () =>
       repository.queryPositions({
@@ -301,13 +329,28 @@ export function usePositions(affiliateCode?: string, asOfDate?: string) {
 
 // ── Affiliates ───────────────────────────────────────────────────────────
 export function useSaveAffiliate() {
+  const { user } = useAuth();
   return useAuditedMutation(
     'Affiliates',
     'Save',
     'Affiliate',
-    (affiliate: Affiliate) => repository.upsertAffiliate(affiliate),
+    async (affiliate: Affiliate) => {
+      // Every affiliate has the six standard manual-upload sources (Loans, Deposits, Treasury, General ledger,
+      // Balance history, Account history) - created with the affiliate, and any missing one added on a later
+      // save - so its users can load data straight away without configuring anything.
+      const isNew = affiliate.code !== 'GROUP' && !(await repository.getAffiliate(affiliate.code));
+      await repository.upsertAffiliate(affiliate);
+      if (affiliate.code !== 'GROUP' && (isNew || user?.affiliateCode === 'GROUP')) {
+        const existing = await repository.listDataSources(affiliate.code);
+        for (const source of defaultAffiliateSources(affiliate, user?.name ?? 'system')) {
+          if (existing.some((s) => s.id === source.id)) continue;
+          // Only Group-level managers may add sources; anyone else's save of the affiliate still succeeds.
+          await repository.upsertDataSource(source).catch(() => undefined);
+        }
+      }
+    },
     (affiliate) => ({ id: affiliate.code, detail: `${affiliate.name} (${affiliate.status})` }),
-    [keys.affiliates],
+    [keys.affiliates, ['dataSources']],
   );
 }
 
@@ -356,19 +399,7 @@ export function useCommitBatch() {
       supersedes: LoadBatch | null;
       reason: string | null;
     }) => {
-      if (supersedes) {
-        await repository.upsertBatch({ ...supersedes, status: 'Superseded', supersededReason: reason });
-      }
-      await repository.insertPositions(positions);
-      await repository.upsertBatch({
-        ...batch,
-        status: 'Committed',
-        committedBy: user?.name ?? 'unknown',
-        committedAt: new Date().toISOString(),
-        supersedesBatchId: supersedes?.id ?? null,
-        supersededReason: reason,
-      });
-      await repository.deleteStagedBatch(batch.id);
+      await commitPositionsBatch({ batch, positions, supersedes, reason, committedBy: user?.name ?? 'unknown' });
       if (user) {
         await repository.recordAuditEvent(
           auditEvent(

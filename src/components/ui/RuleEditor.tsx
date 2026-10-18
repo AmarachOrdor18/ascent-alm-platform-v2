@@ -1,15 +1,21 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ModuleHeader, type HeaderMetric } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { InfoButton } from '@/components/ui/InfoButton';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
+import { isApprovalGated } from '@/lib/ruleApproval';
+import { isRestrictedToOwnAffiliate } from '@/lib/scope';
+import { RuleApprovalBadge } from '@/components/rules/RuleApprovalBadge';
 import type { Dependency } from '@/store/repository';
 import type { AccessType, RuleMeta } from '@/engine/types';
 
 export interface RuleEditorProps<T extends RuleMeta> {
   title: string;
   description: string;
+  /** Longer explanation shown behind an ⓘ next to the description, instead of wordy text on screen. */
+  about?: string;
   /** What one of these rules is called, singular and lower case. */
   noun: string;
   rules: T[];
@@ -41,6 +47,7 @@ export interface RuleEditorProps<T extends RuleMeta> {
 export function RuleEditor<T extends RuleMeta>({
   title,
   description,
+  about,
   noun,
   rules,
   isLoading,
@@ -57,6 +64,12 @@ export function RuleEditor<T extends RuleMeta>({
 }: RuleEditorProps<T>) {
   const { hasPermission, user } = useAuth();
   const canEdit = hasPermission(editPermission);
+  // An affiliate-scoped user (Affiliate Admin, ALM Analyst) works on their own affiliate's rules only: new
+  // rules and copies are stamped with their affiliate, and a Group default (or another affiliate's rule) is
+  // read-only to them - with "Save as" to make their own version instead of a dead end. RLS enforces the same.
+  const ownAffiliate = isRestrictedToOwnAffiliate(user, hasPermission) ? (user?.affiliateCode ?? null) : null;
+  const stampOwn = (rule: T): T =>
+    ownAffiliate ? ({ ...rule, affiliateCode: ownAffiliate, folder: ownAffiliate } as T) : rule;
 
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -70,7 +83,8 @@ export function RuleEditor<T extends RuleMeta>({
   const isNew = draft !== null && !rules.some((r) => r.id === draft.id);
 
   // Read-Only rules are owned elsewhere (typically the Group default folder).
-  const readOnly = !canEdit || (editing?.accessType === 'Read-Only' && !isNew);
+  const notOwn = !!ownAffiliate && !!editing && !isNew && editing.affiliateCode !== ownAffiliate;
+  const readOnly = !canEdit || notOwn || (editing?.accessType === 'Read-Only' && !isNew);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -90,7 +104,7 @@ export function RuleEditor<T extends RuleMeta>({
   };
 
   const handleCreate = () => {
-    setDraft(createDefault());
+    setDraft(stampOwn(createDefault()));
     setSelectedId(null);
     setDependencies(null);
     setNotice(null);
@@ -115,7 +129,14 @@ export function RuleEditor<T extends RuleMeta>({
       });
       setSelectedId(editing.id);
       setDraft(null);
-      setNotice(isNew ? `${noun} created.` : `${noun} saved as version ${editing.version + 1}.`);
+      const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
+      const saved = isNew ? `${Noun} created.` : `${Noun} saved as version ${editing.version + 1}.`;
+      // Mirrors useRuleMutations, which raises the approval request as part of the save itself.
+      setNotice(
+        isApprovalGated(editing.kind)
+          ? `${saved} Submitted for approval - a run can use it once a second user approves it in Approvals.`
+          : saved,
+      );
     } finally {
       setSaving(false);
     }
@@ -135,7 +156,7 @@ export function RuleEditor<T extends RuleMeta>({
       updatedBy: null,
       updatedAt: null,
     } as T;
-    setDraft(copy);
+    setDraft(stampOwn(copy));
     setSelectedId(null);
     setNotice('Copied. Give it a name and save to create it.');
   };
@@ -158,6 +179,7 @@ export function RuleEditor<T extends RuleMeta>({
       <ModuleHeader
         title={title}
         description={description}
+        about={about}
         asOfDate={null}
         scope={editing ? editing.folder : 'All folders'}
         metrics={[
@@ -170,7 +192,7 @@ export function RuleEditor<T extends RuleMeta>({
             <button
               type="button"
               onClick={handleCreate}
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700"
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
             >
               New {noun}
             </button>
@@ -178,12 +200,12 @@ export function RuleEditor<T extends RuleMeta>({
         }
       />
 
-      {guidance && (
-        <div className="mb-6 rounded-lg bg-navy-50 px-4 py-3 text-[12px] leading-relaxed text-navy-900">{guidance}</div>
-      )}
+      {/* Guidance is explanatory detail, not a working instruction the user must read to operate the
+          screen - so it lives behind an ⓘ instead of a paragraph every editor opens under. */}
+      {guidance && <InfoButton label="How this works">{guidance}</InfoButton>}
 
       {notice && (
-        <div role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-2.5 text-[12px] text-success">
+        <div role="status" className="mb-4 rounded-lg bg-success-bg px-4 py-2.5 text-[13px] text-success">
           {notice}
         </div>
       )}
@@ -195,7 +217,7 @@ export function RuleEditor<T extends RuleMeta>({
             <div className="border-b border-gray-100 p-4">
               <label
                 htmlFor="rule-search"
-                className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
               >
                 Search
               </label>
@@ -205,13 +227,13 @@ export function RuleEditor<T extends RuleMeta>({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={`Name, description or folder…`}
-                className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
+                className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
               />
             </div>
 
             <ul className="max-h-[32rem] overflow-y-auto">
               {filtered.length === 0 && (
-                <li className="p-6 text-center text-[12px] text-gray-400">
+                <li className="p-6 text-center text-[13px] text-gray-400">
                   {isLoading ? 'Loading…' : rules.length === 0 ? `No ${noun}s defined yet.` : 'No matches.'}
                 </li>
               )}
@@ -227,10 +249,10 @@ export function RuleEditor<T extends RuleMeta>({
                     )}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[12px] font-bold text-navy-900">{rule.name}</span>
+                      <span className="truncate text-[13px] font-bold text-navy-900">{rule.name}</span>
                       {!rule.isActive && <StatusBadge status="Inactive" tone="neutral" />}
                     </span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-gray-500">
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-gray-500">
                       <span className="font-mono">{rule.folder}</span>
                       <span aria-hidden="true">·</span>
                       <span>v{rule.version}</span>
@@ -248,8 +270,10 @@ export function RuleEditor<T extends RuleMeta>({
                       )}
                     </span>
                     {summarise && (
-                      <span className="mt-1 block truncate text-[11px] text-gray-500">{summarise(rule)}</span>
+                      <span className="mt-1 block truncate text-[12px] text-gray-500">{summarise(rule)}</span>
                     )}
+                    {/* Maker-checker status of this version (approval-gated kinds only); the detail pane links to the request. */}
+                    <RuleApprovalBadge rule={rule} link={false} className="mt-1" />
                   </button>
                 </li>
               ))}
@@ -261,8 +285,8 @@ export function RuleEditor<T extends RuleMeta>({
         <section className="lg:col-span-2">
           {!editing ? (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-              <p className="text-[13px] font-bold text-navy-900">No {noun} selected</p>
-              <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-gray-500">
+              <p className="text-[14px] font-bold text-navy-900">No {noun} selected</p>
+              <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-gray-500">
                 Choose one from the list to view or edit it, or create a new one. Every rule here behaves the same way -
                 search, edit, copy, delete, check dependencies.
               </p>
@@ -273,7 +297,7 @@ export function RuleEditor<T extends RuleMeta>({
                 <div className="min-w-0 flex-1">
                   <label
                     htmlFor="rule-name"
-                    className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Name
                   </label>
@@ -282,11 +306,11 @@ export function RuleEditor<T extends RuleMeta>({
                     value={editing.name}
                     disabled={readOnly}
                     onChange={(e) => update({ name: e.target.value } as Partial<T>)}
-                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] font-bold text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-[14px] font-bold text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
                   />
                   <label
                     htmlFor="rule-desc"
-                    className="mb-1 mt-3 block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="mb-1 mt-3 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Description
                   </label>
@@ -296,9 +320,17 @@ export function RuleEditor<T extends RuleMeta>({
                     disabled={readOnly}
                     onChange={(e) => update({ description: e.target.value } as Partial<T>)}
                     placeholder="What this rule is for, and when to use it"
-                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
                   />
                 </div>
+                {!isNew && selected && isApprovalGated(selected.kind) && (
+                  <div className="shrink-0 text-right">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      Approval
+                    </span>
+                    <RuleApprovalBadge rule={selected} />
+                  </div>
+                )}
               </div>
 
               {/* Governance: folder, access type, activation */}
@@ -306,7 +338,7 @@ export function RuleEditor<T extends RuleMeta>({
                 <div>
                   <label
                     htmlFor="rule-folder"
-                    className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Folder
                   </label>
@@ -315,29 +347,29 @@ export function RuleEditor<T extends RuleMeta>({
                     value={editing.folder}
                     disabled={readOnly}
                     onChange={(e) => update({ folder: e.target.value } as Partial<T>)}
-                    className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                    className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="rule-access"
-                    className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                    className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
                   >
                     Access type
                   </label>
                   <select
                     id="rule-access"
                     value={editing.accessType}
-                    disabled={!canEdit}
+                    disabled={!canEdit || notOwn}
                     onChange={(e) => update({ accessType: e.target.value as AccessType } as Partial<T>)}
-                    className="w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
+                    className="w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50"
                   >
                     <option value="Read-Write">Read-Write</option>
                     <option value="Read-Only">Read-Only</option>
                   </select>
                 </div>
                 <div>
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     Status
                   </span>
                   <div className="flex items-center gap-2 pt-1">
@@ -349,15 +381,26 @@ export function RuleEditor<T extends RuleMeta>({
                       onChange={(e) => update({ isActive: e.target.checked } as Partial<T>)}
                       className="accent-gold-500"
                     />
-                    <label htmlFor="rule-active" className="cursor-pointer text-[12px] text-navy-900">
+                    <label htmlFor="rule-active" className="cursor-pointer text-[13px] text-navy-900">
                       Active
                     </label>
                   </div>
                 </div>
               </div>
 
-              {readOnly && editing.accessType === 'Read-Only' && (
-                <div className="mb-5 rounded-lg bg-warning-bg px-4 py-2.5 text-[11px] leading-relaxed text-warning">
+              {canEdit && notOwn && (
+                <div className="mb-5 rounded-lg bg-navy-50 px-4 py-2.5 text-[12px] leading-relaxed text-navy-900">
+                  {editing.affiliateCode === null
+                    ? 'This is the Group default'
+                    : `This rule belongs to ${editing.affiliateCode}`}{' '}
+                  - only Group-level users change it. Use <span className="font-bold">Save as</span> to make{' '}
+                  {ownAffiliate}&rsquo;s own version; runs for {ownAffiliate} then use yours
+                  {isApprovalGated(editing.kind) ? ' once it is approved' : ''}.
+                </div>
+              )}
+
+              {readOnly && !notOwn && editing.accessType === 'Read-Only' && (
+                <div className="mb-5 rounded-lg bg-warning-bg px-4 py-2.5 text-[12px] leading-relaxed text-warning">
                   This rule is marked read-only. Copy it to create an editable version in your own folder rather than
                   changing a Group standard in place.
                 </div>
@@ -367,7 +410,7 @@ export function RuleEditor<T extends RuleMeta>({
               <div className="mb-5">{renderBody(editing, update, readOnly)}</div>
 
               {validationError && (
-                <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-2.5 text-[12px] text-danger">
+                <div role="alert" className="mb-4 rounded-lg bg-danger-bg px-4 py-2.5 text-[13px] text-danger">
                   {validationError}
                 </div>
               )}
@@ -376,7 +419,7 @@ export function RuleEditor<T extends RuleMeta>({
                 <div
                   role="alert"
                   className={cn(
-                    'mb-4 rounded-lg px-4 py-3 text-[12px] leading-relaxed',
+                    'mb-4 rounded-lg px-4 py-3 text-[13px] leading-relaxed',
                     dependencies.length > 0 ? 'bg-danger-bg text-danger' : 'bg-success-bg text-success',
                   )}
                 >
@@ -401,7 +444,7 @@ export function RuleEditor<T extends RuleMeta>({
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5">
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[12px] text-gray-400">
                   {isNew ? (
                     'Not yet saved'
                   ) : (
@@ -419,7 +462,7 @@ export function RuleEditor<T extends RuleMeta>({
                       <button
                         type="button"
                         onClick={() => void checkDependencies(editing.id).then(setDependencies)}
-                        className="rounded-lg px-3 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                        className="rounded-lg px-3 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
                       >
                         Check dependencies
                       </button>
@@ -427,25 +470,27 @@ export function RuleEditor<T extends RuleMeta>({
                         type="button"
                         onClick={handleCopy}
                         disabled={!canEdit}
-                        className="rounded-lg border border-gray-200 px-3 py-2 text-[12px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-[13px] font-bold text-navy-900 hover:border-navy-700 disabled:opacity-40"
                       >
                         Save as
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete()}
-                        disabled={!canEdit}
-                        className="rounded-lg px-3 py-2 text-[12px] font-bold text-danger hover:underline disabled:opacity-40"
-                      >
-                        Delete
-                      </button>
+                      {!notOwn && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete()}
+                          disabled={!canEdit}
+                          className="rounded-lg px-3 py-2 text-[13px] font-bold text-danger hover:underline disabled:opacity-40"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </>
                   )}
                   {draft && (
                     <button
                       type="button"
                       onClick={() => setDraft(null)}
-                      className="rounded-lg px-3 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900"
+                      className="rounded-lg px-3 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900"
                     >
                       Cancel
                     </button>
@@ -455,7 +500,7 @@ export function RuleEditor<T extends RuleMeta>({
                     onClick={() => void handleSave()}
                     disabled={readOnly || saving || draft === null || validationError !== null}
                     title={validationError ?? undefined}
-                    className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+                    className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
                   >
                     {saving ? 'Saving…' : isNew ? `Create ${noun}` : 'Save'}
                   </button>
@@ -473,14 +518,14 @@ export function RuleEditor<T extends RuleMeta>({
 export function RuleField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <span className="mb-1 block text-[11px] font-medium text-gray-600">{label}</span>
+      <span className="mb-1 block text-[12px] font-medium text-gray-600">{label}</span>
       {children}
-      {hint && <p className="mt-1 text-[10px] leading-relaxed text-gray-400">{hint}</p>}
+      {hint && <p className="mt-1 text-[11px] leading-relaxed text-gray-400">{hint}</p>}
     </div>
   );
 }
 
 export const ruleInput =
-  'w-full rounded border border-gray-200 px-2 py-1 text-[12px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50';
+  'w-full rounded border border-gray-200 px-2 py-1 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700 disabled:bg-gray-50';
 
 export const ruleNumber = `${ruleInput} text-right font-mono`;

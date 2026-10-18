@@ -15,7 +15,6 @@ import {
   FeeIcon,
   FundAccountingIcon,
   ArrowUpDownIcon,
-  CalendarIcon,
   FileTextIcon,
   RegulatoryIcon,
   SearchIcon,
@@ -26,7 +25,6 @@ import {
   ReconciliationIcon,
   CorporateActionsIcon,
   ClientManagementIcon,
-  NairaIcon,
   SettingsIcon,
   CheckCircleIcon,
   BriefcaseIcon,
@@ -43,6 +41,8 @@ export interface NavItem {
   /** Not used by the router; kept for the search index's provenance. */
   phase: number;
   icon: ComponentType<IconProps>;
+  /** Other URL prefixes that belong to this entry, so it stays highlighted across every screen it owns. */
+  matchPrefixes?: string[];
 }
 
 export interface NavGroup {
@@ -50,64 +50,91 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-// Screens sharing a workflow are grouped as tabs inside a module rather than each getting a sidebar row;
-// routing.test.ts asserts the resulting ~13-item count on purpose, not by drift.
+// Home, the work areas in the order the work happens, then Admin. Every screen is a tab inside one of them
+// (src/pages/areas/Areas.tsx); routing.test.ts holds the sidebar to this list on purpose. A single-item group
+// renders flat, with no group header. Organisation setup lives under Admin, for set-up managers only.
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'OVERVIEW',
+    label: 'HOME',
+    items: [{ name: 'Home', path: '/dashboard', permission: 'dashboard.view', phase: 6, icon: DashboardIcon }],
+  },
+  {
+    label: 'DATA',
     items: [
-      { name: 'Executive Dashboard', path: '/dashboard', permission: 'dashboard.view', phase: 6, icon: DashboardIcon },
+      {
+        name: 'Data',
+        path: '/data/operations',
+        permission: 'data.view',
+        phase: 2,
+        icon: DownloadIcon,
+        matchPrefixes: ['/data', '/position-book'],
+      },
     ],
   },
   {
-    label: 'RISK MANAGEMENT',
+    label: 'ASSUMPTIONS',
     items: [
-      { name: 'Liquidity Risk', path: '/risk/liquidity', permission: 'risk.view', phase: 6, icon: RiskIcon },
-      { name: 'IRRBB & Behavioural Risk', path: '/risk/irrbb', permission: 'risk.view', phase: 6, icon: TrendingUpIcon },
-      { name: 'Stress Testing & Scenario Analysis', path: '/risk/stress-testing', permission: 'risk.view', phase: 5, icon: AlertIcon },
-      { name: 'Concentration & Large Exposures', path: '/risk/concentration', permission: 'risk.view', phase: 6, icon: PortfolioIcon },
+      {
+        name: 'Assumptions',
+        path: '/assumptions',
+        permission: 'risk.view',
+        phase: 4,
+        icon: PerformanceIcon,
+        matchPrefixes: ['/assumptions', '/rules'],
+      },
     ],
   },
   {
-    label: 'MONITORING',
+    label: 'RESULTS',
     items: [
-      { name: 'Monitoring', path: '/monitoring', permission: 'risk.view', phase: 7, icon: PieChartIcon },
+      {
+        name: 'Run & results',
+        path: '/risk/liquidity',
+        permission: 'risk.view',
+        phase: 5,
+        icon: RiskIcon,
+        matchPrefixes: ['/execution', '/risk', '/treasury', '/monitoring'],
+      },
     ],
   },
   {
-    label: 'TREASURY',
+    label: 'APPROVALS',
     items: [
-      { name: 'FTP & Profitability', path: '/treasury/ftp', permission: 'treasury.view', phase: 6, icon: FeeIcon },
-      { name: 'Balance Sheet & Treasury', path: '/treasury/balance-sheet', permission: 'treasury.view', phase: 6, icon: FundAccountingIcon },
+      {
+        name: 'Approvals',
+        path: '/controls',
+        permission: 'risk.view',
+        phase: 7,
+        icon: AuthorizationQueueIcon,
+        matchPrefixes: ['/controls'],
+      },
     ],
   },
   {
-    label: 'REPORTING',
+    label: 'REPORTS',
     items: [
-      { name: 'Reporting & ALCO', path: '/reporting', permission: 'reporting.view', phase: 8, icon: FileTextIcon },
+      {
+        name: 'Reports',
+        path: '/reporting',
+        permission: 'reporting.view',
+        phase: 8,
+        icon: FileTextIcon,
+        matchPrefixes: ['/reporting'],
+      },
     ],
   },
   {
-    label: 'DATA MANAGEMENT',
-    items: [{ name: 'Data Management', path: '/data/operations', permission: 'data.view', phase: 2, icon: DownloadIcon }],
-  },
-  {
-    label: 'EXECUTION',
-    items: [{ name: 'Execution & Scheduling', path: '/execution', permission: 'run.execute', phase: 5, icon: RefreshIcon }],
-  },
-  {
-    label: 'GROUP & AFFILIATE MANAGEMENT',
+    label: 'ADMIN',
     items: [
-      { name: 'Group & Affiliate Management', path: '/affiliates', permission: 'group.manage', phase: 3, icon: BriefcaseIcon },
+      {
+        name: 'Admin',
+        path: '/admin',
+        permission: 'dashboard.view',
+        phase: 8,
+        icon: ShieldCheckIcon,
+        matchPrefixes: ['/admin', '/account', '/setup', '/affiliates'],
+      },
     ],
-  },
-  {
-    label: 'CONTROLS',
-    items: [{ name: 'Controls', path: '/controls', permission: 'risk.view', phase: 7, icon: AuthorizationQueueIcon }],
-  },
-  {
-    label: 'ADMINISTRATION',
-    items: [{ name: 'Administration', path: '/admin', permission: 'dashboard.view', phase: 7, icon: ShieldCheckIcon }],
   },
 ];
 
@@ -119,7 +146,7 @@ export const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 // needs - the default tab owns the module's bare path, so that is where the sidebar link actually
 // lands a user. Gating the hub any looser than that used to route a role straight into ModuleTabs'
 // "Access restricted" wall the instant they clicked the sidebar row (e.g. a Reporting User clicking
-// "Execution & Scheduling" landed on Process Run, which needs run.execute - a permission Reporting
+// "Execution & Scheduling" landed on Run now, which needs run.execute - a permission Reporting
 // User doesn't hold - producing an immediate, confusing dead end). FTP & Profitability had the same
 // problem (default tab Funds Transfer Pricing needs treasury.view; the hub was gated on the looser
 // risk.view, so Control Tester hit the same wall). Both NAV_GROUPS entries above are now gated on
@@ -131,50 +158,153 @@ export const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 // see it simply doesn't get that entry (e.g. Profitability Ratios' own entry below stays risk.view
 // even though the FTP & Profitability hub is now treasury.view).
 export const SEARCH_INDEX: NavItem[] = [
-  { name: 'Executive Dashboard', path: '/dashboard', permission: 'dashboard.view', phase: 6, icon: DashboardIcon },
+  { name: 'Home', path: '/dashboard', permission: 'dashboard.view', phase: 6, icon: DashboardIcon },
+  {
+    name: 'Organisation setup',
+    path: '/setup',
+    permission: 'group.manage|affiliate.manage',
+    phase: 3,
+    icon: CheckCircleIcon,
+  },
+  {
+    name: 'Organisation details & defaults',
+    path: '/setup/organisation',
+    permission: 'group.manage',
+    phase: 3,
+    icon: SettingsIcon,
+  },
+  { name: 'Behavioural Models', path: '/assumptions', permission: 'risk.view', phase: 4, icon: PerformanceIcon },
+  { name: 'Model Register', path: '/assumptions/models', permission: 'risk.view', phase: 4, icon: PerformanceIcon },
+  { name: 'History for Models', path: '/data/history', permission: 'data.view', phase: 3, icon: DownloadIcon },
 
   { name: 'Liquidity Risk', path: '/risk/liquidity', permission: 'risk.view', phase: 6, icon: RiskIcon },
-  { name: 'Maturity & Repricing Gap', path: '/risk/liquidity/gap-analysis', permission: 'risk.view', phase: 6, icon: BarChartIcon },
+  {
+    name: 'Maturity & Repricing Gap',
+    path: '/risk/liquidity/gap-analysis',
+    permission: 'risk.view',
+    phase: 6,
+    icon: BarChartIcon,
+  },
   { name: 'Interest Rate Risk (IRRBB)', path: '/risk/irrbb', permission: 'risk.view', phase: 6, icon: TrendingUpIcon },
-  { name: 'Behavioural Analysis', path: '/risk/irrbb/behavioural-analysis', permission: 'risk.view', phase: 6, icon: PerformanceIcon },
+  {
+    name: 'Behavioural Analysis',
+    path: '/risk/irrbb/behavioural-analysis',
+    permission: 'risk.view',
+    phase: 6,
+    icon: PerformanceIcon,
+  },
   { name: 'Stress Testing', path: '/risk/stress-testing', permission: 'risk.view', phase: 5, icon: AlertIcon },
-  { name: 'What-If Builder', path: '/risk/stress-testing/what-if', permission: 'run.execute', phase: 5, icon: ColumnsIcon },
-  { name: 'Forecast', path: '/risk/stress-testing/forecast', permission: 'run.execute', phase: 5, icon: TrendingUpIcon },
-  { name: 'Concentration & Large Exposures', path: '/risk/concentration', permission: 'risk.view', phase: 6, icon: PortfolioIcon },
+  {
+    name: 'What-If Builder',
+    path: '/risk/stress-testing/what-if',
+    permission: 'run.execute',
+    phase: 5,
+    icon: ColumnsIcon,
+  },
+  {
+    name: 'Forecast',
+    path: '/risk/stress-testing/forecast',
+    permission: 'run.execute',
+    phase: 5,
+    icon: TrendingUpIcon,
+  },
+  {
+    name: 'Concentration & Large Exposures',
+    path: '/risk/concentration',
+    permission: 'risk.view',
+    phase: 6,
+    icon: PortfolioIcon,
+  },
 
   { name: 'Limits & Breaches', path: '/monitoring', permission: 'risk.view', phase: 7, icon: ShieldCheckIcon },
   { name: 'Key Risk Indicators', path: '/monitoring/kri', permission: 'risk.view', phase: 7, icon: ColumnsIcon },
   { name: 'Liquidity Risk Map', path: '/monitoring/risk-map', permission: 'risk.view', phase: 7, icon: PieChartIcon },
 
   { name: 'Funds Transfer Pricing', path: '/treasury/ftp', permission: 'treasury.view', phase: 6, icon: FeeIcon },
-  { name: 'Profitability Ratios', path: '/treasury/ftp/profitability', permission: 'risk.view', phase: 6, icon: ValuationIcon },
-  { name: 'Balance Sheet Analytics', path: '/treasury/balance-sheet', permission: 'treasury.view', phase: 6, icon: FundAccountingIcon },
-  { name: 'FX Position', path: '/treasury/balance-sheet/fx-position', permission: 'treasury.view', phase: 6, icon: ArrowUpDownIcon },
+  {
+    name: 'Profitability',
+    path: '/treasury/ftp/profitability',
+    permission: 'risk.view',
+    phase: 6,
+    icon: ValuationIcon,
+  },
+  {
+    name: 'Balance Sheet Analytics',
+    path: '/treasury/balance-sheet',
+    permission: 'treasury.view',
+    phase: 6,
+    icon: FundAccountingIcon,
+  },
+  {
+    name: 'FX Position',
+    path: '/treasury/balance-sheet/fx-position',
+    permission: 'treasury.view',
+    phase: 6,
+    icon: ArrowUpDownIcon,
+  },
 
   { name: 'Report Packs', path: '/reporting', permission: 'reporting.view', phase: 8, icon: FileTextIcon },
-  { name: 'Regulatory Reporting', path: '/reporting/regulatory', permission: 'reporting.view', phase: 8, icon: RegulatoryIcon },
+  {
+    name: 'Regulatory Reporting',
+    path: '/reporting/regulatory',
+    permission: 'reporting.view',
+    phase: 8,
+    icon: RegulatoryIcon,
+  },
   { name: 'Ad-Hoc Analysis', path: '/reporting/ad-hoc', permission: 'reporting.view', phase: 8, icon: SearchIcon },
 
-  { name: 'Data Upload & Staging', path: '/data/operations', permission: 'data.view', phase: 3, icon: DownloadIcon },
-  { name: 'GL Reconciliation', path: '/data/operations/gl-reconciliation', permission: 'data.view', phase: 3, icon: ReconciliationIcon },
-  { name: 'Data Vintages & Load History', path: '/data/operations/vintages', permission: 'data.view', phase: 3, icon: HistoryIcon },
-  { name: 'Position Book', path: '/data/operations/position-book', permission: 'data.view', phase: 3, icon: PortfolioIcon },
-  { name: 'Dimensions & Hierarchies', path: '/data/structure', permission: 'data.view', phase: 2, icon: CorporateActionsIcon },
-  { name: 'Counterparty Register', path: '/data/structure/counterparties', permission: 'data.view', phase: 2, icon: ClientManagementIcon },
-  { name: 'Interest Rates & Curves', path: '/affiliates/GROUP/settings?section=ref-yield-curves', permission: 'group.manage', phase: 2, icon: TrendingUpIcon },
-  { name: 'Currency & FX Rates', path: '/affiliates/GROUP/settings?section=ref-fx-rates', permission: 'group.manage', phase: 2, icon: NairaIcon },
-  { name: 'Economic Indicators', path: '/affiliates/GROUP/settings?section=ref-economic-indicators', permission: 'group.manage', phase: 2, icon: BarChartIcon },
-  { name: 'Holiday Calendar', path: '/affiliates/GROUP/settings?section=ref-holiday-calendar', permission: 'group.manage', phase: 2, icon: CalendarIcon },
-  { name: 'Connection Health', path: '/affiliates/GROUP/settings?section=data-sources', permission: 'group.manage', phase: 2, icon: CorporateActionsIcon },
+  { name: 'Data Sources & Upload', path: '/data/operations', permission: 'data.view', phase: 3, icon: DownloadIcon },
+  { name: 'Upload Data', path: '/data/operations?upload=1', permission: 'data.upload', phase: 3, icon: DownloadIcon },
+  {
+    name: 'GL Reconciliation (ledger check)',
+    path: '/data/operations?domain=GeneralLedger',
+    permission: 'data.view',
+    phase: 3,
+    icon: ReconciliationIcon,
+  },
+  { name: 'Load History', path: '/data/loads', permission: 'data.view', phase: 3, icon: HistoryIcon },
+  {
+    name: 'Position Book',
+    path: '/data/operations/position-book',
+    permission: 'data.view',
+    phase: 3,
+    icon: PortfolioIcon,
+  },
+  {
+    name: 'Dimensions & Hierarchies',
+    path: '/data/structure',
+    permission: 'data.view',
+    phase: 2,
+    icon: CorporateActionsIcon,
+  },
+  {
+    name: 'Counterparty Register',
+    path: '/data/structure/counterparties',
+    permission: 'data.view',
+    phase: 2,
+    icon: ClientManagementIcon,
+  },
+  // Market data has one home: Data → Market data - upload the combined file once (curves + FX + indicators),
+  // see its status, and open each kind on its own tab.
+  { name: 'Market data', path: '/data/market', permission: 'data.view', phase: 2, icon: TrendingUpIcon },
+  { name: 'FX rates', path: '/data/market/fx', permission: 'data.view', phase: 2, icon: TrendingUpIcon },
+  { name: 'Yield curves', path: '/data/market/curves', permission: 'data.view', phase: 2, icon: TrendingUpIcon },
 
-  { name: 'Process Run', path: '/execution', permission: 'run.execute', phase: 5, icon: RefreshIcon },
-  { name: 'Run History', path: '/execution/history', permission: 'risk.view', phase: 5, icon: HistoryIcon },
+  { name: 'Readiness', path: '/execution/readiness', permission: 'risk.view', phase: 5, icon: CheckCircleIcon },
+  { name: 'Run now', path: '/execution', permission: 'run.execute', phase: 5, icon: RefreshIcon },
+  { name: 'Runs', path: '/execution/history', permission: 'risk.view', phase: 5, icon: HistoryIcon },
   { name: 'Batch Scheduler', path: '/execution/scheduler', permission: 'run.execute', phase: 5, icon: ClockIcon },
 
-  { name: 'Business Rules', path: '/affiliates/GROUP/settings?section=rule-coverage', permission: 'group.manage', phase: 4, icon: SettingsIcon },
-  { name: 'Validation Rules', path: '/affiliates/GROUP/settings?section=rule-ValidationRule', permission: 'group.manage', phase: 3, icon: CheckCircleIcon },
+  { name: 'Rules & Scenarios', path: '/assumptions/rules', permission: 'risk.view', phase: 4, icon: SettingsIcon },
+  { name: 'Validation Rules', path: '/rules/validation', permission: 'data.view', phase: 3, icon: CheckCircleIcon },
 
-  { name: 'Group & Affiliate Management', path: '/affiliates', permission: 'group.manage', phase: 3, icon: BriefcaseIcon },
+  {
+    name: 'Group & Affiliate Management',
+    path: '/affiliates',
+    permission: 'group.manage',
+    phase: 3,
+    icon: BriefcaseIcon,
+  },
 
   { name: 'Approvals', path: '/controls', permission: 'risk.view', phase: 7, icon: AuthorizationQueueIcon },
   { name: 'Control Remediation', path: '/controls/remediation', permission: 'risk.view', phase: 7, icon: AlertIcon },

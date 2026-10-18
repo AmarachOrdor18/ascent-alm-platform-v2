@@ -6,8 +6,15 @@ import { RatioChart } from '@/components/ui/RatioChart';
 import { Amount } from '@/components/ui/Amount';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useBatches, useFxRates, usePositions, resolveSingleAffiliate } from '@/lib/hooks';
-import { useRuleMutations, newRuleMeta } from '@/lib/ruleHooks';
+import {
+  useAffiliates,
+  useBatches,
+  useFxRates,
+  usePositions,
+  useYieldCurves,
+  resolveSingleAffiliate,
+} from '@/lib/hooks';
+import { useApprovedRuleFor, useRuleMutations, newRuleMeta } from '@/lib/ruleHooks';
 import { useRequestApproval } from '@/lib/governanceHooks';
 import { buildFxTable, missingRates } from '@/engine/fx';
 import { computeLcr, computeNsfr } from '@/engine/liquidity';
@@ -15,12 +22,21 @@ import { computeEveSensitivity, computeNiiSensitivity } from '@/engine/irrbb';
 import {
   computeCounterbalancingCapacity,
   computeSurvivalHorizon,
-  severeOutflowProfile,
+  deriveSevereRun,
+  DEFAULT_STRESS_SEVERITY,
 } from '@/engine/stress';
-import { computeDepositRunoff, applyDepositBetas } from '@/engine/behavioural';
+import { computeDepositRunoff, DEFAULT_BETAS, DEFAULT_PATTERNS } from '@/engine/behavioural';
+import { applyProductCharacteristics } from '@/engine/classification';
+import { buildCashflowBook } from '@/engine/run';
+import { engineCurvesAsOf } from '@/engine/ftp';
 import { availableAsOfDates } from '@/engine/vintage';
 import { formatPct } from '@/lib/format';
-import type { ForecastScenarioRule } from '@/engine/ruleTypes';
+import type {
+  BehaviourPatternRule,
+  ForecastScenarioRule,
+  PrepaymentRule,
+  ProductCharacteristicRule,
+} from '@/engine/ruleTypes';
 
 interface Levers {
   rateShockBps: number;
@@ -67,7 +83,7 @@ const PRESETS: Array<{ name: string; description: string; levers: Levers }> = [
 
 export function WhatIf() {
   const { hasPermission, user } = useAuth();
-  const { affiliateCode } = useScope();
+  const { affiliateCode, asOfDate: workingDate, setAsOfDate: setWorkingDate } = useScope();
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
   const { save } = useRuleMutations<ForecastScenarioRule>('ForecastScenario');
@@ -76,16 +92,33 @@ export function WhatIf() {
 
   const affiliate = resolveSingleAffiliate(affiliates, affiliateCode);
   const dates = affiliate ? availableAsOfDates(batches, affiliate.code) : [];
-  // Defaults to the most recent committed date, but - unlike before - that's only a default, not the
-  // only option. A user with committed data at more than one as-of date (e.g. an earlier real load
-  // sitting alongside a later one) had no way to pick anything but whichever date happened to sort
-  // last, even while every other screen with committed data (Process Run, Position Book) lets them
-  // choose.
-  const [asOfDateOverride, setAsOfDateOverride] = useState('');
-  const asOfDate = (asOfDateOverride && dates.includes(asOfDateOverride) ? asOfDateOverride : dates[0]) ?? '';
+  // The working date from the header (one date for the whole app); the picker below changes that same
+  // working date. Falls back to the latest date this affiliate has data for.
+  const asOfDate = (workingDate && dates.includes(workingDate) ? workingDate : dates[0]) ?? '';
   const currency = affiliate?.functionalCurrency ?? 'USD';
-  const { data: positions = [] } = usePositions(affiliate?.code, asOfDate);
+  const { data: rawPositions = [] } = usePositions(affiliate?.code, asOfDate);
   const { data: fxRates = [] } = useFxRates();
+  // A raw uploaded position carries no HQLA level, LCR cashflow role, or run-off/inflow rate - a real
+  // Process Run only ever computes LCR/NSFR after applying the affiliate's Product Characteristics
+  // rule (engine/run.ts). This screen queries positions directly rather than through a run, so without
+  // this same step every position looks like neither HQLA, an outflow nor an inflow, and LCR/NSFR both
+  // compute to null - the numbers this screen exists to show, silently missing. Same affiliate-fork-
+  // else-Group-default fallback every other screen uses (AffiliateSettings, DataLoadPanel) - and, like
+  // Process Run, only a rule a second user has approved is picked up.
+  const { rule: productRule } = useApprovedRuleFor<ProductCharacteristicRule>('ProductCharacteristic', affiliate?.code);
+  // Same for behaviour: the affiliate's approved pattern set (else the Group default) drives run-off,
+  // deposit betas and the severe run here, so a what-if answers on the basis a real run would use.
+  // Engine defaults only when no approved rule exists at all.
+  const { rule: behaviourRule } = useApprovedRuleFor<BehaviourPatternRule>('BehaviourPattern', affiliate?.code);
+  // And the approved prepayment rule, so the scenario's cashflow book is generated exactly as a run's would be.
+  const { rule: prepaymentRule } = useApprovedRuleFor<PrepaymentRule>('Prepayment', affiliate?.code);
+  const { data: storedCurves = [] } = useYieldCurves();
+  const patterns = behaviourRule?.patterns ?? DEFAULT_PATTERNS;
+  const betas = behaviourRule?.betas ?? DEFAULT_BETAS;
+  const positions = useMemo(
+    () => applyProductCharacteristics(rawPositions, productRule?.assumptions ?? []),
+    [rawPositions, productRule],
+  );
 
   const [levers, setLevers] = useState<Levers>(BASE);
   const [saved, setSaved] = useState(false);
@@ -98,7 +131,12 @@ export function WhatIf() {
   // The engine throws on a missing rate rather than converting at 1.0; detect the gap here instead of crashing.
   const fx = useMemo(() => buildFxTable(currency, fxRates, asOfDate), [currency, fxRates, asOfDate]);
   const missingFx = useMemo(
-    () => missingRates(positions.map((p) => p.currency), currency, fx),
+    () =>
+      missingRates(
+        positions.map((p) => p.currency),
+        currency,
+        fx,
+      ),
     [positions, currency, fx],
   );
 
@@ -118,36 +156,82 @@ export function WhatIf() {
               : p,
           );
 
-    const baseLcr = computeLcr(grown, ctx);
-    const stressedLcr = computeLcr(grown, ctx, {
-      hqlaHaircutPercent: levers.hqlaHaircutPercent,
-      runoffMultiplier: levers.runoffMultiplier,
-      inflowSuppressionPercent: levers.inflowSuppressionPercent,
-    });
+    // The same cashflow book a run generates (run.ts buildCashflowBook) - LCR's 30-day window, NII and EVE
+    // all read it, so the what-if baseline matches a real run on the same rules.
+    let book: ReturnType<typeof buildCashflowBook> | undefined;
+    try {
+      book = buildCashflowBook(grown, asOfDate, {
+        behaviourPatterns: patterns,
+        prepaymentRules: (prepaymentRule?.assumptions ?? [])
+          .filter((a) => a.method !== 'None')
+          .map((a) => ({ commonCoaCode: a.commonCoaCode, cpr: a.cpr })),
+        termDepositBehaviour: behaviourRule?.termDepositBehaviour ?? [],
+      });
+    } catch {
+      book = undefined;
+    }
+    const curves = engineCurvesAsOf(storedCurves, asOfDate);
+
+    const baseLcr = computeLcr(grown, ctx, {}, book);
+    const stressedLcr = computeLcr(
+      grown,
+      ctx,
+      {
+        hqlaHaircutPercent: levers.hqlaHaircutPercent,
+        runoffMultiplier: levers.runoffMultiplier,
+        inflowSuppressionPercent: levers.inflowSuppressionPercent,
+      },
+      book,
+    );
 
     const baseNsfr = computeNsfr(grown, ctx);
     const stressedNsfr = computeNsfr(grown, ctx, { depositAttritionPercent: levers.depositAttritionPercent });
 
-    const baseNii = computeNiiSensitivity(grown, irrbbCtx, levers.rateShockBps);
+    const baseNii = computeNiiSensitivity(grown, irrbbCtx, levers.rateShockBps, 365, book);
     const adjustedNii = levers.applyDepositBetas
-      ? applyDepositBetas(grown, levers.rateShockBps, baseNii.deltaNii)
+      ? {
+          betaAdjustedDeltaNii: computeNiiSensitivity(
+            grown,
+            { ...irrbbCtx, depositBetas: betas },
+            levers.rateShockBps,
+            365,
+            book,
+          ).deltaNii,
+        }
       : null;
 
-    const eve = computeEveSensitivity(grown, irrbbCtx, levers.rateShockBps);
+    const eve = computeEveSensitivity(grown, irrbbCtx, levers.rateShockBps, book ? { book, curves } : undefined);
 
+    // The severe run is the behaviour rule's own (its volatile share, at its severity); the run-off lever
+    // scales that severity rather than replacing it with a fixed multiple of LCR outflows.
+    const ruleSeverity = behaviourRule?.stressSeverityMultiplier ?? DEFAULT_STRESS_SEVERITY;
     const capacity = computeCounterbalancingCapacity(grown, ctx, levers.hqlaHaircutPercent);
-    const outflow = stressedLcr.grossOutflows * 2;
-    const survival = computeSurvivalHorizon(capacity.total, severeOutflowProfile(outflow), ctx);
+    const severe = deriveSevereRun(grown, patterns, ctx, {
+      severityMultiplier: ruleSeverity * levers.runoffMultiplier,
+    });
+    const survival = computeSurvivalHorizon(capacity.total, severe.profile, ctx);
     const baseSurvival = computeSurvivalHorizon(
       computeCounterbalancingCapacity(grown, ctx).total,
-      severeOutflowProfile(baseLcr.grossOutflows * 2),
+      deriveSevereRun(grown, patterns, ctx, { severityMultiplier: ruleSeverity }).profile,
       ctx,
     );
 
-    const runoff = computeDepositRunoff(grown, undefined, levers.runoffMultiplier);
+    const runoff = computeDepositRunoff(grown, patterns, levers.runoffMultiplier);
 
     return { baseLcr, stressedLcr, baseNsfr, stressedNsfr, baseNii, adjustedNii, eve, survival, baseSurvival, runoff };
-  }, [positions, levers, ctx, irrbbCtx, missingFx]);
+  }, [
+    positions,
+    levers,
+    ctx,
+    irrbbCtx,
+    missingFx,
+    behaviourRule,
+    patterns,
+    betas,
+    prepaymentRule,
+    storedCurves,
+    asOfDate,
+  ]);
 
   const isBase = JSON.stringify(levers) === JSON.stringify(BASE);
 
@@ -184,7 +268,8 @@ export function WhatIf() {
     <>
       <ModuleHeader
         title="What-If Builder"
-        description="Move a lever, see the answer. Every parameter here was previously reachable only by making an HTTP request."
+        description="Move a lever, see the answer."
+        about="Every parameter here was previously reachable only by making an HTTP request."
         asOfDate={asOfDate}
         scope={affiliate?.name ?? 'No affiliate'}
         currency={currency}
@@ -202,7 +287,8 @@ export function WhatIf() {
                 : (result?.stressedLcr.lcrPercent ?? 100) < 130
                   ? 'warning'
                   : 'success',
-            about: 'The Liquidity Coverage Ratio recomputed live under the levers set on this screen - the delta shows the move from the unstressed base case.',
+            about:
+              'The Liquidity Coverage Ratio recomputed live under the levers set on this screen - the delta shows the move from the unstressed base case.',
           },
           {
             label: 'NSFR',
@@ -213,9 +299,12 @@ export function WhatIf() {
           {
             label: 'Survival horizon',
             value: result ? `${result.survival.survivalHorizonDays} days` : '-',
-            delta: result ? `${result.survival.survivalHorizonDays - result.baseSurvival.survivalHorizonDays} days` : undefined,
+            delta: result
+              ? `${result.survival.survivalHorizonDays - result.baseSurvival.survivalHorizonDays} days`
+              : undefined,
             tone: (result?.survival.survivalHorizonDays ?? 30) < 20 ? 'danger' : 'success',
-            about: "Days the counterbalancing capacity lasts under this scenario's outflow assumption - the delta shows the move from the base-case survival horizon.",
+            about:
+              "Days the counterbalancing capacity lasts under this scenario's outflow assumption - the delta shows the move from the base-case survival horizon.",
           },
           {
             label: 'ΔNII',
@@ -228,14 +317,14 @@ export function WhatIf() {
           <>
             {dates.length > 1 && (
               <div className="flex items-center gap-1.5">
-                <label htmlFor="wi-asof" className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <label htmlFor="wi-asof" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
                   As of
                 </label>
                 <select
                   id="wi-asof"
                   value={asOfDate}
-                  onChange={(e) => setAsOfDateOverride(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-[12px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
+                  onChange={(e) => setWorkingDate(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
                 >
                   {dates.map((d) => (
                     <option key={d} value={d}>
@@ -249,7 +338,7 @@ export function WhatIf() {
               type="button"
               onClick={() => setLevers(BASE)}
               disabled={isBase}
-              className="rounded-lg px-4 py-2 text-[12px] font-bold text-gray-500 hover:text-navy-900 disabled:opacity-30"
+              className="rounded-lg px-4 py-2 text-[13px] font-bold text-gray-500 hover:text-navy-900 disabled:opacity-30"
             >
               Reset
             </button>
@@ -260,9 +349,9 @@ export function WhatIf() {
               title={
                 levers.rateShockBps === 0
                   ? 'Set a rate shock to save this as a scenario'
-                  : 'Saves the scenario and submits it for approval - a Process Run can only use an Approved scenario'
+                  : 'Saves the scenario and submits it for approval - a run can only use an Approved scenario'
               }
-              className="rounded-lg bg-navy-900 px-4 py-2 text-[12px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
+              className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-40"
             >
               {saved ? 'Submitted - pending approval' : 'Submit scenario for approval'}
             </button>
@@ -271,24 +360,35 @@ export function WhatIf() {
       />
 
       {positions.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[12px] text-gray-500">
+        <p className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-[13px] text-gray-500">
           No committed positions for {affiliate?.name ?? 'this affiliate'}. Load data before running a what-if.
         </p>
+      ) : !productRule ? (
+        <div className="rounded-2xl border border-warning/30 bg-warning/5 p-10 text-center">
+          <p className="text-[13px] font-bold text-navy-900">
+            No approved Product Characteristics rule for this affiliate
+          </p>
+          <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-600">
+            LCR and NSFR read a position&rsquo;s HQLA level, cashflow role, and ASF/RSF factors from that rule - without
+            one, every position looks like neither HQLA, an outflow nor an inflow, so both ratios compute to nothing.
+            Configure one under Business Rules → Product Characteristics and have a second user approve it.
+          </p>
+        </div>
       ) : missingFx.length > 0 ? (
         <div className="rounded-2xl border border-danger/30 bg-danger/5 p-10 text-center">
-          <p className="text-[12px] font-bold text-danger">
+          <p className="text-[13px] font-bold text-danger">
             No {currency} rate for {missingFx.join(', ')} as at {asOfDate}.
           </p>
-          <p className="mx-auto mt-2 max-w-lg text-[11px] leading-relaxed text-gray-600">
-            The book holds positions in those currencies. Converting them at 1.0 would produce a figure that looks
-            right and is not, so nothing is computed until the rates are loaded on the FX Rates screen.
+          <p className="mx-auto mt-2 max-w-lg text-[12px] leading-relaxed text-gray-600">
+            The book holds positions in those currencies. Converting them at 1.0 would produce a figure that looks right
+            and is not, so nothing is computed until the rates are loaded on the FX Rates screen.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="space-y-6 lg:col-span-1">
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">Presets</h2>
+              <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">Presets</h2>
               <div className="space-y-2">
                 {PRESETS.map((p) => (
                   <button
@@ -300,15 +400,15 @@ export function WhatIf() {
                     }}
                     className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-navy-700"
                   >
-                    <span className="block text-[12px] font-bold text-navy-900">{p.name}</span>
-                    <span className="block text-[11px] leading-relaxed text-gray-500">{p.description}</span>
+                    <span className="block text-[13px] font-bold text-navy-900">{p.name}</span>
+                    <span className="block text-[12px] leading-relaxed text-gray-500">{p.description}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">Levers</h2>
+              <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">Levers</h2>
               <div className="space-y-5">
                 <Slider
                   id="shock"
@@ -380,7 +480,7 @@ export function WhatIf() {
                     className="mt-0.5 accent-gold-500"
                   />
                   <div className="flex items-center gap-1.5">
-                    <label htmlFor="betas" className="cursor-pointer text-[11px] font-bold text-navy-900">
+                    <label htmlFor="betas" className="cursor-pointer text-[12px] font-bold text-navy-900">
                       Apply deposit betas
                     </label>
                     <InfoButton label="Why this matters">
@@ -397,7 +497,7 @@ export function WhatIf() {
             {result && (
               <>
                 <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                  <h2 className="mb-4 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                  <h2 className="mb-4 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                     Base versus scenario
                   </h2>
                   <RatioChart
@@ -424,14 +524,14 @@ export function WhatIf() {
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                    <h3 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    <h3 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                       Survival horizon
                     </h3>
                     <p className="text-[28px] font-bold text-navy-900">
                       {result.survival.survivalHorizonDays}
-                      <span className="ml-1 text-[14px] font-normal text-gray-500">days</span>
+                      <span className="ml-1 text-[15px] font-normal text-gray-500">days</span>
                     </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    <p className="mt-1 text-[12px] text-gray-500">
                       Base case {result.baseSurvival.survivalHorizonDays} days · opening buffer{' '}
                       <Amount value={result.survival.openingBuffer} currency={currency} />
                     </p>
@@ -443,21 +543,31 @@ export function WhatIf() {
                   </div>
 
                   <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                    <h3 className="mb-3 text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    <h3 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">
                       Rate sensitivity
                     </h3>
-                    <dl className="space-y-2 text-[12px]">
-                      <Line label="ΔNII" value={<Amount value={result.baseNii.deltaNii} currency={currency} colorBySign />} />
+                    <dl className="space-y-2 text-[13px]">
+                      <Line
+                        label="ΔNII"
+                        value={<Amount value={result.baseNii.deltaNii} currency={currency} colorBySign />}
+                      />
                       {result.adjustedNii && (
                         <Line
                           label="ΔNII after betas"
-                          value={<Amount value={result.adjustedNii.betaAdjustedDeltaNii} currency={currency} colorBySign />}
+                          value={
+                            <Amount value={result.adjustedNii.betaAdjustedDeltaNii} currency={currency} colorBySign />
+                          }
                         />
                       )}
-                      <Line label="ΔEVE" value={<Amount value={result.eve.deltaEve} currency={currency} colorBySign />} />
+                      <Line
+                        label="ΔEVE"
+                        value={<Amount value={result.eve.deltaEve} currency={currency} colorBySign />}
+                      />
                       <Line
                         label="EVE as % of equity"
-                        value={<span className="font-mono">{formatPct(result.eve.eveSensitivityPercentOfEquity, 2)}</span>}
+                        value={
+                          <span className="font-mono">{formatPct(result.eve.eveSensitivityPercentOfEquity, 2)}</span>
+                        }
                       />
                       <Line
                         label="Basel outlier test"
@@ -478,16 +588,22 @@ export function WhatIf() {
 
                 <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
                   <div className="mb-3 flex items-center gap-1.5">
-                    <h3 className="text-[12px] font-bold uppercase tracking-widest text-navy-900">
+                    <h3 className="text-[13px] font-bold uppercase tracking-widest text-navy-900">
                       Deposit behaviour under this scenario
                     </h3>
                     <InfoButton label="Methodology">{result.runoff.methodology}</InfoButton>
                   </div>
-                  <dl className="grid grid-cols-2 gap-4 text-[12px] md:grid-cols-4">
-                    <Stat label="Total deposits" value={<Amount value={result.runoff.totalDeposits} currency={currency} />} />
+                  <dl className="grid grid-cols-2 gap-4 text-[13px] md:grid-cols-4">
+                    <Stat
+                      label="Total deposits"
+                      value={<Amount value={result.runoff.totalDeposits} currency={currency} />}
+                    />
                     <Stat label="Core" value={<Amount value={result.runoff.totalCore} currency={currency} />} />
                     <Stat label="Volatile" value={<Amount value={result.runoff.totalVolatile} currency={currency} />} />
-                    <Stat label="Core share" value={<span className="font-mono">{formatPct(result.runoff.corePercent)}</span>} />
+                    <Stat
+                      label="Core share"
+                      value={<span className="font-mono">{formatPct(result.runoff.corePercent)}</span>}
+                    />
                   </dl>
                 </div>
               </>
@@ -521,10 +637,10 @@ function Slider({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <label htmlFor={id} className="text-[11px] font-medium text-gray-600">
+        <label htmlFor={id} className="text-[12px] font-medium text-gray-600">
           {label}
         </label>
-        <span className="font-mono text-[12px] font-bold text-navy-900">{format(value)}</span>
+        <span className="font-mono text-[13px] font-bold text-navy-900">{format(value)}</span>
       </div>
       <input
         id={id}
@@ -552,7 +668,7 @@ function Line({ label, value }: { label: string; value: ReactNode }) {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
+      <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</dt>
       <dd className="mt-0.5">{value}</dd>
     </div>
   );
