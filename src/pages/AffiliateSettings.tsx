@@ -1,25 +1,16 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useRoute, useSearch } from 'wouter';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Redirect, useLocation, useRoute, useSearch } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Amount } from '@/components/ui/Amount';
 import { ShieldCheckIcon } from '@/components/icons/Icons';
-import { DataSourcesSummary, RuleInheritance } from '@/components/affiliates/AffiliateSettingsPanels';
 import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
-import { useAffiliates, useSaveAffiliate, useDeleteAffiliate, usePositions, useHolidayCalendars } from '@/lib/hooks';
+import { useAffiliates, useSaveAffiliate, useDeleteAffiliate, useHolidayCalendars } from '@/lib/hooks';
 import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { approvals, newApprovalRequest } from '@/lib/governanceHooks';
 import { legacySettingsSectionTarget } from '@/lib/rulePaths';
 import { METRIC_LABEL, REGULATORY_MINIMA } from '@/engine/limits';
-import { formatDate } from '@/lib/format';
 import type { AffiliateStatus, InternalThreshold } from '@/engine/types';
-
-function SettingsScreenFallback() {
-  return <div className="p-6 text-[13px] text-gray-400">Loading…</div>;
-}
-
-const AdminUsersLazy = lazy(() => import('@/pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 
 // Any move to Live is deliberately absent - Testing → Live and Suspended → Live only happen through an
 // approved Affiliates/Activate request (the database applies it; see the security_onboarding migration).
@@ -38,29 +29,17 @@ interface Group {
   group: string;
   items: Category[];
 }
-// The slim affiliate page (teardown §2, §12 row 6): profile, thresholds, users, a data-sources summary and
-// a read-only rule-inheritance summary. Rules are edited only in Assumptions, market data in Data → Market
-// data, data sources and column mapping in Data → Sources; old ?section= links redirect there
-// (lib/rulePaths.ts legacySettingsSectionTarget).
-function buildNav(isGroup: boolean): Group[] {
+// The affiliate page: profile and thresholds only. Readiness lives in Run & results, users in Admin, data
+// sources in Data and rules in Assumptions - each in one place; old ?section= links land on Profile.
+function buildNav(): Group[] {
   return [
     {
-      group: 'PROFILE',
+      group: 'AFFILIATE',
       items: [
-        { key: 'overview', label: 'Overview' },
-        ...(isGroup
-          ? []
-          : [
-              { key: 'profile', label: 'Profile' },
-              { key: 'thresholds', label: 'Thresholds' },
-            ]),
+        { key: 'profile', label: 'Profile' },
+        { key: 'thresholds', label: 'Thresholds' },
       ],
     },
-    {
-      group: 'PEOPLE & DATA',
-      items: [{ key: 'users', label: 'Users' }, ...(isGroup ? [] : [{ key: 'data-sources', label: 'Data sources' }])],
-    },
-    { group: 'ASSUMPTIONS', items: [{ key: 'rules', label: 'Rule inheritance' }] },
   ];
 }
 
@@ -94,15 +73,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 /** Column mapping per source of this affiliate: which column of the affiliate's own file feeds each standard field. */
 
-function OverviewRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className={mono ? 'font-mono text-navy-900' : 'text-navy-900'}>{value}</dd>
-    </div>
-  );
-}
-
 export function AffiliateSettings() {
   const [, params] = useRoute('/affiliates/:code/settings');
   const { user, hasPermission } = useAuth();
@@ -117,12 +87,12 @@ export function AffiliateSettings() {
   // Lets a link/redirect deep-link straight to a category (e.g. `?section=connectors`) instead of
   // always landing on Profile - read once on mount, not resynced on every search-string change, so
   // navigating between categories in-page doesn't fight the URL.
-  const [section, setSection] = useState(() => new URLSearchParams(searchString).get('section') || 'overview');
+  const [section, setSection] = useState(() => new URLSearchParams(searchString).get('section') || 'profile');
   // Click-throughs from the Group health matrix (and any other in-app link) arrive as a new
   // ?section= on the same route, so keep the in-page section in sync with the URL after mount.
   useEffect(() => {
     const next = new URLSearchParams(searchString).get('section');
-    if (next) setSection(next);
+    if (next === 'profile' || next === 'thresholds') setSection(next);
   }, [searchString]);
 
   const affiliate = affiliates.find((a) => a.code === params?.code);
@@ -135,7 +105,6 @@ export function AffiliateSettings() {
   }, [movedTo, navigate]);
 
   // ── Overview (absorbed from the old read-only AffiliateDetail/"View" page) ─────────────
-  const { data: overviewPositions = [] } = usePositions(affiliate?.code);
   const { data: approvalRequests = [] } = approvals.useList(affiliate?.code);
   const pendingActivation = approvalRequests.find(
     (r) => r.status === 'Pending' && r.module === 'Affiliates' && r.action === 'Activate',
@@ -158,9 +127,6 @@ export function AffiliateSettings() {
       ),
     );
   };
-
-  const overviewTotals = (category: string) =>
-    overviewPositions.filter((p) => p.category === category).reduce((s, p) => s + p.amount, 0);
 
   // ── Profile draft ──────────────────────────────────────────────────────
   const [profileDraft, setProfileDraft] = useState<{
@@ -239,8 +205,9 @@ export function AffiliateSettings() {
     );
   }
 
-  const isGroup = affiliate.code === 'GROUP';
-  const NAV = buildNav(isGroup);
+  // The organisation's own settings live on Admin → Organisation.
+  if (affiliate.code === 'GROUP') return <Redirect to="/setup/organisation" />;
+  const NAV = buildNav();
 
   return (
     <>
@@ -306,80 +273,6 @@ export function AffiliateSettings() {
         </nav>
 
         <div className="space-y-6">
-          {section === 'overview' && (
-            <>
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <SettingsCard title="Profile">
-                  <dl className="space-y-3 text-[13px]">
-                    <OverviewRow label="Code" value={affiliate.code} mono />
-                    <OverviewRow label="Legal entity" value={affiliate.legalEntityCode} mono />
-                    <OverviewRow label="Region" value={affiliate.region} />
-                    <OverviewRow label="Regulator" value={affiliate.regulator} />
-                    <OverviewRow label="Fiscal year end" value={affiliate.fiscalYearEnd} mono />
-                    <OverviewRow
-                      label="Holiday calendar"
-                      value={
-                        calendars.find((c) => c.id === affiliate.holidayCalendarId)?.name ??
-                        affiliate.holidayCalendarId ??
-                        'Not set'
-                      }
-                    />
-                    <OverviewRow label="Created" value={formatDate(affiliate.createdAt.slice(0, 10))} />
-                  </dl>
-                </SettingsCard>
-
-                <SettingsCard title="Currencies">
-                  <dl className="space-y-3 text-[13px]">
-                    <OverviewRow label="Functional" value={affiliate.functionalCurrency} mono />
-                    <OverviewRow label="Reporting" value={affiliate.reportingCurrency} mono />
-                    <OverviewRow label="Other active" value={affiliate.activeCurrencies.join(' · ') || 'None'} mono />
-                  </dl>
-                  <p className="mt-4 border-t border-gray-100 pt-3 text-[12px] leading-relaxed text-gray-500">
-                    The functional currency cannot be changed once set. Balances consolidate through the reporting
-                    currency on the way to the Group functional currency.
-                  </p>
-                </SettingsCard>
-
-                <SettingsCard title="Balance sheet">
-                  {overviewPositions.length === 0 ? (
-                    <p className="text-[13px] text-gray-500">No positions loaded yet.</p>
-                  ) : (
-                    <dl className="space-y-3 text-[13px]">
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Assets</dt>
-                        <dd>
-                          <Amount value={overviewTotals('Asset')} currency={affiliate.functionalCurrency} />
-                        </dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Liabilities</dt>
-                        <dd>
-                          <Amount value={overviewTotals('Liability')} currency={affiliate.functionalCurrency} />
-                        </dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-gray-500">Capital</dt>
-                        <dd>
-                          <Amount value={overviewTotals('Capital')} currency={affiliate.functionalCurrency} />
-                        </dd>
-                      </div>
-                      <div className="flex justify-between border-t border-gray-100 pt-2">
-                        <dt className="font-bold text-navy-900">A − (L + C)</dt>
-                        <dd>
-                          <Amount
-                            value={overviewTotals('Asset') - overviewTotals('Liability') - overviewTotals('Capital')}
-                            currency={affiliate.functionalCurrency}
-                            colorBySign
-                          />
-                        </dd>
-                      </div>
-                    </dl>
-                  )}
-                </SettingsCard>
-              </div>
-            </>
-          )}
-
           {section === 'profile' && (
             <SettingsCard title="Profile" description="Basic information and contact details for this affiliate.">
               <Field label="Name">
@@ -541,7 +434,7 @@ export function AffiliateSettings() {
                           ? `Delete ${affiliate.name}? It is Live - this removes the affiliate record but does NOT remove its committed positions, batches or dimension mappings, which would be left orphaned. This cannot be undone.`
                           : `Delete ${affiliate.name}? This removes the affiliate record but does NOT remove any batches, positions or dimension mappings already created for it, which would be left orphaned. This cannot be undone.`;
                       if (window.confirm(warning))
-                        deleteAffiliate.mutate(affiliate, { onSuccess: () => navigate('/affiliates') });
+                        deleteAffiliate.mutate(affiliate, { onSuccess: () => navigate('/setup/organisation') });
                     }}
                     className="rounded-lg border border-danger px-4 py-2 text-[13px] font-bold text-danger hover:bg-danger hover:text-white"
                   >
@@ -647,16 +540,6 @@ export function AffiliateSettings() {
               )}
             </SettingsCard>
           )}
-
-          {section === 'data-sources' && !isGroup && <DataSourcesSummary code={affiliate.code} />}
-
-          {section === 'users' && (
-            <Suspense fallback={<SettingsScreenFallback />}>
-              <AdminUsersLazy embedded forcedAffiliateCode={affiliate.code} />
-            </Suspense>
-          )}
-
-          {section === 'rules' && <RuleInheritance affiliateCode={affiliate.code} isGroup={isGroup} />}
         </div>
       </div>
     </>

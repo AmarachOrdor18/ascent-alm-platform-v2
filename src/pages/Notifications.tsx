@@ -110,7 +110,7 @@ export function Notifications({
     <>
       {!embedded && (
         <ModuleHeader
-          title="Notifications"
+          title="Alert rules"
           description="Which events raise an alert, over which channel, to whom, and when it escalates."
           asOfDate={null}
           scope="Ecobank Group"

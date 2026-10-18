@@ -805,24 +805,6 @@ const AFFILIATES: Step[] = [
   ),
 ];
 
-const SETTINGS = '/affiliates/GROUP/settings?section=';
-const GROUP_SETTINGS: Step[] = [
-  s(
-    `${SETTINGS}overview`,
-    'main nav',
-    'The organisation record',
-    'Profile, users and which assumptions are Group defaults. Rules are edited in Assumptions, market data in Data, data sources in Data → Sources.',
-    { permission: 'group.manage' },
-  ),
-  s(
-    `${SETTINGS}rules`,
-    'heading:Rule inheritance',
-    'Group defaults',
-    'Each assumption every affiliate inherits unless it has its own version - with its approval status. Read-only here.',
-    { permission: 'group.manage' },
-  ),
-];
-
 const RULE_EDITORS: Step[] = [
   s(
     '/rules/behaviour-patterns',
@@ -1028,7 +1010,7 @@ const MODULES: { id: string; title: string; description: string; steps: Step[] }
     id: 'setup',
     title: 'Organisation',
     description: 'Organisation details, affiliates, defaults and Group assumptions',
-    steps: [...AFFILIATES, ...GROUP_SETTINGS],
+    steps: [...AFFILIATES],
   },
   {
     id: 'data',

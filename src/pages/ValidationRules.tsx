@@ -42,7 +42,8 @@ export function ValidationRules({
   const affiliates = accessibleAffiliates(allAffiliates, user, hasPermission);
   const canEdit = hasPermission('data.configure');
 
-  const [asOfDate, setAsOfDate] = useState('2026-07-31');
+  const { asOfDate: workingDate } = useScope();
+  const asOfDate = workingDate ?? new Date().toISOString().slice(0, 10);
 
   const [pickedCode, setPickedCode] = useState<string | null>(null);
   // At Group scope there is no single affiliate to default to - an undefined code here (unlike 'GROUP')
@@ -252,16 +253,6 @@ export function ValidationRules({
           ]}
           actions={
             <>
-              <label htmlFor="vr-asof" className="sr-only">
-                As-of date
-              </label>
-              <input
-                id="vr-asof"
-                type="date"
-                value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
-                className="rounded border border-gray-200 px-2 py-2 text-[13px] focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
-              />
               <button
                 type="button"
                 onClick={() => void runChecks()}

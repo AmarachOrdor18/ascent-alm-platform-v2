@@ -60,7 +60,7 @@ export function OrganisationSetup() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
         <nav aria-label="Organisation setup steps">
           <ol className="space-y-1">
-            {ORG_SETUP_STEPS.map((s, i) => {
+            {ORG_SETUP_STEPS.filter((s) => s !== 'review').map((s, i) => {
               const done = !!record?.steps[s]?.done || status === 'Complete';
               return (
                 <li key={s}>

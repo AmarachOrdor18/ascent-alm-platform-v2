@@ -1,3 +1,4 @@
+import { useScope } from '@/context/ScopeContext';
 import type { ReactNode } from 'react';
 import type { AffiliateStatus } from '@/engine/types';
 
@@ -26,17 +27,21 @@ export function AffiliateSelector({
   /** Extra controls (e.g. a domain selector) rendered inline in the same bar - for a caller that scopes on more than just the affiliate. */
   children?: ReactNode;
 }) {
-  // Deliberately independent of the global Scope switcher (which only lists Live affiliates); this lists every affiliate regardless of status.
+  // The header Scope is the one place an affiliate is chosen. This bar only asks for one when the header is on
+  // Group and the screen needs a single affiliate - and choosing here switches the header scope too.
+  const { affiliateCode: scopeCode, setAffiliateCode } = useScope();
   const options = affiliates.filter((a) => a.code !== 'GROUP');
   const current = options.find((a) => a.code === value);
+  const choose = (code: string) => {
+    setAffiliateCode(code);
+    onChange(code);
+  };
 
-  // Someone confined to one affiliate (the caller passes accessibleAffiliates) has nothing to choose:
-  // no picker - just the extra controls, if any, with the affiliate named rather than selectable.
-  if (options.length === 1 && current) {
+  if (scopeCode !== 'GROUP' || (options.length === 1 && current)) {
     if (!children) return null;
     return (
       <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <span className="text-[13px] font-bold text-navy-900">{current.name}</span>
+        <span className="text-[13px] font-bold text-navy-900">{current?.name}</span>
         {children}
       </div>
     );
@@ -45,12 +50,12 @@ export function AffiliateSelector({
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
       <label htmlFor="entity-picker" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-        Working on
+        Pick an affiliate
       </label>
       <select
         id="entity-picker"
         value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => choose(e.target.value)}
         className="rounded border border-gray-200 px-2 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
       >
         {options.length === 0 && <option value="">No affiliates onboarded yet</option>}

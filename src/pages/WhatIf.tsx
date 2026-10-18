@@ -83,7 +83,7 @@ const PRESETS: Array<{ name: string; description: string; levers: Levers }> = [
 
 export function WhatIf() {
   const { hasPermission, user } = useAuth();
-  const { affiliateCode, asOfDate: workingDate, setAsOfDate: setWorkingDate } = useScope();
+  const { affiliateCode, asOfDate: workingDate } = useScope();
   const { data: affiliates = [] } = useAffiliates();
   const { data: batches = [] } = useBatches();
   const { save } = useRuleMutations<ForecastScenarioRule>('ForecastScenario');
@@ -315,25 +315,6 @@ export function WhatIf() {
         ]}
         actions={
           <>
-            {dates.length > 1 && (
-              <div className="flex items-center gap-1.5">
-                <label htmlFor="wi-asof" className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                  As of
-                </label>
-                <select
-                  id="wi-asof"
-                  value={asOfDate}
-                  onChange={(e) => setWorkingDate(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none"
-                >
-                  {dates.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
             <button
               type="button"
               onClick={() => setLevers(BASE)}

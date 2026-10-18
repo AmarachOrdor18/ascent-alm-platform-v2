@@ -372,7 +372,7 @@ export const ADMIN_TABS: ModuleTab[] = [
   },
   {
     key: 'notifications',
-    label: 'Notifications',
+    label: 'Alert rules',
     path: '/admin',
     permission: 'dashboard.view',
     Component: Notifications,
