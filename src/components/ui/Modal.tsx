@@ -17,8 +17,8 @@ export function Modal({
   description?: ReactNode;
   onClose: () => void;
   footer?: ReactNode;
-  /** Wider card for content with a table (e.g. a checked users file). */
-  wide?: boolean;
+  /** Wider card for content with a table (e.g. a checked users file); 'xl' for a working window (Upload data). */
+  wide?: boolean | 'xl';
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -35,7 +35,7 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative flex max-h-full w-full flex-col overflow-y-auto rounded-2xl bg-white shadow-2xl ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+        className={`relative flex max-h-full w-full flex-col overflow-y-auto rounded-2xl bg-white shadow-2xl ${wide === 'xl' ? 'max-w-4xl' : wide ? 'max-w-2xl' : 'max-w-lg'}`}
       >
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
           <div>

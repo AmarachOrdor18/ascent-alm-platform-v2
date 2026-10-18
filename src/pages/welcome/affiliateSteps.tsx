@@ -31,6 +31,7 @@ import { approvals, newApprovalRequest } from '@/lib/governanceHooks';
 import { admittedLedger } from '@/lib/sourceIngest';
 import { sourceKindLabel } from '@/lib/dataSources';
 import { buildDefaultsWorkbook, readDefaultsWorkbook } from '@/lib/affiliateDefaultsWorkbook';
+import { AffiliateAssumptionsExchange } from '@/components/rules/AffiliateAssumptionsExchange';
 import { currentBatch, positionBookReadiness } from '@/engine/vintage';
 import { deriveMembersFromFile } from '@/engine/dimensions';
 import { METRIC_LABEL, REGULATORY_MINIMA } from '@/engine/limits';
@@ -795,6 +796,13 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
             </span>
           </li>
         </ul>
+      </Card>
+
+      <Card
+        title="Assumptions (optional)"
+        description="Using the Group's assumptions is fine. To use your own, download the Group's, change them in Excel and upload them - they become this affiliate's own."
+      >
+        <AffiliateAssumptionsExchange affiliate={affiliate} />
       </Card>
 
       <Card

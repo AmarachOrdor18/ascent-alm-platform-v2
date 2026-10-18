@@ -2,6 +2,8 @@ import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { GroupAssumptionsUpload } from '@/components/rules/GroupAssumptionsUpload';
 import { useAuth } from '@/context/AuthContext';
+import { useScope } from '@/context/ScopeContext';
+import { AffiliateAssumptionsExchange } from '@/components/rules/AffiliateAssumptionsExchange';
 import { useRules } from '@/lib/ruleHooks';
 import type { RuleKind, RuleMeta } from '@/engine/types';
 
@@ -150,6 +152,8 @@ const GROUPS: Array<{ title: string; rules: RuleEntry[] }> = [
 ];
 
 export function RulesHub() {
+  const { affiliate, affiliateCode } = useScope();
+  const isGroup = affiliateCode === 'GROUP';
   return (
     <>
       <ModuleHeader
@@ -159,6 +163,15 @@ export function RulesHub() {
         asOfDate={null}
       />
       <GroupAssumptionsUpload className="mb-6" />
+      {!isGroup && affiliate && (
+        <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <h3 className="mb-1 text-[13px] font-bold text-navy-900">{affiliate.name}&rsquo;s own assumptions</h3>
+          <p className="mb-3 text-[12px] text-gray-500">
+            Download the Group&rsquo;s, change them in Excel, upload them - they become {affiliate.name}&rsquo;s own.
+          </p>
+          <AffiliateAssumptionsExchange affiliate={affiliate} />
+        </section>
+      )}
       <div className="space-y-6">
         {GROUPS.map((g) => (
           <section key={g.title} data-tour-section={g.title}>

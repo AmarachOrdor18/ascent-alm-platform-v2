@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Drawer } from '@/components/ui/Drawer';
+import { Modal } from '@/components/ui/Modal';
 import { DownloadIcon } from '@/components/icons/Icons';
 import { useScope } from '@/context/ScopeContext';
 import { readUploadAsCsvText, UPLOAD_ACCEPT } from '@/lib/fileImport';
@@ -257,12 +257,11 @@ export function UploadDataModal({
   const noSources = uploadable.length === 0;
 
   return (
-    <Drawer
+    <Modal
       title="Upload data"
-      description="Files are checked first."
-      about="Nothing reaches calculations until it is admitted."
+      description="Files are checked first - nothing reaches calculations until it is admitted."
       onClose={onClose}
-      wide
+      wide="xl"
       footer={
         files.length > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -379,7 +378,7 @@ export function UploadDataModal({
           ))}
         </div>
       )}
-    </Drawer>
+    </Modal>
   );
 }
 

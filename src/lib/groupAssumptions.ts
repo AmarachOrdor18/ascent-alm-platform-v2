@@ -320,40 +320,55 @@ export function parseGroupAssumptions(sheets: Sheets): ParsedAssumptions {
 }
 
 /**
- * Save the parsed assumptions as Group defaults. Each updates the Group rule of that kind (a new version,
- * keeping history) or creates one. Gated kinds raise an approval request from the loader.
+ * Save the parsed assumptions as Group defaults - or, given an affiliate, as that affiliate's own rules (the
+ * Group's stay untouched, and runs for the affiliate prefer its own approved rule). Each updates the rule of
+ * that kind (a new version, keeping history) or creates one. Gated kinds raise an approval request.
  */
 export async function importGroupAssumptions(
   parsed: ParsedAssumptions,
   user: Pick<User, 'id' | 'name' | 'role'>,
+  affiliate: { code: string; name: string } | null = null,
 ): Promise<ImportedAssumption[]> {
   const out: ImportedAssumption[] = [];
   const now = new Date().toISOString();
   const requests: ApprovalRequest[] = await repository.listApprovalRequests();
+  const scope = affiliate?.code ?? null;
+  const fileWord = affiliate ? `${affiliate.name} assumptions file` : 'Group assumptions file';
+  // "Group capital charge" becomes "Ecobank Nigeria capital charge" for an affiliate's own copy.
+  const nameFor = (name: string) =>
+    affiliate
+      ? /^group\b/i.test(name)
+        ? name.replace(/^group\b/i, affiliate.name)
+        : `${affiliate.name} - ${name}`
+      : name;
   for (const item of parsed.items) {
-    const existing = (await repository.listRules({ kind: item.kind, affiliateCode: null })) as RuleMeta[];
+    const name = nameFor(item.name);
+    const existing = (await repository.listRules({ kind: item.kind, affiliateCode: scope })) as RuleMeta[];
+    const own = existing.filter((r) => (r.affiliateCode ?? null) === scope);
     const target =
-      existing.find((r) => r.name === item.name) ??
-      [...existing]
+      own.find((r) => r.name === name) ??
+      [...own]
         .filter((r) => r.isActive)
         .sort((a, b) => (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt))[0];
     const base: RuleMeta = target
       ? {
           ...target,
-          name: item.name,
+          name,
           version: target.version + 1,
           isActive: true,
           updatedBy: user.name,
           updatedAt: now,
         }
       : {
-          id: `${item.kind.toUpperCase()}-GROUP-${Date.now().toString(36).toUpperCase()}`,
+          id: `${item.kind.toUpperCase()}-${scope ?? 'GROUP'}-${Date.now().toString(36).toUpperCase()}`,
           kind: item.kind,
-          name: item.name,
-          description: 'Loaded from the Group assumptions setup file.',
-          folder: 'Group Default',
+          name,
+          description: affiliate
+            ? `${affiliate.name}'s own copy, loaded from its assumptions file (based on the Group defaults).`
+            : 'Loaded from the Group assumptions setup file.',
+          folder: affiliate ? affiliate.name : 'Group Default',
           accessType: 'Read-Write',
-          affiliateCode: null,
+          affiliateCode: scope,
           version: 1,
           isActive: true,
           createdBy: user.name,
@@ -372,7 +387,7 @@ export async function importGroupAssumptions(
       }
       await repository.upsertApprovalRequest({
         ...ruleApprovalRequest(rule, user.name, now, user.id),
-        summary: `${item.label} loaded from the Group assumptions file as version ${rule.version} - ${item.summary} Not usable in a run until approved.`,
+        summary: `${item.label} loaded from the ${fileWord} as version ${rule.version} - ${item.summary} Not usable in a run until approved.`,
       });
     }
     await repository.recordAuditEvent({
@@ -385,7 +400,7 @@ export async function importGroupAssumptions(
       userName: user.name,
       role: user.role,
       outcome: 'Success',
-      detail: `${rule.name} (version ${rule.version}) from the Group assumptions file: ${item.summary}`,
+      detail: `${rule.name} (version ${rule.version}) from the ${fileWord}: ${item.summary}`,
       recordedAt: now,
     });
     out.push({
