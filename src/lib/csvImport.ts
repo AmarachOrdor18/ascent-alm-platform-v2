@@ -14,6 +14,7 @@ import type {
   RateType,
   RecordStatus,
 } from '@/engine/types';
+import { normaliseDate } from './dates';
 import type { LedgerBalance } from '@/engine/reconciliation';
 import type { StoredFxRate } from '@/engine/types';
 
@@ -120,11 +121,12 @@ function boolean(value: string | undefined, column: string, line: number, errors
 function isoDate(value: string | undefined, column: string, line: number, errors: RowError[]): IsoDate | null {
   const t = (value ?? '').trim();
   if (t === '' || t === 'N/A' || t === '-') return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-    errors.push({ line, column, message: `"${t}" is not an ISO date (YYYY-MM-DD)` });
+  const d = normaliseDate(t);
+  if (!d) {
+    errors.push({ line, column, message: `"${t}" is not a date (use e.g. 2026-09-30 or 30/09/2026)` });
     return null;
   }
-  return t;
+  return d;
 }
 
 /** Coerce to one of a known set, reporting rather than silently defaulting. */

@@ -124,7 +124,7 @@ function xmlToTable(text: string): string[][] {
 function excelToTable(buffer: ArrayBuffer, allSheets = false): string[][] {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(buffer, { type: 'array' });
+    workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   } catch {
     throw new Error('This Excel file could not be read.');
   }
@@ -133,7 +133,7 @@ function excelToTable(buffer: ArrayBuffer, allSheets = false): string[][] {
     const out: Array<Record<string, string>> = [];
     for (const name of workbook.SheetNames) {
       const rows = XLSX.utils
-        .sheet_to_json<unknown[]>(workbook.Sheets[name]!, { header: 1, raw: false, defval: '' })
+        .sheet_to_json<unknown[]>(workbook.Sheets[name]!, { header: 1, raw: false, defval: '', dateNF: 'yyyy-mm-dd' })
         .map((r) => r.map(stringifyCell));
       if (rows.length < 2) continue;
       const head = rows[0]!.map((h) => h.trim());
@@ -157,7 +157,7 @@ function excelToTable(buffer: ArrayBuffer, allSheets = false): string[][] {
     throw new Error('This Excel file has no readable worksheet.');
   }
 
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '' });
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '', dateNF: 'yyyy-mm-dd' });
   return rows.map((row) => row.map(stringifyCell));
 }
 
@@ -180,7 +180,7 @@ export function tableToCsv(table: string[][]): string {
 export async function readWorkbookSheets(file: File): Promise<Record<string, string[][]>> {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
   } catch {
     throw new Error('This Excel file could not be read.');
   }
@@ -189,7 +189,7 @@ export async function readWorkbookSheets(file: File): Promise<Record<string, str
     const sheet = workbook.Sheets[name];
     if (!sheet) continue;
     out[name] = XLSX.utils
-      .sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '' })
+      .sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '', dateNF: 'yyyy-mm-dd' })
       .map((r) =>
         r.map((c) =>
           c === null || c === undefined ? '' : c instanceof Date ? c.toISOString().slice(0, 10) : String(c),

@@ -2,6 +2,7 @@
 // the pure helpers the upload screens use to read a file against a source's fields - header matching,
 // alias renaming, routing a dropped file to the right source, and reading the as-of date from the file.
 // No storage and no React here.
+import { normaliseDate } from './dates';
 import { parseCsv } from './csvImport';
 import { tableToCsv } from './fileImport';
 import { POSITION_TEMPLATES } from './positionTemplates';
@@ -436,12 +437,7 @@ export function routeFile(
 }
 
 function toIsoDate(v: string): string | null {
-  const t = v.trim();
-  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  const dmy = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (dmy) return `${dmy[3]}-${dmy[2]!.padStart(2, '0')}-${dmy[1]!.padStart(2, '0')}`;
-  return null;
+  return normaliseDate(v);
 }
 
 /**
