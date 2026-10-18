@@ -139,6 +139,8 @@ function excelToTable(buffer: ArrayBuffer, allSheets = false): string[][] {
       const head = rows[0]!.map((h) => h.trim());
       for (const h of head) if (h && !header.some((x) => x.toLowerCase() === h.toLowerCase())) header.push(h);
       for (const r of rows.slice(1)) {
+        // Rows Excel keeps after the data (formatted or cleared cells) are blank - skip them, not report them.
+        if (r.every((c) => !c.trim())) continue;
         const obj: Record<string, string> = { dataType: name };
         head.forEach((h, i) => {
           if (!h) return;
