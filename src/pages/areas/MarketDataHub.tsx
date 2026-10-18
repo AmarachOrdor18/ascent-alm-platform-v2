@@ -59,8 +59,11 @@ export function MarketDataHub() {
   // Age is judged against the date being worked on (header As-of date), not today's calendar date.
   const statusRef = workingDate ?? newestLoaded;
   const status = useMemo(
-    () => marketDataStatus(fxRates, curves, indicators, slaDays, statusRef),
-    [fxRates, curves, indicators, slaDays, statusRef],
+    () =>
+      marketDataStatus(fxRates, curves, indicators, slaDays, statusRef).map((k) =>
+        workingDate ? k : { ...k, stale: false },
+      ),
+    [fxRates, curves, indicators, slaDays, statusRef, workingDate],
   );
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -148,9 +151,10 @@ export function MarketDataHub() {
         if (row.asOfDate > g.asOfDate) g.asOfDate = row.asOfDate;
       } else seriesGroups.set(label, { label, observations: 1, asOfDate: row.asOfDate });
     }
+    const fileDates = [...split.fx.map((r) => r.asOfDate), ...split.curves.map((r) => r.asOfDate)].filter(Boolean);
     setStage({
       fileName: file.name,
-      asOfDate,
+      asOfDate: fileDates.sort().at(-1) ?? asOfDate,
       records: { fx: split.fx, curves: split.curves, indicators: split.indicators },
       curveGroups: [...curveGroups.values()],
       seriesGroups: [...seriesGroups.values()],
@@ -179,7 +183,7 @@ export function MarketDataHub() {
       void qc.invalidateQueries({ queryKey: ['auditEvents'] });
       void qc.invalidateQueries({ queryKey: notificationKeys.all });
       setSaved(
-        `Loaded from ${stage.fileName}: ${result.fx} FX rate${result.fx === 1 ? '' : 's'}, ${result.curves} curve version${result.curves === 1 ? '' : 's'}, ${result.indicators} indicator series${result.indicators === 1 ? '' : 's'}. ` +
+        `Loaded from ${stage.fileName}: ${result.fx} FX rate${result.fx === 1 ? '' : 's'}, ${result.curves} curve version${result.curves === 1 ? '' : 's'}, ${result.indicators} indicator series. ` +
           (affected.length > 0
             ? `Affiliates affected and notified: ${affected.map((a) => a.name).join(', ')}.`
             : 'No affiliate uses these currencies yet.'),

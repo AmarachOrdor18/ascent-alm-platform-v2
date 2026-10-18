@@ -7,7 +7,7 @@ import { ResultTable } from '@/components/ui/ResultTable';
 import { useAuth } from '@/context/AuthContext';
 import { isRestrictedToOwnAffiliate } from '@/lib/scope';
 import { useScope } from '@/context/ScopeContext';
-import { useCurrencies, useYieldCurves, useSaveYieldCurve, useSaveBatch } from '@/lib/hooks';
+import { useCurrencies, useYieldCurves, useSaveYieldCurve, useSaveBatch, useDeleteYieldCurve } from '@/lib/hooks';
 import { formatPct } from '@/lib/format';
 import { referenceLoadBatch } from '@/lib/referenceBatch';
 import { useMarketDataSaved } from '@/lib/marketDataHooks';
@@ -52,6 +52,7 @@ export function YieldCurves() {
   const { data: curves = [], isLoading } = useYieldCurves();
   const { data: currencies = [] } = useCurrencies();
   const save = useSaveYieldCurve();
+  const deleteCurve = useDeleteYieldCurve();
   const saveBatch = useSaveBatch();
   const marketDataSaved = useMarketDataSaved();
   // Market data is Group-wide: only Group-level users change it (affiliate users see it read-only).
@@ -270,6 +271,25 @@ export function YieldCurves() {
           ))}
         </select>
         {isLoading && <span className="text-[13px] text-gray-400">Loading…</span>}
+        {canEdit && !isNewCurve && activeId && curves.some((c) => c.id === activeId) && (
+          <button
+            type="button"
+            disabled={deleteCurve.isPending}
+            onClick={() => {
+              const c = curves.find((x) => x.id === activeId)!;
+              if (
+                !window.confirm(
+                  `Delete the ${c.currency} curve dated ${c.asOfDate}? Runs already made keep their copy.`,
+                )
+              )
+                return;
+              deleteCurve.mutate(c, { onSuccess: () => setActiveId(null) });
+            }}
+            className="text-[12px] font-bold text-danger hover:underline disabled:opacity-40"
+          >
+            Delete this curve version
+          </button>
+        )}
       </div>
 
       {!editing ? (

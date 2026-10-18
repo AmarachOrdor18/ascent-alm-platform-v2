@@ -170,6 +170,18 @@ export function useSaveYieldCurve() {
   );
 }
 
+/** Removes one dated curve version - how a wrongly loaded curve is taken back out. */
+export function useDeleteYieldCurve() {
+  return useAuditedMutation(
+    'Rate Management',
+    'Delete',
+    'Yield Curve',
+    (curve: StoredYieldCurve) => repository.deleteYieldCurve(curve.id),
+    (curve) => ({ id: curve.id, detail: `${curve.name} (${curve.currency}) as of ${curve.asOfDate} deleted` }),
+    [keys.curves],
+  );
+}
+
 // ── Currencies and FX ────────────────────────────────────────────────────
 export function useCurrencies() {
   return useQuery({ queryKey: keys.currencies, queryFn: () => repository.listCurrencies() });
