@@ -328,18 +328,6 @@ export function DataSourcesStep({ affiliate, onBack, onContinue }: AffStepProps)
           </ul>
         )}
       </Card>
-      <Card title="Column mapping">
-        <p className="text-[13px] text-navy-900">
-          Your files keep their own column names. On the first upload to each source you confirm any column that
-          doesn&rsquo;t match - once.
-        </p>
-      </Card>
-      <Card title="Market data">
-        <p className="flex items-center gap-2 text-[13px] text-navy-900">
-          <StatusBadge status="Loaded by Group ✓" tone="success" /> FX rates, yield curves and policy rates are loaded
-          once by Group for every affiliate.
-        </p>
-      </Card>
       <StepFooter mode="wizard" onBack={onBack} onSubmit={submit} disabled={incomplete || sources.length === 0} />
     </div>
   );
