@@ -662,6 +662,8 @@ export interface AdmitInput {
   reason?: string | null;
   /** The lobby entry being admitted, removed once admitted. */
   stagedId?: string | null;
+  /** An earlier load of this source that the new file replaces (withdrawn once this one is admitted). */
+  replacesBatchId?: string | null;
 }
 
 export interface AdmitOutcome {
@@ -828,7 +830,7 @@ const TENOR_LABEL = (days: number) =>
         ? `${days / 7}W`
         : `${days}D`;
 
-async function writeCurves(points: CurvePointRow[], userName: string): Promise<number> {
+async function writeCurves(points: CurvePointRow[], userName: string, loadId: string | null = null): Promise<number> {
   const existing = await repository.listYieldCurves();
   const groups = new Map<string, CurvePointRow[]>();
   for (const p of points) {
@@ -857,13 +859,18 @@ async function writeCurves(points: CurvePointRow[], userName: string): Promise<n
       terms: [...byTenor.values()].sort((a, b) => a.tenorDays - b.tenorDays),
       updatedBy: userName,
       updatedAt: now,
+      loadId,
     } as StoredYieldCurve;
     await repository.upsertYieldCurve(curve);
   }
   return groups.size;
 }
 
-async function writeIndicators(rows: IndicatorSeriesRow[], userName: string): Promise<number> {
+async function writeIndicators(
+  rows: IndicatorSeriesRow[],
+  userName: string,
+  loadId: string | null = null,
+): Promise<number> {
   const existing = await repository.listEconomicIndicators();
   const groups = new Map<string, IndicatorSeriesRow[]>();
   for (const r of rows) {
@@ -880,7 +887,7 @@ async function writeIndicators(rows: IndicatorSeriesRow[], userName: string): Pr
     const dates = new Set(obs.map((o) => o.asOfDate));
     const observations = [
       ...(match?.observations ?? []).filter((o) => !dates.has(o.asOfDate)),
-      ...obs.map((o) => ({ asOfDate: o.asOfDate, value: o.value })),
+      ...obs.map((o) => ({ asOfDate: o.asOfDate, value: o.value, loadId })),
     ].sort((a, b) => a.asOfDate.localeCompare(b.asOfDate));
     const indicator: EconomicIndicator = match
       ? { ...match, observations, updatedBy: userName, updatedAt: now }
@@ -914,23 +921,28 @@ export async function saveMarketDataRecords(
   asOfDate: string,
   fileName: string,
   uploadedBy: string,
+  replacesLoadId: string | null = null,
 ): Promise<{ fx: number; curves: number; indicators: number }> {
   const now = new Date().toISOString();
+  const loadId = `MKT-${Date.now().toString(36).toUpperCase()}`;
+  // A corrected file takes the wrong upload's rows out first - including dates the new file doesn't have.
+  if (replacesLoadId) await removeMarketLoad(replacesLoadId, `Replaced by ${fileName}`, { name: uploadedBy });
   await Promise.all(
     records.fx.map((rate) =>
-      repository.upsertFxRate({ ...rate, source: fileName, updatedBy: uploadedBy, updatedAt: now }),
+      repository.upsertFxRate({ ...rate, source: fileName, updatedBy: uploadedBy, updatedAt: now, loadId }),
     ),
   );
-  const curvesWritten = records.curves.length > 0 ? await writeCurves(records.curves, uploadedBy) : 0;
-  const indicatorsWritten = records.indicators.length > 0 ? await writeIndicators(records.indicators, uploadedBy) : 0;
+  const curvesWritten = records.curves.length > 0 ? await writeCurves(records.curves, uploadedBy, loadId) : 0;
+  const indicatorsWritten =
+    records.indicators.length > 0 ? await writeIndicators(records.indicators, uploadedBy, loadId) : 0;
   const domains = [
     { domain: 'FxRates' as const, rowCount: records.fx.length, note: 'FX rates' },
     { domain: 'MarketRates' as const, rowCount: records.curves.length, note: 'curve points' },
     { domain: 'EconomicIndicators' as const, rowCount: records.indicators.length, note: 'indicator observations' },
   ].filter((d) => d.rowCount > 0);
   for (const d of domains) {
-    await repository.upsertBatch(
-      referenceLoadBatch({
+    await repository.upsertBatch({
+      ...referenceLoadBatch({
         domain: d.domain,
         affiliateCode: 'GROUP',
         asOfDate,
@@ -938,9 +950,54 @@ export async function saveMarketDataRecords(
         uploadedBy,
         rowCount: d.rowCount,
       }),
-    );
+      marketLoadId: loadId,
+    });
   }
   return { fx: records.fx.length, curves: curvesWritten, indicators: indicatorsWritten };
+}
+
+const MARKET_DOMAINS = new Set(['FxRates', 'MarketRates', 'EconomicIndicators', 'MarketData']);
+
+/**
+ * Takes one market-data upload back out: the FX rates, curves and indicator values it wrote are removed and
+ * its load records are marked withdrawn. Rows a later upload overwrote belong to that upload and stay.
+ */
+export async function removeMarketLoad(
+  loadId: string,
+  reason: string,
+  actor: Pick<Actor, 'name'> | null,
+): Promise<void> {
+  const [fx, curves, indicators, batches] = await Promise.all([
+    repository.listFxRates(),
+    repository.listYieldCurves(),
+    repository.listEconomicIndicators(),
+    repository.listBatches('GROUP'),
+  ]);
+  const now = new Date().toISOString();
+  await Promise.all([
+    ...fx.filter((r) => r.loadId === loadId).map((r) => repository.deleteFxRate(r.id)),
+    ...curves.filter((c) => c.loadId === loadId).map((c) => repository.deleteYieldCurve(c.id)),
+    ...indicators
+      .filter((i) => i.observations.some((o) => o.loadId === loadId))
+      .map((i) => {
+        const observations = i.observations.filter((o) => o.loadId !== loadId);
+        return observations.length > 0
+          ? repository.upsertEconomicIndicator({ ...i, observations, updatedAt: now })
+          : repository.deleteEconomicIndicator(i.id);
+      }),
+    ...batches
+      .filter((b) => b.status === 'Committed' && (b.marketLoadId === loadId || b.id === loadId))
+      .map((b) =>
+        repository.upsertBatch({
+          ...b,
+          status: 'Superseded',
+          supersededReason: `Withdrawn: ${reason}`,
+          withdrawnBy: actor?.name ?? 'unknown',
+          withdrawnAt: now,
+          withdrawnReason: reason,
+        }),
+      ),
+  ]);
 }
 
 /** Commit staged positions - the one position commit path (also behind useCommitBatch in lib/hooks.ts). */
@@ -1070,26 +1127,32 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
     case 'FxRates':
       await Promise.all(
         (input.records as StoredFxRate[]).map((rate) =>
-          repository.upsertFxRate({ ...rate, source: source.name, updatedBy: userName, updatedAt: now }),
+          repository.upsertFxRate({
+            ...rate,
+            source: source.name,
+            updatedBy: userName,
+            updatedAt: now,
+            loadId: input.batch.id,
+          }),
         ),
       );
-      committed = await finishCommitted();
+      committed = await finishCommitted({ marketLoadId: input.batch.id });
       await afterMarketDataLoad(
         { fileName: committed.fileName, asOfDate, fx: input.records as StoredFxRate[], curves: [], indicators: [] },
         actor,
       );
       break;
     case 'MarketRates':
-      await writeCurves(input.records as CurvePointRow[], userName);
-      committed = await finishCommitted();
+      await writeCurves(input.records as CurvePointRow[], userName, input.batch.id);
+      committed = await finishCommitted({ marketLoadId: input.batch.id });
       await afterMarketDataLoad(
         { fileName: committed.fileName, asOfDate, fx: [], curves: input.records as CurvePointRow[], indicators: [] },
         actor,
       );
       break;
     case 'EconomicIndicators':
-      await writeIndicators(input.records as IndicatorSeriesRow[], userName);
-      committed = await finishCommitted();
+      await writeIndicators(input.records as IndicatorSeriesRow[], userName, input.batch.id);
+      committed = await finishCommitted({ marketLoadId: input.batch.id });
       await afterMarketDataLoad(
         {
           fileName: committed.fileName,
@@ -1105,12 +1168,18 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
       const content = (input.records[0] ?? { fx: [], curves: [], indicators: [] }) as MarketDataRecords;
       await Promise.all(
         content.fx.map((rate) =>
-          repository.upsertFxRate({ ...rate, source: source.name, updatedBy: userName, updatedAt: now }),
+          repository.upsertFxRate({
+            ...rate,
+            source: source.name,
+            updatedBy: userName,
+            updatedAt: now,
+            loadId: input.batch.id,
+          }),
         ),
       );
-      if (content.curves.length > 0) await writeCurves(content.curves, userName);
-      if (content.indicators.length > 0) await writeIndicators(content.indicators, userName);
-      committed = await finishCommitted();
+      if (content.curves.length > 0) await writeCurves(content.curves, userName, input.batch.id);
+      if (content.indicators.length > 0) await writeIndicators(content.indicators, userName, input.batch.id);
+      committed = await finishCommitted({ marketLoadId: input.batch.id });
       await afterMarketDataLoad({ fileName: committed.fileName, asOfDate, ...content }, actor);
       break;
     }
@@ -1129,6 +1198,12 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
       committed = await finishCommitted();
       break;
     }
+  }
+
+  const replacesId = input.replacesBatchId ?? input.batch.replacesBatchId ?? null;
+  if (replacesId && replacesId !== committed.supersedesBatchId) {
+    const old = (await repository.listBatches(source.affiliateCode)).find((b) => b.id === replacesId);
+    if (old && old.status === 'Committed') await withdrawLoad(old, `Replaced by ${committed.fileName}`, actor);
   }
 
   await audit(
@@ -1158,8 +1233,7 @@ export async function rejectLoad(staged: StagedBatch, reason: string, actor: Act
 
 /**
  * Withdraw an admitted load with a reason. It stops counting (status Superseded, marked withdrawn), so
- * runs no longer pick it up; history rows it added are removed. Rates and curves it saved stay until
- * replaced - market data is a series, not a versioned file.
+ * runs no longer pick it up; history rows, and the rates, curves and indicator values it wrote, are removed.
  */
 export async function withdrawLoad(batch: LoadBatch, reason: string, actor: Actor | null): Promise<LoadBatch> {
   const now = new Date().toISOString();
@@ -1172,6 +1246,7 @@ export async function withdrawLoad(batch: LoadBatch, reason: string, actor: Acto
     withdrawnReason: reason,
   };
   await repository.upsertBatch(withdrawn);
+  if (MARKET_DOMAINS.has(batch.domain)) await removeMarketLoad(batch.marketLoadId ?? batch.id, reason, actor);
   if (batch.domain === 'BalanceHistory') await repository.deleteBalanceHistory(batch.affiliateCode, batch.id);
   if (batch.domain === 'AccountHistory') await repository.deleteAccountHistory(batch.affiliateCode, batch.id);
   if (batch.domain === 'GeneralLedger') await repository.deleteStagedBatch(ledgerCopyId(batch.id));

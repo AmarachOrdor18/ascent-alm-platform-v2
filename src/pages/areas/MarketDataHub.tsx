@@ -12,7 +12,7 @@ import { Link } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
-import { useCurrencies, useEconomicIndicators, useFxRates, useYieldCurves } from '@/lib/hooks';
+import { useBatches, useCurrencies, useEconomicIndicators, useFxRates, useYieldCurves } from '@/lib/hooks';
 import { afterMarketDataLoad } from '@/lib/marketDataEvents';
 import { WhoCanFix } from '@/components/readiness/WhoCanFix';
 import { marketDataStatus } from '@/lib/readiness';
@@ -36,6 +36,8 @@ interface CurveGroup {
 interface Stage {
   fileName: string;
   asOfDate: string;
+  /** Dates the file itself carried for FX rates and curves, when they differ from the header date. */
+  otherFileDates: string[];
   records: MarketDataRecords;
   curveGroups: CurveGroup[];
   seriesGroups: Array<{ label: string; observations: number; asOfDate: string }>;
@@ -49,12 +51,28 @@ export function MarketDataHub() {
   const { data: fxRates = [] } = useFxRates();
   const { data: curves = [] } = useYieldCurves();
   const { data: indicators = [] } = useEconomicIndicators();
+  const { data: batches = [] } = useBatches();
+  // Earlier market-data uploads still in force - one entry per upload (a workbook records one load per kind).
+  const previousUploads = useMemo(() => {
+    const by = new Map<string, { id: string; fileName: string; uploadedAt: string; asOfDate: string }>();
+    for (const b of batches) {
+      if (b.affiliateCode !== 'GROUP' || b.status !== 'Committed') continue;
+      if (!['FxRates', 'MarketRates', 'EconomicIndicators', 'MarketData'].includes(b.domain)) continue;
+      const id = b.marketLoadId ?? b.id;
+      if (!by.has(id))
+        by.set(id, { id, fileName: b.fileName.split(' - ')[0]!, uploadedAt: b.uploadedAt, asOfDate: b.asOfDate });
+    }
+    return [...by.values()].sort((a, z) => z.uploadedAt.localeCompare(a.uploadedAt));
+  }, [batches]);
+  const [replaces, setReplaces] = useState('');
   // Market data is Group's: uploading it needs upload rights at Group level.
   const canUpload =
     (hasPermission('data.upload') || hasPermission('data.configure')) &&
     (user?.affiliateCode === 'GROUP' || hasPermission('group.manage'));
   const slaDays = useMarketDataSlaDays();
-  const { asOfDate: workingDate } = useScope();
+  const { asOfDate: scopeDate, asOfDateChosen } = useScope();
+  // Only a date picked in the header counts as the working date.
+  const workingDate = asOfDateChosen ? scopeDate : null;
   const newestLoaded = [...fxRates.map((r) => r.asOfDate), ...curves.map((c) => c.asOfDate)].sort().at(-1) ?? today();
   // Age is judged against the date being worked on (header As-of date), not today's calendar date.
   const statusRef = workingDate ?? newestLoaded;
@@ -67,7 +85,6 @@ export function MarketDataHub() {
   );
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const asOfDate = workingDate ?? today();
   const [stage, setStage] = useState<Stage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -133,8 +150,22 @@ export function MarketDataHub() {
       if (inputRef.current) inputRef.current.value = '';
       return;
     }
-    // The date is the fallback applied to rows without their own asOfDate - per-row dates win.
-    const split = splitMarketData(text, asOfDate, user?.name ?? 'unknown');
+    if (!workingDate) {
+      setError('Pick the As-of date at the top of the page first - the upload is loaded as of that date.');
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+    const raw = splitMarketData(text, workingDate, user?.name ?? 'unknown');
+    // FX rates and curves are loaded as of the header date whatever the file says; the policy-rate history
+    // keeps its own monthly dates (it is a series the models are fitted on).
+    const fileDates = [...new Set([...raw.fx, ...raw.curves].map((r) => r.asOfDate))].filter(
+      (d) => d && d !== workingDate,
+    );
+    const split = {
+      ...raw,
+      fx: raw.fx.map((r) => ({ ...r, asOfDate: workingDate, id: `FX-${r.base}-${r.quote}-${workingDate}` })),
+      curves: raw.curves.map((r) => ({ ...r, asOfDate: workingDate })),
+    };
     const curveGroups = new Map<string, CurveGroup>();
     for (const p of split.curves) {
       const label = `${p.currency} · ${p.curveCode} @ ${p.asOfDate}`;
@@ -151,15 +182,16 @@ export function MarketDataHub() {
         if (row.asOfDate > g.asOfDate) g.asOfDate = row.asOfDate;
       } else seriesGroups.set(label, { label, observations: 1, asOfDate: row.asOfDate });
     }
-    const fileDates = [...split.fx.map((r) => r.asOfDate), ...split.curves.map((r) => r.asOfDate)].filter(Boolean);
     setStage({
       fileName: file.name,
-      asOfDate: fileDates.sort().at(-1) ?? asOfDate,
+      asOfDate: workingDate,
+      otherFileDates: fileDates,
       records: { fx: split.fx, curves: split.curves, indicators: split.indicators },
       curveGroups: [...curveGroups.values()],
       seriesGroups: [...seriesGroups.values()],
       errors: split.errors,
     });
+    setReplaces(previousUploads.find((u) => u.fileName === file.name)?.id ?? '');
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -172,7 +204,9 @@ export function MarketDataHub() {
         stage.asOfDate,
         stage.fileName,
         user?.name ?? 'unknown',
+        replaces || null,
       );
+      setReplaces('');
       // Audit (with the affiliates affected) and notify those affiliates' users and Group.
       const { affected } = await afterMarketDataLoad(
         { fileName: stage.fileName, asOfDate: stage.asOfDate, ...stage.records },
@@ -281,7 +315,9 @@ export function MarketDataHub() {
               className="text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-navy-900 file:px-4 file:py-2 file:text-[13px] file:font-bold file:text-white hover:file:bg-navy-700"
             />
             <p className="mt-2 text-[12px] text-gray-500">
-              Dates come from the file. Rows without one use {formatDate(asOfDate)} (the As-of date in the header).
+              {workingDate
+                ? `Loaded as of ${formatDate(workingDate)} - the As-of date at the top of the page.`
+                : 'Pick the As-of date at the top of the page first - the upload is loaded as of that date.'}
             </p>
           </div>
         ) : (
@@ -318,6 +354,15 @@ export function MarketDataHub() {
               {stage.fileName} - {curriedRows} row{curriedRows === 1 ? '' : 's'} recognised
               {stage.errors.length > 0 && ', ' + stage.errors.length + ' not recognised'}
             </p>
+            <p className="mt-1 text-[12px] text-gray-600">
+              FX rates and curves are loaded as of <span className="font-bold">{formatDate(stage.asOfDate)}</span>.
+              {stage.otherFileDates.length > 0 && (
+                <span className="font-bold text-warning">
+                  {' '}
+                  The file says {stage.otherFileDates.join(', ')} - loaded as {formatDate(stage.asOfDate)}.
+                </span>
+              )}
+            </p>
             <ul className="mt-2 space-y-1 text-[12px] text-navy-900">
               {stage.records.fx.length > 0 && <li>• {stage.records.fx.length} FX rate row(s)</li>}
               {stage.curveGroups.map((g) => (
@@ -342,6 +387,31 @@ export function MarketDataHub() {
                 ))}
                 {stage.errors.length > 10 && <li>…and {stage.errors.length - 10} more.</li>}
               </ul>
+            )}
+            {previousUploads.length > 0 && (
+              <div className="mt-3">
+                <label htmlFor="market-replaces" className="mb-1 block text-[12px] font-bold text-navy-900">
+                  Replaces an earlier upload
+                </label>
+                <select
+                  id="market-replaces"
+                  value={replaces}
+                  onChange={(e) => setReplaces(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-[13px] text-navy-900"
+                >
+                  <option value="">No - add to what is loaded</option>
+                  {previousUploads.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fileName} (loaded {formatDate(u.uploadedAt.slice(0, 10))})
+                    </option>
+                  ))}
+                </select>
+                {replaces && (
+                  <p className="mt-1 text-[12px] text-warning">
+                    Everything that upload loaded is taken out first - including dates this file doesn&apos;t have.
+                  </p>
+                )}
+              </div>
             )}
             <div className="mt-3 flex gap-2">
               <button

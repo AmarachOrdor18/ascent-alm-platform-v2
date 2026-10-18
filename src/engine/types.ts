@@ -413,6 +413,10 @@ export interface LoadBatch {
   withdrawnBy?: string | null;
   withdrawnAt?: string | null;
   withdrawnReason?: string | null;
+  /** Market data: the one upload this load belongs to (a workbook records one load per kind of data). */
+  marketLoadId?: string | null;
+  /** An earlier load of the same source this one replaces (a wrong file, possibly for another date). */
+  replacesBatchId?: string | null;
   /** Rows the checks flagged (advisory findings) when the file was uploaded. */
   rowsFlagged?: number;
   /** The first problems the upload checks found, worded for a person - kept for the load's history. */
@@ -737,6 +741,8 @@ export interface StoredYieldCurve {
   isActive: boolean;
   updatedBy: string;
   updatedAt: string;
+  /** The market-data upload that wrote it - withdrawing or replacing that upload removes it. */
+  loadId?: string | null;
 }
 
 // Functional: one per institution. Reporting: intermediates consolidation. Active: other currencies transacted in.
@@ -759,6 +765,8 @@ export interface StoredFxRate {
   source: string;
   updatedBy: string;
   updatedAt: string;
+  /** The market-data upload that wrote it - withdrawing or replacing that upload removes it. */
+  loadId?: string | null;
 }
 
 export type IndicatorFrequency = 'Weekly' | 'Monthly' | 'Quarterly' | 'Semi-Annually' | 'Annually';
@@ -767,6 +775,8 @@ export type IndicatorValueType = 'Numeric' | 'Percentage' | 'Amount';
 export interface IndicatorObservation {
   asOfDate: IsoDate;
   value: number;
+  /** The market-data upload that wrote it. */
+  loadId?: string | null;
 }
 
 /**

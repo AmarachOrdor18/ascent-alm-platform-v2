@@ -19,7 +19,7 @@ import {
   type FileCheck,
   type ReconciliationSummary,
 } from '@/lib/sourceIngest';
-import { useAdmitLoad, useCanMapColumns, useCheckEnv, useSendToLobby } from '@/lib/sourceHooks';
+import { sourceForLoad, useAdmitLoad, useCanMapColumns, useCheckEnv, useSendToLobby } from '@/lib/sourceHooks';
 import { repository } from '@/store/repositoryInstance';
 import { ColumnMapping } from './ColumnMapping';
 import { useAffiliates } from '@/lib/hooks';
@@ -38,6 +38,8 @@ interface PickedFile {
   checking: boolean;
   readError: string | null;
   reason: string;
+  /** An earlier load of the same source this file replaces; undefined = the suggested one (same file name). */
+  replacesId?: string | null;
   outcome:
     | { kind: 'lobby' | 'admitted'; reconciliation: ReconciliationSummary | null; derived?: DerivedSummary | null }
     | { kind: 'error'; message: string }
@@ -92,7 +94,9 @@ export function UploadDataModal({
   onClose: () => void;
 }) {
   // The working date from the header is the default as-of date; a date in the file itself wins.
-  const { asOfDate: scopeDate, affiliateCode: scopeCode } = useScope();
+  const { asOfDate: scopeDate, asOfDateChosen, affiliateCode: scopeCode } = useScope();
+  // One date for every upload: the As-of date chosen in the header.
+  const workingDate = asOfDateChosen ? scopeDate : null;
   const { data: affiliates = [] } = useAffiliates();
   const env = useCheckEnv();
   const send = useSendToLobby();
@@ -121,7 +125,7 @@ export function UploadDataModal({
       : undefined;
     if (!source || f.readError) return { ...f, check: null, checking: false };
     const check = await checkFile(source, f.fileName, f.rawText, env, {
-      asOfDate: f.asOfOverride || undefined,
+      asOfDate: workingDate ?? undefined,
       defaultAsOfDate: scopeDate ?? undefined,
     });
     return { ...f, check, checking: false };
@@ -193,10 +197,25 @@ export function UploadDataModal({
     if (inputRef.current) inputRef.current.value = '';
   };
 
+  /** Earlier admitted loads of the file's source for other dates - a wrong file it may be correcting. */
+  const replaceOptions = (f: PickedFile): LoadBatch[] =>
+    f.check
+      ? env.batches
+          .filter(
+            (b) =>
+              b.status === 'Committed' &&
+              b.asOfDate !== f.check!.asOfDate &&
+              sourceForLoad(b, [f.check!.source])?.id === f.check!.source.id,
+          )
+          .sort((a, z) => z.uploadedAt.localeCompare(a.uploadedAt))
+      : [];
+  const replacesFor = (f: PickedFile): string | null =>
+    f.replacesId !== undefined ? f.replacesId : (replaceOptions(f).find((b) => b.fileName === f.fileName)?.id ?? null);
+
   const pending = files.filter((f) => !f.outcome || f.outcome.kind === 'error');
   const needsReason = (f: PickedFile) => !!f.check?.replaces && !f.reason.trim();
-  const lobbyReady = pending.filter((f) => f.check && canSendToLobby(f.check));
-  const admitReady = pending.filter((f) => f.check && canAdmitNow(f.check) && !needsReason(f));
+  const lobbyReady = workingDate ? pending.filter((f) => f.check && canSendToLobby(f.check)) : [];
+  const admitReady = workingDate ? pending.filter((f) => f.check && canAdmitNow(f.check) && !needsReason(f)) : [];
 
   const submit = async (mode: 'lobby' | 'admit') => {
     setWorking(true);
@@ -208,12 +227,13 @@ export function UploadDataModal({
           const autoAdmit =
             mode === 'lobby' && check.source.autoAdmit && canAdmitNow(check) && !needsReason(f) && check.flagged === 0;
           if (mode === 'lobby' && !autoAdmit) {
-            await send.mutateAsync(check);
+            // The replacement choice travels with the file, so admitting it from the lobby honours it.
+            await send.mutateAsync({ ...check, batch: { ...check.batch, replacesBatchId: replacesFor(f) } });
             update(f.key, { outcome: { kind: 'lobby', reconciliation: null } });
           } else {
             const out = await admit.mutateAsync({
               source: check.source,
-              batch: check.batch,
+              batch: { ...check.batch, replacesBatchId: replacesFor(f) },
               positions: check.positions,
               records: check.records,
               reason: f.reason || null,
@@ -278,6 +298,15 @@ export function UploadDataModal({
         <Notice tone="info">There is no data source you can upload to yet. Ask an administrator to add one.</Notice>
       ) : (
         <div className="space-y-5">
+          {workingDate ? (
+            <Notice tone="info">
+              Every file is loaded as of {workingDate} - the As-of date at the top of the page.
+            </Notice>
+          ) : (
+            <Notice tone="warning">
+              Pick the As-of date at the top of the page first - every file is loaded as of that date.
+            </Notice>
+          )}
           <div>
             <label htmlFor="upload-source" className="mb-1 block text-[12px] font-bold text-gray-600">
               Where is this data going?
@@ -338,8 +367,10 @@ export function UploadDataModal({
               sources={uploadable}
               label={label}
               onChangeSource={(id) => void recheck(f.key, { sourceId: id || null })}
-              onChangeDate={(d) => void recheck(f.key, { asOfOverride: d })}
               onReason={(r) => update(f.key, { reason: r })}
+              replaceOptions={replaceOptions(f)}
+              replacesId={replacesFor(f)}
+              onReplaces={(id) => update(f.key, { replacesId: id })}
               onRemove={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
               onMapped={(saved) => onMapped(f.key, saved)}
               previous={f.check ? previousLoad(f.check, env.batches) : null}
@@ -357,8 +388,10 @@ function FileCard({
   sources,
   label,
   onChangeSource,
-  onChangeDate,
   onReason,
+  replaceOptions,
+  replacesId,
+  onReplaces,
   onRemove,
   onMapped,
   previous,
@@ -368,8 +401,10 @@ function FileCard({
   sources: DataSource[];
   label: (s: DataSource) => string;
   onChangeSource: (id: string) => void;
-  onChangeDate: (d: string) => void;
   onReason: (r: string) => void;
+  replaceOptions: LoadBatch[];
+  replacesId: string | null;
+  onReplaces: (id: string | null) => void;
   onRemove: () => void;
   onMapped: (saved: DataSource) => void;
   previous: LoadBatch | null;
@@ -379,8 +414,6 @@ function FileCard({
   const blocking = c ? blockingCount(c) : 0;
   const creatable = c?.unmapped ?? [];
   const [showIssues, setShowIssues] = useState(false);
-  // One date for the platform: the file's own date (or the header As-of date). The picker only opens on request.
-  const [editDate, setEditDate] = useState(false);
   const canMap = useCanMapColumns(c?.source.affiliateCode);
   const mapping = !!c && !f.checking && needsMapping(c);
   const matchedColumns = c ? c.headers.length - c.ignoredColumns.length : 0;
@@ -457,35 +490,17 @@ function FileCard({
               >
                 Data as of
               </label>
-              {editDate || f.asOfOverride ? (
-                <input
-                  id={`date-${f.key}`}
-                  type="date"
-                  className={inputCls}
-                  value={f.asOfOverride || c?.asOfDate || ''}
-                  onChange={(e) => onChangeDate(e.target.value)}
-                  disabled={!c}
-                />
-              ) : (
-                <p id={`date-${f.key}`} className="py-1.5 text-[13px] font-bold text-navy-900">
-                  {c?.asOfDate ?? '-'}
-                </p>
-              )}
+              <p id={`date-${f.key}`} className="py-1.5 text-[13px] font-bold text-navy-900">
+                {c?.asOfDate ?? '-'}
+              </p>
               {c && (
                 <p className="mt-0.5 text-[11px] text-gray-500">
-                  {c.fileDate
-                    ? c.fileDate === c.asOfDate
-                      ? 'Read from the file.'
-                      : `The file says ${c.fileDate}.`
-                    : 'No date in the file - the As-of date in the header is used.'}{' '}
-                  {!editDate && !f.asOfOverride && (
-                    <button
-                      type="button"
-                      onClick={() => setEditDate(true)}
-                      className="font-bold text-navy-700 hover:underline"
-                    >
-                      Change
-                    </button>
+                  The As-of date in the header.
+                  {c.fileDate && c.fileDate !== c.asOfDate && (
+                    <span className="font-bold text-warning">
+                      {' '}
+                      The file says {c.fileDate} - it is loaded as {c.asOfDate}.
+                    </span>
                   )}
                 </p>
               )}
@@ -606,6 +621,32 @@ function FileCard({
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+              )}
+
+              {replaceOptions.length > 0 && (
+                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                  <label htmlFor={`replaces-${f.key}`} className="mb-1 block text-[12px] font-bold text-navy-900">
+                    Replaces an earlier upload of {c.source.name}
+                  </label>
+                  <select
+                    id={`replaces-${f.key}`}
+                    className={inputCls}
+                    value={replacesId ?? ''}
+                    onChange={(e) => onReplaces(e.target.value || null)}
+                  >
+                    <option value="">No - keep the earlier uploads</option>
+                    {replaceOptions.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.fileName} - as of {b.asOfDate}
+                      </option>
+                    ))}
+                  </select>
+                  {replacesId && (
+                    <p className="mt-1 text-[12px] text-warning">
+                      That upload is withdrawn when this one is admitted - it stops counting, and stays in History.
+                    </p>
                   )}
                 </div>
               )}

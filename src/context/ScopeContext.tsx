@@ -96,7 +96,8 @@ export function ScopeProvider({ children }: { children: React.ReactNode }) {
     () => datesForScope(batches, affiliateCode, affiliates),
     [batches, affiliateCode, affiliates],
   );
-  const asOfDate = chosenDate && availableDates.includes(chosenDate) ? chosenDate : (availableDates[0] ?? null);
+  // The chosen date is the working date even before any data exists for it - uploads are stamped with it.
+  const asOfDate = chosenDate ?? availableDates[0] ?? null;
 
   // Persist (debounced) to the user's own record - self-editable, like toursSeen.
   useEffect(() => {
@@ -140,7 +141,7 @@ export function ScopeProvider({ children }: { children: React.ReactNode }) {
         setRun(null);
       },
       availableDates,
-      asOfDateChosen: !!chosenDate && chosenDate === asOfDate,
+      asOfDateChosen: !!chosenDate,
       run,
       setRun,
       // Functional currency at affiliate scope; Group consolidates in USD.
