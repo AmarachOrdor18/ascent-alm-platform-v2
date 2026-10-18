@@ -572,7 +572,9 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
   const { data: users = [] } = useUsers();
   const saveAffiliate = useSaveAffiliate();
   const [editing, setEditing] = useState<Affiliate | 'new' | null>(null);
-  const real = affiliates.filter((a) => a.code !== 'GROUP').sort((a, b) => a.name.localeCompare(b.name));
+  const real = affiliates
+    .filter((a) => a.code !== 'GROUP')
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.code.localeCompare(b.code));
   const activeCurrencies = currencies.filter((c) => c.isActive);
 
   // People management, merged in from the former Users & access step: the flow is add affiliate →
@@ -623,7 +625,7 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
           <p className="text-[13px] text-gray-400">Loading…</p>
         ) : real.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-[13px] text-gray-500">
-            No affiliates yet. Add the first one below - or continue and add them later from Admin → Organisation setup.
+            No affiliates yet. Add the first one below - or continue and add them later from Admin → Organisation.
           </p>
         ) : (
           <table className="w-full text-left text-[13px]">
@@ -635,6 +637,7 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
                 <th className="py-2 pr-3">Regulator</th>
                 <th className="py-2 pr-3">Currency</th>
                 <th className="py-2 pr-3">Status</th>
+                <th className="py-2 pr-3">Affiliate Admin</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -648,6 +651,23 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
                   <td className="py-2 pr-3 font-mono">{a.functionalCurrency || '-'}</td>
                   <td className="py-2 pr-3">
                     <StatusBadge status={a.status} />
+                  </td>
+                  <td className="py-2 pr-3">
+                    {adminsOf(a.code).length > 0 ? (
+                      <span className="text-navy-900">
+                        {adminsOf(a.code)
+                          .map((u) => `${u.name} (${u.email})`)
+                          .join(', ')}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setInvite({ code: a.code })}
+                        className="text-[12px] font-bold text-navy-700 hover:underline"
+                      >
+                        Invite admin for {a.code}
+                      </button>
+                    )}
                   </td>
                   <td className="py-2 text-right">
                     <button
@@ -710,18 +730,10 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
         ) : (
           <>
             {withoutAdmin.length > 0 && (
-              <ul className="divide-y divide-gray-50">
-                {withoutAdmin.map((a) => (
-                  <li key={a.code} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]">
-                    <span className="font-medium text-navy-900">
-                      {a.name} <span className="font-mono text-[11px] text-gray-400">{a.code}</span>
-                    </span>
-                    <button type="button" onClick={() => setInvite({ code: a.code })} className={btnSecondary}>
-                      Invite its admin
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <p className="text-[13px] text-warning">
+                No Affiliate Admin yet for {withoutAdmin.map((a) => a.name).join(', ')} - use the invite link in the
+                table above.
+              </p>
             )}
             <div className="mt-4 flex flex-wrap gap-3">
               <button type="button" onClick={() => setBulk(true)} className={btnPrimary}>
@@ -752,7 +764,11 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
 
       {invite && (
         <Modal
-          title="Invite a person"
+          title={
+            invite.code
+              ? `Invite a person to ${affiliates.find((a) => a.code === invite.code)?.name ?? invite.code} (${invite.code})`
+              : 'Invite a person'
+          }
           wide
           onClose={() => setInvite(null)}
           description={
