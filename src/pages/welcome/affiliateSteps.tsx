@@ -3,7 +3,7 @@
  * real tables (the affiliate row, its data sources, app_users, dimension members, approvals) - never to a
  * draft - and the wizard records progress per step on the 'AFF:<code>' onboarding record.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Drawer } from '@/components/ui/Drawer';
 import { LedgerCheckPanel } from '@/components/data/LedgerCheckPanel';
 import { useQuery } from '@tanstack/react-query';
@@ -23,17 +23,18 @@ import {
 } from '@/lib/hooks';
 import { useDataSources, useLobby, useSaveDataSource } from '@/lib/sourceHooks';
 import { availableFor, useConnectors } from '@/lib/connectorHooks';
-import { useSettings } from '@/lib/onboardingHooks';
-import { effectiveSetting, ORG_SETTING, ORG_SETTING_DEFAULTS, type AffiliateStep } from '@/lib/onboarding';
+import { useDeleteSetting, useSaveSetting, useSettings } from '@/lib/onboardingHooks';
+import { effectiveSetting, ORG_SETTING, ORG_SETTING_DEFAULTS, settingId, type AffiliateStep } from '@/lib/onboarding';
 import { useLimitConfigs } from '@/lib/limitHooks';
 import { useRules } from '@/lib/ruleHooks';
 import { approvals, newApprovalRequest } from '@/lib/governanceHooks';
 import { admittedLedger } from '@/lib/sourceIngest';
 import { sourceKindLabel } from '@/lib/dataSources';
+import { buildDefaultsWorkbook, readDefaultsWorkbook } from '@/lib/affiliateDefaultsWorkbook';
 import { currentBatch, positionBookReadiness } from '@/engine/vintage';
 import { deriveMembersFromFile } from '@/engine/dimensions';
 import { METRIC_LABEL, REGULATORY_MINIMA } from '@/engine/limits';
-import { TP_METHOD_LABELS } from '@/engine/ftp';
+import { CORE_TP_METHODS, TP_METHOD_LABELS } from '@/engine/ftp';
 import { formatAmount, formatDate } from '@/lib/format';
 import { UploadDataModal } from '@/components/data/UploadDataModal';
 import {
@@ -108,7 +109,7 @@ export interface AffStepProps {
   onContinue: () => Promise<void>;
 }
 
-const Inherited = () => <StatusBadge status="Inherited ✓" tone="success" />;
+const Inherited = () => <StatusBadge status="Inherited ✓" tone="success" className="whitespace-nowrap" />;
 
 // ─── Step 1: Confirm affiliate ──────────────────────────────────────────────
 
@@ -506,7 +507,18 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
   });
   const errors = rows.filter((r) => r.error);
 
-  const settingRows: Array<{ label: string; key: string; show: (v: unknown) => string }> = [
+  const saveSetting = useSaveSetting();
+  const deleteSetting = useDeleteSetting();
+  /** undefined = untouched; null = back to the organisation value; otherwise the affiliate's own value. */
+  const [settingDraft, setSettingDraft] = useState<Record<string, unknown>>({});
+
+  const settingRows: Array<{
+    label: string;
+    key: string;
+    show: (v: unknown) => string;
+    options?: Array<{ value: string; label: string }>;
+    parse?: (v: string) => unknown;
+  }> = [
     { label: 'Reporting cycle', key: ORG_SETTING.cycleFrequency, show: (v) => String(v) },
     {
       label: 'Month-end',
@@ -517,11 +529,17 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
       label: 'Transfer pricing method',
       key: ORG_SETTING.ftpMethod,
       show: (v) => TP_METHOD_LABELS[v as keyof typeof TP_METHOD_LABELS] ?? String(v),
+      options: CORE_TP_METHODS.map((m) => ({ value: m, label: TP_METHOD_LABELS[m] ?? m })),
     },
     {
       label: 'Liquidity premium in transfer pricing',
       key: ORG_SETTING.ftpLiquidityPremium,
       show: (v) => (v ? 'Yes' : 'No'),
+      options: [
+        { value: 'true', label: 'Yes' },
+        { value: 'false', label: 'No' },
+      ],
+      parse: (v) => v === 'true',
     },
   ];
 
@@ -551,17 +569,160 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
         thresholds[r.limit.metricKey] = r.t;
       }
     }
+    await Promise.all(
+      Object.entries(settingDraft).map(([key, value]) => {
+        const id = settingId(affiliate.code, key);
+        if (value === null) return settings.some((x) => x.id === id) ? deleteSetting.mutateAsync(id) : undefined;
+        return saveSetting.mutateAsync({
+          id,
+          affiliateCode: affiliate.code,
+          key,
+          value,
+          updatedBy: user?.name ?? 'unknown',
+          updatedAt: new Date().toISOString(),
+        });
+      }),
+    );
     await saveAffiliate.mutateAsync({ ...affiliate, internalThresholds: thresholds, limitsConfirmed: true });
     await onContinue();
   };
 
   const tone = (t: Tightness) => (t === 'Inherited' ? 'success' : t === 'Tighter' ? 'info' : 'warning');
 
+  // Download → change in Excel → upload: fills this step; nothing is saved until Save & continue.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [excelNote, setExcelNote] = useState<{ tone: 'success' | 'danger'; lines: string[] } | null>(null);
+  const settingState = settingRows.map((s) => {
+    const eff = effectiveSetting(
+      s.key,
+      affiliate.code,
+      settings,
+      ORG_SETTING_DEFAULTS[s.key as keyof typeof ORG_SETTING_DEFAULTS],
+    );
+    const org = effectiveSetting(
+      s.key,
+      'GROUP',
+      settings,
+      ORG_SETTING_DEFAULTS[s.key as keyof typeof ORG_SETTING_DEFAULTS],
+    );
+    const drafted = settingDraft[s.key];
+    const own = drafted === undefined ? (eff.source === 'Affiliate' ? eff.value : null) : drafted;
+    return { s, eff, org, own, canChange: eff.overridable && !!s.options };
+  });
+
+  const downloadExcel = () => {
+    const buffer = buildDefaultsWorkbook(
+      settingState.map(({ s, org, own, canChange }) => ({
+        key: s.key,
+        label: s.label,
+        organisationValue: s.show(org.value),
+        yourValue: own === null ? '' : s.show(own),
+        canChange,
+        options: (s.options ?? []).map((o) => o.label),
+      })),
+      rows.map((r) => ({
+        key: r.limit.metricKey,
+        label: METRIC_LABEL[r.limit.metricKey] ?? r.limit.label,
+        organisationAmber: r.limit.amberThreshold,
+        organisationRed: r.limit.redThreshold,
+        amber: r.t.amberPercent,
+        red: r.t.redPercent,
+        minimum: r.minimum,
+      })),
+    );
+    const url = URL.createObjectURL(
+      new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${affiliate.code}_defaults.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const uploadExcel = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const read = await readDefaultsWorkbook(file);
+      const problems = [...read.problems];
+      const nextSettings: Record<string, unknown> = {};
+      for (const { s, canChange, own } of settingState) {
+        const written = read.settings[s.key];
+        if (written === undefined) continue;
+        const current = own === null ? '' : s.show(own);
+        if (written === current) continue;
+        if (!canChange) {
+          problems.push(`${s.label} is set by the organisation - left as it is.`);
+          continue;
+        }
+        if (written === '') {
+          nextSettings[s.key] = null;
+          continue;
+        }
+        const option = s.options!.find(
+          (o) => o.label.toLowerCase() === written.toLowerCase() || o.value.toLowerCase() === written.toLowerCase(),
+        );
+        if (!option)
+          problems.push(`${s.label}: "${written}" is not one of ${s.options!.map((o) => o.label).join(', ')}.`);
+        else nextSettings[s.key] = s.parse ? s.parse(option.value) : option.value;
+      }
+      setSettingDraft((d) => ({ ...d, ...nextSettings }));
+      const known = new Set(rows.map((r) => r.limit.metricKey));
+      const nextThresholds: Record<string, InternalThreshold> = {};
+      for (const [key, v] of Object.entries(read.thresholds)) {
+        if (known.has(key)) nextThresholds[key] = { amberPercent: v.amber, redPercent: v.red };
+      }
+      setDraft((d) => ({ ...d, ...nextThresholds }));
+      const changed = Object.keys(nextSettings).length + Object.keys(nextThresholds).length;
+      setExcelNote({
+        tone: problems.length > 0 ? 'danger' : 'success',
+        lines: [
+          `${file.name}: values filled in below - check them, then Save & continue.`,
+          ...(changed === 0 ? ['Nothing differed from what is shown.'] : []),
+          ...problems,
+        ],
+      });
+    } catch {
+      setExcelNote({
+        tone: 'danger',
+        lines: ['This file could not be read - use the workbook downloaded from this step.'],
+      });
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={downloadExcel} className={btnSecondary}>
+          Download as Excel
+        </button>
+        <button type="button" onClick={() => fileRef.current?.click()} className={btnSecondary}>
+          Upload filled file
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls"
+          aria-label="Filled defaults workbook"
+          className="hidden"
+          onChange={(e) => void uploadExcel(e.target.files?.[0])}
+        />
+      </div>
+      {excelNote && (
+        <div
+          role="status"
+          className={`rounded-lg px-4 py-2.5 text-[13px] ${excelNote.tone === 'success' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}
+        >
+          {excelNote.lines.map((l) => (
+            <p key={l}>{l}</p>
+          ))}
+        </div>
+      )}
       <Card
         title="Organisation defaults"
-        description="Set once by your organisation. Ask your Organisation Admin to change them."
+        description="Where your organisation allows it, choose this affiliate's own value; the rest are set by the organisation."
       >
         <ul className="divide-y divide-gray-50 text-[13px]">
           {settingRows.map((s) => {
@@ -571,13 +732,49 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
               settings,
               ORG_SETTING_DEFAULTS[s.key as keyof typeof ORG_SETTING_DEFAULTS],
             );
+            const org = effectiveSetting(
+              s.key,
+              'GROUP',
+              settings,
+              ORG_SETTING_DEFAULTS[s.key as keyof typeof ORG_SETTING_DEFAULTS],
+            );
+            const drafted = settingDraft[s.key];
+            const own = drafted === undefined ? (eff.source === 'Affiliate' ? eff.value : null) : drafted;
             return (
-              <li key={s.key} className="flex items-center justify-between py-2">
+              <li key={s.key} className="flex items-center justify-between gap-3 py-2">
                 <span className="text-gray-600">{s.label}</span>
-                <span className="flex items-center gap-2">
-                  <span className="font-medium text-navy-900">{s.show(eff.value)}</span>
-                  {eff.source === 'Affiliate' ? <StatusBadge status="Overridden" tone="warning" /> : <Inherited />}
-                </span>
+                {eff.overridable && s.options ? (
+                  <span className="flex items-center gap-2">
+                    <select
+                      aria-label={s.label}
+                      value={own === null ? '' : String(own)}
+                      onChange={(e) =>
+                        setSettingDraft((d) => ({
+                          ...d,
+                          [s.key]: e.target.value === '' ? null : s.parse ? s.parse(e.target.value) : e.target.value,
+                        }))
+                      }
+                      className={`${input} w-auto`}
+                    >
+                      <option value="">Organisation default ({s.show(org.value)})</option>
+                      {s.options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    {own === null ? (
+                      <Inherited />
+                    ) : (
+                      <StatusBadge status="Own value" tone="info" className="whitespace-nowrap" />
+                    )}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium text-navy-900">{s.show(eff.value)}</span>
+                    <span className="whitespace-nowrap text-[11px] text-gray-400">Set by organisation</span>
+                  </span>
+                )}
               </li>
             );
           })}
@@ -614,7 +811,7 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
                 <th className="py-2 pr-3">Organisation (amber / red)</th>
                 <th className="py-2 pr-3">This affiliate - amber %</th>
                 <th className="py-2 pr-3">red %</th>
-                <th className="py-2">Status</th>
+                <th className="whitespace-nowrap py-2">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -656,7 +853,7 @@ export function ConfigurationStep({ affiliate, onBack, onContinue }: AffStepProp
                       className={`${input} w-24 font-mono`}
                     />
                   </td>
-                  <td className="py-2">
+                  <td className="whitespace-nowrap py-2">
                     <StatusBadge
                       status={
                         r.tightness === 'Inherited'
