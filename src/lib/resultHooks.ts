@@ -4,6 +4,7 @@ import { useBatches } from './hooks';
 import { useRunResults, useScopedRuns } from './runHooks';
 import { isRunStale } from './runStaleness';
 import { buildSeries, pickOfficial, type OfficialRun } from './runSeries';
+import { isConsolidatedRun, useGroupConsolidation } from './groupConsolidation';
 import type { CalculationElement, LoadBatch, ProcessRun, RunResult } from '@/engine/types';
 
 export interface RunSelection {
@@ -39,8 +40,19 @@ export function useRunSelection(): RunSelection {
     [scopeRuns, asOfDate],
   );
 
-  const available = useMemo(() => buildSeries(runs).flatMap((s) => s.versions), [runs]);
-  const official = useMemo(() => pickOfficial(runs), [runs]);
+  // Group with no Group run of its own for the date: the consolidation of the affiliates' official runs.
+  const wantsConsolidation = affiliateCode === 'GROUP' && !!asOfDate && runs.length === 0;
+  const consolidation = useGroupConsolidation(wantsConsolidation, asOfDate);
+  const consolidated = wantsConsolidation ? (consolidation.data?.run ?? null) : null;
+
+  const available = useMemo(
+    () => (consolidated ? [consolidated] : buildSeries(runs).flatMap((s) => s.versions)),
+    [runs, consolidated],
+  );
+  const official = useMemo<OfficialRun | null>(
+    () => (consolidated ? { run: consolidated, kind: 'Provisional' } : pickOfficial(runs)),
+    [runs, consolidated],
+  );
 
   // Resolve the session choice against the fresh list, so a sign-off/reopen shows up immediately.
   const chosen = run ? (runs.find((r) => r.id === run.id) ?? run) : null;
@@ -57,7 +69,7 @@ export function useRunSelection(): RunSelection {
       if (next) setRun(next.id === official?.run.id ? null : next);
     },
     selectOfficial: () => setRun(null),
-    isLoading,
+    isLoading: isLoading || (wantsConsolidation && consolidation.isLoading && consolidation.sources.length > 0),
   };
 }
 
@@ -75,12 +87,17 @@ export function useSelectedRun(): SelectedRun {
   const selection = useRunSelection();
   const { data: batches = [] } = useBatches();
   const active = selection.run;
-  const { data: results = [] } = useRunResults(active?.id ?? null);
+  const consolidated = isConsolidatedRun(active);
+  const { data: storedResults = [] } = useRunResults(active && !consolidated ? active.id : null);
+  // A consolidated Group view is computed, not stored - its results come with it.
+  const { asOfDate } = useScope();
+  const consolidation = useGroupConsolidation(consolidated, asOfDate);
+  const results = consolidated ? (consolidation.data?.results ?? []) : storedResults;
 
   return {
     ...selection,
     results,
-    isStale: isRunStale(active, batches),
+    isStale: consolidated ? false : isRunStale(active, batches),
     missing: (element) => (active ? !active.elements.includes(element) : true),
     sourceBatches: active ? batches.filter((b) => active.positionBatchIds.includes(b.id)) : [],
   };

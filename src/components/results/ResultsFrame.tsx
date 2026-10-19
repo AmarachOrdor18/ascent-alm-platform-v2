@@ -1,3 +1,4 @@
+import { isConsolidatedRun } from '@/lib/groupConsolidation';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -94,7 +95,7 @@ export function ResultsFrame({
 }: ResultsFrameProps) {
   const [showLineage, setShowLineage] = useState(false);
   const { data: affiliates = [] } = useAffiliates();
-  const { asOfDate: workingDate } = useScope();
+  const { asOfDate: workingDate, affiliateCode: scopeCode } = useScope();
   if (isLoading) {
     return (
       <p className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-[13px] text-gray-500">
@@ -114,6 +115,18 @@ export function ResultsFrame({
         </EmptyState>
       );
     }
+    if (scopeCode === 'GROUP')
+      return (
+        <EmptyState
+          title={
+            workingDate ? `No affiliate has a completed run for ${formatDate(workingDate)}` : 'Pick a date at the top'
+          }
+          cta={{ label: 'Go to Run now', href: '/execution' }}
+        >
+          The Group view consolidates each Live affiliate&rsquo;s official run for the date - there is no separate Group
+          run to do. Run an affiliate for this date (or pick another date in the header).
+        </EmptyState>
+      );
     return (
       <EmptyState
         title={workingDate ? `No completed run for ${formatDate(workingDate)}` : 'No completed run for this scope'}
@@ -126,6 +139,7 @@ export function ResultsFrame({
   }
 
   const notComputed = requires.filter((e) => !run.elements.includes(e));
+  const consolidated = isConsolidatedRun(run);
   const version = versionOf(run, allRuns);
   const status = signOffStatusOf(run);
   const versionLabel = (r: ProcessRun) =>
@@ -142,16 +156,24 @@ export function ResultsFrame({
           <span className="font-bold text-navy-900">{run.name}</span>
           <span aria-hidden="true">·</span>
           <span className="font-mono">{formatDate(run.asOfDate)}</span>
-          <span aria-hidden="true">·</span>
-          <span className="font-mono font-bold text-navy-900">v{version}</span>
+          {!consolidated && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="font-mono font-bold text-navy-900">v{version}</span>
+            </>
+          )}
           <span aria-hidden="true">·</span>
           <span className="font-mono">{run.reportingCurrency}</span>
           <span aria-hidden="true">·</span>
           <span>{run.processType}</span>
-          <StatusBadge
-            status={status === 'SignedOff' ? 'Signed off ✓' : SIGN_OFF_LABEL[status]}
-            tone={SIGN_OFF_TONE[status]}
-          />
+          {consolidated ? (
+            <StatusBadge status="Consolidated from affiliate runs" tone="info" />
+          ) : (
+            <StatusBadge
+              status={status === 'SignedOff' ? 'Signed off ✓' : SIGN_OFF_LABEL[status]}
+              tone={SIGN_OFF_TONE[status]}
+            />
+          )}
           {isStale && <StatusBadge status="Superseded data" tone="warning" />}
         </div>
 
