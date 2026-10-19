@@ -146,17 +146,6 @@ function field(name: string, required = false, key = false, type?: SourceFieldTy
 
 const uniq = (names: string[]) => Array.from(new Set(names));
 
-/** Position columns the importer understands beyond the department templates. */
-export const POSITION_EXTRA_FIELDS = [
-  'productCode',
-  'behaviouralTag',
-  'hqlaLevel',
-  'hqlaHaircutPct',
-  'lcrCashflowRole',
-  'irrbbRateSensitive',
-  'approxDurationYears',
-];
-
 /** The fields a new source of this kind starts with - the platform's own column names, derived from the templates and importers. */
 export function defaultFieldsFor(domain: DataSourceDomain, contributor?: PositionContributor): SourceField[] {
   switch (domain) {
@@ -166,10 +155,6 @@ export function defaultFieldsFor(domain: DataSourceDomain, contributor?: Positio
         : uniq(ALL_CONTRIBUTORS.flatMap((c) => POSITION_TEMPLATES[c].columns));
       return [
         ...uniq(columns).map((c) => field(c, ['id', 'category', 'amount'].includes(c), c === 'id')),
-        // Read by the position importer for liquidity, rate risk and product rules - kept even when a template omits them.
-        ...POSITION_EXTRA_FIELDS.filter((c) => !columns.includes(c)).map((c) =>
-          field(c, false, false, c === 'approxDurationYears' ? 'Number' : undefined),
-        ),
         field('asOfDate'),
         // Optional: which department a row came from (Loans, Deposits, Treasury) - informational only.
         ...(contributor ? [] : [field('department')]),

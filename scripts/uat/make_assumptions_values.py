@@ -17,7 +17,7 @@ SHEETS = {
         [3, "Operating cost allocation", "Needed for profitability", "Yes - an Approver approves", "Step 4 > Set up"],
         [4, "Expected credit loss", "Needed for profitability", "Yes - an Approver approves", "Step 4 > Set up"],
         [5, "Capital charge", "Needed for profitability", "Yes - an Approver approves", "Step 4 > Set up"],
-        [6, "Product characteristics", "Optional (files already carry liquidity treatment)", "Yes - an Approver approves", "Step 4 > Set up"],
+        [6, "Product characteristics", "Needed for LCR/NSFR (liquidity treatment by common account)", "Yes - an Approver approves", "Step 4 > Set up"],
         [7, "Deposit behaviour", "Optional - a standard pattern already ships", "Yes, if changed", "Leave as shipped; replace later with a fitted model"],
         ["", "Approvals", "", "", "Sign in as kofi.mensah@ecobank.com (Approver) > Approvals > Waiting for me > Approve each request"],
     ]),
@@ -63,16 +63,15 @@ SHEETS = {
         ["COA-14 Loans", "100%", ""],
     ]),
     "6 Product characteristics": (["Product", "Currency", "LCR role", "LCR rate %", "ASF %", "RSF %", "HQLA level", "Haircut %"], [
-        ["CASH", "NGN", "HQLA", "", "", "0", "Level 1", "0"],
-        ["TBILL", "NGN", "HQLA", "", "", "5", "Level 1", "0"],
-        ["FGNBOND", "NGN", "HQLA", "", "", "5", "Level 1", "0"],
-        ["INTERBANK", "NGN", "Inflow", "50", "", "15", "", ""],
-        ["DDA", "NGN", "Outflow", "10", "90", "", "", ""],
-        ["TD", "NGN", "Outflow", "5", "95", "", "", ""],
-        ["LOAN-RET", "NGN", "Inflow", "50", "", "85", "", ""],
-        ["LOAN-COR", "NGN", "Inflow", "50", "", "85", "", ""],
-        ["LOAN-SME", "NGN", "Inflow", "50", "", "85", "", ""],
-        ["(then)", "", "", "", "", "", "", "Use 'Copy across currencies' to repeat for GHS and KES"],
+        # By common account, so every affiliate's products are covered whatever the bank calls them; the files
+        # carry no liquidity columns - the platform applies these.
+        ["Common account: COA-11 (Cash & central bank)", "Any", "HQLA", "", "", "0", "Level 1", "0"],
+        ["Common account: COA-12 (Interbank placements)", "Any", "Inflow", "50", "", "15", "", ""],
+        ["Common account: COA-13 (Government securities)", "Any", "HQLA", "", "", "5", "Level 1", "0"],
+        ["Common account: COA-14 (Loans)", "Any", "Inflow", "50", "", "85", "", ""],
+        ["Common account: COA-22 (Customer deposits)", "Any", "Outflow", "10", "90", "", "", ""],
+        ["Common account: COA-23 (Borrowings)", "Any", "Outflow", "100", "100", "", "", ""],
+        ["Common account: COA-31 (Capital)", "Any", "None", "", "100", "", "", ""],
     ]),
 }
 

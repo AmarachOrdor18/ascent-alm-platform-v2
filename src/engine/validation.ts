@@ -186,15 +186,11 @@ export function validatePositions(
 
     const factors = ruleOf('V-007');
     if (factors) {
+      // Only a contradiction in what the file itself says is flagged. Factors a file leaves out (LCR rate, RSF,
+      // ASF) are applied later by the product characteristics assumption - their absence is not an upload issue.
       if (p.lcrCashflowRole === 'HQLA' && p.hqlaLevel === 'None') {
         raise(factors, p.id, 'Classified as HQLA but carries no HQLA level');
       }
-      if (p.lcrCashflowRole !== 'None' && p.lcrCashflowRole !== 'HQLA' && p.lcrRatePct === null) {
-        raise(factors, p.id, `Classified as ${p.lcrCashflowRole} but carries no LCR rate`);
-      }
-      if (p.category === 'Asset' && p.rsfFactorPct === null) raise(factors, p.id, 'Asset carries no RSF factor');
-      if (p.category !== 'Asset' && p.asfFactorPct === null)
-        raise(factors, p.id, 'Liability or capital carries no ASF factor');
     }
 
     const dateOrder = ruleOf('V-008');
