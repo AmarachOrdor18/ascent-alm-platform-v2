@@ -1,3 +1,4 @@
+import { Link } from 'wouter';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
@@ -218,6 +219,14 @@ export function ValidationRules({
 
   return (
     <>
+      {!embedded && (
+        <Link
+          href="/assumptions/rules"
+          className="mb-3 inline-block text-[12px] font-bold text-navy-700 hover:underline"
+        >
+          ← Rules &amp; scenarios
+        </Link>
+      )}
       {!embedded && (
         <ModuleHeader
           title="Validation Rules"
