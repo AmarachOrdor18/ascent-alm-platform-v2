@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAffiliateOnboarding } from '@/lib/onboardingHooks';
+import {
+  ConfigurationStep,
+  DataSourcesStep,
+  InitialDataStep,
+  LiquidityStep,
+  ReadinessStep,
+  UsersStep,
+} from '@/pages/welcome/affiliateSteps';
 import { Link, Redirect, useLocation, useRoute, useSearch } from 'wouter';
 import { ModuleHeader } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -31,13 +40,23 @@ interface Group {
 }
 // The affiliate page: profile and thresholds only. Readiness lives in Run & results, users in Admin, data
 // sources in Data and rules in Assumptions - each in one place; old ?section= links land on Profile.
+const SETUP_SECTIONS = ['dataSources', 'users', 'configuration', 'initialData', 'liquidity', 'readiness'] as const;
+type SetupSection = (typeof SETUP_SECTIONS)[number];
+const SECTION_KEYS = new Set<string>(['profile', ...SETUP_SECTIONS]);
+
 function buildNav(): Group[] {
   return [
+    { group: 'AFFILIATE', items: [{ key: 'profile', label: 'Profile' }] },
     {
-      group: 'AFFILIATE',
+      // The onboarding steps, open any time - to change or re-test what was set up.
+      group: 'SET-UP',
       items: [
-        { key: 'profile', label: 'Profile' },
-        { key: 'thresholds', label: 'Thresholds' },
+        { key: 'dataSources', label: 'Data sources' },
+        { key: 'users', label: 'Users' },
+        { key: 'configuration', label: 'Configuration & thresholds' },
+        { key: 'initialData', label: 'Data & ledger check' },
+        { key: 'liquidity', label: 'Liquidity treatment' },
+        { key: 'readiness', label: 'Readiness' },
       ],
     },
   ];
@@ -92,10 +111,20 @@ export function AffiliateSettings() {
   // ?section= on the same route, so keep the in-page section in sync with the URL after mount.
   useEffect(() => {
     const next = new URLSearchParams(searchString).get('section');
-    if (next === 'profile' || next === 'thresholds') setSection(next);
+    if (next && SECTION_KEYS.has(next)) setSection(next);
   }, [searchString]);
 
   const affiliate = affiliates.find((a) => a.code === params?.code);
+  const { record: onboardingRecord } = useAffiliateOnboarding(params?.code);
+  const [stepSaved, setStepSaved] = useState<string | null>(null);
+  const stepProps = (key: SetupSection) => ({
+    affiliate: affiliate!,
+    // In settings a step saves in place - no wizard to move on to.
+    onContinue: async () => {
+      setStepSaved(key);
+      window.setTimeout(() => setStepSaved(null), 2500);
+    },
+  });
 
   // Old sections now live elsewhere (rules → Assumptions, market data → Data → Market data, connections →
   // Data → Sources, notifications/audit → Admin): forward the old link there.
@@ -273,6 +302,22 @@ export function AffiliateSettings() {
         </nav>
 
         <div className="space-y-6">
+          {stepSaved && stepSaved === section && <StatusBadge status="Saved" tone="success" />}
+          {section === 'dataSources' && <DataSourcesStep {...stepProps('dataSources')} />}
+          {section === 'users' && <UsersStep {...stepProps('users')} />}
+          {section === 'configuration' && <ConfigurationStep {...stepProps('configuration')} />}
+          {section === 'initialData' && <InitialDataStep {...stepProps('initialData')} />}
+          {section === 'liquidity' && <LiquidityStep {...stepProps('liquidity')} />}
+          {section === 'readiness' && (
+            <ReadinessStep
+              affiliate={affiliate}
+              record={onboardingRecord}
+              onGoTo={(step) => setSection(SECTION_KEYS.has(step) ? step : 'profile')}
+              onSubmitted={async () => {
+                setStepSaved('readiness');
+              }}
+            />
+          )}
           {section === 'profile' && (
             <SettingsCard title="Profile" description="Basic information and contact details for this affiliate.">
               <Field label="Name">

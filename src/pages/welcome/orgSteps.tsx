@@ -1,3 +1,4 @@
+import { Link } from 'wouter';
 /**
  * The organisation set-up steps, shared by the guided onboarding (/welcome/organisation, mode 'wizard')
  * and Admin → Organisation setup → Organisation & defaults (mode 'page'). The wizard runs four steps -
@@ -677,6 +678,15 @@ export function AffiliatesStep({ mode, onBack, onContinue }: StepProps) {
                     >
                       Edit
                     </button>
+                    {/* Outside the wizard: the affiliate's own settings - its set-up steps, open any time. */}
+                    {mode === 'page' && (
+                      <Link
+                        href={`/affiliates/${a.code}/settings`}
+                        className="ml-3 whitespace-nowrap text-[12px] font-bold text-navy-700 hover:underline"
+                      >
+                        Open settings
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}
