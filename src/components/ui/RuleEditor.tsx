@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { Link, useLocation } from 'wouter';
 import { ModuleHeader, type HeaderMetric } from '@/components/layout/ModuleHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
@@ -173,9 +174,20 @@ export function RuleEditor<T extends RuleMeta>({
   };
 
   const activeCount = rules.filter((r) => r.isActive).length;
+  // Opened as its own page (not inside onboarding's side panel): a way back to the list of assumptions.
+  const [location] = useLocation();
+  const standalone = location.startsWith('/rules/');
 
   return (
     <>
+      {standalone && (
+        <Link
+          href="/assumptions/rules"
+          className="mb-3 inline-block text-[12px] font-bold text-navy-700 hover:underline"
+        >
+          ← Rules &amp; scenarios
+        </Link>
+      )}
       <ModuleHeader
         title={title}
         description={description}

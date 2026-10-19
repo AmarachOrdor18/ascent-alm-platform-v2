@@ -33,7 +33,7 @@ export type ReadinessCategory = 'Setup' | 'Data' | 'From Group' | 'Rules' | 'Cal
 export type ReadinessScope = 'Group' | 'Affiliate';
 /** ok = done; missing = not there; warning = there but needs attention; default = a standard default is in use. */
 export type ReadinessStatus = 'ok' | 'missing' | 'warning' | 'default';
-export type ReadinessVerdict = 'Ready' | 'Ready with warnings' | 'Blocked';
+export type ReadinessVerdict = 'Ready' | 'Ready with warnings' | 'Blocked' | 'Signed off';
 
 export interface ReadinessItem {
   key: string;
@@ -54,6 +54,8 @@ export interface ReadinessItem {
   fixHref: string;
   /** Short label for the fix button. */
   fixLabel: string;
+  /** The date's run is signed off - final figures, not a fault; reopening it allows a new version. */
+  signedOff?: boolean;
 }
 
 export interface Readiness {
@@ -260,7 +262,9 @@ function pendingFor(rules: RuleMeta[], affiliateCode: string, approvals: Approva
 }
 
 function verdictOf(items: ReadinessItem[]): ReadinessVerdict {
-  if (items.some((i) => i.blocking && i.status !== 'ok')) return 'Blocked';
+  const stopping = items.filter((i) => i.blocking && i.status !== 'ok');
+  if (stopping.length > 0 && stopping.every((i) => i.signedOff)) return 'Signed off';
+  if (stopping.length > 0) return 'Blocked';
   if (items.some((i) => i.status !== 'ok')) return 'Ready with warnings';
   return 'Ready';
 }
@@ -683,9 +687,11 @@ export function computeReadiness(inp: ReadinessInputs): Readiness {
     const lock = seriesLockReason(series, scopeRuns);
     const latest = series?.latest ?? null;
     const pendingSignOff = latest ? signOffStatusOf(latest) === 'PendingSignOff' : false;
+    const signedOff = !!lock && !pendingSignOff;
     items.push({
       key: 'series',
-      label: 'Run series open',
+      label: signedOff ? 'Signed off - figures are final' : 'Run series open',
+      signedOff,
       category: 'Governance',
       scope: 'Affiliate',
       status: lock ? 'missing' : 'ok',

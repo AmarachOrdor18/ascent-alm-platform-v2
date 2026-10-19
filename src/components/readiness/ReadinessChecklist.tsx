@@ -22,6 +22,7 @@ export const VERDICT_TONE: Record<ReadinessVerdict, string> = {
   Ready: 'bg-success-bg text-success',
   'Ready with warnings': 'bg-warning-bg text-warning',
   Blocked: 'bg-danger-bg text-danger',
+  'Signed off': 'bg-navy-50 text-navy-700',
 };
 
 export function VerdictBadge({ verdict }: { verdict: ReadinessVerdict }) {
@@ -33,6 +34,22 @@ export function VerdictBadge({ verdict }: { verdict: ReadinessVerdict }) {
 }
 
 export function ReadinessRow({ item, affiliateCode }: { item: ReadinessItem; affiliateCode: string | null }) {
+  if (item.signedOff) {
+    return (
+      <li className="flex items-start gap-3 py-2.5">
+        <span aria-hidden="true" className="mt-0.5 text-[14px]">
+          🔒
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-bold text-navy-900">{item.label}</p>
+          <p className="text-[12px] leading-relaxed text-gray-500">
+            {item.detail} To run this date again, reopen it (Run &amp; results → Runs → Reopen) - that creates a new
+            version.
+          </p>
+        </div>
+      </li>
+    );
+  }
   const mark = item.blocking && item.status !== 'ok' ? MARK.missing : MARK[item.status];
   return (
     <li className="flex items-start gap-3 py-2.5">
@@ -74,19 +91,41 @@ export function ReadinessChecklist({
   categories?: typeof READINESS_CATEGORIES;
 }) {
   const affiliateCode = readiness.affiliateCode === 'GROUP' ? null : readiness.affiliateCode;
+  // What needs attention is shown in full; what is done is one short line (detail on hover) - less scrolling.
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
       {categories.map((cat) => {
-        const rows = readiness.items.filter((i) => i.category === cat && (showOk || i.status !== 'ok'));
-        if (rows.length === 0) return null;
+        const inCat = readiness.items.filter((i) => i.category === cat);
+        const open = inCat.filter((i) => i.status !== 'ok');
+        const done = showOk ? inCat.filter((i) => i.status === 'ok') : [];
+        if (open.length === 0 && done.length === 0) return null;
         return (
           <section key={cat}>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{cat}</h3>
-            <ul className="divide-y divide-gray-50">
-              {rows.map((i) => (
-                <ReadinessRow key={i.key} item={i} affiliateCode={affiliateCode} />
-              ))}
-            </ul>
+            <h3 className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-gray-400">
+              {cat}
+              <span className="font-normal normal-case tracking-normal">
+                {done.length}/{inCat.length} done
+              </span>
+            </h3>
+            {open.length > 0 && (
+              <ul className="divide-y divide-gray-50">
+                {open.map((i) => (
+                  <ReadinessRow key={i.key} item={i} affiliateCode={affiliateCode} />
+                ))}
+              </ul>
+            )}
+            {done.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {done.map((i) => (
+                  <li key={i.key} title={i.detail} className="flex items-center gap-2 text-[12px] text-gray-600">
+                    <span aria-hidden="true" className="font-bold text-success">
+                      ✓
+                    </span>
+                    <span className="truncate">{i.label}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         );
       })}

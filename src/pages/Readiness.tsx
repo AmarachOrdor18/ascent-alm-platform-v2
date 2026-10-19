@@ -366,9 +366,20 @@ function AffiliateReadiness() {
         }
       />
 
-      {readiness && readiness.blockers.length > 0 && (
+      {readiness && readiness.verdict === 'Blocked' && (
         <div role="alert" className="mb-6 rounded-lg bg-danger-bg px-4 py-3 text-[13px] text-danger">
-          <span className="font-bold">Blocked:</span> {readiness.blockers.map((b) => b.label).join(', ')}.
+          <span className="font-bold">Blocked:</span>{' '}
+          {readiness.blockers
+            .filter((b) => !b.signedOff)
+            .map((b) => b.label)
+            .join(', ')}
+          .
+        </div>
+      )}
+      {readiness && readiness.verdict === 'Signed off' && (
+        <div role="status" className="mb-6 rounded-lg bg-navy-50 px-4 py-3 text-[13px] text-navy-900">
+          <span className="font-bold">Signed off:</span> this date&rsquo;s figures are final. Reopen it in Run &amp;
+          results → Runs to run it again.
         </div>
       )}
 
