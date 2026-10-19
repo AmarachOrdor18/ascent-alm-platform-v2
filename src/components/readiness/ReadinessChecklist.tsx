@@ -37,9 +37,6 @@ export function ReadinessRow({ item, affiliateCode }: { item: ReadinessItem; aff
   if (item.signedOff) {
     return (
       <li className="flex items-start gap-3 py-2.5">
-        <span aria-hidden="true" className="mt-0.5 text-[14px]">
-          🔒
-        </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-bold text-navy-900">{item.label}</p>
           <p className="text-[12px] leading-relaxed text-gray-500">
