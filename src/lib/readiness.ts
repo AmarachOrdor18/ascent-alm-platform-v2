@@ -298,7 +298,13 @@ export function computeReadiness(inp: ReadinessInputs): Readiness {
     const status = affiliate?.status ?? 'Onboarding';
     items.push({
       key: 'live',
-      label: 'Affiliate is Live',
+      // Says where the affiliate is, not what it should be - "Affiliate is Live" beside a ✗ read as a claim.
+      label:
+        status === 'Live'
+          ? 'Affiliate is Live'
+          : status === 'Testing'
+            ? 'Affiliate status: Testing (waiting for go-live approval)'
+            : `Affiliate status: ${status}`,
       category: 'Setup',
       scope: 'Affiliate',
       status: status === 'Live' ? 'ok' : 'missing',
