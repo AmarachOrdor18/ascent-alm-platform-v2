@@ -102,7 +102,8 @@ export const AFFILIATE_STEP_META: Record<AffiliateStep, StepMeta> = {
     title: 'Liquidity treatment',
     what: 'Give every product your files created its HQLA status and LCR / NSFR factors - each row is pre-filled from the product’s common-account family.',
     why: 'LCR and NSFR classify the book by product; an untreated product lands in results as "Not classified".',
-    needed: 'Review the pre-filled rows, adjust any factor, then save. Saving raises the approval request; an Approver decides it.',
+    needed:
+      'Review the pre-filled rows, adjust any factor, then save. Saving raises the approval request; an Approver decides it.',
     next: 'Run the readiness check and ask for go-live.',
   },
   readiness: {
@@ -1199,7 +1200,9 @@ const HQLA_LEVELS = ['Level 1', 'Level 2A', 'Level 2B', 'None'] as const;
 function useLiquidityCoverage(affiliateCode: string, posDate: string | null) {
   const { data: positions = [] } = usePositions(affiliateCode);
   const { data: rules = [] } = useRules<ProductCharacteristicRule>('ProductCharacteristic');
-  const { data: requests = [] } = approvals.useList(affiliateCode);
+  // Every request this user can see - the Group default's approval is a Group request, not the affiliate's;
+  // filtering to the affiliate made an approved Group rule look unapproved and every product "uncovered".
+  const { data: requests = [] } = approvals.useList();
   const book = useMemo(() => (posDate ? positions.filter((p) => p.asOfDate === posDate) : []), [positions, posDate]);
   const inUse = useMemo(() => effectiveProductRule(rules, affiliateCode, requests), [rules, requests, affiliateCode]);
   // The affiliate's newest own active rule - the save target. It is what the draft merges into, even
@@ -1269,7 +1272,12 @@ export function LiquidityStep({ affiliate, onBack, onContinue }: AffStepProps) {
 
   // The draft merged over the affiliate's own rule - what a run would see after the save and the
   // approval. Only after this merge can the step tell "done" from "complete".
-  const draftAssumptions = useMemo(() => (rows ? [...(own?.assumptions ?? []), ...rows] : null), [rows, own]);
+  // Group default rows still apply under the affiliate's own (own product rows win in the lookup), so a product
+  // the Group already covers by common account is never counted as uncovered.
+  const draftAssumptions = useMemo(
+    () => (rows ? [...(liquidity.inUse?.assumptions ?? []), ...(own?.assumptions ?? []), ...rows] : null),
+    [rows, own, liquidity.inUse],
+  );
   const uncoveredDraft = useMemo(
     () => (draftAssumptions ? uncoveredProducts(liquidity.book, draftAssumptions) : uncovered),
     [liquidity.book, draftAssumptions, uncovered],
@@ -1313,27 +1321,29 @@ export function LiquidityStep({ affiliate, onBack, onContinue }: AffStepProps) {
 
   return (
     <div className="space-y-4">
-      <Card title="Liquidity treatment for your products" description="HQLA level, LCR role and rate, ASF and RSF factors by product.">
+      <Card
+        title="Liquidity treatment for your products"
+        description="HQLA level, LCR role and rate, ASF and RSF factors by product."
+      >
         {liquidity.book.length === 0 ? (
           <p className="text-[13px] text-gray-500">
             Upload your position files first - the products to treat come from the books they create.
           </p>
         ) : pendingCoversAll && !showDraft && own ? (
           <p className="text-[13px] text-navy-900">
-            <StatusBadge status="Waiting for approval" tone="warning" /> Treatment for every product is saved as
-            version {own.version} - an approver decides it under Approvals. Runs use it once approved.
+            <StatusBadge status="Waiting for approval" tone="warning" /> Treatment for every product is saved as version{' '}
+            {own.version} - an approver decides it under Approvals. Runs use it once approved.
           </p>
         ) : uncovered.length === 0 && !showDraft ? (
           <p className="text-[13px] text-navy-900">
-            <StatusBadge status="Covered " tone="success" /> Every product in the {formatDate(posDate!)} book
-            carries liquidity treatment.
+            <StatusBadge status="Covered " tone="success" /> Every product in the {formatDate(posDate!)} book carries
+            liquidity treatment.
           </p>
         ) : (
           <p className="text-[13px] text-gray-500">
-            {uncoveredDraft.length} of{' '}
-            {new Set(liquidity.book.map((p) => `${p.productCode}|${p.currency}`)).size} product(s) still uncovered -
-            the rows below are pre-filled from each product's common-account family. Adjust any factor, then
-            save: the change goes to Approvals for a second sign-off.
+            {uncoveredDraft.length} of {new Set(liquidity.book.map((p) => `${p.productCode}|${p.currency}`)).size}{' '}
+            product(s) still uncovered - the rows below are pre-filled from each product's common-account family. Adjust
+            any factor, then save: the change goes to Approvals for a second sign-off.
           </p>
         )}
       </Card>
@@ -1389,9 +1399,7 @@ export function LiquidityStep({ affiliate, onBack, onContinue }: AffStepProps) {
                         min={0}
                         max={100}
                         value={row[field] ?? ''}
-                        onChange={(e) =>
-                          update(i, { [field]: e.target.value === '' ? null : Number(e.target.value) })
-                        }
+                        onChange={(e) => update(i, { [field]: e.target.value === '' ? null : Number(e.target.value) })}
                         className={`${cell} w-20`}
                       />
                     </td>
