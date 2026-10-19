@@ -408,7 +408,10 @@ export class LocalRepository implements Repository {
         const becameApproved = row.status === 'Approved' && previous?.status !== 'Approved';
         if (becameApproved && row.module === 'Affiliates' && row.action === 'Activate') {
           const affiliate = await this.database.affiliates.get(row.entityId);
-          if (affiliate && (affiliate.status === 'Testing' || affiliate.status === 'Suspended')) {
+          // 'Onboarding' included: a new affiliate never passes through 'Testing' unless a Group user
+          // moves the status by hand in Affiliate Settings - the welcome readiness flow raises the
+          // Activate request straight from 'Onboarding', and approving it must still make it Live.
+          if (affiliate && (affiliate.status === 'Onboarding' || affiliate.status === 'Testing' || affiliate.status === 'Suspended')) {
             await this.database.affiliates.put({ ...affiliate, status: 'Live' });
           }
         }

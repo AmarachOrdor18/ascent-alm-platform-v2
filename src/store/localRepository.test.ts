@@ -498,6 +498,25 @@ describe('reset', () => {
   });
 });
 
+const activateRequestFor = (code: string, name: string, id: string, status: 'Pending' | 'Approved' | 'Rejected') => ({
+  id,
+  module: 'Affiliates',
+  entityType: 'Affiliate',
+  entityId: code,
+  entityLabel: name,
+  action: 'Activate' as const,
+  summary: 'go live',
+  affiliateCode: code,
+  status,
+  requestedBy: 'Maker',
+  requestedById: 'U-1',
+  requestedAt: '2026-10-01T00:00:00Z',
+  decidedBy: status === 'Pending' ? null : 'Checker',
+  decidedById: status === 'Pending' ? null : 'U-2',
+  decidedAt: status === 'Pending' ? null : '2026-10-02T00:00:00Z',
+  decisionNote: null,
+});
+
 describe('affiliate activation through approval', () => {
   it('moves the affiliate Live only when its Activate request is approved', async () => {
     await repo.upsertAffiliate(affiliate('GH', { status: 'Testing' }));
@@ -531,5 +550,17 @@ describe('affiliate activation through approval', () => {
       decidedById: 'U-2',
     });
     expect((await repo.getAffiliate('GH'))?.status).toBe('Live');
+  });
+
+  // A brand-new affiliate sits in 'Onboarding' and the welcome readiness flow raises its Activate
+  // request straight from there - the approval must still make it Live, not silently do nothing.
+  it('activates an affiliate that is still Onboarding - and re-approving a decided request does not flip it back', async () => {
+    await repo.upsertAffiliate(affiliate('NG', { status: 'Onboarding' }));
+    await repo.upsertApprovalRequest(activateRequestFor('NG', 'Ecobank NG', 'APR-3', 'Pending'));
+    expect((await repo.getAffiliate('NG'))?.status).toBe('Onboarding');
+    await repo.upsertApprovalRequest(activateRequestFor('NG', 'Ecobank NG', 'APR-3', 'Rejected'));
+    expect((await repo.getAffiliate('NG'))?.status).toBe('Onboarding');
+    await repo.upsertApprovalRequest(activateRequestFor('NG', 'Ecobank NG', 'APR-4', 'Approved'));
+    expect((await repo.getAffiliate('NG'))?.status).toBe('Live');
   });
 });
