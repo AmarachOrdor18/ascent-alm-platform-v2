@@ -38,7 +38,7 @@ def cover(i, text):
     set_text(p, text)
 
 
-cover(9, 'Response to Clarification Questions')
+cover(9, 'Clarification Response & Validation Guide')
 cover(10, 'Ecobank Group – Asset & Liability Management (ALM) Platform')
 cover(14, '19th October 2026')
 
@@ -130,36 +130,73 @@ def table(header, rows, widths):
 
 
 # ══ Content ══
+
+
+def subhead(text):
+    """A capability title: the body paragraph's bold lead, in the heading navy, a little larger."""
+    p = copy.deepcopy(T_BODY)
+    runs = p.findall(qn('w:r'))
+    for r in runs[1:]:
+        p.remove(r)
+    r = runs[0]
+    r.find(qn('w:t')).text = text
+    rpr = r.find(qn('w:rPr'))
+    rpr.append(rpr.makeelement(qn('w:color'), {qn('w:val'): '1F3864'}))
+    for sz in rpr.findall(qn('w:sz')):
+        sz.set(qn('w:val'), '22')
+    ppr = p.find(qn('w:pPr'))
+    sp = ppr.find(qn('w:spacing'))
+    if sp is not None:
+        sp.set(qn('w:before'), '160')
+    keep = ppr.makeelement(qn('w:keepNext'), {})
+    ppr.insert(0, keep)
+    add(p)
+
+
+def capability(code, title, question, answer, steps, scenarios):
+    subhead(f'{code}. {title}')
+    lead('Question.', question)
+    lead('Response.', answer)
+    lead('How to test it.', '')
+    for i, (text, expected) in enumerate(steps, 1):
+        lead(f'{i}.', text)
+        if expected:
+            lead('You should see:', expected)
+    if scenarios:
+        lead('Scenarios to try.', '')
+        for s_ in scenarios:
+            lead('•', s_)
+
+
 heading('1. Introduction')
-lead('Purpose.', 'This document is Qucoon’s response to the clarification questions raised by Ecobank Group on the '
-     'behavioural modelling and funds transfer pricing (FTP) capabilities of the proposed Asset & Liability Management '
-     '(ALM) platform, Ascent ALM. Each answer states what the platform does and where Ecobank can see it working.')
-lead('Background.', 'Ecobank Group asked whether the proposed solution derives behavioural assumptions natively, applies '
-     'them across all ALM calculations without re-entry, and provides a complete FTP and profitability engine on the '
-     'same cashflows as liquidity and interest-rate risk. The answers below are confirmed against the working platform.')
-lead('How to read the answers.', 'Every response gives a direct answer, a short explanation and the screen in the platform '
-     'where the capability can be tested end to end by Ecobank’s own users, without Qucoon support.')
+lead('Purpose.', 'This document answers Ecobank Group’s clarification questions on the behavioural modelling and funds '
+     'transfer pricing (FTP) capabilities of the proposed Asset & Liability Management (ALM) platform, Ascent ALM, and '
+     'is also a guide for Ecobank’s business team to validate each answer on the platform themselves.')
+lead('How it is organised.', 'For every question you will find our response, the exact steps to test it - who to sign in as, '
+     'what to click and what you should see - and further scenarios to try. No support from Qucoon is needed to follow it.')
 
 heading('2. Platform Access')
-lead('Link.', 'The capabilities in this document can be validated directly on the Ascent ALM user-acceptance environment at '
-     'https://ascent-alm-v2.vercel.app (any modern browser; no installation).')
-lead('Sign-in.', 'Use the accounts below, each set up with a different role so the business team can see maker-checker '
-     'controls working. The password is provided separately with this document. Dedicated named accounts for Ecobank’s '
-     'reviewers can be created on request, and are recommended for any extended review.')
+lead('Link.', 'https://ascent-alm-v2.vercel.app - open it in any modern browser (Chrome or Edge recommended); nothing needs '
+     'to be installed.')
+lead('Sign-in.', 'Use the accounts below. Each has a different role so that the controls between people (one person makes '
+     'a change, another approves it) can be seen working. The password is provided separately with this document. '
+     'Named accounts for Ecobank’s reviewers can be created on request.')
 table(
-    ['Role', 'Sign-in (email)', 'Use it to validate'],
+    ['Role', 'Sign-in (email)', 'Use it for'],
     [
-        ['Organisation Admin', 'adaeze.okonkwo@ecobank.com', 'Group set-up, market data, Group assumptions, users'],
-        ['ALM Analyst', 'chinwe.okafor@ecobank.com', 'Behavioural models (B1–B5), runs, FTP and profitability results (F1–F4)'],
-        ['Approver', 'kofi.mensah@ecobank.com', 'Approving model-derived assumptions and run sign-offs (B6)'],
-        ['Affiliate Admin (Nigeria)', 'ngadmin.test@ecobank.com', 'An affiliate’s own view: data, its own assumptions, readiness'],
+        ['ALM Analyst', 'chinwe.okafor@ecobank.com', 'Most tests: behavioural models, runs and results'],
+        ['Approver', 'kofi.mensah@ecobank.com', 'Approving model-derived assumptions and run sign-offs'],
+        ['Organisation Admin', 'adaeze.okonkwo@ecobank.com', 'Group settings, market data, users and the audit log'],
+        ['Affiliate Admin (Nigeria)', 'ngadmin.test@ecobank.com', 'Nigeria’s own view and its own assumptions'],
         ['Viewer', 'yaw.boateng@ecobank.com', 'Read-only access to results and reports'],
     ],
     [2300, 3000, 3634],
 )
-lead('Guide.', 'A step-by-step validation walkthrough (ALM_UAT_Walkthrough) accompanies this document; the numbered '
-     'sections referenced below can be followed without Qucoon support. In the platform, choose the affiliate with Scope '
-     'and the month-end with As of at the top of the page.')
+lead('Finding your way.', 'The menu on the left has seven areas: Home, Data, Assumptions, Run & results, Approvals, Reports '
+     'and Admin. At the top of every page, Scope chooses the affiliate (or Group) and As of chooses the month-end; every '
+     'screen follows these two. The bell shows notifications, and the run label next to the date shows which run the '
+     'results are read from. The ⓘ next to a title explains that screen.')
+lead('Before each test.', 'Set Scope to Ecobank Nigeria and As of to 31 Jul 2026 unless the steps say otherwise.')
 spacer()
 
 heading('3. Summary of Responses')
@@ -183,120 +220,224 @@ table(
 spacer()
 
 heading('4. Behavioural Modelling & Assumptions')
-table(
-    ['ID', 'Question', 'Response', 'Where to see it in the platform'],
+capability(
+    'B1', 'Native behavioural modelling engine',
+    'Does the proposed solution include a native behavioural modelling engine capable of analysing historical '
+    'transactional and balance data and independently deriving behavioural assumptions?',
+    'Yes. The platform includes a native behavioural modelling engine that ingests historical transactional and balance '
+    'data, performs statistical analysis, and derives behavioural assumptions independently within the platform.',
     [
-        ['B1', 'Does the proposed solution include a native behavioural modelling engine capable of analysing historical '
-               'transactional and balance data and independently deriving behavioural assumptions?',
-         'Yes. The platform includes a native behavioural modelling engine that ingests historical transactional and '
-         'balance data, performs statistical analysis, and derives behavioural assumptions independently within the platform.',
-         'Data → Upload data (balance and account history), then Assumptions → Behavioural models → Calibrate.'],
-        ['B2', 'Can the system perform statistical regression, time-series analysis and other relevant modelling techniques '
-               'internally, without requiring Python, R, Excel or third-party analytical software?',
-         'Yes. All statistical modelling including regression analysis, time-series decomposition and curve fitting is '
-         'performed natively within the platform. No external tools such as Python, R, Excel or third-party software are required.',
-         'Behavioural models → Fit model: R², RMSE, MAPE, p-values and 95% confidence intervals are shown on screen.'],
-        ['B3', 'Can the solution calculate core and non-core deposit balances, deposit stability, decay rates and expected '
-               'runoff profiles using historical data?',
-         'Yes. The engine segments deposits into core and non-core categories based on historical behaviour, calculates '
-         'deposit stability metrics, derives decay rates and generates expected runoff profiles. Segmentation is '
-         'configurable by deposit type, client type, tenor, currency and affiliate.',
-         'Model “Deposit stability & run-off”: core method (minimum balance or volatility), segment by product, '
-         'customer type, currency or tenor band; decay rate, half-life and runoff chart.'],
-        ['B4', 'Can the solution independently estimate loan prepayment rates, early withdrawal behaviour, deposit renewal '
-               'rates and repricing betas?',
-         'Yes. The behavioural engine models loan prepayment rates, early withdrawal patterns, deposit renewal behaviour and '
-         'repricing betas using historical data. Outputs are model-derived assumptions that can be reviewed, adjusted and '
-         'approved by authorised users before application.',
-         'Models “Loan prepayment” (CPR), “Term deposit” (renewal and early withdrawal) and '
-         '“Repricing beta” (beta, lag, fit statistics against the central bank policy rate).'],
-        ['B5', 'Can users calibrate, back-test and validate behavioural models entirely within the proposed solution?',
-         'Yes. The platform provides built-in calibration, back-testing and validation tools. Users compare model outputs '
-         'against observed outcomes, assess model fit, review confidence intervals and adjust parameters within the platform. '
-         'Model versions are tracked with full audit trails.',
-         'Back-test hold-out and tolerance (MAE, RMSE, MAPE, bias, Pass/Fail); Behavioural models → Model register; '
-         'Admin → Audit log.'],
-        ['B6', 'Once approved, are behavioural assumptions automatically applied to liquidity risk, IRRBB, FTP, stress testing '
-               'and forecasting without manual transfer or re-entry?',
-         'Yes. Once behavioural assumptions are approved through the platform’s maker-checker workflow, they are '
-         'automatically applied across all dependent modules - liquidity risk, IRRBB, FTP, stress testing and forecasting. '
-         'No manual transfer, re-entry or file export is required.',
-         'Model register → Propose as assumption → Approvals (a second user approves) → Run now; '
-         'Run & results → Behavioural analysis lists the approved version each run applied.'],
-        ['B7', 'Is the complete behavioural modelling, calibration and back-testing functionality included in the proposed '
-               'licence and implementation scope, or does it require an additional module, external consultancy or a '
-               'separate modelling platform?',
-         'Fully included. The behavioural modelling engine, calibration tools and back-testing functionality are all part of '
-         'the core platform scope and the proposed commercial terms.',
-         'All of the above runs in the same platform - no separate module, export or external tool.'],
+        ('Sign in as the ALM Analyst. Go to Data → Data sources and open Balance history, then Account history.',
+         'the history loaded for Ecobank Nigeria - 24 month-ends of balances by product, customer type and currency, and '
+         'account-level history.'),
+        ('Go to Assumptions → Behavioural models → Calibrate.',
+         'a coverage table showing how many months of history each segment has (for example DDA · Retail · NGN: 24).'),
     ],
-    [600, 2650, 3384, 2300],
+    ['Upload a further month of history (Data → Upload data, choose the file) and open Calibrate again: the coverage '
+     'for each segment increases by one month.'],
+)
+capability(
+    'B2', 'Statistics computed inside the platform',
+    'Can the system perform statistical regression, time-series analysis and other relevant modelling techniques '
+    'internally, without requiring Python, R, Excel or third-party analytical software?',
+    'Yes. All statistical modelling including regression analysis, time-series decomposition and curve fitting is '
+    'performed natively within the platform. No external tools such as Python, R, Excel or third-party software are required.',
+    [
+        ('In Calibrate, choose Model = Deposit stability & run-off and Segment = DDA · Retail · NGN, then click Fit model.',
+         'the fit statistics on screen - R², RMSE, MAPE, p-values and 95% confidence intervals - calculated in the '
+         'browser session with nothing downloaded.'),
+    ],
+    ['Choose another segment (for example TD · Corporate · NGN) and fit again: every statistic is recalculated '
+     'for that segment.'],
+)
+capability(
+    'B3', 'Core and non-core deposits, stability, decay and runoff',
+    'Can the solution calculate core and non-core deposit balances, deposit stability, decay rates and expected runoff '
+    'profiles using historical data?',
+    'Yes. The engine segments deposits into core and non-core categories based on historical behaviour, calculates deposit '
+    'stability metrics, derives decay rates and generates expected runoff profiles. Segmentation is configurable by deposit '
+    'type, client type, tenor, currency and affiliate.',
+    [
+        ('With the Deposit stability & run-off model fitted (B2), read the results panel.',
+         'the core and non-core (volatile) split, stability measures, the decay rate and half-life, and a run-off profile chart.'),
+        ('Change Core method from Minimum balance to Volatility and click Fit model.',
+         'a different core amount, calculated by the second method.'),
+    ],
+    ['Change Segment by to product, customer type, currency or tenor band: the list of segments changes accordingly.',
+     'Change Scope to Ecobank Ghana: the same model is fitted on Ghana’s own history.'],
+)
+capability(
+    'B4', 'Prepayment, early withdrawal, renewal and repricing betas',
+    'Can the solution independently estimate loan prepayment rates, early withdrawal behaviour, deposit renewal rates and '
+    'repricing betas?',
+    'Yes. The behavioural engine models loan prepayment rates, early withdrawal patterns, deposit renewal behaviour and '
+    'repricing betas using historical data. Outputs are model-derived assumptions that can be reviewed, adjusted and '
+    'approved by authorised users before application.',
+    [
+        ('In Calibrate choose Model = Loan prepayment and click Fit model.',
+         'an annual prepayment rate (CPR) with its confidence interval.'),
+        ('Choose Model = Term deposit, select the period and click Fit model.',
+         'the renewal (roll-over) rate and the early-withdrawal rate.'),
+        ('Choose Model = Repricing beta, Policy series = CBN_MPR (the Central Bank of Nigeria policy rate) and click Fit model.',
+         'the beta with its standard error, p-value, R², confidence interval and the best lag in months.'),
+    ],
+    ['Run the repricing beta for Ecobank Ghana with the BOG_POLICY series and compare the beta with Nigeria’s.'],
+)
+capability(
+    'B5', 'Calibration, back-testing and validation',
+    'Can users calibrate, back-test and validate behavioural models entirely within the proposed solution?',
+    'Yes. The platform provides built-in calibration, back-testing and validation tools. Users compare model outputs against '
+    'observed outcomes, assess model fit, review confidence intervals and adjust parameters within the platform. Model '
+    'versions are tracked with full audit trails.',
+    [
+        ('On the Deposit stability & run-off model set Back-test hold-out = 3 months and Tolerance = MAPE 10%, then Fit model.',
+         'predicted against actual balances for the three held-out months, the errors (MAE, RMSE, MAPE, bias) and a Pass or '
+         'Fail verdict.'),
+        ('Click Save to model register, then open the Model register tab.',
+         'the saved model run with its segment, data window, parameters, fit statistics, back-test result and status Draft.'),
+    ],
+    ['Set the tolerance to MAPE 1% and fit again: the back-test now shows Fail.',
+     'Sign in as the Organisation Admin and open Admin → Audit log: each fit and save is recorded with who and when; '
+     'entries cannot be edited or deleted.'],
+)
+capability(
+    'B6', 'Approved assumptions flow into every calculation',
+    'Once approved, are behavioural assumptions automatically applied to liquidity risk, IRRBB, FTP, stress testing and '
+    'forecasting without manual transfer or re-entry?',
+    'Yes. Once behavioural assumptions are approved through the platform’s maker-checker workflow, they are '
+    'automatically applied across all dependent modules - liquidity risk, IRRBB, FTP, stress testing and forecasting. '
+    'No manual transfer, re-entry or file export is required.',
+    [
+        ('As the ALM Analyst, in the Model register select the saved model run and click Propose as assumption.',
+         'exactly what will change (for example “core share 60% → 58%”) and the status Proposed - waiting for approval.'),
+        ('Sign in as the Approver. Go to Approvals → Waiting for me and click Review on the request.',
+         'the proposed assumption in full - each setting before and after - then click Approve.'),
+        ('Sign in as the ALM Analyst. Set As of = 31 Aug 2026 and go to Run & results → Run now → Execute.',
+         'a new run version for Ecobank Nigeria · 31 Aug 2026.'),
+        ('Go to Run & results → Interest rate → Behavioural analysis.',
+         '“Patterns this run applied” naming the version just approved. Liquidity → Maturity & repricing gap, '
+         'Interest rate → NII & EVE, FTP & profitability and Stress & scenarios all use it - nothing was re-entered.'),
+    ],
+    ['As the ALM Analyst, try to approve your own proposal in Approvals: it is refused - the person who makes a change '
+     'cannot approve it.',
+     'Propose a second change and leave it unapproved, then run: the run still uses the previously approved assumption.',
+     'As the Approver, reject a proposal without a reason: rejection needs a reason; once given, the proposal is not used.'],
+)
+capability(
+    'B7', 'Included in scope',
+    'Is the complete behavioural modelling, calibration and back-testing functionality included in the proposed licence '
+    'and implementation scope, or does it require an additional module, external consultancy or a separate modelling platform?',
+    'Fully included. The behavioural modelling engine, calibration tools and back-testing functionality are all part of the '
+    'core platform scope and the proposed commercial terms.',
+    [('Repeat B1 to B6 above.', 'every step happened in the same platform - no separate module, export or external tool.')],
+    [],
 )
 spacer()
 
 heading('5. FTP & Profitability')
-table(
-    ['ID', 'Question', 'Response', 'Where to see it in the platform'],
+capability(
+    'F1', 'Complete FTP engine',
+    'Is the complete FTP engine included in the proposed commercial solution, including matched-maturity FTP, pooled '
+    'funding, liquidity premiums and basis/currency adjustments?',
+    'Yes. The FTP engine is fully included in the proposed scope and commercial terms. It supports matched-maturity FTP, '
+    'pooled funding rate allocation, liquidity premium assignment, and basis and currency adjustments.',
     [
-        ['F1', 'Is the complete FTP engine included in the proposed commercial solution, including matched-maturity FTP, '
-               'pooled funding, liquidity premiums and basis/currency adjustments?',
-         'Yes. The FTP engine is fully included in the proposed scope and commercial terms. It supports matched-maturity FTP, '
-         'pooled funding rate allocation, liquidity premium assignment, and basis and currency adjustments.',
-         'Assumptions → Rules & scenarios → FTP method & curve and FTP add-ons; FTP & profitability → '
-         'Transfer pricing → Compare methods.'],
-        ['F2', 'Can the solution calculate FTP at individual transaction level and automatically aggregate the results by '
-               'product, business unit, affiliate and Group?',
-         'Yes. FTP is calculated at the individual instrument/transaction level and automatically aggregated by product, '
-         'business unit, affiliate and Group. Users can drill down from Group-level profitability to the underlying '
-         'transaction detail.',
-         'Transfer pricing drill-down: Group → affiliate → business unit → product → positions; each '
-         'line shows base rate, add-ons and all-in rate.'],
-        ['F3', 'Does the FTP engine use the same contractual and behavioural cashflows as the liquidity and IRRBB engines?',
-         'Yes. All engines operate on a single, consistent set of cashflow data. The contractual and behavioural cashflows '
-         'used by the FTP engine are the same cashflows used by the liquidity and IRRBB engines. There is no duplication or '
-         'separate data pipeline.',
-         'Approve a prepayment assumption and re-run: the behavioural gap, loan FTP rates and EVE all move together.'],
-        ['F4', 'Can the system allocate funding costs, operating expenses, expected credit losses and capital charges to '
-               'support product and customer profitability analysis?',
-         'Yes. The profitability module supports multi-layer cost allocation including funding costs (via FTP), operating '
-         'expense allocation, expected credit loss attribution and capital charges. This enables full product-level and '
-         'customer-level profitability analysis.',
-         'FTP & profitability → Profitability: waterfall to risk-adjusted profit and RAROC, Product / Customer view, '
-         'cost pool reconciliation.'],
+        ('Go to Assumptions → Rules & scenarios and open FTP method & curve.',
+         'the default method (matched maturity), the method and curve per product class, and funding pools.'),
+        ('Go back (← Rules & scenarios) and open FTP add-ons.',
+         'the liquidity premium (for example 25 bps on loans) and the currency basis adjustment (40 bps on USD positions).'),
+        ('Go to Run & results → FTP & profitability → Transfer pricing and expand a loan line.',
+         'the method applied, the base rate from the curve, each add-on with its reason, and the all-in transfer rate.'),
+        ('Click Compare methods and pick a product.',
+         'the transfer rate under matched maturity, duration, average life, repricing term and pooled, side by side.'),
     ],
-    [600, 2650, 3384, 2300],
+    ['Look at a USD position: the currency basis add-on appears only on non-local-currency lines.'],
+)
+capability(
+    'F2', 'Transaction-level FTP with aggregation',
+    'Can the solution calculate FTP at individual transaction level and automatically aggregate the results by product, '
+    'business unit, affiliate and Group?',
+    'Yes. FTP is calculated at the individual instrument/transaction level and automatically aggregated by product, business '
+    'unit, affiliate and Group. Users can drill down from Group-level profitability to the underlying transaction detail.',
+    [
+        ('Set Scope = Group (As of 31 Jul 2026) and open FTP & profitability → Transfer pricing.',
+         'the Group view, consolidated from Ecobank Nigeria and Ecobank Ghana - no separate Group run is needed.'),
+        ('Drill down: Group → Ecobank Nigeria → a business unit → a product → the positions.',
+         'totals that add up at every level, down to each individual position.'),
+    ],
+    ['Switch the roll-up between business unit, product and affiliate: margins are shown for each grouping.'],
+)
+capability(
+    'F3', 'One set of cashflows for FTP, liquidity and IRRBB',
+    'Does the FTP engine use the same contractual and behavioural cashflows as the liquidity and IRRBB engines?',
+    'Yes. All engines operate on a single, consistent set of cashflow data. The contractual and behavioural cashflows used by '
+    'the FTP engine are the same cashflows used by the liquidity and IRRBB engines. There is no duplication or separate data '
+    'pipeline.',
+    [
+        ('As the ALM Analyst go to Assumptions → Rules & scenarios → Loan prepayment, set a prepayment rate (for '
+         'example 8% a year) and save. As the Approver, approve it in Approvals.', ''),
+        ('As the ALM Analyst, with As of = 31 Aug 2026, go to Run & results → Run now → Execute.',
+         'a new run version.'),
+        ('Use the run label at the top to switch between the previous and the new version, and compare Liquidity → '
+         'Maturity & repricing gap, FTP & profitability → Transfer pricing (loan rates) and Interest rate → NII & EVE.',
+         'all three change together: loans repay earlier in the gap, loan transfer rates shorten, and EVE moves - one set of cashflows.'),
+    ],
+    [],
+)
+capability(
+    'F4', 'Full product and customer profitability',
+    'Can the system allocate funding costs, operating expenses, expected credit losses and capital charges to support '
+    'product and customer profitability analysis?',
+    'Yes. The profitability module supports multi-layer cost allocation including funding costs (via FTP), operating expense '
+    'allocation, expected credit loss attribution and capital charges. This enables full product-level and customer-level '
+    'profitability analysis.',
+    [
+        ('Go to Run & results → FTP & profitability → Profitability.',
+         'a waterfall from client interest through transfer pricing, operating expenses, expected credit loss and the capital '
+         'charge to risk-adjusted profit, with RAROC.'),
+        ('Switch between Product view and Customer view and drill down.',
+         'profitability by product and by customer, down to individual positions.'),
+        ('Read the cost pool reconciliation panel.',
+         'for each operating cost pool, allocated plus unallocated equals the pool - nothing is lost or double counted.'),
+    ],
+    ['Open Assumptions → Rules & scenarios → Operating cost allocation, Expected credit loss and Capital charge to '
+     'see the inputs; a change goes to Approvals and is used by the next run once approved.',
+     'Set Scope = Group to see profitability consolidated across Nigeria and Ghana.'],
 )
 spacer()
 
 heading('6. Demonstration Environment')
-lead('Set-up.', 'The answers above can be tested on the Ascent ALM user-acceptance environment, configured for Ecobank Group '
-     'with its affiliates onboarded through the platform’s own onboarding flow, Group market data loaded once for all '
-     'affiliates, and Group-default assumptions approved through maker-checker.')
+lead('Set-up.', 'The test environment is configured for Ecobank Group. Affiliates were onboarded through the platform’s '
+     'own onboarding flow, market data is loaded once by Group for every affiliate, and Group-default assumptions are '
+     'approved through maker-checker.')
 table(
     ['Affiliate', 'Status', 'Month-end runs', 'Notes'],
     [
-        ['Ecobank Nigeria', 'Live', '2', '31 Jul 2026 (signed off) and 31 Aug 2026; behavioural, FTP and profitability results'],
-        ['Ecobank Ghana', 'Live', '1', '31 Jul 2026; onboarded through the same affiliate flow'],
+        ['Ecobank Nigeria', 'Live', '2', '31 Jul 2026 (signed off) and 31 Aug 2026'],
+        ['Ecobank Ghana', 'Live', '1', '31 Jul 2026'],
         ['Ecobank Group', 'Consolidated', '-', 'No separate Group run: the Group view consolidates each Live affiliate’s '
          'official run for the month-end (e.g. 31 Jul 2026 = Nigeria + Ghana)'],
     ],
-    [2000, 1400, 900, 4634],
+    [2000, 1400, 1500, 4034],
 )
 spacer()
 
-heading('7. Notes and Assumptions')
-lead('Data loading.', 'In the test environment historical balance, account and position data are loaded through the '
-     'platform’s data sources by file upload, checked and admitted by Ecobank users. Automated connectors to source '
-     'systems are configured during implementation.')
+heading('7. Notes')
+lead('Data loading.', 'In the test environment historical balance, account and position data are loaded by file upload '
+     'through the platform’s data sources, where they are checked and admitted by Ecobank users. Automated connectors '
+     'to source systems are configured during implementation.')
 lead('Governance.', 'Every assumption change, model proposal and run sign-off passes through maker-checker approval; the '
-     'person who raises a change cannot approve it, and every action is recorded in an append-only audit log.')
+     'person who raises a change cannot approve it, and every action is recorded in an audit log that cannot be edited.')
+lead('Shared environment.', 'Changes made while testing (for example approving a new assumption) are visible to everyone '
+     'using the environment. A version is never overwritten - earlier versions and runs stay available.')
 
 heading('8. Next Steps')
-lead('Next steps.', 'Ecobank’s business team validates the capabilities above on the user-acceptance environment (Section 2) '
-     'using the walkthrough provided. Qucoon is available to clarify any point or set up named reviewer accounts.')
+lead('Next steps.', 'Ecobank’s business team validates the capabilities above using Section 2 to sign in. Qucoon is '
+     'available to clarify any point or to set up named reviewer accounts.')
 plain('Please let us know if any further clarification is required.')
 
 heading('9. Sign-off')
+
 sign = copy.deepcopy(T_SIGN)
 trs = sign.findall(qn('w:tr'))
 names = [
@@ -317,6 +458,6 @@ for name, role, org in names:
     sign.append(tr)
 add(sign)
 
-d.core_properties.title = 'Response to Clarification Questions - Ecobank Group ALM Platform'
+d.core_properties.title = 'Clarification Response & Validation Guide - Ecobank Group ALM Platform'
 d.save(OUT)
 print('->', OUT)

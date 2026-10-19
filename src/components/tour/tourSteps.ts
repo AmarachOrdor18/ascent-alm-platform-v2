@@ -82,7 +82,7 @@ const DASHBOARD: Step[] = [
     '/dashboard',
     sel.tour('run-strip'),
     'Every number comes from one run',
-    'This strip names the run behind the page. "Source data" shows exactly which uploaded files it used.',
+    'This strip names the run behind the page. "Source data" shows exactly which uploaded files it used. At Group scope it reads "Group consolidated" - the affiliates’ own runs combined, with no separate Group run.',
   ),
   s(
     '/dashboard',
@@ -129,7 +129,7 @@ const UPLOAD: Step[] = [
     '/data/operations',
     sel.tour('sources-table'),
     'Data sources',
-    'Each source belongs to one affiliate (or Group, for market data) and carries one kind of data. Click a source to see its lobby, fields and loads.',
+    'Each source belongs to one affiliate and carries one kind of data (Loans, Deposits, Treasury, General ledger, history). At Group scope this is a grid - one row per affiliate, one column per source. Click a source to see its lobby, fields and loads.',
     { permission: 'data.view' },
   ),
   s('/data/operations', sel.tour('upload-data'), 'Upload data', 'Next opens the upload window.', {
@@ -140,7 +140,7 @@ const UPLOAD: Step[] = [
     '',
     sel.tour('upload-drop'),
     'Drop your files',
-    'Drop one or several files. Each goes to the source whose columns it matches, and is checked before anything is saved: row counts, column matching, the date in the file, duplicates and unknown codes.',
+    'Drop one or several files. Each goes to the source whose columns it matches and is loaded as of the As-of date at the top of the page. Everything is checked before it is saved: row counts, column matching, duplicates and unknown codes.',
     { permission: 'data.upload' },
   ),
   s(
@@ -249,7 +249,7 @@ const READINESS: Step[] = [
     '/execution/readiness',
     sel.tour('page-header'),
     'Are we ready to run?',
-    'For the scope in the header: at Group, market data and one row per affiliate; for an affiliate, its checklist - data, market data from Group, assumptions and governance - with who can fix each open item.',
+    'For the scope in the header: at Group, market data and one row per affiliate; for an affiliate, a compact checklist - data, market data from Group, assumptions and governance - with who can fix each open item. A date already signed off shows "Signed off": reopen it to run again.',
     { permission: 'risk.view' },
   ),
 ];
@@ -628,9 +628,9 @@ const FTP: Step[] = [
   ),
   s(
     '/treasury/ftp',
-    'heading:Margin by business unit',
-    'Margin by business unit',
-    "Each unit's margin after paying Treasury for funding - its real contribution.",
+    'heading:FTP margin drill-down',
+    'Margin drill-down',
+    "Drill from Group to affiliate, business unit, product and position - each one's margin after paying Treasury for funding.",
     { permission: 'treasury.view' },
   ),
   s(

@@ -35,6 +35,7 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
+        data-tour="drawer"
         className={`relative flex max-h-full w-full flex-col overflow-y-auto rounded-2xl bg-white shadow-2xl ${wide === 'xl' ? 'max-w-4xl' : wide ? 'max-w-2xl' : 'max-w-lg'}`}
       >
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
@@ -46,6 +47,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tour="drawer-close"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-navy-900"
           >
             ✕
