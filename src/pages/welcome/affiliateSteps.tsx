@@ -6,6 +6,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Drawer } from '@/components/ui/Drawer';
 import { LedgerCheckPanel } from '@/components/data/LedgerCheckPanel';
+import { SourceDrawer, type SourceTab } from '@/components/data/SourceDrawer';
 import { useQuery } from '@tanstack/react-query';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ROLES, canonicalRole, useAuth } from '@/context/AuthContext';
@@ -1086,6 +1087,9 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
   const { data: lobby = [] } = useLobby();
   const [uploading, setUploading] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  // A file sent to the lobby is admitted (or rejected) here - without leaving onboarding.
+  const [lobbySource, setLobbySource] = useState<string | null>(null);
+  const [lobbyTab, setLobbyTab] = useState<SourceTab>('lobby');
   const glSource = sources.find((s) => s.domain === 'GeneralLedger');
 
   return (
@@ -1106,7 +1110,15 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
               <li key={s.id} className="flex items-center justify-between py-2">
                 <span className="font-medium text-navy-900">{s.name}</span>
                 <span className="flex items-center gap-2">
-                  {waiting > 0 && <StatusBadge status={`${waiting} waiting to be admitted`} tone="warning" />}
+                  {waiting > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setLobbySource(s.id)}
+                      className="whitespace-nowrap rounded-full bg-warning-bg px-2.5 py-0.5 text-[12px] font-bold text-warning hover:underline"
+                    >
+                      Review &amp; admit ({waiting})
+                    </button>
+                  )}
                   {last ? (
                     <StatusBadge status={`Loaded for ${formatDate(last)}`} tone="success" />
                   ) : (
@@ -1137,6 +1149,21 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
       <StepFooter mode="wizard" onBack={onBack} onSubmit={onContinue} submitLabel="Continue" />
       {uploading && (
         <UploadDataModal sources={sources} groupView={false} pickDate onClose={() => setUploading(false)} />
+      )}
+      {lobbySource && (
+        <SourceDrawer
+          sourceId={lobbySource}
+          tab={lobbyTab}
+          onTab={setLobbyTab}
+          onClose={() => {
+            setLobbySource(null);
+            setLobbyTab('lobby');
+          }}
+          onUpload={() => {
+            setLobbySource(null);
+            setUploading(true);
+          }}
+        />
       )}
       {ledgerOpen && (
         <Drawer title="Ledger check" onClose={() => setLedgerOpen(false)} wide>
