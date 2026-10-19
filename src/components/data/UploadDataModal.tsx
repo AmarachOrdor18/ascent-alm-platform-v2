@@ -232,6 +232,8 @@ export function UploadDataModal({
 
   const submit = async (mode: 'lobby' | 'admit') => {
     setWorking(true);
+    // Files admitted together: the ledger check runs after each, but only the last result is the whole book.
+    const checkedKeys: string[] = [];
     try {
       for (const f of mode === 'lobby' ? lobbyReady : admitReady) {
         const check = f.check!;
@@ -251,6 +253,7 @@ export function UploadDataModal({
               records: check.records,
               reason: f.reason || null,
             });
+            if (out.reconciliation) checkedKeys.push(f.key);
             update(f.key, { outcome: { kind: 'admitted', reconciliation: out.reconciliation, derived: out.derived } });
           }
         } catch (err) {
@@ -258,6 +261,15 @@ export function UploadDataModal({
         }
       }
     } finally {
+      const earlier = new Set(checkedKeys.slice(0, -1));
+      if (earlier.size > 0)
+        setFiles((prev) =>
+          prev.map((f) =>
+            earlier.has(f.key) && f.outcome?.kind === 'admitted'
+              ? { ...f, outcome: { ...f.outcome, reconciliation: null } }
+              : f,
+          ),
+        );
       setWorking(false);
     }
   };
