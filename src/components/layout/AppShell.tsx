@@ -323,17 +323,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <input
                     id="scope-asof"
                     type="date"
-                    list="scope-asof-dates"
                     value={asOfDateChosen && asOfDate ? asOfDate : ''}
                     onChange={(e) => setAsOfDate(e.target.value || null)}
                     title="The working date - every upload is loaded as of this date, and readiness, runs and results use it."
                     className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[13px] font-medium text-navy-900 focus:border-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-700"
                   />
-                  <datalist id="scope-asof-dates">
-                    {availableDates.map((d) => (
-                      <option key={d} value={d} />
-                    ))}
-                  </datalist>
                   {!asOfDateChosen && (
                     <span className="text-[12px] text-gray-400">
                       {availableDates.length > 0 ? `Latest (${formatDate(availableDates[0]!)})` : 'Pick a date'}
