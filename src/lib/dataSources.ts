@@ -119,6 +119,7 @@ const COMMON_ALIASES: Record<string, string[]> = {
   value: ['observation', 'reading'],
   balance: ['closing balance', 'outstanding balance'],
   department: ['dept', 'contributor', 'business line'],
+  drCr: ['dr/cr', 'dr cr', 'debit/credit', 'debit credit', 'side', 'dc'],
   dataType: ['type', 'data type', 'kind', 'sheet'],
 };
 
@@ -150,9 +151,10 @@ const uniq = (names: string[]) => Array.from(new Set(names));
 export function defaultFieldsFor(domain: DataSourceDomain, contributor?: PositionContributor): SourceField[] {
   switch (domain) {
     case 'Positions': {
-      const columns = contributor
-        ? POSITION_TEMPLATES[contributor].columns
-        : uniq(ALL_CONTRIBUTORS.flatMap((c) => POSITION_TEMPLATES[c].columns));
+      // Every position source accepts the same columns - a deposits file may carry a repricing date or a
+      // customer, a treasury file a behavioural tag - so no department's file is stopped for a column its
+      // template happens not to list.
+      const columns = uniq(ALL_CONTRIBUTORS.flatMap((c) => POSITION_TEMPLATES[c].columns));
       return [
         ...uniq(columns).map((c) => field(c, ['id', 'category', 'amount'].includes(c), c === 'id')),
         field('asOfDate'),
@@ -166,6 +168,8 @@ export function defaultFieldsFor(domain: DataSourceDomain, contributor?: Positio
         field('orgUnitCode', false, true),
         field('currency'),
         field('endingBalance', true),
+        // Which side the balance sits on (Dr / Cr) - read for reference; balances are taken as given.
+        field('drCr'),
         field('asOfDate'),
       ];
     case 'Counterparties':
@@ -552,6 +556,7 @@ export const FIELD_HELP: Record<string, { label: string; usedFor: string }> = {
   monthlyDebit: { label: 'Monthly debits', usedFor: 'Deposit behaviour (money out).' },
   asOfDate: { label: 'As-of date', usedFor: 'The date the data describes; can also be chosen on upload.' },
   department: { label: 'Department', usedFor: 'Which team sent the row (Loans, Deposits, Treasury) - for reference.' },
+  drCr: { label: 'Debit / credit', usedFor: 'Which side of the ledger the balance sits on (kept for reference).' },
   endingBalance: { label: 'Closing balance', usedFor: 'Compared with the positions total in the ledger check.' },
   code: { label: 'Code', usedFor: 'Identifies each row.' },
   name: { label: 'Name', usedFor: 'Shown on screens and reports.' },
