@@ -5,6 +5,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useScope } from '@/context/ScopeContext';
 import { AffiliateAssumptionsExchange } from '@/components/rules/AffiliateAssumptionsExchange';
 import { useRules } from '@/lib/ruleHooks';
+import { approvals } from '@/lib/governanceHooks';
+import { isApprovalGated, isRuleApproved, pickApprovedRule } from '@/lib/ruleApproval';
+import { InfoButton } from '@/components/ui/InfoButton';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { RuleKind, RuleMeta } from '@/engine/types';
 
 interface RuleEntry {
@@ -154,60 +158,104 @@ const GROUPS: Array<{ title: string; rules: RuleEntry[] }> = [
 export function RulesHub() {
   const { affiliate, affiliateCode } = useScope();
   const isGroup = affiliateCode === 'GROUP';
+  const scopeName = isGroup ? 'Group' : (affiliate?.name ?? affiliateCode);
   return (
     <>
       <ModuleHeader
         title="Rules & scenarios"
         description="The assumptions every run applies, grouped by what they change."
-        about="Every save is versioned and each run records the exact version it used."
+        about="Every save is versioned and each run records the exact version it used. 'In use' is the rule a run at the current scope picks: the affiliate's own approved rule, else the Group default."
         asOfDate={null}
       />
       <GroupAssumptionsUpload className="mb-6" />
       {!isGroup && affiliate && (
-        <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h3 className="mb-1 text-[13px] font-bold text-navy-900">{affiliate.name}&rsquo;s own assumptions</h3>
-          <p className="mb-3 text-[12px] text-gray-500">
-            Download the Group&rsquo;s, change them in Excel, upload them - they become {affiliate.name}&rsquo;s own.
-          </p>
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white px-5 py-3 shadow-sm">
+          <p className="text-[13px] font-bold text-navy-900">{affiliate.name}&rsquo;s own assumptions</p>
           <AffiliateAssumptionsExchange affiliate={affiliate} />
-        </section>
+        </div>
       )}
-      <div className="space-y-6">
-        {GROUPS.map((g) => (
-          <section key={g.title} data-tour-section={g.title}>
-            <h2 className="mb-3 text-[13px] font-bold uppercase tracking-widest text-navy-900">{g.title}</h2>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <table className="w-full text-left text-[13px]">
+          <thead className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+            <tr>
+              <th className="px-4 py-2.5">Assumption</th>
+              <th className="px-4 py-2.5">In use for {scopeName}</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5" />
+            </tr>
+          </thead>
+          {GROUPS.map((g) => (
+            <tbody key={g.title} data-tour-section={g.title}>
+              <tr className="bg-gray-50/70">
+                <td colSpan={4} className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-navy-900">
+                  {g.title}
+                </td>
+              </tr>
               {g.rules.map((r) => (
-                <RuleCard key={r.kind} entry={r} />
+                <RuleRow key={r.kind} entry={r} affiliateCode={affiliateCode} />
               ))}
-            </div>
-          </section>
-        ))}
+            </tbody>
+          ))}
+        </table>
       </div>
     </>
   );
 }
 
-function RuleCard({ entry }: { entry: RuleEntry }) {
+function RuleRow({ entry, affiliateCode }: { entry: RuleEntry; affiliateCode: string }) {
   const { hasPermission } = useAuth();
   const { data: rules = [] } = useRules<RuleMeta>(entry.kind);
-  const active = rules.filter((r) => r.isActive).length;
+  const { data: requests = [] } = approvals.useList();
   const canOpen = hasPermission(entry.permission);
+  const gated = isApprovalGated(entry.kind);
+  const scoped = rules.filter(
+    (r) => r.isActive && (r.affiliateCode === null || affiliateCode === 'GROUP' || r.affiliateCode === affiliateCode),
+  );
+  const latest = (list: RuleMeta[]) =>
+    [...list].sort((a, b) => (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt))[0] ?? null;
+  // What a run at this scope picks: approved rules for gated kinds, the newest active rule otherwise.
+  const inUse = gated
+    ? pickApprovedRule(scoped, affiliateCode, requests)
+    : ((affiliateCode !== 'GROUP' ? latest(scoped.filter((r) => r.affiliateCode === affiliateCode)) : null) ??
+      latest(scoped.filter((r) => r.affiliateCode === null)));
+  const pending = gated ? scoped.filter((r) => !isRuleApproved(r, requests)).length : 0;
+  const own = inUse && inUse.affiliateCode !== null;
 
   return (
-    <div className="flex flex-col rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[14px] font-bold text-navy-900">{entry.label}</p>
-        <span className={active > 0 ? 'text-[12px] font-bold text-success' : 'text-[12px] font-bold text-gray-400'}>
-          {active > 0 ? `${active} active` : 'None defined'}
+    <tr className="border-t border-gray-50">
+      <td className="px-4 py-2.5">
+        <span className="flex items-center gap-1.5 font-bold text-navy-900">
+          {entry.label}
+          <InfoButton label={`About ${entry.label}`}>{entry.effect}</InfoButton>
         </span>
-      </div>
-      <p className="mt-1 flex-1 text-[13px] leading-relaxed text-gray-500">{entry.effect}</p>
-      {canOpen && (
-        <Link href={entry.href} className="mt-3 text-[12px] font-bold text-navy-700 hover:underline">
-          {rules.length > 0 ? 'View & edit →' : 'Define one →'}
-        </Link>
-      )}
-    </div>
+      </td>
+      <td className="px-4 py-2.5 text-gray-600">
+        {inUse ? (
+          <span>
+            {inUse.name} <span className="font-mono text-[12px] text-gray-400">v{inUse.version}</span>{' '}
+            <span className={`text-[11px] font-bold ${own ? 'text-info' : 'text-gray-400'}`}>
+              {own ? 'Own' : 'Group default'}
+            </span>
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-2.5">
+        {inUse ? (
+          <StatusBadge status={gated ? 'Approved & in use' : 'In use'} tone="success" />
+        ) : (
+          <StatusBadge status="Not set" tone="neutral" />
+        )}
+        {pending > 0 && <StatusBadge status={`${pending} waiting for approval`} tone="warning" className="ml-1.5" />}
+      </td>
+      <td className="whitespace-nowrap px-4 py-2.5 text-right">
+        {canOpen && (
+          <Link href={entry.href} className="text-[12px] font-bold text-navy-700 hover:underline">
+            {rules.length > 0 ? 'Open' : 'Set up'}
+          </Link>
+        )}
+      </td>
+    </tr>
   );
 }

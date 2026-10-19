@@ -18,6 +18,21 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return { error };
   }
 
+  componentDidUpdate() {
+    // A screen file from an earlier deploy is gone - reload once to load the current build.
+    const message = this.state.error?.message ?? '';
+    if (/dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(message)) {
+      try {
+        if (!sessionStorage.getItem('ascent-reloaded-for-new-build')) {
+          sessionStorage.setItem('ascent-reloaded-for-new-build', '1');
+          window.location.reload();
+        }
+      } catch {
+        /* storage unavailable - the error card stays */
+      }
+    }
+  }
+
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', this.props.screenName ?? 'unknown screen', error, info.componentStack);

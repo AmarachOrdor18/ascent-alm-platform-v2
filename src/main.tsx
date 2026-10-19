@@ -17,6 +17,33 @@ const queryClient = new QueryClient({
   },
 });
 
+// After a deploy, an open tab still points at the previous build's screen files, which no longer exist.
+// Reload once to pick up the new build instead of showing "Failed to fetch dynamically imported module".
+const RELOADED_KEY = 'ascent-reloaded-for-new-build';
+export function reloadForNewBuild(): boolean {
+  try {
+    if (sessionStorage.getItem(RELOADED_KEY)) return false;
+    sessionStorage.setItem(RELOADED_KEY, '1');
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForNewBuild()) event.preventDefault();
+});
+window.addEventListener('load', () => {
+  // A successful load of the new build clears the guard, so the next deploy can reload again.
+  window.setTimeout(() => {
+    try {
+      sessionStorage.removeItem(RELOADED_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  }, 10_000);
+});
+
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element #root not found');
 
