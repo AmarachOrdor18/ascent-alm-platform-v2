@@ -725,8 +725,10 @@ export function ReconciliationNotice({ summary, currency }: { summary: Reconcili
     <Notice tone={summary.outOfTolerance === 0 ? 'success' : 'warning'}>
       Ledger check for {summary.asOfDate}: {summary.accounts} account{summary.accounts === 1 ? '' : 's'} compared,{' '}
       {summary.outOfTolerance === 0 ? 'all within tolerance' : `${summary.outOfTolerance} outside tolerance`} (total
-      difference {formatAmount(summary.totalVariance, currency)}). Open the general ledger source to review and sign
-      off.
+      difference {formatAmount(summary.totalVariance, currency)}).{' '}
+      {summary.outOfTolerance > 0 &&
+        'If Loans, Deposits or Treasury for this date are still waiting, the check runs again as each is admitted. '}
+      Review and sign off in the ledger check (General ledger source → Ledger check).
     </Notice>
   );
 }

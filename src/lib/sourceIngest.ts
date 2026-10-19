@@ -1076,6 +1076,18 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
       });
       if (input.stagedId && input.stagedId !== input.batch.id) await repository.deleteStagedBatch(input.stagedId);
       reconciliation = await autoReconcile(affiliate, asOfDate);
+      if (reconciliation) {
+        await sendNotification(
+          {
+            affiliateCode: source.affiliateCode,
+            kind: 'gl.committed',
+            title: `Ledger check updated for ${affiliate?.name ?? source.affiliateCode} (${asOfDate})`,
+            body: `${source.name} admitted. ${reconciliation.accounts} account(s) compared, ${reconciliation.outOfTolerance === 0 ? 'all within tolerance - ready for sign-off' : `${reconciliation.outOfTolerance} outside tolerance`}.`,
+            link: '/data/operations?domain=GeneralLedger',
+          },
+          actor,
+        );
+      }
       break;
     }
     case 'GeneralLedger': {
@@ -1114,7 +1126,7 @@ export async function admitLoad(input: AdmitInput, actor: Actor | null): Promise
           body: reconciliation
             ? `Ledger check: ${reconciliation.accounts} account(s) compared, ${reconciliation.outOfTolerance === 0 ? 'all within tolerance' : `${reconciliation.outOfTolerance} outside tolerance`}. Ready for sign-off.`
             : 'The ledger check runs once positions for the same date are admitted.',
-          link: `/data/operations?source=${source.id}`,
+          link: `/data/operations?source=${source.id}&tab=check`,
         },
         actor,
       );
