@@ -20,6 +20,7 @@ import {
   ConfirmStep,
   DataSourcesStep,
   InitialDataStep,
+  LiquidityStep,
   ReadinessStep,
   UsersStep,
 } from './affiliateSteps';
@@ -161,6 +162,7 @@ export function AffiliateWelcome() {
           { title: 'Users & access', detail: 'Add your analysts, approvers and viewers.' },
           { title: 'Configuration', detail: 'See what you inherit from the organisation and adjust what you may.' },
           { title: 'Initial data', detail: 'Upload your positions and general ledger.' },
+          { title: 'Liquidity treatment', detail: 'Set the regulatory treatment of every product your files create.' },
           { title: 'Readiness check', detail: 'Confirm everything is ready, then submit for activation.' },
         ]}
         onStart={() => setStarted(true)}
@@ -210,6 +212,7 @@ export function AffiliateWelcome() {
       {current === 'users' && <UsersStep {...props} />}
       {current === 'configuration' && <ConfigurationStep {...props} />}
       {current === 'initialData' && <InitialDataStep {...props} />}
+      {current === 'liquidity' && <LiquidityStep {...props} />}
       {current === 'readiness' && (
         <ReadinessStep
           affiliate={affiliate}

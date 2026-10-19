@@ -14,6 +14,7 @@ export const AFFILIATE_STEPS = [
   'users',
   'configuration',
   'initialData',
+  'liquidity',
   'readiness',
 ] as const;
 

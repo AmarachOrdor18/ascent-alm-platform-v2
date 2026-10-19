@@ -1,9 +1,9 @@
 /**
- * The six steps of an Affiliate Admin's guided setup (/welcome/affiliate). Each step saves straight to the
+ * The seven steps of an Affiliate Admin's guided setup (/welcome/affiliate). Each step saves straight to the
  * real tables (the affiliate row, its data sources, app_users, dimension members, approvals) - never to a
  * draft - and the wizard records progress per step on the 'AFF:<code>' onboarding record.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from '@/components/ui/Drawer';
 import { LedgerCheckPanel } from '@/components/data/LedgerCheckPanel';
 import { SourceDrawer, type SourceTab } from '@/components/data/SourceDrawer';
@@ -27,7 +27,9 @@ import { availableFor, useConnectors } from '@/lib/connectorHooks';
 import { useDeleteSetting, useSaveSetting, useSettings } from '@/lib/onboardingHooks';
 import { effectiveSetting, ORG_SETTING, ORG_SETTING_DEFAULTS, settingId, type AffiliateStep } from '@/lib/onboarding';
 import { useLimitConfigs } from '@/lib/limitHooks';
-import { useRules } from '@/lib/ruleHooks';
+import { newRuleMeta, useRuleMutations, useRules } from '@/lib/ruleHooks';
+import { effectiveProductRule, proposedAssumptions, uncoveredProducts } from '@/lib/productTreatment';
+import type { ProductAssumption, ProductCharacteristicRule } from '@/engine/ruleTypes';
 import { approvals, newApprovalRequest } from '@/lib/governanceHooks';
 import { admittedLedger } from '@/lib/sourceIngest';
 import { sourceKindLabel } from '@/lib/dataSources';
@@ -94,7 +96,14 @@ export const AFFILIATE_STEP_META: Record<AffiliateStep, StepMeta> = {
     why: 'Nothing can be calculated until data is loaded and checked.',
     needed:
       'The Loans, Deposits, Treasury and general ledger files for the same date. The mapping is suggested for you.',
-    next: 'Check readiness and ask for go-live.',
+    next: 'Set how your products are treated, then check readiness.',
+  },
+  liquidity: {
+    title: 'Liquidity treatment',
+    what: 'Give every product your files created its HQLA status and LCR / NSFR factors - each row is pre-filled from the product’s common-account family.',
+    why: 'LCR and NSFR classify the book by product; an untreated product lands in results as "Not classified".',
+    needed: 'Review the pre-filled rows, adjust any factor, then save. Saving raises the approval request; an Approver decides it.',
+    next: 'Run the readiness check and ask for go-live.',
   },
   readiness: {
     title: 'Readiness check',
@@ -1174,7 +1183,268 @@ export function InitialDataStep({ affiliate, onBack, onContinue }: AffStepProps)
   );
 }
 
-// ─── Step 6: Readiness ──────────────────────────────────────────────────────
+// ─── Step 6: Liquidity treatment ──────────────────────────────────────────────────────
+
+const LCR_ROLES = ['HQLA', 'Inflow', 'Outflow', 'None'] as const;
+const HQLA_LEVELS = ['Level 1', 'Level 2A', 'Level 2B', 'None'] as const;
+
+/**
+ * The loaded book for the date, the product-characteristics rules, and the coverage gap in the rule a run would
+ * use. Shared by the liquidity step and the readiness gate: products are created by the file upload itself
+ * (csvImport derives P- codes from the product class text) with no treatment set, so LCR/NSFR would report the
+ * whole book as "Not classified". Only ONE product-characteristics rule is ever applied to a run - the
+ * affiliate's approved own rule, else the Group default - so coverage is measured against exactly that one,
+ * never the union of both.
+ */
+function useLiquidityCoverage(affiliateCode: string, posDate: string | null) {
+  const { data: positions = [] } = usePositions(affiliateCode);
+  const { data: rules = [] } = useRules<ProductCharacteristicRule>('ProductCharacteristic');
+  const { data: requests = [] } = approvals.useList(affiliateCode);
+  const book = useMemo(() => (posDate ? positions.filter((p) => p.asOfDate === posDate) : []), [positions, posDate]);
+  const inUse = useMemo(() => effectiveProductRule(rules, affiliateCode, requests), [rules, requests, affiliateCode]);
+  // The affiliate's newest own active rule - the save target. It is what the draft merges into, even
+  // while its newest version is still pending approval.
+  const own = useMemo(
+    () =>
+      rules.filter((r) => r.affiliateCode === affiliateCode && r.isActive).sort((a, b) => b.version - a.version)[0] ??
+      null,
+    [rules, affiliateCode],
+  );
+  const pendingRule = useMemo(
+    () =>
+      own &&
+      requests.some(
+        (r) =>
+          r.status === 'Pending' &&
+          r.entityType === 'ProductCharacteristic' &&
+          r.entityId === own.id &&
+          r.entityVersion === own.version,
+      )
+        ? own
+        : null,
+    [own, requests],
+  );
+  const uncovered = useMemo(
+    () => (book.length === 0 ? [] : uncoveredProducts(book, inUse?.assumptions ?? [])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pure over the two inputs; keep them the only deps
+    [book, inUse],
+  );
+  const pendingCoversAll = useMemo(
+    () => book.length > 0 && !!pendingRule && uncoveredProducts(book, pendingRule.assumptions).length === 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pure over the two inputs; keep them the only deps
+    [book, pendingRule],
+  );
+  return { positions, book, rules, requests, inUse, own, pendingRule, uncovered, pendingCoversAll };
+}
+
+export function LiquidityStep({ affiliate, onBack, onContinue }: AffStepProps) {
+  const { user } = useAuth();
+  const { data: batches = [] } = useBatches();
+  const posDate = latestDate(batches, affiliate.code, 'Positions');
+  const liquidity = useLiquidityCoverage(affiliate.code, posDate);
+  const { own, uncovered, pendingCoversAll } = liquidity;
+  const { data: coaOwn = [] } = useDimensionMembers('CommonCoa', affiliate.code);
+  const { data: coaGroup = [] } = useDimensionMembers('CommonCoa', 'GROUP');
+  const coaNames = useMemo(() => new Map([...coaGroup, ...coaOwn].map((m) => [m.code, m.name])), [coaOwn, coaGroup]);
+  const productLabel = (code: string) => liquidity.book.find((p) => p.productCode === code)?.productClass ?? code;
+  const { save, isSaving } = useRuleMutations<ProductCharacteristicRule>('ProductCharacteristic');
+
+  const [rows, setRows] = useState<ProductAssumption[] | null>(null);
+  const uncoveredKey = uncovered.map((u) => `${u.productCode}|${u.currency}`).join(';');
+  // Seed the draft exactly once per uncovering pattern - a refetch must never erase the user's edits.
+  useEffect(() => {
+    if (rows === null && uncovered.length > 0)
+      setRows(
+        proposedAssumptions(
+          liquidity.book,
+          liquidity.inUse?.assumptions ?? [],
+          (code) => coaNames.get(code) ?? undefined,
+        ),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seeded per uncovering pattern, not per object identity
+  }, [rows, uncoveredKey]);
+
+  const update = (index: number, patch: Partial<ProductAssumption>) =>
+    setRows((prev) => (prev ?? []).map((r, i) => (i === index ? { ...r, ...patch } : r)));
+
+  // The draft merged over the affiliate's own rule - what a run would see after the save and the
+  // approval. Only after this merge can the step tell "done" from "complete".
+  const draftAssumptions = useMemo(() => (rows ? [...(own?.assumptions ?? []), ...rows] : null), [rows, own]);
+  const uncoveredDraft = useMemo(
+    () => (draftAssumptions ? uncoveredProducts(liquidity.book, draftAssumptions) : uncovered),
+    [liquidity.book, draftAssumptions, uncovered],
+  );
+
+  const submit = async () => {
+    if (!user || !rows || rows.length === 0) {
+      await onContinue();
+      return;
+    }
+    const now = new Date().toISOString();
+    const keyOf = (a: ProductAssumption) =>
+      a.commonCoaCode ? `coa:${a.commonCoaCode}|${a.currency}` : `prod:${a.productCode}|${a.currency}`;
+    const replaced = new Set(rows.map(keyOf));
+    const kept = (own?.assumptions ?? []).filter((a) => !replaced.has(keyOf(a)));
+    if (own) {
+      await save({
+        ...own,
+        version: own.version + 1,
+        updatedBy: user.name,
+        updatedAt: now,
+        assumptions: [...kept, ...rows],
+      });
+    } else {
+      await save({
+        ...newRuleMeta('ProductCharacteristic', `${affiliate.name} product characteristics`, user.name),
+        kind: 'ProductCharacteristic',
+        folder: affiliate.code,
+        affiliateCode: affiliate.code,
+        description:
+          "Liquidity treatment for the products this affiliate's files create - configured during affiliate onboarding.",
+        assumptions: rows,
+      });
+    }
+    setRows(null);
+    await onContinue();
+  };
+
+  const showDraft = rows !== null && rows.length > 0;
+  const cell = 'w-full rounded border border-gray-200 px-2 py-1 text-[12px]';
+
+  return (
+    <div className="space-y-4">
+      <Card title="Liquidity treatment for your products" description="HQLA level, LCR role and rate, ASF and RSF factors by product.">
+        {liquidity.book.length === 0 ? (
+          <p className="text-[13px] text-gray-500">
+            Upload your position files first - the products to treat come from the books they create.
+          </p>
+        ) : pendingCoversAll && !showDraft && own ? (
+          <p className="text-[13px] text-navy-900">
+            <StatusBadge status="Waiting for approval" tone="warning" /> Treatment for every product is saved as
+            version {own.version} - an approver decides it under Approvals. Runs use it once approved.
+          </p>
+        ) : uncovered.length === 0 && !showDraft ? (
+          <p className="text-[13px] text-navy-900">
+            <StatusBadge status="Covered " tone="success" /> Every product in the {formatDate(posDate!)} book
+            carries liquidity treatment.
+          </p>
+        ) : (
+          <p className="text-[13px] text-gray-500">
+            {uncoveredDraft.length} of{' '}
+            {new Set(liquidity.book.map((p) => `${p.productCode}|${p.currency}`)).size} product(s) still uncovered -
+            the rows below are pre-filled from each product's common-account family. Adjust any factor, then
+            save: the change goes to Approvals for a second sign-off.
+          </p>
+        )}
+      </Card>
+      {showDraft && rows && (
+        <div className="overflow-x-auto rounded-lg border border-gray-100 bg-white">
+          <table className="w-full min-w-[820px] text-left text-[12px]">
+            <thead className="bg-navy-50/60 text-[11px] uppercase tracking-wider text-gray-500">
+              <tr>
+                <th className="px-3 py-2">Product</th>
+                <th className="px-3 py-2">LCR role</th>
+                <th className="px-3 py-2">Rate %</th>
+                <th className="px-3 py-2">ASF %</th>
+                <th className="px-3 py-2">RSF %</th>
+                <th className="px-3 py-2">HQLA level</th>
+                <th className="px-3 py-2">Rate-sens.</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((row, i) => (
+                <tr key={`${row.productCode}|${row.currency}`}>
+                  <td className="px-3 py-2">
+                    <p className="font-bold text-navy-900">{productLabel(row.productCode)}</p>
+                    <p className="font-mono text-[11px] text-gray-400">
+                      {row.productCode} · {row.currency}
+                    </p>
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      aria-label={`LCR role for ${row.productCode}`}
+                      value={row.lcrCashflowRole}
+                      onChange={(e) => update(i, { lcrCashflowRole: e.target.value as typeof row.lcrCashflowRole })}
+                      className={`${cell} w-24`}
+                    >
+                      {LCR_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  {(
+                    [
+                      ['Rate %', 'lcrRatePct', 'lcrRatePct' as const],
+                      ['ASF %', 'asfFactorPct', 'asfFactorPct' as const],
+                      ['RSF %', 'rsfFactorPct', 'rsfFactorPct' as const],
+                    ] as Array<[string, string, 'lcrRatePct' | 'asfFactorPct' | 'rsfFactorPct']>
+                  ).map(([labelText, , field]) => (
+                    <td key={field} className="px-3 py-2">
+                      <input
+                        aria-label={`${labelText} for ${row.productCode}`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={row[field] ?? ''}
+                        onChange={(e) =>
+                          update(i, { [field]: e.target.value === '' ? null : Number(e.target.value) })
+                        }
+                        className={`${cell} w-20`}
+                      />
+                    </td>
+                  ))}
+                  <td className="px-3 py-2">
+                    <select
+                      aria-label={`HQLA level for ${row.productCode}`}
+                      value={row.hqlaLevel}
+                      onChange={(e) => update(i, { hqlaLevel: e.target.value as typeof row.hqlaLevel })}
+                      className={`${cell} w-28`}
+                    >
+                      {HQLA_LEVELS.map((l) => (
+                        <option key={l} value={l}>
+                          {l === 'None' ? '- none -' : l}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      aria-label={`Rate-sensitive for ${row.productCode}`}
+                      type="checkbox"
+                      checked={row.isRateSensitive}
+                      onChange={(e) => update(i, { isRateSensitive: e.target.checked })}
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setRows((prev) => (prev ?? []).filter((_, j) => j !== i))}
+                      className="text-[12px] font-bold text-navy-700 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <StepFooter
+        mode="wizard"
+        onBack={onBack}
+        onSubmit={submit}
+        disabled={isSaving}
+        submitLabel={showDraft ? 'Save & continue' : 'Continue'}
+      />
+    </div>
+  );
+}
+
+// ─── Step 7: Readiness ──────────────────────────────────────
 
 export interface ReadinessItem {
   label: string;
@@ -1208,6 +1478,31 @@ export function useAffiliateReadiness(
     sources.every((s) => s.connectorType === 'ManualUpload' || !!s.connectorId) &&
     !!record?.steps.dataSources?.done;
   const reconciled = posBatches.length > 0 && posBatches.every((b) => !!b!.reconciledAt);
+  // Products are created by the upload; until they carry liquidity treatment, LCR/NSFR report the book
+  // "Not classified" - same gate the go-live request is judged on, same lookup the run applies.
+  const liquidity = useLiquidityCoverage(affiliate.code, posDate);
+  const liquidityItem: ReadinessItem | null =
+    liquidity.book.length === 0
+      ? null
+      : liquidity.uncovered.length === 0
+        ? {
+            label: 'Liquidity treatment covers the products',
+            ok: true,
+            detail: `Every product in the ${formatDate(posDate!)} book carries liquidity treatment.`,
+          }
+        : liquidity.pendingCoversAll
+          ? {
+              label: 'Liquidity treatment covers the products',
+              ok: false,
+              detail: 'Saved - waiting for an Approver to approve the treatment before go-live and runs use it.',
+              step: 'liquidity',
+            }
+          : {
+              label: 'Liquidity treatment covers the products',
+              ok: false,
+              detail: `${liquidity.uncovered.length} product(s) carry no liquidity treatment - LCR and NSFR would report them "Not classified".`,
+              step: 'liquidity',
+            };
   return [
     {
       label: 'Affiliate configured',
@@ -1256,6 +1551,7 @@ export function useAffiliateReadiness(
           : 'Load the general ledger for the same date, then sign off the ledger check.',
       step: 'initialData',
     },
+    ...(liquidityItem ? [liquidityItem] : []),
   ];
 }
 

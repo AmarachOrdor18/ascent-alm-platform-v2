@@ -40,6 +40,21 @@ describe('onboarding records', () => {
     expect(markStep(rec, AFFILIATE_STEPS[0], true, 'U-2').currentStep).toBe(AFFILIATE_STEPS[1]);
   });
 
+  it('locks liquidity treatment between initial data and readiness in the affiliate wizard', () => {
+    // Products are created by the file upload, so their treatment is set right after the book lands,
+    // before readiness sees what is still uncovered.
+    expect(AFFILIATE_STEPS).toEqual([
+      'confirm',
+      'dataSources',
+      'users',
+      'configuration',
+      'initialData',
+      'liquidity',
+      'readiness',
+    ]);
+    expect(AFFILIATE_STEPS.indexOf('liquidity')).toBeLessThan(AFFILIATE_STEPS.indexOf('readiness'));
+  });
+
   it('keeps people on the affiliates step: the wizard runs four steps with no users step', () => {
     expect(ORG_STEPS).toEqual(['organisation', 'affiliates', 'settings', 'review']);
     // The Admin page keeps the assumptions section on top of the wizard steps; 'users' belongs to
