@@ -213,8 +213,8 @@ export function UploadDataModal({
           )
           .sort((a, z) => z.uploadedAt.localeCompare(a.uploadedAt))
       : [];
-  const replacesFor = (f: PickedFile): string | null =>
-    f.replacesId !== undefined ? f.replacesId : (replaceOptions(f).find((b) => b.fileName === f.fileName)?.id ?? null);
+  // Nothing is replaced unless chosen: the same file name every month is normal, not a correction.
+  const replacesFor = (f: PickedFile): string | null => f.replacesId ?? null;
 
   useEffect(() => {
     const open = files.filter((f) => !f.outcome && f.sourceId && !f.readError);

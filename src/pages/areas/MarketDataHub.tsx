@@ -197,7 +197,8 @@ export function MarketDataHub() {
       seriesGroups: [...seriesGroups.values()],
       errors: split.errors,
     });
-    setReplaces(previousUploads.find((u) => u.fileName === file.name)?.id ?? '');
+    // Nothing is replaced unless chosen.
+    setReplaces('');
     if (inputRef.current) inputRef.current.value = '';
   };
 
