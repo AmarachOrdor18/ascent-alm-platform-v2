@@ -82,7 +82,7 @@ const DASHBOARD: Step[] = [
     '/dashboard',
     sel.tour('run-strip'),
     'Every number comes from one run',
-    'This strip names the run behind the page. "Source data" shows exactly which uploaded files it used. At Group scope it reads "Group consolidated" - the affiliates’ own runs combined, with no separate Group run.',
+    'This strip names the run behind the page. "Source data" shows exactly which uploaded files it used. At Group scope it reads "Group consolidated · N affiliates" - the affiliates’ own runs combined, with no separate Group run; click "Combines N affiliate runs" to see which run of each affiliate is used.',
   ),
   s(
     '/dashboard',
@@ -916,7 +916,7 @@ const MODELS: Step[] = [
     '/assumptions',
     'button:Fit model',
     'Fit, then propose',
-    'Fit shows parameters with 95% intervals and fit statistics. Save it to the register, then propose it - a second person approves before any run uses it.',
+    'Fit opens the result in its own window - parameters with 95% intervals and fit statistics. Close it and "View fit result" reopens it. Save it to the register, then propose it - a second person approves before any run uses it.',
     { permission: 'risk.view' },
   ),
 ];

@@ -1,4 +1,4 @@
-import { isConsolidatedRun } from '@/lib/groupConsolidation';
+import { isConsolidatedRun, useGroupSources } from '@/lib/groupConsolidation';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -78,6 +78,69 @@ export function LineagePanel({ run, batches }: { run: ProcessRun; batches: LoadB
   );
 }
 
+/** The affiliate runs behind the Group consolidated view - a searchable, scrolling list so it holds up at 30+. */
+function ConsolidationSources({ sources }: { sources: ReturnType<typeof useGroupSources> }) {
+  const [q, setQ] = useState('');
+  const shown = sources.filter((s) => s.affiliateName.toLowerCase().includes(q.trim().toLowerCase()));
+  const signedOff = sources.filter((s) => signOffStatusOf(s.run) === 'SignedOff').length;
+  return (
+    <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[12px] font-bold uppercase tracking-wider text-gray-400">
+          Affiliate runs combined - {sources.length} · {signedOff} signed off
+        </h3>
+        {sources.length > 8 && (
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Find affiliate"
+            aria-label="Find affiliate"
+            className="rounded-lg border border-gray-200 px-3 py-1 text-[12px] focus:border-navy-700 focus:outline-none"
+          />
+        )}
+      </div>
+      <p className="mb-2 text-[12px] text-gray-500">
+        Each Live affiliate&rsquo;s official run for the date - its signed-off version, else its latest completed one.
+      </p>
+      <div className="max-h-64 overflow-y-auto">
+        <table className="w-full text-[12px]">
+          <thead className="sticky top-0 bg-white">
+            <tr className="border-b border-gray-200 text-left text-gray-400">
+              <th className="py-1 px-2 font-bold uppercase tracking-wider">Affiliate</th>
+              <th className="py-1 px-2 font-bold uppercase tracking-wider">Version</th>
+              <th className="py-1 px-2 font-bold uppercase tracking-wider">Status</th>
+              <th className="py-1 px-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((s) => {
+              const st = signOffStatusOf(s.run);
+              return (
+                <tr key={s.run.id} className="border-b border-gray-100">
+                  <td className="py-1.5 px-2 font-bold text-navy-900">{s.affiliateName}</td>
+                  <td className="py-1.5 px-2 font-mono">v{s.version}</td>
+                  <td className="py-1.5 px-2">
+                    <StatusBadge status={SIGN_OFF_LABEL[st]} tone={SIGN_OFF_TONE[st]} />
+                  </td>
+                  <td className="py-1.5 px-2 text-right">
+                    <Link
+                      href={`/execution/history?run=${s.run.id}`}
+                      className="font-bold text-navy-700 hover:underline"
+                    >
+                      Open in Runs →
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function ResultsFrame({
   run,
   available,
@@ -94,7 +157,9 @@ export function ResultsFrame({
   children,
 }: ResultsFrameProps) {
   const [showLineage, setShowLineage] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const { data: affiliates = [] } = useAffiliates();
+  const groupSources = useGroupSources(run && isConsolidatedRun(run) ? run.asOfDate : null);
   const { asOfDate: workingDate, affiliateCode: scopeCode } = useScope();
   if (isLoading) {
     return (
@@ -167,7 +232,15 @@ export function ResultsFrame({
           <span aria-hidden="true">·</span>
           <span>{run.processType}</span>
           {consolidated ? (
-            <StatusBadge status="Consolidated from affiliate runs" tone="info" />
+            <button
+              type="button"
+              onClick={() => setShowSources((v) => !v)}
+              aria-expanded={showSources}
+              className="rounded-full border border-navy-700/20 bg-navy-50 px-2.5 py-0.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+            >
+              Combines {groupSources.length} affiliate run{groupSources.length === 1 ? '' : 's'}{' '}
+              {showSources ? '▴' : '▾'}
+            </button>
           ) : (
             <StatusBadge
               status={status === 'SignedOff' ? 'Signed off ✓' : SIGN_OFF_LABEL[status]}
@@ -211,6 +284,8 @@ export function ResultsFrame({
         </div>
       </div>
 
+      {consolidated && showSources && <ConsolidationSources sources={groupSources} />}
+
       {!isOfficial && official && (
         <p className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-navy-700/20 bg-navy-50 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
           <span>
@@ -234,7 +309,19 @@ export function ResultsFrame({
         </p>
       )}
 
-      {isOfficial && status !== 'SignedOff' && (
+      {consolidated && groupSources.some((s) => signOffStatusOf(s.run) !== 'SignedOff') && (
+        <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
+          <span className="font-bold">
+            Includes provisional figures - {groupSources.filter((s) => signOffStatusOf(s.run) !== 'SignedOff').length}{' '}
+            of {groupSources.length} affiliate runs not yet signed off.
+          </span>{' '}
+          <button type="button" onClick={() => setShowSources(true)} className="font-bold underline hover:no-underline">
+            See which
+          </button>
+        </p>
+      )}
+
+      {!consolidated && isOfficial && status !== 'SignedOff' && (
         <p className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-[12px] leading-relaxed text-navy-900">
           <span className="font-bold">
             Provisional figures

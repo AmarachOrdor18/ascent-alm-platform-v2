@@ -313,7 +313,13 @@ function LayersExplorer({ layers }: { layers: ProfitabilityLayersResult }) {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <Waterfall node={node} currency={currency} />
+            {node.level === 'Customers' && children.length > 0 ? (
+              // "All customers" adds up to the same total as the Group, so the waterfall would look unchanged -
+              // the customer view ranks the customers instead. Click a bar to see that customer's layers.
+              <CustomerRanking nodes={children} currency={currency} nameOf={nameOf} onDrill={setCurrentId} />
+            ) : (
+              <Waterfall node={node} currency={currency} />
+            )}
           </div>
           <dl className="space-y-2 text-[13px]">
             <Row label="Assets" value={<Amount value={node.assetBalance} currency={currency} />} />
@@ -452,6 +458,77 @@ function Waterfall({ node, currency }: { node: ProfitabilityNode; currency: Curr
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+const TOP_CUSTOMERS = 12;
+
+function CustomerRanking({
+  nodes,
+  currency,
+  nameOf,
+  onDrill,
+}: {
+  nodes: ProfitabilityNode[];
+  currency: CurrencyCode;
+  nameOf: (n: ProfitabilityNode) => string;
+  onDrill: (id: string) => void;
+}) {
+  const ranked = [...nodes].sort((a, b) => (b.riskAdjustedProfit ?? 0) - (a.riskAdjustedProfit ?? 0));
+  const shown = ranked.slice(0, TOP_CUSTOMERS);
+  const data = shown.map((n) => ({ id: n.id, label: nameOf(n), value: n.riskAdjustedProfit ?? 0 }));
+  return (
+    <div>
+      <p className="mb-1 text-[12px] text-gray-500">
+        Risk-adjusted profit by customer
+        {ranked.length > TOP_CUSTOMERS && ` - top ${TOP_CUSTOMERS} of ${ranked.length}, all listed below`}. Click a bar
+        to see that customer's layers.
+      </p>
+      <div style={{ width: '100%', height: Math.max(200, data.length * 28 + 40) }} aria-label="Customer ranking">
+        <ResponsiveContainer>
+          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 8 }}>
+            <CartesianGrid stroke="hsl(var(--gray-200))" strokeDasharray="3 3" horizontal={false} />
+            <XAxis
+              type="number"
+              tick={{ fontSize: 11, fill: 'hsl(var(--gray-500))' }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => formatAmount(v, currency)}
+            />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={150}
+              tick={{ fontSize: 11, fill: 'hsl(var(--gray-600))' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              formatter={(v: number) => [formatAmount(v, currency), 'Risk-adjusted profit']}
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--gray-200))' }}
+            />
+            <ReferenceLine x={0} stroke="hsl(var(--gray-400))" />
+            <Bar
+              dataKey="value"
+              isAnimationActive={false}
+              radius={[2, 2, 2, 2]}
+              cursor="pointer"
+              onClick={(d: { id?: string }) => d.id && onDrill(d.id)}
+            >
+              {data.map((d) => (
+                <Cell key={d.id} fill={d.value >= 0 ? LAYER_COLOR.up : LAYER_COLOR.down} />
+              ))}
+              <LabelList
+                dataKey="value"
+                position="right"
+                style={{ fontSize: 10, fill: 'hsl(var(--gray-600))' }}
+                formatter={(v: number) => formatAmount(v, currency)}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

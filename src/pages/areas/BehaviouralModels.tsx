@@ -5,6 +5,7 @@ import { AffiliateSelector } from '@/components/layout/AffiliateSelector';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { InfoButton } from '@/components/ui/InfoButton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Modal } from '@/components/ui/Modal';
 import { ModelRunDetail } from '@/components/models/ModelRunDetail';
 import { ProposePanel } from '@/components/models/ProposePanel';
 import { useAuth } from '@/context/AuthContext';
@@ -180,6 +181,8 @@ export function BehaviouralModels() {
     error: FitErrorView | null;
   } | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  // The fit result opens in its own window so it cannot be missed below the options.
+  const [showResult, setShowResult] = useState(false);
 
   const needs = MODEL_TYPES.find((m) => m.type === modelType)!.needs;
   const isBalanceModel = needs === 'Balance';
@@ -311,15 +314,22 @@ export function BehaviouralModels() {
             ? 'Pick the policy-rate series.'
             : null;
 
-  const fit = () => {
-    if (!spec || blocker) return;
+  const fit = (withSpec: WorkbenchSpec | null = spec) => {
+    if (!withSpec || blocker) return;
+    const key = JSON.stringify([affiliate?.code, withSpec, balanceRows.length, accountRows.length]);
     setSavedId(null);
+    setShowResult(true);
     try {
-      const outcome = runCalibration(spec, { balances: balanceRows, accounts: accountRows, indicators });
-      setResult({ key: specKey, outcome, error: null });
+      const outcome = runCalibration(withSpec, { balances: balanceRows, accounts: accountRows, indicators });
+      setResult({ key, outcome, error: null });
     } catch (e) {
-      setResult({ key: specKey, outcome: null, error: describeFitError(e) });
+      setResult({ key, outcome: null, error: describeFitError(e) });
     }
+  };
+  // Switch a growing book to outflow percentile and fit again straight away.
+  const refitWithOutflow = () => {
+    setDecayMethod('OutflowPercentile');
+    if (spec?.modelType === 'DepositRunoff') fit({ ...spec, decayMethod: 'OutflowPercentile' });
   };
 
   const current = result && result.key === specKey ? result : null;
@@ -604,6 +614,18 @@ export function BehaviouralModels() {
                           <option value="FloorFit">Floor fit (core + decay jointly)</option>
                           <option value="OutflowPercentile">Outflow percentile</option>
                         </select>
+                        {segment?.growing && decayMethod !== 'OutflowPercentile' && (
+                          <p className="mt-1.5 text-[11px] leading-snug text-warning">
+                            This segment is growing - decay and floor fits need a shrinking book.{' '}
+                            <button
+                              type="button"
+                              onClick={() => setDecayMethod('OutflowPercentile')}
+                              className="font-bold underline"
+                            >
+                              Use outflow percentile
+                            </button>
+                          </p>
+                        )}
                       </Field>
                       {decayMethod === 'OutflowPercentile' && (
                         <Field
@@ -758,20 +780,6 @@ export function BehaviouralModels() {
                     </>
                   )}
                 </div>
-                {modelType === 'DepositRunoff' && segment?.growing && decayMethod !== 'OutflowPercentile' && (
-                  <p className="mt-4 rounded-lg bg-warning-bg px-3 py-2 text-[12px] leading-relaxed text-warning">
-                    This segment is growing or flat over its history. Decay and floor fits measure a balance running
-                    off, so they will likely refuse it. Outflow percentile measures the worst monthly outflows observed
-                    instead and works for a growing book.{' '}
-                    <button
-                      type="button"
-                      onClick={() => setDecayMethod('OutflowPercentile')}
-                      className="font-bold underline"
-                    >
-                      Switch to outflow percentile
-                    </button>
-                  </p>
-                )}
               </Step>
 
               {modelType !== 'TermDeposit' && (
@@ -820,77 +828,89 @@ export function BehaviouralModels() {
                 <button
                   type="button"
                   disabled={!!blocker}
-                  onClick={fit}
+                  onClick={() => fit()}
                   className="rounded-lg bg-navy-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Fit model
                 </button>
                 {blocker && <span className="text-[12px] text-gray-500">{blocker}</span>}
-                {result && !current && (
-                  <span className="text-[12px] text-warning">
-                    Options changed since the last fit - fit again to see results.
-                  </span>
+                {current && !showResult && (
+                  <button
+                    type="button"
+                    onClick={() => setShowResult(true)}
+                    className="rounded-lg border border-gray-200 px-4 py-2.5 text-[13px] font-bold text-navy-900 hover:border-navy-700"
+                  >
+                    {current.error ? 'View fit error' : 'View fit result'}
+                  </button>
                 )}
               </div>
 
-              {current?.error && (
-                <section role="alert" className="rounded-2xl border border-danger/30 bg-danger-bg p-5">
-                  <p className="text-[14px] font-bold text-danger">{current.error.title}</p>
-                  <p className="mt-1 font-mono text-[12px] text-danger">{current.error.message}</p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-gray-700">{current.error.hint}</p>
-                  {current.error.suggestOutflowPercentile && (
-                    <button
-                      type="button"
-                      onClick={() => setDecayMethod('OutflowPercentile')}
-                      className="mt-3 rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
-                    >
-                      Use outflow percentile instead
-                    </button>
+              {current && showResult && (
+                <Modal
+                  wide="xl"
+                  title={current.error ? 'The model could not be fitted' : 'Fit result'}
+                  description={segment ? `Segment: ${segment.label}` : undefined}
+                  onClose={() => setShowResult(false)}
+                >
+                  {current.error && (
+                    <section role="alert" className="rounded-2xl border border-danger/30 bg-danger-bg p-5">
+                      <p className="text-[14px] font-bold text-danger">{current.error.title}</p>
+                      <p className="mt-1 font-mono text-[12px] text-danger">{current.error.message}</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-gray-700">{current.error.hint}</p>
+                      {current.error.suggestOutflowPercentile && (
+                        <button
+                          type="button"
+                          onClick={refitWithOutflow}
+                          className="mt-3 rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700"
+                        >
+                          Fit with outflow percentile instead
+                        </button>
+                      )}
+                    </section>
                   )}
-                </section>
-              )}
 
-              {current?.outcome && (
-                <section className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-[15px] font-bold text-navy-900">Fit result</h2>
-                    {savedRun ? (
-                      <span className="text-[13px] text-success">
-                        Saved to the model register as version {savedRun.version}.{' '}
-                        <Link href="/assumptions/models" className="font-bold underline">
-                          Open register
-                        </Link>
-                      </span>
-                    ) : hasPermission('rules.edit') ? (
-                      <button
-                        type="button"
-                        disabled={saveRun.isPending}
-                        onClick={async () => {
-                          const stored = toStoredModelRun(current.outcome!, {
-                            affiliateCode: affiliate.code,
-                            createdBy: user?.name ?? 'unknown',
-                            existing: runs,
-                          });
-                          await saveRun.mutateAsync(stored);
-                          setSavedId(stored.id);
-                        }}
-                        className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-50"
-                      >
-                        {saveRun.isPending ? 'Saving…' : 'Save to model register'}
-                      </button>
-                    ) : (
-                      <span className="text-[12px] text-gray-500">
-                        Saving to the register needs the rules-edit permission.
-                      </span>
-                    )}
-                  </div>
-                  {savedRun && <ProposePanel run={savedRun} />}
-                  <ModelRunDetail
-                    run={current.outcome.run}
-                    chart={current.outcome.chart}
-                    chartUnit={current.outcome.chartUnit}
-                  />
-                </section>
+                  {current.outcome && (
+                    <section className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-end gap-3">
+                        {savedRun ? (
+                          <span className="text-[13px] text-success">
+                            Saved to the model register as version {savedRun.version}.{' '}
+                            <Link href="/assumptions/models" className="font-bold underline">
+                              Open register
+                            </Link>
+                          </span>
+                        ) : hasPermission('rules.edit') ? (
+                          <button
+                            type="button"
+                            disabled={saveRun.isPending}
+                            onClick={async () => {
+                              const stored = toStoredModelRun(current.outcome!, {
+                                affiliateCode: affiliate.code,
+                                createdBy: user?.name ?? 'unknown',
+                                existing: runs,
+                              });
+                              await saveRun.mutateAsync(stored);
+                              setSavedId(stored.id);
+                            }}
+                            className="rounded-lg bg-navy-900 px-4 py-2 text-[13px] font-bold text-white hover:bg-navy-700 disabled:opacity-50"
+                          >
+                            {saveRun.isPending ? 'Saving…' : 'Save to model register'}
+                          </button>
+                        ) : (
+                          <span className="text-[12px] text-gray-500">
+                            Saving to the register needs the rules-edit permission.
+                          </span>
+                        )}
+                      </div>
+                      {savedRun && <ProposePanel run={savedRun} />}
+                      <ModelRunDetail
+                        run={current.outcome.run}
+                        chart={current.outcome.chart}
+                        chartUnit={current.outcome.chartUnit}
+                      />
+                    </section>
+                  )}
+                </Modal>
               )}
             </>
           )}

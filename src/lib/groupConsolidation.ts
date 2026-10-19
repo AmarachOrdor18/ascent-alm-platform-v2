@@ -65,7 +65,8 @@ export function useGroupConsolidation(enabled: boolean, asOfDate: string | null)
       const run: ProcessRun = {
         ...draftRun({
           id: `${GROUP_CONSOLIDATED_PREFIX}${asOfDate}`,
-          name: `Group consolidated - ${sources.map((s) => `${s.affiliateName} v${s.version}`).join(', ')}`,
+          // Short on purpose - with many affiliates the list goes in the results strip's "affiliate runs" panel.
+          name: `Group consolidated · ${sources.length} affiliate${sources.length === 1 ? '' : 's'}`,
           asOfDate: asOfDate!,
           affiliateCode: 'GROUP',
           reportingCurrency: 'USD',
