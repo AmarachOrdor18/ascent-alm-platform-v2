@@ -156,10 +156,51 @@ export function ColumnMapping({
       )}
       {error && <Notice tone="danger">{error}</Notice>}
 
-      <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+      {inline && sample && (
+        <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+          {sample.headers
+            .filter((h) => !Object.values(sample.auto).includes(h))
+            .map((h) => {
+              const assigned = Object.keys(chosen).find((k) => chosen[k] === h) ?? '';
+              const open = source.fields.filter((f) => !chosen[f.name] || f.name === assigned);
+              return (
+                <li key={h} className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[1fr_1.4fr] md:items-center">
+                  <p className="text-[13px] text-navy-900">
+                    Column <span className="font-mono font-bold">{h}</span> in your file
+                  </p>
+                  <select
+                    aria-label={`Field for column ${h}`}
+                    value={assigned}
+                    disabled={!canEdit}
+                    onChange={(e) => {
+                      if (assigned) pick(assigned, '');
+                      if (e.target.value) pick(e.target.value, h);
+                    }}
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-[13px] focus:border-navy-700 focus:outline-none"
+                  >
+                    <option value="">Ignore this column</option>
+                    {open.map((f) => (
+                      <option key={f.name} value={f.name}>
+                        {fieldLabel(f.name)}
+                        {f.required ? ' (required)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </li>
+              );
+            })}
+        </ul>
+      )}
+
+      <ul
+        className={cn(
+          'divide-y divide-gray-100 rounded-lg border border-gray-100',
+          inline && unmatchedRequired.length === 0 && 'hidden',
+        )}
+      >
         {source.fields
-          // Inline: the matched fields are already settled - only the open decisions are listed.
-          .filter((f) => !inline || !sample?.auto[f.name] || chosen[f.name] !== sample.auto[f.name])
+          // Inline: only required fields still without a column; the file's columns are handled above.
+          .filter((f) => !inline || (f.required && !chosen[f.name]))
           .map((f) => {
             const help = FIELD_HELP[f.name];
             const value = chosen[f.name] ?? '';
@@ -224,7 +265,7 @@ export function ColumnMapping({
           })}
       </ul>
 
-      {sample && ignored.length > 0 && (
+      {sample && !inline && ignored.length > 0 && (
         <Notice tone="info">
           These columns in your file are not used and will be ignored:{' '}
           <span className="font-mono">{ignored.join(', ')}</span>

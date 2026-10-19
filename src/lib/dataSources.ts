@@ -146,6 +146,17 @@ function field(name: string, required = false, key = false, type?: SourceFieldTy
 
 const uniq = (names: string[]) => Array.from(new Set(names));
 
+/** Position columns the importer understands beyond the department templates. */
+export const POSITION_EXTRA_FIELDS = [
+  'productCode',
+  'behaviouralTag',
+  'hqlaLevel',
+  'hqlaHaircutPct',
+  'lcrCashflowRole',
+  'irrbbRateSensitive',
+  'approxDurationYears',
+];
+
 /** The fields a new source of this kind starts with - the platform's own column names, derived from the templates and importers. */
 export function defaultFieldsFor(domain: DataSourceDomain, contributor?: PositionContributor): SourceField[] {
   switch (domain) {
@@ -155,6 +166,10 @@ export function defaultFieldsFor(domain: DataSourceDomain, contributor?: Positio
         : uniq(ALL_CONTRIBUTORS.flatMap((c) => POSITION_TEMPLATES[c].columns));
       return [
         ...uniq(columns).map((c) => field(c, ['id', 'category', 'amount'].includes(c), c === 'id')),
+        // Read by the position importer for liquidity, rate risk and product rules - kept even when a template omits them.
+        ...POSITION_EXTRA_FIELDS.filter((c) => !columns.includes(c)).map((c) =>
+          field(c, false, false, c === 'approxDurationYears' ? 'Number' : undefined),
+        ),
         field('asOfDate'),
         // Optional: which department a row came from (Loans, Deposits, Treasury) - informational only.
         ...(contributor ? [] : [field('department')]),
@@ -566,7 +581,15 @@ export const FIELD_HELP: Record<string, { label: string; usedFor: string }> = {
   value: { label: 'Value', usedFor: 'The indicator reading.' },
   dataType: { label: 'Data type / sheet', usedFor: 'Tells FX, curve and indicator rows apart.' },
   balance: { label: 'Balance', usedFor: 'Behavioural models.' },
-  productCode: { label: 'Product', usedFor: 'Behavioural models by product.' },
+  productCode: { label: 'Product code', usedFor: 'Product rules, behavioural models and profitability by product.' },
+  hqlaLevel: { label: 'HQLA level', usedFor: 'Liquid-asset level for the LCR buffer (Level 1, 2A, 2B).' },
+  hqlaHaircutPct: { label: 'HQLA haircut %', usedFor: 'Haircut applied to the liquid asset in the LCR.' },
+  lcrCashflowRole: { label: 'LCR role', usedFor: 'Whether the position is an LCR inflow, outflow or liquid asset.' },
+  irrbbRateSensitive: { label: 'Rate sensitive', usedFor: 'Included in interest-rate risk (NII and EVE).' },
+  approxDurationYears: {
+    label: 'Approx. duration (years)',
+    usedFor: 'Rate risk where no cash-flow schedule is given.',
+  },
 };
 
 /** "interestRatePct" -> "Interest rate pct" for fields without help text. */
