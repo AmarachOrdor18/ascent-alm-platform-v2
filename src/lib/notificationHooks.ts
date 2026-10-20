@@ -39,6 +39,14 @@ export function useMarkNotificationsRead() {
   });
 }
 
+export function useClearNotifications() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => repository.clearNotifications(ids),
+    onSuccess: () => client.invalidateQueries({ queryKey: notificationKeys.all }),
+  });
+}
+
 export function useSendNotification() {
   const { user } = useAuth();
   const client = useQueryClient();

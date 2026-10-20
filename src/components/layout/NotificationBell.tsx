@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/cn';
-import { useMarkNotificationsRead, useMyNotifications } from '@/lib/notificationHooks';
+import { useClearNotifications, useMarkNotificationsRead, useMyNotifications } from '@/lib/notificationHooks';
 import type { AppNotification } from '@/engine/types';
 
 function ago(iso: string): string {
@@ -21,6 +21,7 @@ export function NotificationBell() {
   const [, navigate] = useLocation();
   const { data: list = [] } = useMyNotifications();
   const markRead = useMarkNotificationsRead();
+  const clear = useClearNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const unread = list.filter((n) => !n.read);
@@ -75,15 +76,27 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full z-50 mt-2 w-96 rounded-xl border border-gray-200 bg-white shadow-xl">
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
             <p className="text-[12px] font-bold uppercase tracking-wider text-gray-400">Notifications</p>
-            {unread.length > 0 && (
-              <button
-                type="button"
-                onClick={() => markRead.mutate(unread.map((n) => n.id))}
-                className="text-[12px] font-bold text-navy-700 hover:underline"
-              >
-                Mark all read
-              </button>
-            )}
+            <span className="flex items-center gap-3">
+              {unread.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => markRead.mutate(unread.map((n) => n.id))}
+                  className="text-[12px] font-bold text-navy-700 hover:underline"
+                >
+                  Mark all read
+                </button>
+              )}
+              {list.length > 0 && (
+                <button
+                  type="button"
+                  disabled={clear.isPending}
+                  onClick={() => clear.mutate(list.map((n) => n.id))}
+                  className="text-[12px] font-bold text-gray-500 hover:text-danger hover:underline disabled:opacity-50"
+                >
+                  {clear.isPending ? 'Clearing…' : 'Clear all'}
+                </button>
+              )}
+            </span>
           </div>
           {list.length === 0 ? (
             <p className="px-4 py-6 text-center text-[13px] text-gray-500">

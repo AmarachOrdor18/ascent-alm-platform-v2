@@ -411,7 +411,10 @@ export class LocalRepository implements Repository {
           // 'Onboarding' included: a new affiliate never passes through 'Testing' unless a Group user
           // moves the status by hand in Affiliate Settings - the welcome readiness flow raises the
           // Activate request straight from 'Onboarding', and approving it must still make it Live.
-          if (affiliate && (affiliate.status === 'Onboarding' || affiliate.status === 'Testing' || affiliate.status === 'Suspended')) {
+          if (
+            affiliate &&
+            (affiliate.status === 'Onboarding' || affiliate.status === 'Testing' || affiliate.status === 'Suspended')
+          ) {
             await this.database.affiliates.put({ ...affiliate, status: 'Live' });
           }
         }
@@ -785,6 +788,10 @@ export class LocalRepository implements Repository {
   async listNotifications(userId: string): Promise<AppNotification[]> {
     const rows = await this.database.notifications.where('userId').equals(userId).toArray();
     return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async clearNotifications(ids: string[]): Promise<void> {
+    await this.database.notifications.bulkDelete(ids);
   }
 
   async markNotificationsRead(ids: string[]): Promise<void> {

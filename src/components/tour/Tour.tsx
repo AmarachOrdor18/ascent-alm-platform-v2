@@ -549,23 +549,26 @@ export function TourLauncher({ className }: { className?: string }) {
           className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl"
         >
           <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-gold-600">Guided tours</p>
-          {tours.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                start(t.id);
-              }}
-              className="block w-full rounded-lg px-3 py-2 text-left hover:bg-gray-50"
-            >
-              <span className="block text-[13px] font-bold text-navy-900">{t.title}</span>
-              <span className="block text-[12px] text-gray-500">
-                {t.description} · {t.steps.length} steps
-              </span>
-            </button>
-          ))}
+          {/* About three tours in view; the rest scroll. */}
+          <div className="max-h-[11.5rem] overflow-y-auto">
+            {tours.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  start(t.id);
+                }}
+                className="block w-full rounded-lg px-3 py-2 text-left hover:bg-gray-50"
+              >
+                <span className="block text-[13px] font-bold text-navy-900">{t.title}</span>
+                <span className="block text-[12px] text-gray-500">
+                  {t.description} · {t.steps.length} steps
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

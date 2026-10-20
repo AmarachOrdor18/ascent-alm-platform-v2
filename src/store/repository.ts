@@ -350,6 +350,8 @@ export interface Repository {
   // In-app notifications (the header bell) - the signed-in user's own, newest first.
   listNotifications(userId: string): Promise<AppNotification[]>;
   markNotificationsRead(ids: string[]): Promise<void>;
+  /** Removes the signed-in user's own notifications (Clear all in the bell). */
+  clearNotifications(ids: string[]): Promise<void>;
   /**
    * Tell the users of a scope that something happened. null = everyone; 'GROUP' = Group-level users; an
    * affiliate code = its users, plus Group-level users unless `groupUsers` is false. The sender is skipped.

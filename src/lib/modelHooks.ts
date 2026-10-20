@@ -3,6 +3,7 @@
  * the "propose as assumption" flow. Proposals save through the ordinary rule save path
  * (useRuleMutations), which raises the maker-checker approval request - nothing here approves anything.
  */
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { repository } from '@/store/repositoryInstance';
 import { useAuth } from '@/context/AuthContext';
@@ -57,20 +58,40 @@ function auditEvent(user: User, action: string, entity: string, entityId: string
 
 // ── History ──────────────────────────────────────────────────────────────
 
+// History only changes on an upload (which refreshes these keys), so it is kept for a while instead of being
+// re-read on every visit - account history runs to thousands of rows.
+const HISTORY_STALE_MS = 10 * 60_000;
+
+const balanceHistoryQuery = (affiliateCode: string) => ({
+  queryKey: modelKeys.balanceHistory(affiliateCode),
+  queryFn: () => repository.listBalanceHistory(affiliateCode),
+  staleTime: HISTORY_STALE_MS,
+});
+const accountHistoryQuery = (affiliateCode: string) => ({
+  queryKey: modelKeys.accountHistory(affiliateCode),
+  queryFn: () => repository.listAccountHistory(affiliateCode),
+  staleTime: HISTORY_STALE_MS,
+});
+
 export function useBalanceHistory(affiliateCode: string | undefined) {
-  return useQuery({
-    queryKey: modelKeys.balanceHistory(affiliateCode ?? ''),
-    queryFn: () => repository.listBalanceHistory(affiliateCode!),
-    enabled: !!affiliateCode,
-  });
+  return useQuery({ ...balanceHistoryQuery(affiliateCode ?? ''), enabled: !!affiliateCode });
 }
 
 export function useAccountHistory(affiliateCode: string | undefined) {
-  return useQuery({
-    queryKey: modelKeys.accountHistory(affiliateCode ?? ''),
-    queryFn: () => repository.listAccountHistory(affiliateCode!),
-    enabled: !!affiliateCode,
-  });
+  return useQuery({ ...accountHistoryQuery(affiliateCode ?? ''), enabled: !!affiliateCode });
+}
+
+/** Starts loading an affiliate's history in the background, so Calibrate opens with it already there. */
+export function usePrefetchHistory(affiliateCode: string | null | undefined) {
+  const client = useQueryClient();
+  useEffect(() => {
+    if (!affiliateCode || affiliateCode === 'GROUP') return;
+    const t = window.setTimeout(() => {
+      void client.prefetchQuery(balanceHistoryQuery(affiliateCode));
+      void client.prefetchQuery(accountHistoryQuery(affiliateCode));
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [client, affiliateCode]);
 }
 
 export interface HistoryUploadInput {

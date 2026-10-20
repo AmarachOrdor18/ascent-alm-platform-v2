@@ -9,6 +9,7 @@ import { NAV_GROUPS, SEARCH_INDEX } from './navigation';
 import { CommandPalette } from './CommandPalette';
 import { RunPill } from './RunPill';
 import { NotificationBell } from './NotificationBell';
+import { usePrefetchHistory } from '@/lib/modelHooks';
 import { TourLauncher, TourProvider } from '@/components/tour/Tour';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -18,6 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, role, hasPermission, logout } = useAuth();
   const { affiliateCode, setAffiliateCode, affiliates, asOfDate, availableDates, setAsOfDate, asOfDateChosen } =
     useScope();
+  usePrefetchHistory(affiliateCode);
 
   // Settings pages are pinned to one affiliate by their own URL (see AffiliateSettings.tsx) and aren't
   // as-of dated - the Scope switcher and "As at" here are for the rest of the app, whose data genuinely

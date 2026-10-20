@@ -818,6 +818,14 @@ export class SupabaseRepository implements Repository {
     return ((data ?? []) as Array<{ data: AppNotification }>).map((r) => r.data);
   }
 
+  async clearNotifications(ids: string[]): Promise<void> {
+    // RLS limits the delete to the signed-in user's own rows.
+    for (const batch of chunks(ids, MAX_IN_LIST)) {
+      const { error } = await this.db.from('notifications').delete().in('id', batch);
+      if (error) throw supabaseError('notifications', 'delete', error);
+    }
+  }
+
   async markNotificationsRead(ids: string[]): Promise<void> {
     for (const id of ids) {
       const row = await this.one<AppNotification>('notifications', 'id', id);
