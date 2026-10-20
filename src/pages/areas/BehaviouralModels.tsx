@@ -404,6 +404,8 @@ export function BehaviouralModels() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {MODEL_TYPES.map((m) => {
                 const has = m.needs === 'Balance' ? balanceRows.length > 0 : accountRows.length > 0;
+                // Until the history has arrived, say so - not "not uploaded".
+                const checking = m.needs === 'Balance' ? loadingBalances : loadingAccounts;
                 return (
                   <button
                     key={m.type}
@@ -420,10 +422,10 @@ export function BehaviouralModels() {
                     <p
                       className={cn(
                         'mt-2 text-[11px] font-bold uppercase tracking-wider',
-                        has ? 'text-success' : 'text-warning',
+                        checking ? 'text-gray-400' : has ? 'text-success' : 'text-warning',
                       )}
                     >
-                      {m.needs} history {has ? 'loaded' : 'not uploaded'}
+                      {checking ? 'Checking history…' : `${m.needs} history ${has ? 'loaded' : 'not uploaded'}`}
                     </p>
                   </button>
                 );

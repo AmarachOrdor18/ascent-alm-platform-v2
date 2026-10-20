@@ -99,17 +99,29 @@ export class SupabaseRepository implements Repository {
   // ── Generic table access ──────────────────────────────────────────────
   /** Every matching record, paged so PostgREST's row cap never truncates a list. */
   private async all<T>(table: string, pk: Pk = 'id', filter?: Filter): Promise<T[]> {
-    const out: T[] = [];
-    for (let from = 0; ; from += PAGE) {
-      let query = this.db.from(table).select('data');
+    const page = async (from: number, withCount: boolean) => {
+      let query = this.db.from(table).select('data', withCount ? { count: 'exact' } : undefined);
       if (filter) query = filter(query);
-      const { data, error } = await query.order(pk, { ascending: true }).range(from, from + PAGE - 1);
+      const { data, error, count } = await query.order(pk, { ascending: true }).range(from, from + PAGE - 1);
       if (error) throw supabaseError(table, 'read', error);
-      const rows = (data ?? []) as Array<{ data: T }>;
-      for (const row of rows) out.push(row.data);
-      if (rows.length < PAGE) break;
+      return { rows: ((data ?? []) as Array<{ data: T }>).map((r) => r.data), count: count ?? null };
+    };
+    // The first page also returns the total, so the rest can be fetched side by side instead of one after
+    // another - a few thousand history rows otherwise took several round trips in a row.
+    const first = await page(0, true);
+    if (first.rows.length < PAGE) return first.rows;
+    if (first.count === null) {
+      const out = [...first.rows];
+      for (let from = PAGE; ; from += PAGE) {
+        const next = await page(from, false);
+        out.push(...next.rows);
+        if (next.rows.length < PAGE) return out;
+      }
     }
-    return out;
+    const starts: number[] = [];
+    for (let from = PAGE; from < first.count; from += PAGE) starts.push(from);
+    const rest = await Promise.all(starts.map((from) => page(from, false)));
+    return [...first.rows, ...rest.flatMap((r) => r.rows)];
   }
 
   private async one<T>(table: string, pk: Pk, key: string): Promise<T | null> {
@@ -214,8 +226,14 @@ export class SupabaseRepository implements Repository {
     return rows;
   }
 
-  insertPositions(positions: Position[]): Promise<void> {
-    return this.put('positions', 'id', positions);
+  // Keyed by batch + position id: the same position id comes back every month-end, and keying by it alone
+  // let each new upload overwrite the earlier month's book (and the runs pinned to it).
+  async insertPositions(positions: Position[]): Promise<void> {
+    for (const batch of chunks(positions)) {
+      const payload = batch.map((p) => ({ id: `${p.batchId}:${p.id}`, data: p }));
+      const { error } = await this.db.from('positions').upsert(payload, { onConflict: 'id' });
+      if (error) throw supabaseError('positions', 'write', error);
+    }
   }
 
   // ── Load batches ──────────────────────────────────────────────────────
