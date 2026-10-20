@@ -972,6 +972,242 @@ const PROFIT_LAYERS: Step[] = [
   ),
 ];
 
+// ─── Validation guide: the Ecobank clarification tests (B1-B7, F1-F4), step by step ─────────────────
+// The card says what to select; the page stays clickable underneath, so the reviewer does each step.
+
+const v = (route: string, selector: string | null, section: string, title: string, body: string): Step =>
+  s(route, selector, title, body, { section, permission: 'risk.view' });
+
+const VALIDATION: Step[] = [
+  v(
+    '/dashboard',
+    sel.tour('scope'),
+    'Set-up',
+    'Scope = Ecobank Nigeria',
+    'Set Scope to Ecobank Nigeria before each test unless a test says otherwise.',
+  ),
+  v(
+    '/dashboard',
+    sel.tour('asof'),
+    'Set-up',
+    'As of = 31/07/2026',
+    'Set the As-of date to 31/07/2026. Every screen follows Scope and As of.',
+  ),
+  // B1
+  v(
+    '/data/operations',
+    'button:Balance history',
+    'B1 · Modelling engine',
+    'Open Balance history',
+    'Click Balance history in the Ecobank Nigeria list, then Coverage for models at the top of the panel.',
+  ),
+  v(
+    '/data/history',
+    sel.tour('page-header'),
+    'B1 · Modelling engine',
+    'Confirm the history',
+    'Confirm DDA · NGN and TD · NGN, 24 month-ends (Aug 2024 - Jul 2026), all Usable. Then change History type to Account history: DDA 118 accounts, TD 80 accounts.',
+  ),
+  v(
+    '/assumptions',
+    'heading:1what to model',
+    'B1 · Modelling engine',
+    'Calibrate',
+    'Wait for the cards to say "history loaded", then click Deposit stability & run-off.',
+  ),
+  v(
+    '/assumptions',
+    'heading:2segment',
+    'B1 · Modelling engine',
+    'Segments',
+    'Segment by = Product and Currency: DDA · NGN and TD · NGN, Usable. Tick Customer type to see four segments, then untick it again.',
+  ),
+  // B2
+  v(
+    '/assumptions',
+    'button:Repricing beta',
+    'B2 · Statistics',
+    'Repricing beta',
+    'Click Repricing beta, then the circle next to DDA · NGN.',
+  ),
+  v(
+    '/assumptions',
+    'heading:3method & options',
+    'B2 · Statistics',
+    'Set the options',
+    'Policy-rate series = CBN_MPR (NG, 25 obs); Lag search = 3; Beta applies to = Non-Core. Leave Back-test at 3 and 0.25.',
+  ),
+  v(
+    '/assumptions',
+    'button:Fit model',
+    'B2 · Statistics',
+    'Fit model',
+    'Click Fit model. Confirm beta, 95% interval, R², RMSE, p-value and standard error. Close (✕) and repeat for TD · NGN.',
+  ),
+  // B3
+  v(
+    '/assumptions',
+    'button:Deposit stability & run-off',
+    'B3 · Core & run-off',
+    'Deposit stability & run-off',
+    'Click the card, then the circle next to DDA · NGN.',
+  ),
+  v(
+    '/assumptions',
+    'heading:3method & options',
+    'B3 · Core & run-off',
+    'Set the options',
+    'Core method = Minimum balance; look-back 12; confidence 99%; Run-off method = Outflow percentile (the book is growing); Outflow confidence 95%; Pattern applies to = Core only; Pattern name empty.',
+  ),
+  v(
+    '/assumptions',
+    'button:Fit model',
+    'B3 · Core & run-off',
+    'Fit model',
+    'Verify core amount and share, run-off rate λ, half-life, stability statistics and the run-off profile. Then try Core method = Volatility.',
+  ),
+  // B4
+  v(
+    '/assumptions',
+    'button:Loan prepayment',
+    'B4 · Prepayment & renewal',
+    'Loan prepayment',
+    'Click the card, select TD · NGN (the only segment with scheduled balances), leave 12 / 3 / 0.005 and Fit model. Confirm SMM, CPR and its 95% interval.',
+  ),
+  v(
+    '/assumptions',
+    'button:Term-deposit renewal',
+    'B4 · Prepayment & renewal',
+    'Term-deposit renewal & early withdrawal',
+    'Close the window, click this card, select TD · NGN (dates fill in), leave Minimum accounts = 12 and Fit model. Confirm renewal and early-withdrawal rates.',
+  ),
+  // B5
+  v(
+    '/assumptions',
+    'heading:4back-test',
+    'B5 · Back-testing',
+    'Back-test',
+    'Fit Repricing beta on DDA · NGN with CBN_MPR, Hold-out 3, Tolerance 0.25: PASS, tested on May-Jul 2026. Click Save to model register. Tolerance 0.01 shows FAIL.',
+  ),
+  v(
+    '/assumptions/models',
+    TABLE,
+    'B5 · Back-testing',
+    'Model register',
+    'The saved model: segment, data window, parameters, statistics, back-test and status Draft.',
+  ),
+  v(
+    '/admin/audit',
+    sel.tour('page-header'),
+    'B5 · Back-testing',
+    'Audit log',
+    'The save is recorded with who and when.',
+  ),
+  // B6
+  v(
+    '/assumptions',
+    'button:Fit model',
+    'B6 · Approved assumptions',
+    'Fit, save, propose',
+    'Fit Deposit stability & run-off as in B3, click Save to model register, then Propose as assumption. Status: Proposed - waiting for approval.',
+  ),
+  v(
+    '/controls',
+    sel.tour('page-header'),
+    'B6 · Approved assumptions',
+    'Approve as the Approver',
+    'Sign out, sign in as the Approver, open Waiting for me, click Review, then Approve. You cannot approve your own change.',
+  ),
+  v(
+    '/execution',
+    sel.tour('preflight'),
+    'B6 · Approved assumptions',
+    'Run 31 Aug',
+    'Back as the Organisation Admin, set As of = 31/08/2026. If signed off: Reopen…, type a reason, Reopen. Then Full ALCO Pack → Execute run.',
+  ),
+  v(
+    '/risk/irrbb/behavioural-analysis',
+    'heading:Patterns this run applied',
+    'B6 · Approved assumptions',
+    'Patterns this run applied',
+    'Names the version just approved - the gap, NII & EVE, FTP and stress all use it.',
+  ),
+  // F1
+  v(
+    '/assumptions/rules',
+    sel.section('Transfer pricing'),
+    'F1 · FTP engine',
+    'FTP rules',
+    'Open FTP method & curve → Group FTP - Matched maturity: method and curve per product class, funding pools. Then FTP add-ons → Group FTP add-ons: +25 bps loans, +15 bps deposits, +40 bps USD.',
+  ),
+  v(
+    '/treasury/ftp',
+    'heading:Transfer rate detail',
+    'F1 · FTP engine',
+    'Transfer rate detail',
+    'Set As of = 31/07/2026. Click the arrow on Loans - Corporate Term Loan: method, base curve, liquidity premium, all-in rate.',
+  ),
+  v(
+    '/treasury/ftp',
+    'heading:Compare methods',
+    'F1 · FTP engine',
+    'Compare methods',
+    'Pick a product: matched maturity, duration, average life, repricing term and pooled side by side.',
+  ),
+  // F2
+  v(
+    '/treasury/ftp',
+    sel.tour('run-strip'),
+    'F2 · Aggregation',
+    'Group consolidated',
+    'Set Scope = Ecobank Group (Consolidated): "Group consolidated · 2 affiliates". Click Combines 2 affiliate runs to see each run used.',
+  ),
+  v(
+    '/treasury/ftp',
+    'heading:FTP margin drill-down',
+    'F2 · Aggregation',
+    'Drill down',
+    'Click an affiliate, a business unit, then a product - the margins add up at every level.',
+  ),
+  // F3
+  v(
+    '/rules/prepayment',
+    'button:New prepayment rule',
+    'F3 · One set of cashflows',
+    'Prepayment rule',
+    'New prepayment rule → Add class assumption: COA-14, Annual CPR 8 → Create. The Approver approves it, then run 31 Aug (Full ALCO Pack).',
+  ),
+  v(
+    '/execution/history',
+    TABLE,
+    'F3 · One set of cashflows',
+    'Compare versions',
+    'Use the Run drop-down on Maturity & repricing gap, Transfer pricing and NII & EVE - all three move together.',
+  ),
+  // F4
+  v(
+    '/treasury/ftp/profitability',
+    'heading:Fully-loaded profitability',
+    'F4 · Profitability',
+    'Fully-loaded profitability',
+    'Scope = Ecobank Nigeria, As of = 31/07/2026. The waterfall: NII, FTP, opex, ECL, capital charge, risk-adjusted profit, RAROC.',
+  ),
+  v(
+    '/treasury/ftp/profitability',
+    'button:Customer view',
+    'F4 · Profitability',
+    'Customer view',
+    'Customers ranked by risk-adjusted profit - click a bar for that customer’s layers. Product view drills to business units and products.',
+  ),
+  v(
+    '/treasury/ftp/profitability',
+    'heading:Cost pool reconciliation',
+    'F4 · Profitability',
+    'Cost pools',
+    'Staff, technology and premises pools fully allocated - ₦0 residual.',
+  ),
+];
+
 // ─── Tours ─────────────────────────────────────────────────────────────────
 
 const welcome = (title: string, body: string): Step => s('/dashboard', null, title, body, { section: 'Welcome' });
@@ -1006,6 +1242,12 @@ const GETTING_STARTED: Step[] = [
 ];
 
 const MODULES: { id: string; title: string; description: string; steps: Step[] }[] = [
+  {
+    id: 'validation',
+    title: 'Validation guide',
+    description: 'The behavioural modelling and FTP tests (B1-B7, F1-F4), step by step',
+    steps: VALIDATION,
+  },
   {
     id: 'setup',
     title: 'Organisation',
