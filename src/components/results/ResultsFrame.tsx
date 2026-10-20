@@ -147,7 +147,8 @@ export function ResultsFrame({
   allRuns = available,
   official = null,
   isOfficial = true,
-  onSelect,
+  // Versions are switched from the Run box in the top bar.
+  onSelect: _onSelect,
   onSelectOfficial,
   isLoading,
   isStale,
@@ -207,8 +208,6 @@ export function ResultsFrame({
   const consolidated = isConsolidatedRun(run);
   const version = versionOf(run, allRuns);
   const status = signOffStatusOf(run);
-  const versionLabel = (r: ProcessRun) =>
-    `${formatDate(r.asOfDate)} · v${versionOf(r, allRuns)} · ${SIGN_OFF_LABEL[signOffStatusOf(r)]}${r.id === official?.run.id ? ' (official)' : ''}`;
 
   return (
     <>
@@ -216,72 +215,37 @@ export function ResultsFrame({
         data-tour="run-strip"
         className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white px-5 py-3 shadow-sm"
       >
+        {/* Affiliate, date, version and sign-off are in the Run box in the top bar (which also switches
+            versions) - this strip only adds what that box does not say. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-500">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Reading from</span>
-          <span className="font-bold text-navy-900">{run.name}</span>
-          <span aria-hidden="true">·</span>
-          <span className="font-mono">{formatDate(run.asOfDate)}</span>
-          {!consolidated && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono font-bold text-navy-900">v{version}</span>
-            </>
-          )}
-          <span aria-hidden="true">·</span>
-          <span className="font-mono">{run.reportingCurrency}</span>
-          <span aria-hidden="true">·</span>
-          <span>{run.processType}</span>
           {consolidated ? (
-            <button
-              type="button"
-              onClick={() => setShowSources((v) => !v)}
-              aria-expanded={showSources}
-              className="rounded-full border border-navy-700/20 bg-navy-50 px-2.5 py-0.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
-            >
-              Combines {groupSources.length} affiliate run{groupSources.length === 1 ? '' : 's'}{' '}
-              {showSources ? '▴' : '▾'}
-            </button>
+            <>
+              <span className="font-bold text-navy-900">{run.name}</span>
+              <button
+                type="button"
+                onClick={() => setShowSources((v) => !v)}
+                aria-expanded={showSources}
+                className="rounded-full border border-navy-700/20 bg-navy-50 px-2.5 py-0.5 text-[11px] font-bold text-navy-900 hover:border-navy-700"
+              >
+                Combines {groupSources.length} affiliate run{groupSources.length === 1 ? '' : 's'}{' '}
+                {showSources ? '▴' : '▾'}
+              </button>
+            </>
           ) : (
-            <StatusBadge
-              status={status === 'SignedOff' ? 'Signed off ✓' : SIGN_OFF_LABEL[status]}
-              tone={SIGN_OFF_TONE[status]}
-            />
+            <span>
+              Figures from the run in the top bar{run.processType !== 'Static' ? ` · ${run.processType}` : ''}
+            </span>
           )}
           {isStale && <StatusBadge status="Superseded data" tone="warning" />}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowLineage((v) => !v)}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-bold text-navy-900 hover:border-navy-700"
-          >
-            {showLineage ? 'Hide source data' : 'Source data'}
-          </button>
-          {available.length > 1 && (
-            <>
-              <label
-                htmlFor="run-select"
-                className="text-[12px] text-gray-500"
-                title="Which run version to show, within the scope selected above. The official version is the default."
-              >
-                Run
-              </label>
-              <select
-                id="run-select"
-                value={run.id}
-                onChange={(e) => onSelect(e.target.value)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] focus:border-navy-700 focus:outline-none"
-              >
-                {available.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {versionLabel(r)}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowLineage((v) => !v)}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-bold text-navy-900 hover:border-navy-700"
+        >
+          {showLineage ? 'Hide source data' : 'Source data'}
+        </button>
       </div>
 
       {consolidated && showSources && <ConsolidationSources sources={groupSources} />}

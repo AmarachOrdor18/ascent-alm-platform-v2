@@ -55,7 +55,15 @@ export function HomeReadinessStrip() {
       ) : readiness ? (
         <span className="flex items-center gap-2 text-[13px] text-gray-600">
           <VerdictBadge verdict={readiness.verdict} />
-          {readiness.blockers.length > 0 && <span>{readiness.blockers.map((b) => b.label).join(', ')}</span>}
+          {/* "Signed off" is the verdict itself - list only the other blockers next to it. */}
+          {readiness.blockers.some((b) => b.key !== 'series') && (
+            <span>
+              {readiness.blockers
+                .filter((b) => b.key !== 'series')
+                .map((b) => b.label)
+                .join(', ')}
+            </span>
+          )}
         </span>
       ) : (
         <span className="text-[13px] text-gray-400">Checking…</span>

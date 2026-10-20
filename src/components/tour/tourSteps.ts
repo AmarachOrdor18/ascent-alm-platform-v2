@@ -1196,7 +1196,7 @@ const VALIDATION: Step[] = [
     TABLE,
     'F3 · One set of cashflows',
     'Compare versions',
-    'You are on Run & results → Run → Runs. Then use the Run drop-down on Maturity & repricing gap, Transfer pricing and NII & EVE - all three move together.',
+    'You are on Run & results → Run → Runs. Then click the Run box in the top bar to switch between the old and new version on Maturity & repricing gap, Transfer pricing and NII & EVE - all three move together.',
   ),
   // F4
   v(

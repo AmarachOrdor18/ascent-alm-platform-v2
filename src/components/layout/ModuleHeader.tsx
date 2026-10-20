@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import { formatAsAt } from '@/lib/format';
 import type { CurrencyCode, IsoDate } from '@/engine/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { InfoButton } from '@/components/ui/InfoButton';
@@ -41,9 +40,10 @@ export function ModuleHeader({
   title,
   description,
   about,
-  asOfDate,
+  // Shown in the top bar now; still accepted so callers need not change.
+  asOfDate: _asOfDate,
   currency,
-  scope,
+  scope: _scope,
   staleWarning,
   warningLabel = 'Stale data',
   metrics,
@@ -65,23 +65,10 @@ export function ModuleHeader({
             )}
           </h1>
 
-          {(asOfDate || scope || currency) && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-500">
-              {asOfDate && <span className="font-bold text-navy-700">{formatAsAt(asOfDate)}</span>}
-              {scope && (
-                <>
-                  {asOfDate && <span aria-hidden="true">·</span>}
-                  <span>{scope}</span>
-                </>
-              )}
-              {currency && (
-                <>
-                  {(asOfDate || scope) && <span aria-hidden="true">·</span>}
-                  <span>
-                    Stated in <span className="font-mono">{currency}</span>
-                  </span>
-                </>
-              )}
+          {/* Date and scope are in the top bar; only the currency is added here. */}
+          {currency && (
+            <div className="mt-2 text-[12px] text-gray-500">
+              Stated in <span className="font-mono">{currency}</span>
             </div>
           )}
         </div>
