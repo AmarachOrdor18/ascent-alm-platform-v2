@@ -125,6 +125,12 @@ export interface CheckEnv {
   userName: string;
 }
 
+/** Another department's positions file picked in the same upload, for the same affiliate and date. */
+export interface UploadCompanion {
+  contributor: DataSource['contributor'];
+  positions: Position[];
+}
+
 export const blockingCount = (c: FileCheck) => c.issues.filter((i) => i.blocking).length;
 
 /** Nothing stops it going to the lobby: the file was read, it is not a repeat, and it has rows to load. */
@@ -223,8 +229,14 @@ async function validateForSource(
   affiliate: Affiliate,
   asOfDate: string,
   env: CheckEnv,
+  companions: UploadCompanion[] = [],
 ): Promise<ValidationResult> {
   const contributor = source.contributor;
+  // Other departments' files in the same upload stand in for their stored loads - checking each file only
+  // against what is already admitted would fail the balance sheet whenever the book is loaded together.
+  const fromUpload = new Map(
+    companions.filter((c) => c.contributor && c.contributor !== contributor).map((c) => [c.contributor!, c.positions]),
+  );
   // A source with no department carries the whole book, so the balance-sheet identity is checked on the file itself.
   if (!contributor) {
     return validatePositions(
@@ -237,11 +249,11 @@ async function validateForSource(
   const required = affiliate.requiredContributors ?? ALL_CONTRIBUTORS;
   const complete = required
     .filter((c) => c !== contributor)
-    .every((c) => currentBatch(env.batches, affiliate.code, 'Positions', asOfDate, c) !== null);
+    .every((c) => fromUpload.has(c) || currentBatch(env.batches, affiliate.code, 'Positions', asOfDate, c) !== null);
   let balance: Position[] = [];
   if (complete) {
     const others = new Set(
-      ALL_CONTRIBUTORS.filter((c) => c !== contributor)
+      ALL_CONTRIBUTORS.filter((c) => c !== contributor && !fromUpload.has(c))
         .map((c) => currentBatch(env.batches, affiliate.code, 'Positions', asOfDate, c))
         .filter((b): b is LoadBatch => b !== null)
         .map((b) => b.id),
@@ -250,7 +262,7 @@ async function validateForSource(
       others.size > 0
         ? await repository.queryPositions({ affiliateCode: affiliate.code, asOfDate, batchIds: [...others] })
         : [];
-    balance = [...existing, ...positions];
+    balance = [...existing, ...[...fromUpload.values()].flat(), ...positions];
   }
   return validatePositions(
     positions,
@@ -266,7 +278,7 @@ export async function checkFile(
   fileName: string,
   rawText: string,
   env: CheckEnv,
-  options: { asOfDate?: string; defaultAsOfDate?: string } = {},
+  options: { asOfDate?: string; defaultAsOfDate?: string; companions?: UploadCompanion[] } = {},
 ): Promise<FileCheck> {
   const affiliate = env.affiliates.find((a) => a.code === source.affiliateCode) ?? null;
   const checksum = await contentChecksum(rawText);
@@ -388,6 +400,9 @@ export async function checkFile(
     return {
       ...base,
       ...partial,
+      // Reloading the same file to replace the load it matches (same source, same date) is a reload, not a
+      // double count - the old load is withdrawn on admit, and a reason is still required.
+      duplicateOf: partial.replaces && base.duplicateOf?.id === partial.replaces.id ? null : base.duplicateOf,
       invalid,
       duplicates,
       valid: Math.max(0, partial.accepted - (partial.dropped ? 0 : invalid) - duplicates),
@@ -414,7 +429,7 @@ export async function checkFile(
       });
       const codeRules = applicableCodeMappings(env.codeMappings, source.affiliateCode);
       const positions = applyCodeMappings(result.rows, codeRules);
-      const validation = await validateForSource(positions, source, affiliate!, asOfDate, env);
+      const validation = await validateForSource(positions, source, affiliate!, asOfDate, env, options.companions);
       const unmapped = await findUnmapped(positions, source.affiliateCode);
       const plan = planSupersede(env.batches, source.affiliateCode, 'Positions', asOfDate, source.contributor);
       const issues: CheckIssue[] = [

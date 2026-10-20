@@ -19,6 +19,7 @@ import {
   type DerivedSummary,
   type FileCheck,
   type ReconciliationSummary,
+  type UploadCompanion,
 } from '@/lib/sourceIngest';
 import { sourceForLoad, useAdmitLoad, useCanMapColumns, useCheckEnv, useSendToLobby } from '@/lib/sourceHooks';
 import { repository } from '@/store/repositoryInstance';
@@ -123,7 +124,7 @@ export function UploadDataModal({
   // A mapping saved in this drawer applies straight away, before the sources list refetches.
   const savedSources = useRef<Record<string, DataSource>>({});
 
-  const runCheck = async (f: PickedFile): Promise<PickedFile> => {
+  const checkOne = async (f: PickedFile, companions: UploadCompanion[] = []): Promise<PickedFile> => {
     const source = f.sourceId
       ? (savedSources.current[f.sourceId] ?? uploadable.find((s) => s.id === f.sourceId))
       : undefined;
@@ -131,9 +132,38 @@ export function UploadDataModal({
     const check = await checkFile(source, f.fileName, f.rawText, env, {
       asOfDate: workingDate ?? undefined,
       defaultAsOfDate: scopeDate ?? undefined,
+      companions,
     });
     return { ...f, check, checking: false };
   };
+
+  /**
+   * Checks `targets`, then re-checks each positions file with the other departments' files picked alongside it
+   * (same affiliate and date), so a book uploaded together is balanced together.
+   */
+  const runChecks = async (targets: PickedFile[], everyone: PickedFile[]): Promise<PickedFile[]> => {
+    const first = await Promise.all(targets.map((f) => checkOne(f)));
+    const latest = everyone.map((f) => first.find((c) => c.key === f.key) ?? f);
+    return Promise.all(
+      first.map((f) => {
+        const c = f.check;
+        if (!c || c.source.domain !== 'Positions') return f;
+        const companions = latest
+          .filter(
+            (o) =>
+              o.key !== f.key &&
+              !o.outcome &&
+              o.check?.source.domain === 'Positions' &&
+              o.check.source.affiliateCode === c.source.affiliateCode &&
+              o.check.asOfDate === c.asOfDate &&
+              o.check.source.contributor !== c.source.contributor,
+          )
+          .map((o) => ({ contributor: o.check!.source.contributor, positions: o.check!.positions }));
+        return companions.length > 0 ? checkOne(f, companions) : f;
+      }),
+    );
+  };
+  const runCheck = async (f: PickedFile): Promise<PickedFile> => (await runChecks([f], files))[0]!;
 
   const update = (key: string, patch: Partial<PickedFile>) =>
     setFiles((prev) => prev.map((f) => (f.key === key ? { ...f, ...patch } : f)));
@@ -151,9 +181,10 @@ export function UploadDataModal({
   const envKey = `${env.batches.length}:${env.lobby.length}`;
   useEffect(() => {
     if (files.length === 0) return;
-    void Promise.all(files.filter((f) => !f.outcome).map(runCheck)).then((checked) =>
-      setFiles((prev) => prev.map((f) => checked.find((c) => c.key === f.key) ?? f)),
-    );
+    void runChecks(
+      files.filter((f) => !f.outcome),
+      files,
+    ).then((checked) => setFiles((prev) => prev.map((f) => checked.find((c) => c.key === f.key) ?? f)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when the stored loads change
   }, [envKey]);
 
@@ -196,7 +227,12 @@ export function UploadDataModal({
       });
     }
     setFiles((prev) => [...prev, ...picked]);
-    const checked = await Promise.all(picked.map(runCheck));
+    // Files already in the window are re-checked too - a new department's file can complete their book.
+    const everyone = [...files, ...picked];
+    const checked = await runChecks(
+      everyone.filter((f) => !f.outcome && (picked.includes(f) || f.check?.source.domain === 'Positions')),
+      everyone,
+    );
     setFiles((prev) => prev.map((f) => checked.find((c) => c.key === f.key) ?? f));
     if (inputRef.current) inputRef.current.value = '';
   };
@@ -219,7 +255,7 @@ export function UploadDataModal({
   useEffect(() => {
     const open = files.filter((f) => !f.outcome && f.sourceId && !f.readError);
     if (open.length === 0) return;
-    void Promise.all(open.map(runCheck)).then((checked) =>
+    void runChecks(open, files).then((checked) =>
       setFiles((prev) => prev.map((f) => checked.find((c) => c.key === f.key) ?? f)),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-check only when the date changes
