@@ -315,6 +315,8 @@ export function ProcessRun() {
     [elements, unapprovedRules.join('|'), unapprovedScenarios.join('|'), processType, newBusinessId],
   );
   const { readiness } = useReadiness(affiliate?.code ?? null, effectiveDate || null, selection);
+  // The banner above the pre-flight explains a locked date (with Reopen…); the checklist keeps the rest.
+  const otherBlockers = (readiness?.blockers ?? []).filter((b) => !(seriesLock && lockedLatest && b.key === 'series'));
   const blockers: string[] = !affiliate
     ? ['No affiliate selected.']
     : readiness
@@ -450,12 +452,21 @@ export function ProcessRun() {
       {seriesLock && lockedLatest && (
         <div className="mb-6 rounded-lg border border-navy-700/20 bg-navy-50 px-4 py-3 text-[13px] leading-relaxed text-navy-900">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span>
-              <span className="font-bold">{seriesLock}</span>{' '}
-              {signOffStatusOf(lockedLatest) === 'SignedOff'
-                ? 'Reopening keeps the signed-off figures frozen and on record; the next run becomes a new version.'
-                : 'See Approvals for the pending request.'}
-            </span>
+            {signOffStatusOf(lockedLatest) === 'SignedOff' ? (
+              <span>
+                <span className="font-bold">
+                  {formatDate(lockedLatest.asOfDate)} is signed off (v{versionOf(lockedLatest, scopeRuns)}
+                  {lockedLatest.signOff?.signedOffBy ? `, by ${lockedLatest.signOff.signedOffBy}` : ''}) - its figures
+                  are final.
+                </span>{' '}
+                To run this date again, reopen it: the signed-off version stays on record and the new run becomes the
+                next version.
+              </span>
+            ) : (
+              <span>
+                <span className="font-bold">{seriesLock}</span> See Approvals for the pending request.
+              </span>
+            )}
             <span className="flex gap-2">
               {signOffStatusOf(lockedLatest) === 'SignedOff' && (
                 <button
@@ -536,6 +547,7 @@ export function ProcessRun() {
           )}
         </div>
         {currentSeries?.latest &&
+          !(seriesLock && lockedLatest) &&
           (() => {
             // Sign-off status of this date's latest version, linking to its request while it waits.
             const latest = currentSeries.latest;
@@ -572,11 +584,19 @@ export function ProcessRun() {
             );
           })()}
         {!readiness && blockers.length > 0 && <p className="mt-2 text-[13px] text-danger">{blockers[0]}</p>}
-        {readiness && readiness.blockers.length > 0 && (
+        {readiness && otherBlockers.length > 0 && (
           <div role="alert" className="mt-3 rounded-lg bg-danger-bg px-4 py-2">
             <p className="text-[13px] font-bold text-danger">Cannot run yet.</p>
-            <ReadinessChecklist readiness={{ ...readiness, items: readiness.blockers }} />
+            <ReadinessChecklist readiness={{ ...readiness, items: otherBlockers }} />
           </div>
+        )}
+        {readiness && otherBlockers.length === 0 && seriesLock && lockedLatest && (
+          <p className="mt-2 text-[12px] text-gray-600">
+            Everything else is ready -{' '}
+            {signOffStatusOf(lockedLatest) === 'SignedOff'
+              ? 'reopen the date above to run it again.'
+              : 'the run can start once the pending sign-off is decided.'}
+          </p>
         )}
         {readiness && showPreflight && readiness.warnings.length > 0 && (
           <div className="mt-3 border-t border-gray-100 pt-3">
