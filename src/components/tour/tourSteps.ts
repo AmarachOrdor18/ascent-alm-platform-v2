@@ -65,7 +65,7 @@ const SHELL: Step[] = [
     '/dashboard',
     sel.tour('help'),
     'Replay or pick a tour',
-    'Click ? any time to replay this tour, or take a deeper tour of one module.',
+    'Click Guided tour (top left) any time to replay this tour, or take a deeper tour of one module.',
   ),
   s(
     '/dashboard',
@@ -1252,7 +1252,7 @@ const GETTING_STARTED: Step[] = [
   APPROVALS[0]!,
   APPROVALS[1]!,
   REPORT_PACKS[0]!,
-  finish('Click ? any time to replay this, or take a short tour of one area.'),
+  finish('Click Guided tour (top left) any time to replay this, or take a short tour of one area.'),
 ];
 
 const MODULES: { id: string; title: string; description: string; steps: Step[] }[] = [

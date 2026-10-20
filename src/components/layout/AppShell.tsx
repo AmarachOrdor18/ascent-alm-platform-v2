@@ -283,7 +283,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
-            <TourLauncher className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-[14px] font-bold text-navy-900 hover:border-navy-700" />
+            <TourLauncher className="flex h-8 items-center gap-1.5 rounded-full border border-gray-200 px-3 text-[12px] font-bold text-navy-900 hover:border-navy-700" />
             {!onSettingsPage && (
               <div className="ml-auto flex items-center gap-6">
                 <div data-tour="scope" className="flex items-center gap-2">
